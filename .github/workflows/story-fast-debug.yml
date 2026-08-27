@@ -1,0 +1,101 @@
+name: Story Fast Debug
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+    paths:
+      - .github/workflows/story-fast-debug.yml
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feat/story-runtime-foundation
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Inject fallback
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
+          EOF
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Static analysis
+        run: dart analyze --fatal-infos lib test
+
+      - name: Build universal Android debug APK
+        run: flutter build apk --debug
+
+      - name: Verify debug APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$apksigner"
+          "$apksigner" verify --verbose build/app/outputs/flutter-apk/app-debug.apk
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | tr -d ' ')"
+          SHORT_SHA="$(git rev-parse --short=8 HEAD)"
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-debug.apk "dist/Kelivo_${VERSION}_Story_TEST_${SHORT_SHA}_universal-debug.apk"
+          sha256sum dist/*.apk > dist/SHA256SUMS.txt
+          printf 'commit=%s\nversion=%s\nsigning=android-debug\nvalidation=static-analysis+apk-signature\n' \
+            "$(git rev-parse HEAD)" "$VERSION" > dist/BUILD_INFO.txt
+
+      - name: Publish prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | tr -d ' ')"
+          VERSION_NAME="${VERSION%%+*}"
+          SHORT_SHA="$(git rev-parse --short=8 HEAD)"
+          TAG="story-test-v${VERSION_NAME}-${SHORT_SHA}"
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$(git rev-parse HEAD)" \
+            --title "Kelivo Story Runtime TEST ${VERSION} (${SHORT_SHA})" \
+            --notes "Installable Android debug-signed test build for Story Runtime functional testing. Static analysis and APK signature verification passed before publishing. Full non-baseline regression suite continues independently." \
+            --prerelease
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: story-fast-debug
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
