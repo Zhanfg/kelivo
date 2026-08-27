@@ -1,6 +1,7 @@
 import '../../../core/database/business_preferences.dart';
 import '../../../core/models/chat_message.dart';
 import '../models/story_runtime_models.dart';
+import '../parsing/story_message_event_store.dart';
 import '../parsing/story_response_parser.dart';
 import '../state/story_runtime_machine.dart';
 import '../state/story_runtime_store.dart';
@@ -10,13 +11,23 @@ import '../world_tree/story_world_tree_coordinator.dart';
 import '../world_tree/story_world_tree_projection.dart';
 import '../world_tree/story_world_tree_store.dart';
 
+final class StoryFinalizedCommitResult {
+  const StoryFinalizedCommitResult({
+    required this.structured,
+    this.visibleText,
+  });
+
+  final bool structured;
+  final String? visibleText;
+}
+
 /// Commits a successfully finalized native Kelivo assistant reply into Story
 /// sidecar state without changing Kelivo's ChatMessage schema.
 ///
-/// Structured v1 Story responses are parsed and reduced into Scene Runtime. A
-/// provider that returns plain prose or malformed Story JSON is treated as a
-/// compatibility fallback: the turn still commits and remains readable, while
-/// machine state simply receives no event-derived patch for that reply.
+/// Structured Story responses keep normal reader-visible Markdown in the
+/// native message and append a hidden event trailer. The trailer is parsed into
+/// sidecar state; callers may then replace ChatMessage.content with [visibleText].
+/// Plain prose or malformed trailers remain readable compatibility fallbacks.
 final class StoryRuntimeCommitService {
   StoryRuntimeCommitService(BusinessPreferences preferences)
     : this.withRepositories(
@@ -24,6 +35,7 @@ final class StoryRuntimeCommitService {
         executionStore: StoryRuntimeExecutionStore(preferences),
         worldTreeStore: StoryWorldTreeStore(preferences),
         sceneRuntimeStore: StorySceneRuntimeStore(preferences),
+        messageEventStore: StoryMessageEventStore(preferences),
       );
 
   StoryRuntimeCommitService.withRepositories({
@@ -31,23 +43,20 @@ final class StoryRuntimeCommitService {
     required StoryRuntimeExecutionRepository executionStore,
     required StoryWorldTreeRepository worldTreeStore,
     StorySceneRuntimeRepository? sceneRuntimeStore,
+    StoryMessageEventStore? messageEventStore,
   }) : _sessionStore = sessionStore,
        _executionStore = executionStore,
        _worldTreeStore = worldTreeStore,
-       _sceneRuntimeStore = sceneRuntimeStore;
+       _sceneRuntimeStore = sceneRuntimeStore,
+       _messageEventStore = messageEventStore;
 
   final StoryRuntimeSessionRepository _sessionStore;
   final StoryRuntimeExecutionRepository _executionStore;
   final StoryWorldTreeRepository _worldTreeStore;
   final StorySceneRuntimeRepository? _sceneRuntimeStore;
+  final StoryMessageEventStore? _messageEventStore;
 
   /// Recovery-safe bridge for the current Kelivo lifecycle.
-  ///
-  /// The request path records the streaming assistant placeholder id in
-  /// [StoryRuntimeExecutionState.currentTurnId]. On the next Story request the
-  /// same id is present as a non-streaming persisted message after a successful
-  /// finalize. This lets us close the previous Story transaction without
-  /// guessing which historical assistant message belongs to it.
   Future<void> commitPendingFinalizedTurn(List<ChatMessage> messages) async {
     if (messages.isEmpty) return;
     final conversationId = messages.last.conversationId.trim();
@@ -65,9 +74,6 @@ final class StoryRuntimeCommitService {
     for (final message in messages.reversed) {
       if (message.id != turnId) continue;
       if (message.role != 'assistant' || message.isStreaming) return;
-      // Successful _finishStreaming always persists durationMs. The error path
-      // deliberately does not, so a failed/cancelled generation cannot be
-      // mistaken for a completed Story turn during recovery.
       if (message.durationMs == null) return;
       finalized = message;
       break;
@@ -76,22 +82,25 @@ final class StoryRuntimeCommitService {
     await commitAssistantMessage(finalized);
   }
 
-  Future<void> commitAssistantMessage(ChatMessage message) async {
+  Future<StoryFinalizedCommitResult?> commitAssistantMessage(
+    ChatMessage message,
+  ) async {
     final conversationId = message.conversationId.trim();
-    if (conversationId.isEmpty || message.role != 'assistant') return;
+    if (conversationId.isEmpty || message.role != 'assistant') return null;
 
     final session = await _sessionStore.readOrDefault(conversationId);
-    if (!session.enabled) return;
+    if (!session.enabled) return null;
 
     final machine = StoryRuntimeStateMachine(_executionStore);
     var execution = await _executionStore.readOrDefault(conversationId);
 
-    // Finalization callbacks can be replayed during UI/controller recovery.
-    // Once this exact assistant revision reached awaitingUser, committing it a
-    // second time would only create artificial World Tree/session revisions.
     if (execution.phase == StoryRuntimePhase.awaitingUser &&
         execution.currentTurnId == message.id) {
-      return;
+      final existing = await _messageEventStore?.readForMessage(message.id);
+      return StoryFinalizedCommitResult(
+        structured: existing != null,
+        visibleText: _visibleTextIfTrailerPresent(message.content),
+      );
     }
 
     try {
@@ -115,19 +124,32 @@ final class StoryRuntimeCommitService {
         );
       }
 
+      StoryParsedResponse? parsed;
       StoryTurn? parsedTurn;
       if (execution.phase == StoryRuntimePhase.parsing ||
           execution.phase == StoryRuntimePhase.applying) {
         try {
-          parsedTurn = const StoryResponseParser().parse(
+          parsed = const StoryResponseParser().parseEmbedded(
             message.content,
             turnId: message.id,
           );
+          parsedTurn = parsed.turn;
+          final eventStore = _messageEventStore;
+          if (eventStore != null) {
+            await eventStore.upsertRecord(
+              StoryMessageEventRecord(
+                conversationId: conversationId,
+                messageId: message.id,
+                turn: parsedTurn,
+                updatedAt: DateTime.now().toUtc(),
+              ),
+            );
+          }
         } on StoryResponseParseException {
-          // Compatibility fallback: the native assistant message remains the
-          // readable source of truth, but carries no structured state update.
+          parsed = null;
           parsedTurn = null;
         } on FormatException {
+          parsed = null;
           parsedTurn = null;
         }
       }
@@ -190,9 +212,23 @@ final class StoryRuntimeCommitService {
         currentTurnId: message.id,
         memoryVersion: committedTree.memoryVersion,
       );
+      return StoryFinalizedCommitResult(
+        structured: parsedTurn != null,
+        visibleText: parsed?.visibleText,
+      );
     } catch (error) {
       await machine.fail(conversationId: conversationId, error: error);
       rethrow;
     }
+  }
+}
+
+String? _visibleTextIfTrailerPresent(String content) {
+  try {
+    return const StoryResponseParser()
+        .parseEmbedded(content, turnId: 'recovery')
+        .visibleText;
+  } on Object {
+    return null;
   }
 }
