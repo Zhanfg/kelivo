@@ -134,6 +134,7 @@ extension StoryResolvedSkillPromptProjection on StoryResolvedSkillCapabilities {
     required String epochId,
     required String sceneEpochId,
     required String worldlineId,
+    Iterable<String> referenceProfileFingerprints = const <String>[],
     String? mcpProfileId,
     String? worldBookSnapshotId,
     String? toolSchemaFingerprint,
@@ -145,6 +146,7 @@ extension StoryResolvedSkillPromptProjection on StoryResolvedSkillCapabilities {
       activeSkillIds: [
         for (final skill in activeSkills) '${skill.id}@${skill.version}',
       ],
+      referenceProfileFingerprints: referenceProfileFingerprints,
       toolIds: toolIds,
       mcpProfileId: mcpProfileId,
       worldBookSnapshotId: worldBookSnapshotId,
