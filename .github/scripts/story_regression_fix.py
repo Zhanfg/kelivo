@@ -1,33 +1,15 @@
 from pathlib import Path
 
 
-def replace_once(path: str, old: str, new: str) -> None:
-    file = Path(path)
-    text = file.read_text()
-    count = text.count(old)
-    if count != 1:
-        raise SystemExit(f"{path}: expected one match, got {count}")
-    file.write_text(text.replace(old, new))
-
-
-message_path = "lib/features/home/services/message_generation_service.dart"
-old_story = """    StoryBreakArmorMode(
-            contextProvider.read<BusinessPreferences>(),
-          )
-          .prependToSystemPrompt(apiMessages);
-
-    final storyConversationId = (currentConversation?.id ?? '').trim();
-    final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();
-    if (storyConversationId.isNotEmpty && storyAssistantId.isNotEmpty) {
-      final storyPrompt = await StoryMvpPromptService(
-        contextProvider.read<BusinessPreferences>(),
-      ).build(
-        conversationId: storyConversationId,
-        assistantId: storyAssistantId,
-      );
-      _injectStoryMvpSystemPrompt(apiMessages, storyPrompt);
-    }
-"""
+message_path = Path("lib/features/home/services/message_generation_service.dart")
+message_text = message_path.read_text()
+start_marker = "    StoryBreakArmorMode("
+end_marker = "      _injectStoryMvpSystemPrompt(apiMessages, storyPrompt);\n    }\n"
+start = message_text.find(start_marker)
+end_start = message_text.find(end_marker, start)
+if start < 0 or end_start < 0:
+    raise SystemExit("message_generation_service.dart: Story injection block not found")
+end = end_start + len(end_marker)
 new_story = """    BusinessPreferences? storyPreferences;
     try {
       storyPreferences = contextProvider.read<BusinessPreferences>();
@@ -50,7 +32,7 @@ new_story = """    BusinessPreferences? storyPreferences;
       }
     }
 """
-replace_once(message_path, old_story, new_story)
+message_path.write_text(message_text[:start] + new_story + message_text[end:])
 
 for path in [
     "test/core/services/backup/restore_bundle_mover_test.dart",
