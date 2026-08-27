@@ -4,12 +4,23 @@ import '../cache/story_prompt_cache_plan.dart';
 ///
 /// Keep this text frozen within a protocol version. Dynamic scene, memory,
 /// character and presentation data belongs in later cache classes, not here.
+///
+/// The reader-visible prose comes first. Structured events are duplicated in a
+/// trailing HTML comment so Kelivo can progressively render normal prose while
+/// streaming, then persist semantic events after finalization without exposing
+/// protocol JSON in Chat mode.
 const String storyResponseContractV1 = '''
 [STORY_OUTPUT_V1]
-Return story-visible content as one JSON object with this exact envelope:
-{"version":1,"events":[EVENT,...]}
+Write the polished reader-visible story response first as ordinary Markdown prose.
+Do not wrap the visible prose in JSON, XML, a code fence, or protocol markers.
 
-EVENT fields:
+After the visible prose, append exactly one trailing HTML comment in this form:
+<!--KELIVO_STORY_EVENTS
+{"version":1,"events":[EVENT,...]}
+KELIVO_STORY_EVENTS-->
+Nothing may follow that closing marker.
+
+The events must semantically mirror the visible prose. EVENT fields:
 - type: narration | dialogue | action | expression | scene_transition | choice_set | runtime_notice
 - actor: {"type":"self"} | {"type":"world"} | {"type":"character","character_id":"STABLE_ID"}
 - text: optional ordered array of {"text":"...","effect":"...","decoration":"...","motion":"..."}
@@ -28,8 +39,9 @@ Actor rules:
 Presentation rules:
 - Use semantic text effects only when narratively meaningful. Never output raw RGB, font size, vibration duration or animation parameters.
 - Keep ordinary prose ordinary. Horror/distortion effects are exceptional emphasis, not default styling.
-- Do not serialize reasoning, tool calls, tool results or approval UI into this JSON. Kelivo carries those as native runtime parts.
+- Do not serialize reasoning, tool calls, tool results or approval UI into the event JSON. Kelivo carries those as native runtime parts.
 - Do not force user interaction every turn. Emit choice_set only when the user actually needs a meaningful decision.
+- The HTML comment is machine-readable sidecar data and must never be discussed in the visible prose.
 [/STORY_OUTPUT_V1]
 ''';
 
