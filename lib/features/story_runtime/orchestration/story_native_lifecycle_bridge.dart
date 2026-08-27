@@ -1,5 +1,6 @@
 import '../../../core/database/business_preferences.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/tts/network_tts.dart';
 import '../state/story_runtime_store.dart';
 import '../voice/story_voice_models.dart';
@@ -31,10 +32,21 @@ final class StoryNativeLifecycleBridge {
 
   /// Advances Story sidecar state for one successfully finalized native reply.
   ///
-  /// The commit service is idempotent for replayed finalize callbacks, so this
-  /// method is safe to call from controller recovery paths as well.
-  Future<void> commitFinalizedAssistant(ChatMessage message) {
-    return _commitService.commitAssistantMessage(message);
+  /// When a structured event trailer is present, Story commits it first and
+  /// then asks Kelivo's own ChatService to persist only the reader-visible
+  /// Markdown. The sidecar is therefore optional for history readability.
+  Future<StoryFinalizedCommitResult?> commitFinalizedAssistant(
+    ChatMessage message, {
+    ChatService? chatService,
+  }) async {
+    final result = await _commitService.commitAssistantMessage(message);
+    final visible = result?.visibleText;
+    if (visible != null &&
+        visible != message.content &&
+        chatService != null) {
+      await chatService.updateMessage(message.id, content: visible);
+    }
+    return result;
   }
 
   /// Applies the Story narrator voice to Kelivo's currently selected network
