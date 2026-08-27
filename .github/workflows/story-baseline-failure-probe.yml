@@ -108,3 +108,5 @@ jobs:
           cat /tmp/baseline-summary.txt
           # Diagnostic workflow succeeds even when base is red; the output is evidence.
           exit 0
+
+# Trigger baseline verification for Story Runtime stabilization.
