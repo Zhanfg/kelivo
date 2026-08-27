@@ -1,4 +1,5 @@
 import '../../../core/services/tts/network_tts.dart';
+import 'story_voice_context.dart';
 import 'story_voice_models.dart';
 
 /// Stable Story binding to one of Kelivo's existing network TTS services.
@@ -143,6 +144,7 @@ final class StoryResolvedVoiceRequest {
     required this.voiceId,
     required this.instruction,
     required this.assignmentRevision,
+    required this.cacheIdentity,
   });
 
   final TtsServiceOptions service;
@@ -150,13 +152,19 @@ final class StoryResolvedVoiceRequest {
   final String voiceId;
   final String instruction;
   final int assignmentRevision;
+
+  /// Stable semantic identity for the routed voice/context. Kelivo's native
+  /// TtsProvider remains authoritative for actual chunk/replay audio caching.
+  final String cacheIdentity;
 }
 
 /// Maps Story semantics onto an existing Kelivo TTS service configuration.
 ///
 /// MiMo receives the same configured API key/base URL/model by default. Story
-/// changes only voice + natural-language delivery instruction unless an
-/// explicit modelOverride was stored on the assignment.
+/// changes only voice + natural-language delivery/context instruction unless an
+/// explicit modelOverride was stored on the assignment. The resulting service
+/// is still played once through native TtsProvider, preserving its internal
+/// chunking, prefetch, seek and replay cache semantics.
 final class StoryVoiceResolver {
   const StoryVoiceResolver();
 
@@ -164,25 +172,45 @@ final class StoryVoiceResolver {
     required TtsServiceOptions service,
     required StoryVoiceAssignment assignment,
     StorySpeechIntent intent = const StorySpeechIntent(),
+    StoryVoiceContextWindow? context,
   }) {
     if (service.id != assignment.ttsServiceId) {
       throw StateError('story_voice_service_identity_mismatch');
     }
-    final instruction = StoryVoiceInstructionCompiler.compile(
+    final deliveryInstruction = StoryVoiceInstructionCompiler.compile(
       persona: assignment.personaDescription,
       intent: intent,
+    );
+    final contextInstruction = StoryVoiceContextCompiler.instruction(context);
+    final instruction = _mergeInstructions(
+      deliveryInstruction,
+      contextInstruction,
     );
     final routed = _routeService(
       service,
       assignment: assignment,
       instruction: instruction,
     );
+    final modelIdentity = switch (routed) {
+      MimoTtsOptions() => routed.model,
+      StepTtsOptions() => routed.model,
+      QwenTtsOptions() => routed.model,
+      _ => routed.kind.name,
+    };
     return StoryResolvedVoiceRequest(
       service: routed,
       characterId: assignment.characterId,
       voiceId: assignment.voiceId,
       instruction: instruction,
       assignmentRevision: assignment.revision,
+      cacheIdentity: StoryVoiceContextCompiler.cacheIdentity(
+        serviceId: routed.id,
+        model: modelIdentity,
+        voiceId: assignment.voiceId,
+        persona: assignment.personaDescription,
+        deliveryInstruction: deliveryInstruction,
+        context: context,
+      ),
     );
   }
 
