@@ -144,6 +144,6 @@ final class StoryAgencyPolicy {
         signals.identityImpact * 0.10 +
         signals.relationshipImpact * 0.10 +
         signals.worldlineImpact * 0.10;
-    return weighted.clamp(0.0, 1.0);
+    return weighted.clamp(0.0, 1.0).toDouble();
   }
 }
