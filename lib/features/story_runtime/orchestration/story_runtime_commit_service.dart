@@ -25,9 +25,13 @@ final class StoryRuntimeCommitService {
     required StoryRuntimeSessionRepository sessionStore,
     required StoryRuntimeExecutionRepository executionStore,
     required StoryWorldTreeRepository worldTreeStore,
-  }) : _sessionStore = sessionStore,
-       _executionStore = executionStore,
-       _worldTreeStore = worldTreeStore;
+  }) : this._fromRepositories(sessionStore, executionStore, worldTreeStore);
+
+  StoryRuntimeCommitService._fromRepositories(
+    this._sessionStore,
+    this._executionStore,
+    this._worldTreeStore,
+  );
 
   final StoryRuntimeSessionRepository _sessionStore;
   final StoryRuntimeExecutionRepository _executionStore;
