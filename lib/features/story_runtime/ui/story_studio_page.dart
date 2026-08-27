@@ -21,6 +21,9 @@ import '../skills/story_skill_package_importer.dart';
 import '../skills/story_skill_package_store.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
+import '../voice/story_voice_routing.dart';
+import '../voice/story_voice_store.dart';
+import '../world_tree/story_world_tree_store.dart';
 
 class StoryStudioPage extends StatefulWidget {
   const StoryStudioPage({super.key});
@@ -46,8 +49,18 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
   late StorySkillPackageStore _skillPackageStore;
   late StorySkillPackageImporter _skillImporter;
   late StorySkillBindingStore _skillBindingStore;
+  late StoryWorldTreeStore _worldTreeStore;
+  late StoryVoiceRoutingStore _voiceStore;
 
   StoryRuntimeSessionState? _session;
+  String? _storyWorldTreeId;
+  StoryVoiceAssignment? _narrator;
+  String? _narratorServiceId;
+  bool _narratorWorldlineScoped = false;
+  final TextEditingController _narratorVoiceController =
+      TextEditingController();
+  final TextEditingController _narratorPersonaController =
+      TextEditingController();
   List<StoryReferenceDocument> _documents = const [];
   List<StoryReferenceStyleProfile> _profiles = const [];
   List<StoryReferenceInvocation> _selectedReferences = const [];
@@ -72,6 +85,8 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
     _skillPackageStore = StorySkillPackageStore(preferences);
     _skillImporter = StorySkillPackageImporter(repository: _skillPackageStore);
     _skillBindingStore = StorySkillBindingStore(preferences);
+    _worldTreeStore = StoryWorldTreeStore(preferences);
+    _voiceStore = StoryVoiceRoutingStore(preferences);
     _bootstrap();
   }
 
@@ -125,6 +140,13 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
       final bindings = assistantId == null
           ? const <StorySkillBinding>[]
           : await _skillBindingStore.readForAssistant(assistantId);
+      final tree = conversationId == null
+          ? null
+          : await _worldTreeStore.readForConversation(conversationId);
+      final voiceRouting = tree == null
+          ? null
+          : await _voiceStore.readOrDefault(tree.worldTreeId);
+      final narrator = voiceRouting?.narrator;
       if (!mounted) return;
       setState(() {
         _documents = documents;
@@ -133,6 +155,12 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
         _session = session;
         _selectedReferences = selection?.invocations ?? const [];
         _skillBindings = bindings;
+        _storyWorldTreeId = tree?.worldTreeId;
+        _narrator = narrator;
+        _narratorServiceId = narrator?.ttsServiceId;
+        _narratorWorldlineScoped = narrator?.worldlineId != null;
+        _narratorVoiceController.text = narrator?.voiceId ?? '';
+        _narratorPersonaController.text = narrator?.personaDescription ?? '';
         _loading = false;
       });
     } catch (error) {
@@ -323,6 +351,55 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
     await _reload();
   }
 
+  Future<void> _saveNarratorVoice() async {
+    final worldTreeId = _storyWorldTreeId;
+    final serviceId = _narratorServiceId?.trim() ?? '';
+    final voiceId = _narratorVoiceController.text.trim();
+    if (worldTreeId == null) {
+      _showMessage('请先启用 Story Mode 并完成至少一个 Story 回合，再配置旁白音色。');
+      return;
+    }
+    if (serviceId.isEmpty || voiceId.isEmpty) {
+      _showMessage('请选择 TTS 服务并填写 Voice ID。');
+      return;
+    }
+    final current = await _voiceStore.readOrDefault(worldTreeId);
+    final scopedWorldlineId = _narratorWorldlineScoped
+        ? _session?.worldlineId
+        : null;
+    final assignment = StoryVoiceAssignment(
+      characterId: '__narrator__',
+      ttsServiceId: serviceId,
+      voiceId: voiceId,
+      personaDescription: _narratorPersonaController.text.trim(),
+      worldlineId: scopedWorldlineId,
+      revision: (_narrator?.revision ?? 0) + 1,
+    );
+    await _voiceStore.upsertState(
+      StoryVoiceRoutingState(
+        worldTreeId: current.worldTreeId,
+        narrator: assignment,
+        assignments: current.assignments,
+      ),
+    );
+    await _reload();
+    if (mounted) _showMessage('旁白音色已保存，并会复用 Kelivo 原生 TTS 服务。');
+  }
+
+  Future<void> _clearNarratorVoice() async {
+    final worldTreeId = _storyWorldTreeId;
+    if (worldTreeId == null) return;
+    final current = await _voiceStore.readOrDefault(worldTreeId);
+    await _voiceStore.upsertState(
+      StoryVoiceRoutingState(
+        worldTreeId: current.worldTreeId,
+        assignments: current.assignments,
+      ),
+    );
+    await _reload();
+    if (mounted) _showMessage('旁白音色绑定已清除。');
+  }
+
   Future<void> _runBusy(Future<void> Function() action) async {
     if (_busy) return;
     setState(() {
@@ -363,6 +440,14 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
     final assistant = selectedConversation?.assistantId == null
         ? assistantProvider.currentAssistant
         : assistantProvider.getById(selectedConversation!.assistantId!);
+    final settings = context.watch<SettingsProvider>();
+    final enabledTtsServices = settings.ttsServices
+        .where((service) => service.enabled)
+        .toList(growable: false);
+    final narratorServiceId =
+        enabledTtsServices.any((service) => service.id == _narratorServiceId)
+        ? _narratorServiceId
+        : null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Story Studio')),
@@ -448,6 +533,101 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
                           },
                   ),
                 const SizedBox(height: 24),
+                _sectionTitle(context, 'Story Voice'),
+                Text(
+                  '旁白复用 Kelivo 已配置的网络 TTS；这里只保存服务 ID、Voice ID 与表达描述，不复制密钥或 Endpoint。',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: narratorServiceId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: '旁白 TTS 服务',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final service in enabledTtsServices)
+                      DropdownMenuItem(
+                        value: service.id,
+                        child: Text(
+                          service.name.trim().isEmpty
+                              ? service.kind.name
+                              : service.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: _busy
+                      ? null
+                      : (value) => setState(() => _narratorServiceId = value),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _narratorVoiceController,
+                  enabled: !_busy,
+                  decoration: const InputDecoration(
+                    labelText: 'Voice ID / 音色名',
+                    hintText: '例如 MiMo / Step / Azure / Qwen 的原生 voice id',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _narratorPersonaController,
+                  enabled: !_busy,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: '表达描述',
+                    hintText: '例如：冷静、低沉、克制，重要场景略微放慢语速。',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('仅当前 Worldline 使用'),
+                  subtitle: Text(
+                    _session?.worldlineId == null
+                        ? '当前还没有可用的 Worldline。'
+                        : '关闭后，同一 World Tree 的其他分支也可复用该旁白。',
+                  ),
+                  value:
+                      _narratorWorldlineScoped && _session?.worldlineId != null,
+                  onChanged: _busy || _session?.worldlineId == null
+                      ? null
+                      : (value) =>
+                            setState(() => _narratorWorldlineScoped = value),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _busy || _storyWorldTreeId == null
+                            ? null
+                            : _saveNarratorVoice,
+                        icon: const Icon(Icons.record_voice_over_outlined),
+                        label: const Text('保存旁白音色'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: _busy || _narrator == null
+                          ? null
+                          : _clearNarratorVoice,
+                      child: const Text('清除'),
+                    ),
+                  ],
+                ),
+                if (_storyWorldTreeId == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Story Voice 会在首个 Story 回合建立 World Tree 后可配置。',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                const SizedBox(height: 24),
                 _sectionTitle(context, 'Reference Library'),
                 Text(
                   '导入小说后先生成抽象 Style Profile。正常 Story 回合不会把整本小说塞进上下文。',
@@ -522,6 +702,13 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
               ],
             ),
     );
+  }
+
+  @override
+  void dispose() {
+    _narratorVoiceController.dispose();
+    _narratorPersonaController.dispose();
+    super.dispose();
   }
 
   Widget _profileCard(StoryReferenceStyleProfile profile) {
