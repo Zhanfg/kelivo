@@ -160,3 +160,5 @@ jobs:
           git diff --cached --check
           git commit -m "fix(story): inject GitHub Skill temporary root"
           git push origin HEAD:feat/story-runtime-foundation
+
+# Trigger repository-defined one-shot fix.
