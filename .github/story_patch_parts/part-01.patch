@@ -1,0 +1,80 @@
+ 
+ class StoryStudioPage extends StatefulWidget {
+   const StoryStudioPage({super.key});
+@@ -46,8 +49,16 @@
+   late StorySkillPackageStore _skillPackageStore;
+   late StorySkillPackageImporter _skillImporter;
+   late StorySkillBindingStore _skillBindingStore;
++  late StoryWorldTreeStore _worldTreeStore;
++  late StoryVoiceRoutingStore _voiceStore;
+ 
+   StoryRuntimeSessionState? _session;
++  String? _storyWorldTreeId;
++  StoryVoiceAssignment? _narrator;
++  String? _narratorServiceId;
++  bool _narratorWorldlineScoped = false;
++  final TextEditingController _narratorVoiceController = TextEditingController();
++  final TextEditingController _narratorPersonaController = TextEditingController();
+   List<StoryReferenceDocument> _documents = const [];
+   List<StoryReferenceStyleProfile> _profiles = const [];
+   List<StoryReferenceInvocation> _selectedReferences = const [];
+@@ -72,6 +83,8 @@
+     _skillPackageStore = StorySkillPackageStore(preferences);
+     _skillImporter = StorySkillPackageImporter(repository: _skillPackageStore);
+     _skillBindingStore = StorySkillBindingStore(preferences);
++    _worldTreeStore = StoryWorldTreeStore(preferences);
++    _voiceStore = StoryVoiceRoutingStore(preferences);
+     _bootstrap();
+   }
+ 
+@@ -125,6 +138,13 @@
+       final bindings = assistantId == null
+           ? const <StorySkillBinding>[]
+           : await _skillBindingStore.readForAssistant(assistantId);
++      final tree = conversationId == null
++          ? null
++          : await _worldTreeStore.readForConversation(conversationId);
++      final voiceRouting = tree == null
++          ? null
++          : await _voiceStore.readOrDefault(tree.worldTreeId);
++      final narrator = voiceRouting?.narrator;
+       if (!mounted) return;
+       setState(() {
+         _documents = documents;
+@@ -133,6 +153,12 @@
+         _session = session;
+         _selectedReferences = selection?.invocations ?? const [];
+         _skillBindings = bindings;
++        _storyWorldTreeId = tree?.worldTreeId;
++        _narrator = narrator;
++        _narratorServiceId = narrator?.ttsServiceId;
++        _narratorWorldlineScoped = narrator?.worldlineId != null;
++        _narratorVoiceController.text = narrator?.voiceId ?? '';
++        _narratorPersonaController.text = narrator?.personaDescription ?? '';
+         _loading = false;
+       });
+     } catch (error) {
+@@ -323,6 +349,55 @@
+     await _reload();
+   }
+ 
++  Future<void> _saveNarratorVoice() async {
++    final worldTreeId = _storyWorldTreeId;
++    final serviceId = _narratorServiceId?.trim() ?? '';
++    final voiceId = _narratorVoiceController.text.trim();
++    if (worldTreeId == null) {
++      _showMessage('请先启用 Story Mode 并完成至少一个 Story 回合，再配置旁白音色。');
++      return;
++    }
++    if (serviceId.isEmpty || voiceId.isEmpty) {
++      _showMessage('请选择 TTS 服务并填写 Voice ID。');
++      return;
++    }
++    final current = await _voiceStore.readOrDefault(worldTreeId);
++    final scopedWorldlineId = _narratorWorldlineScoped
++        ? _session?.worldlineId
++        : null;
++    final assignment = StoryVoiceAssignment(
++      characterId: '__narrator__',
++      ttsServiceId: serviceId,
++      voiceId: voiceId,
