@@ -116,7 +116,8 @@ final class StoryRuntimeCommitService {
       }
 
       StoryTurn? parsedTurn;
-      if (execution.phase == StoryRuntimePhase.parsing) {
+      if (execution.phase == StoryRuntimePhase.parsing ||
+          execution.phase == StoryRuntimePhase.applying) {
         try {
           parsedTurn = const StoryResponseParser().parse(
             message.content,
@@ -129,6 +130,8 @@ final class StoryRuntimeCommitService {
         } on FormatException {
           parsedTurn = null;
         }
+      }
+      if (execution.phase == StoryRuntimePhase.parsing) {
         execution = await machine.transition(
           conversationId: conversationId,
           to: StoryRuntimePhase.applying,
