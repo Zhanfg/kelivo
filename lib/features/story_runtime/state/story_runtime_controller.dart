@@ -17,6 +17,7 @@ final class StoryRuntimeController extends ChangeNotifier {
   String? _attachedConversationId;
   bool _loading = false;
   int _loadGeneration = 0;
+  Future<void> _mutationTail = Future<void>.value();
 
   StoryRuntimeSessionState? get state => _state;
   String? get attachedConversationId => _attachedConversationId;
@@ -41,27 +42,38 @@ final class StoryRuntimeController extends ChangeNotifier {
     _loading = true;
     notifyListeners();
 
-    final loaded = await _store.readOrDefault(normalized);
-    if (generation != _loadGeneration ||
-        _attachedConversationId != normalized) {
-      return;
+    try {
+      final loaded = await _store.readOrDefault(normalized);
+      if (generation != _loadGeneration ||
+          _attachedConversationId != normalized) {
+        return;
+      }
+
+      _state = loaded;
+      _loading = false;
+      notifyListeners();
+    } catch (_) {
+      if (generation == _loadGeneration &&
+          _attachedConversationId == normalized) {
+        _loading = false;
+        notifyListeners();
+      }
+      rethrow;
     }
-
-    _state = loaded;
-    _loading = false;
-    notifyListeners();
   }
 
-  Future<void> setEnabled(bool enabled) async {
-    final current = _requireState();
-    if (current.enabled == enabled) return;
-    await _replaceState(current.copyWith(enabled: enabled));
+  Future<void> setEnabled(bool enabled) {
+    return _mutate((current) {
+      if (current.enabled == enabled) return current;
+      return current.copyWith(enabled: enabled);
+    });
   }
 
-  Future<void> setAgencyMode(StoryAgencyMode mode) async {
-    final current = _requireState();
-    if (current.agencyMode == mode) return;
-    await _replaceState(current.copyWith(agencyMode: mode));
+  Future<void> setAgencyMode(StoryAgencyMode mode) {
+    return _mutate((current) {
+      if (current.agencyMode == mode) return current;
+      return current.copyWith(agencyMode: mode);
+    });
   }
 
   /// Starts or updates a cache-stable scene epoch. The actual scene snapshot is
@@ -71,7 +83,7 @@ final class StoryRuntimeController extends ChangeNotifier {
     required String worldlineId,
     required String sceneEpochId,
     required int revision,
-  }) async {
+  }) {
     if (revision < 0) {
       throw ArgumentError.value(revision, 'revision', 'must be non-negative');
     }
@@ -81,9 +93,8 @@ final class StoryRuntimeController extends ChangeNotifier {
       throw ArgumentError('worldlineId and sceneEpochId must be non-empty');
     }
 
-    final current = _requireState();
-    await _replaceState(
-      current.copyWith(
+    return _mutate(
+      (current) => current.copyWith(
         worldlineId: normalizedWorldline,
         sceneEpochId: normalizedEpoch,
         sceneRevision: revision,
@@ -91,15 +102,44 @@ final class StoryRuntimeController extends ChangeNotifier {
     );
   }
 
-  Future<void> clearSceneEpoch({bool clearWorldline = false}) async {
-    final current = _requireState();
-    await _replaceState(
-      current.copyWith(
+  Future<void> clearSceneEpoch({bool clearWorldline = false}) {
+    return _mutate(
+      (current) => current.copyWith(
         clearSceneEpochId: true,
         clearWorldlineId: clearWorldline,
         sceneRevision: 0,
       ),
     );
+  }
+
+  Future<void> _mutate(
+    StoryRuntimeSessionState Function(StoryRuntimeSessionState current) update,
+  ) {
+    final acceptedConversationId = _attachedConversationId;
+    if (acceptedConversationId == null) {
+      return Future<void>.error(
+        StateError('story_runtime_no_conversation_attached'),
+      );
+    }
+
+    final operation = _mutationTail.then((_) async {
+      if (_attachedConversationId != acceptedConversationId) {
+        throw StateError('story_runtime_conversation_changed');
+      }
+      final current = _requireState();
+      final next = update(current);
+      if (identical(next, current)) return;
+
+      await _store.upsert(next);
+      if (_attachedConversationId != acceptedConversationId) return;
+      _state = next;
+      notifyListeners();
+    });
+    _mutationTail = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return operation;
   }
 
   StoryRuntimeSessionState _requireState() {
@@ -108,17 +148,5 @@ final class StoryRuntimeController extends ChangeNotifier {
       throw StateError('story_runtime_no_conversation_attached');
     }
     return current;
-  }
-
-  Future<void> _replaceState(StoryRuntimeSessionState next) async {
-    final conversationId = _attachedConversationId;
-    if (conversationId == null || next.conversationId != conversationId) {
-      throw StateError('story_runtime_conversation_changed');
-    }
-
-    await _store.upsert(next);
-    if (_attachedConversationId != conversationId) return;
-    _state = next;
-    notifyListeners();
   }
 }
