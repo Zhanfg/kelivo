@@ -1,33 +1,35 @@
 import 'package:flutter/material.dart';
-import '../../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
-import '../../../icons/lucide_adapter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/haptics.dart';
+import '../../../core/services/storage/storage_usage_service.dart';
+import '../../../icons/lucide_adapter.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
+import '../../assistant/pages/assistant_settings_page.dart';
+import '../../backup/pages/backup_page.dart';
+import '../../instruction_injection/pages/instruction_injection_page.dart';
+import '../../mcp/pages/mcp_page.dart';
 import '../../model/pages/default_model_page.dart';
 import '../../provider/pages/providers_page.dart';
-import 'display_settings_page.dart';
-import '../../mcp/pages/mcp_page.dart';
-import '../../assistant/pages/assistant_settings_page.dart';
-import 'about_page.dart';
-import 'memory_settings_page.dart';
-import 'tts_services_page.dart';
-import 'sponsor_page.dart';
-import 'log_viewer_page.dart';
-import '../../search/pages/search_services_page.dart';
-import '../../backup/pages/backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
-import '../../instruction_injection/pages/instruction_injection_page.dart';
-import '../../world_book/pages/world_book_page.dart';
+import '../../search/pages/search_services_page.dart';
+import '../../stats/pages/stats_page.dart';
+import '../../story_runtime/ui/story_reference_library_page.dart';
 import '../../story_runtime/ui/story_skill_manager_page.dart';
 import '../../story_runtime/ui/story_studio_page.dart';
+import '../../world_book/pages/world_book_page.dart';
+import 'about_page.dart';
+import 'display_settings_page.dart';
+import 'log_viewer_page.dart';
+import 'memory_settings_page.dart';
 import 'network_proxy_page.dart';
+import 'sponsor_page.dart';
 import 'storage_space_page.dart';
-import '../../stats/pages/stats_page.dart';
-import '../../../core/services/storage/storage_usage_service.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../../core/services/haptics.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
-import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'tts_services_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -38,11 +40,14 @@ class SettingsPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final languageCode = Localizations.localeOf(context).languageCode;
+    final referenceTextsLabel = languageCode == 'zh'
+        ? '参考文本'
+        : 'Reference Texts';
+    const skillsLabel = 'Skills';
     final storyModeLabel = languageCode == 'zh' ? '故事模式' : 'Story Mode';
-    final storySkillsLabel = languageCode == 'zh' ? '故事技能' : 'Story Skills';
 
-    String modeLabel(ThemeMode m) {
-      switch (m) {
+    String modeLabel(ThemeMode mode) {
+      switch (mode) {
         case ThemeMode.dark:
           return l10n.settingsPageDarkMode;
         case ThemeMode.light:
@@ -98,7 +103,6 @@ class SettingsPage extends StatelessWidget {
       }
     }
 
-    // iOS-style section header (neutral color, not theme color)
     Widget header(String text, {bool first = false}) => Padding(
       padding: EdgeInsets.fromLTRB(12, first ? 2 : 12, 12, 6),
       child: Text(
@@ -155,7 +159,6 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
 
-          // 通用设置：使用iOS风格分组卡片，黑色（中性）图标与标题，无描述
           header(l10n.settingsPageGeneralSection, first: true),
           _iosSectionCard(
             children: [
@@ -282,24 +285,37 @@ class SettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosNavRow(
                 context,
-                icon: Lucide.BookOpen,
-                label: storyModeLabel,
+                icon: Lucide.BookOpenText,
+                label: referenceTextsLabel,
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const StoryStudioPage()),
+                    MaterialPageRoute(
+                      builder: (_) => const StoryReferenceLibraryPage(),
+                    ),
                   );
                 },
               ),
               _iosDivider(context),
               _iosNavRow(
                 context,
-                icon: Lucide.Layers,
-                label: storySkillsLabel,
+                icon: Lucide.Shapes,
+                label: skillsLabel,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const StorySkillManagerPage(),
                     ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Compass,
+                label: storyModeLabel,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StoryStudioPage()),
                   );
                 },
               ),
@@ -433,32 +449,6 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
-              // _iosDivider(context),
-              // _iosNavRow(
-              //   context,
-              //   icon: Lucide.Share2,
-              //   label: l10n.settingsPageShare,
-              //   onTap: () async {
-              //     // Provide anchor rect from overlay for iPad share sheet
-              //     Rect anchor;
-              //     try {
-              //       final overlay = Overlay.of(context);
-              //       final ro = overlay?.context.findRenderObject();
-              //       if (ro is RenderBox && ro.hasSize) {
-              //         final center = ro.size.center(Offset.zero);
-              //         final global = ro.localToGlobal(center);
-              //         anchor = Rect.fromCenter(center: global, width: 1, height: 1);
-              //       } else {
-              //         final size = MediaQuery.of(context).size;
-              //         anchor = Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
-              //       }
-              //     } catch (_) {
-              //       final size = MediaQuery.of(context).size;
-              //       anchor = Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
-              //     }
-              //     await Share.share(l10n.settingsShare, sharePositionOrigin: anchor);
-              //   },
-              // ),
             ],
           ),
 
@@ -469,19 +459,16 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-// --- iOS-style widgets for Settings page ---
-
 Widget _iosSectionCard({required List<Widget> children}) {
   return Builder(
     builder: (context) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      // Light: white with slight transparency; Dark: subtle translucent dark
-      final Color bg = context.appColors.surfaceCard;
+      final Color background = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
-          color: bg,
+          color: background,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
@@ -500,7 +487,6 @@ Widget _iosSectionCard({required List<Widget> children}) {
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
-  // Restore previous visual: align with icon slot (36) + gap (12) + padding (12)
   return Divider(
     height: 6,
     thickness: 0.6,
@@ -510,16 +496,17 @@ Widget _iosDivider(BuildContext context) {
   );
 }
 
-// Shared color tween wrapper to mimic iOS gentle press color transition
 class _AnimatedPressColor extends StatelessWidget {
   const _AnimatedPressColor({
     required this.pressed,
     required this.base,
     required this.builder,
   });
+
   final bool pressed;
   final Color base;
   final Widget Function(Color color) builder;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -604,19 +591,22 @@ Widget _iosNavRow(
       return _AnimatedPressColor(
         pressed: pressed,
         base: baseColor,
-        builder: (c) {
+        builder: (color) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             child: Row(
               children: [
-                SizedBox(width: 36, child: Icon(icon, size: 20, color: c)),
+                SizedBox(
+                  width: 36,
+                  child: Icon(icon, size: 20, color: color),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     label,
                     style: TextStyle(
                       fontSize: 15,
-                      color: c,
+                      color: color,
                       fontWeight: AppFontWeights.medium,
                     ),
                     maxLines: 1,
@@ -645,7 +635,8 @@ Widget _iosNavRow(
                       ),
                     ),
                   ),
-                if (interactive) Icon(Lucide.ChevronRight, size: 16, color: c),
+                if (interactive)
+                  Icon(Lucide.ChevronRight, size: 16, color: color),
               ],
             ),
           );
@@ -662,18 +653,21 @@ class _TactileRow extends StatefulWidget {
     this.pressedScale = 1.00,
     this.haptics = true,
   });
+
   final Widget Function(bool pressed) builder;
   final VoidCallback? onTap;
   final double pressedScale;
   final bool haptics;
+
   @override
   State<_TactileRow> createState() => _TactileRowState();
 }
 
 class _TactileRowState extends State<_TactileRow> {
   bool _pressed = false;
-  void _setPressed(bool v) {
-    if (_pressed != v) setState(() => _pressed = v);
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
   }
 
   @override
@@ -697,7 +691,6 @@ class _TactileRowState extends State<_TactileRow> {
   }
 }
 
-// Icon-only tactile button for AppBar: no ripple, slight press scale
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
@@ -748,7 +741,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-// Bottom sheet iOS-style option with tactile feedback (no ripple)
 Widget _sheetOption(
   BuildContext context, {
   required IconData icon,
@@ -763,24 +755,27 @@ Widget _sheetOption(
     onTap: onTap,
     builder: (pressed) {
       final base = cs.onSurface;
-      final bgTarget = pressed
-          ? (cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05))
+      final background = pressed
+          ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
           : Colors.transparent;
       return _AnimatedPressColor(
         pressed: pressed,
         base: base,
-        builder: (c) {
+        builder: (color) {
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOutCubic,
-            color: bgTarget,
+            color: background,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                SizedBox(width: 24, child: Icon(icon, size: 20, color: c)),
+                SizedBox(width: 24, child: Icon(icon, size: 20, color: color)),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(label, style: TextStyle(fontSize: 15, color: c)),
+                  child: Text(
+                    label,
+                    style: TextStyle(fontSize: 15, color: color),
+                  ),
                 ),
               ],
             ),
