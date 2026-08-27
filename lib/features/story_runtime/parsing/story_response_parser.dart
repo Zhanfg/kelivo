@@ -2,6 +2,16 @@ import 'dart:convert';
 
 import '../models/story_runtime_models.dart';
 
+const String storyEventsCommentStart = '<!--KELIVO_STORY_EVENTS';
+const String storyEventsCommentEnd = 'KELIVO_STORY_EVENTS-->';
+
+final class StoryParsedResponse {
+  const StoryParsedResponse({required this.visibleText, required this.turn});
+
+  final String visibleText;
+  final StoryTurn turn;
+}
+
 /// Strict parser for Story Mode's stable v1 response envelope.
 ///
 /// The parser is deliberately defensive because model output is untrusted UI
@@ -23,6 +33,38 @@ final class StoryResponseParser {
   final int maxSpanChars;
   final int maxTotalTextChars;
   final Duration maxTimeout;
+
+  /// Parses a normal reader-visible story followed by a hidden HTML comment
+  /// carrying the structured event envelope.
+  ///
+  /// Markdown renderers hide the comment while streaming. Once finalized the
+  /// host removes it from ChatMessage.content and stores [turn] in a sidecar.
+  StoryParsedResponse parseEmbedded(String raw, {required String turnId}) {
+    final end = raw.lastIndexOf(storyEventsCommentEnd);
+    final start = end < 0
+        ? -1
+        : raw.lastIndexOf(storyEventsCommentStart, end);
+    if (start < 0 || end < 0 || end < start) {
+      throw const StoryResponseParseException('embedded_events_missing');
+    }
+    final jsonStart = start + storyEventsCommentStart.length;
+    final eventJson = raw.substring(jsonStart, end).trim();
+    if (eventJson.isEmpty) {
+      throw const StoryResponseParseException('embedded_events_empty');
+    }
+    final trailing = raw.substring(end + storyEventsCommentEnd.length).trim();
+    if (trailing.isNotEmpty) {
+      throw const StoryResponseParseException('content_after_embedded_events');
+    }
+    final visible = raw.substring(0, start).trimRight();
+    if (visible.trim().isEmpty) {
+      throw const StoryResponseParseException('visible_story_missing');
+    }
+    return StoryParsedResponse(
+      visibleText: visible,
+      turn: parse(eventJson, turnId: turnId),
+    );
+  }
 
   StoryTurn parse(String raw, {required String turnId}) {
     final normalizedTurnId = turnId.trim();
