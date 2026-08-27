@@ -61,8 +61,7 @@ bool looksLikeStoryEnvelopePrefix(String raw) {
   final compact = source.replaceAll(RegExp(r'\s+'), '');
   if (compact.startsWith('{"version":1,"events"')) return true;
   const canonical = '{"version":1,"events":[';
-  if (canonical.startsWith(compact) && compact.length >= 5) return true;
-  return false;
+  return canonical.startsWith(compact) && compact.length >= 5;
 }
 
 String storyTurnToReadableMarkdown(StoryTurn turn) {
@@ -131,7 +130,7 @@ String? _visibleActorName(StoryEvent event) {
     if (value is String && value.trim().isNotEmpty) return value.trim();
   }
   // Never surface characterId: it is runtime identity, not player-visible text.
-  return event.actor.isSelf ? null : null;
+  return null;
 }
 
 String _escapeMarkdown(String value) => value
