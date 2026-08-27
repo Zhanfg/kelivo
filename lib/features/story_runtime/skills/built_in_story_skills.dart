@@ -12,21 +12,42 @@ Future<List<StorySkillManifest>> loadBuiltInStorySkills() async {
   final lessAiTone = await rootBundle.loadString(
     'assets/story_skills/lieflat-less-ai-tone/SKILL.md',
   );
+  final humanWritingCore = await rootBundle.loadString(
+    'assets/story_skills/lieflat-less-ai-tone/prompts/10_kelivo_human_writing_core.md',
+  );
+  final visualTaste = await rootBundle.loadString(
+    'assets/story_skills/visual-taste-basics/SKILL.md',
+  );
   return <StorySkillManifest>[
     StorySkillManifest(
       id: 'lieflat-less-ai-tone',
-      name: '去 AI 味',
-      version: '2026.08.24',
-      description: '默认写作清理 Skill；按上游白名单规则减少 AI 写作痕迹。',
-      instructions: <String>[lessAiTone],
+      name: 'Human Writing Core · 去 AI 味',
+      version: '2026.08.27',
+      description:
+          '默认写作 Skill：保留实测白名单规则，并融合中英文 anti-slop、风格保真、任务路由与事实守恒。',
+      instructions: <String>[lessAiTone, humanWritingCore],
       activationModes: const <StorySkillActivationMode>{
         StorySkillActivationMode.always,
       },
       metadata: const <String, Object?>{
         'builtIn': true,
         'defaultEnabled': true,
+        'maintainedBy': 'Kelivo',
         'source': 'https://github.com/larashero3-dotcom/lieflat-less-ai-tone',
         'sourceCommit': '27d29232f10124db904ca9c0536d0b67cb3b2833',
+        'synthesizedSources': <String>[
+          'https://github.com/blader/humanizer',
+          'https://github.com/op7418/Humanizer-zh',
+          'https://github.com/hardikpandya/stop-slop',
+          'https://github.com/hylarucoder/ai-flavor-remover',
+          'https://github.com/MrGeDiao/shuorenhua',
+          'https://github.com/petergyang/no-ai-slop',
+          'https://github.com/KKKKhazix/human-writing',
+          'https://github.com/OUBIGFA/De-AI-Prompt-Enhancer-Writer-Booster-SKILL',
+          'https://github.com/dongbeixiaohuo/writing-agent',
+          'https://github.com/alchaincyf/nuwa-skill',
+          'https://github.com/Hello-SimpleAI/chatgpt-comparison-detection',
+        ],
       },
     ),
     const StorySkillManifest(
@@ -59,6 +80,21 @@ Future<List<StorySkillManifest>> loadBuiltInStorySkills() async {
       metadata: <String, Object?>{
         'builtIn': true,
         'defaultEnabled': true,
+      },
+    ),
+    StorySkillManifest(
+      id: 'visual-taste-basics',
+      name: 'Visual Taste · 视觉审美',
+      version: '2026.08.27',
+      description: '前端/UI 设计审美 Skill；减少典型 AI UI 套路，并保持 Kelivo Material 3 设计语言。',
+      instructions: <String>[visualTaste],
+      activationModes: const <StorySkillActivationMode>{
+        StorySkillActivationMode.manual,
+      },
+      metadata: const <String, Object?>{
+        'builtIn': true,
+        'defaultEnabled': false,
+        'source': 'https://github.com/Leonxlnx/taste-skill',
       },
     ),
   ];
