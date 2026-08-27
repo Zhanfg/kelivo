@@ -75,6 +75,24 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Normalize changed Dart formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$(git diff --diff-filter=ACMR --name-only origin/master...HEAD -- | grep -E '^(lib|test)/.*\.dart$' || true)"
+          if [ -z "$files" ]; then
+            exit 0
+          fi
+          dart format $files
+          if git diff --quiet -- $files; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add $files
+          git commit -m 'style(story): normalize Dart formatting'
+          git push origin HEAD:feat/story-runtime-foundation
+
       - name: Format check
         shell: bash
         run: |
