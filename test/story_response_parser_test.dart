@@ -44,6 +44,35 @@ void main() {
       expect(turn.events[2].actor.isSelf, isTrue);
     });
 
+    test('extracts visible prose and hidden event trailer independently', () {
+      final parsed = parser.parseEmbedded('''门外的脚步声突然停住。
+
+<!--KELIVO_STORY_EVENTS
+{"version":1,"events":[{"type":"narration","actor":{"type":"world"},"text":[{"text":"门外的脚步声突然停住。"}]}]}
+KELIVO_STORY_EVENTS-->''', turnId: 'turn-embedded');
+
+      expect(parsed.visibleText, '门外的脚步声突然停住。');
+      expect(parsed.turn.id, 'turn-embedded');
+      expect(parsed.turn.events.single.type, StoryEventType.narration);
+    });
+
+    test('rejects any visible payload after the structured trailer', () {
+      expect(
+        () => parser.parseEmbedded('''正文
+<!--KELIVO_STORY_EVENTS
+{"version":1,"events":[{"type":"narration","actor":{"type":"world"},"text":[{"text":"正文"}]}]}
+KELIVO_STORY_EVENTS-->
+leak''', turnId: 'turn-trailer-leak'),
+        throwsA(
+          isA<StoryResponseParseException>().having(
+            (error) => error.code,
+            'code',
+            'content_after_embedded_events',
+          ),
+        ),
+      );
+    });
+
     test('accepts fenced JSON defensively', () {
       final turn = parser.parse('''```json
 {"version":1,"events":[{"type":"dialogue","actor":{"type":"self"},"text":[{"text":"听见了。"}]}]}
@@ -224,5 +253,6 @@ void main() {
     expect(storyResponseContractContributionV1.stability.name, 'frozen');
     expect(storyResponseContractV1, contains('Never invent or switch'));
     expect(storyResponseContractV1, contains('Do not serialize reasoning'));
+    expect(storyResponseContractV1, contains('KELIVO_STORY_EVENTS'));
   });
 }
