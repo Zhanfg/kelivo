@@ -59,12 +59,17 @@ jobs:
           replace(
               manager,
               '    final description = manifest.description?.trim();\n',
-              '    final description = manifest.description?.trim();\n    final sourceRepository = _githubSourceRepository(package);\n',
+              '    final description = manifest.description.trim();\n    final sourceRepository = _githubSourceRepository(package);\n',
           )
           replace(
               manager,
               "      if (managed && package?.sourceRepository != null) package!.sourceRepository!,\n",
               "      if (sourceRepository != null) sourceRepository,\n",
+          )
+          replace(
+              manager,
+              '            if (description != null && description.isNotEmpty) ...[\n',
+              '            if (description.isNotEmpty) ...[\n',
           )
           p = Path(manager)
           text = p.read_text()
