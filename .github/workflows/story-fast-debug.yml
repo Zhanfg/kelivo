@@ -1,3 +1,4 @@
+# rebuild after native Settings integration
 name: Story Fast Debug
 
 on:
@@ -89,7 +90,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$(git rev-parse HEAD)" \
             --title "Kelivo Story Runtime TEST ${VERSION} (${SHORT_SHA})" \
-            --notes "Installable Android debug-signed test build for Story Runtime functional testing. Static analysis and APK signature verification passed before publishing. Full non-baseline regression suite continues independently." \
+            --notes "Installable Android debug-signed test build after native Settings UI integration. Static analysis and APK signature verification passed before publishing." \
             --prerelease
 
       - name: Upload artifact
