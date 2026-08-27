@@ -191,6 +191,7 @@ class MessageGenerationService {
     // runs only after the single final context trim below.
     messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
     BusinessPreferences? storyPreferences;
+    StoryRuntimePromptResult? storyRuntime;
     try {
       storyPreferences = contextProvider.read<BusinessPreferences>();
     } on ProviderNotFoundException {
@@ -203,12 +204,15 @@ class MessageGenerationService {
 
       final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();
       if (currentConversation != null && storyAssistantId.isNotEmpty) {
-        final runtime = await StoryRuntimePromptService(storyPreferences).build(
+        storyRuntime = await StoryRuntimePromptService(storyPreferences).build(
           conversation: currentConversation,
           messages: messages,
           assistantId: storyAssistantId,
         );
-        _injectStoryRuntimeSystemPrompt(apiMessages, runtime?.providerText);
+        _injectStoryRuntimeSystemPrompt(
+          apiMessages,
+          storyRuntime?.providerText,
+        );
       }
     }
 
@@ -291,10 +295,17 @@ class MessageGenerationService {
     }
     messageBuilderService.stripInternalRevisionIds(apiMessages);
 
-    // Prepare tools
-    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
-      assistant,
-    );
+    // Prepare tools. Story MCP Profiles only narrow this immutable request
+    // snapshot; native Assistant selection, route identity and approval remain
+    // authoritative for execution.
+    var mcpRouteSnapshot = generationController.captureMcpToolRoutes(assistant);
+    if (storyRuntime?.mcpProfileId != null) {
+      mcpRouteSnapshot = mcpRouteSnapshot.filtered(
+        allowedToolNames: storyRuntime!.allowedMcpToolNames,
+        allowedServerIds: storyRuntime.allowedMcpServerIds,
+        includeUnlisted: storyRuntime.includeAssistantMcpDefaults,
+      );
+    }
     final toolDefs = generationController.buildToolDefinitions(
       settings,
       assistant,
