@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/database/business_preferences.dart';
+import '../../../core/providers/assistant_provider.dart';
+import '../skills/story_skill_binding_store.dart';
 import '../skills/story_skill_github_source.dart';
 import '../skills/story_skill_library.dart';
 import '../skills/story_skill_models.dart';
@@ -21,14 +23,17 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
   bool _loading = true;
   bool _busy = false;
   String? _status;
+  String? _assistantId;
 
   late StorySkillPackageStore _packageStore;
   late StorySkillPackageImporter _importer;
   late StorySkillLibrary _library;
   late StorySkillGitHubService _github;
+  late StorySkillBindingStore _bindingStore;
 
   List<StoryInstalledSkillPackage> _packages = const [];
   List<StorySkillManifest> _manifests = const [];
+  List<StorySkillBinding> _bindings = const [];
   final Map<String, StorySkillGitHubUpdateCheck> _updateChecks = {};
 
   @override
@@ -37,9 +42,12 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
     if (_initialized) return;
     _initialized = true;
     final preferences = context.read<BusinessPreferences>();
+    final assistantProvider = context.read<AssistantProvider>();
+    _assistantId = assistantProvider.currentAssistant?.id;
     _packageStore = StorySkillPackageStore(preferences);
     _importer = StorySkillPackageImporter(repository: _packageStore);
     _library = StorySkillLibrary(repository: _packageStore);
+    _bindingStore = StorySkillBindingStore(preferences);
     _github = StorySkillGitHubService(
       repository: _packageStore,
       importer: _importer,
@@ -56,12 +64,29 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
   Future<void> _reload() async {
     if (mounted) setState(() => _loading = true);
     try {
-      final packages = await _packageStore.readAll();
-      final manifests = await _library.loadAll();
+      final assistantProvider = context.read<AssistantProvider>();
+      await assistantProvider.loaded;
+      final assistants = assistantProvider.assistants;
+      var assistantId = _assistantId;
+      if (assistantId == null ||
+          !assistants.any((assistant) => assistant.id == assistantId)) {
+        assistantId = assistantProvider.currentAssistant?.id;
+      }
+
+      final packagesFuture = _packageStore.readAll();
+      final manifestsFuture = _library.loadAll();
+      final bindingsFuture = assistantId == null
+          ? Future.value(const <StorySkillBinding>[])
+          : _bindingStore.readForAssistant(assistantId);
+      final packages = await packagesFuture;
+      final manifests = await manifestsFuture;
+      final bindings = await bindingsFuture;
       if (!mounted) return;
       setState(() {
+        _assistantId = assistantId;
         _packages = packages;
         _manifests = manifests;
+        _bindings = bindings;
         _loading = false;
       });
     } catch (error) {
@@ -69,6 +94,53 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
       setState(() => _loading = false);
       _showError(error);
     }
+  }
+
+  Future<void> _selectAssistant(String? assistantId) async {
+    if (assistantId == null || assistantId == _assistantId) return;
+    setState(() {
+      _assistantId = assistantId;
+      _bindings = const [];
+    });
+    try {
+      final bindings = await _bindingStore.readForAssistant(assistantId);
+      if (!mounted || _assistantId != assistantId) return;
+      setState(() => _bindings = bindings);
+    } catch (error) {
+      if (mounted) _showError(error);
+    }
+  }
+
+  bool _isSkillEnabled(StorySkillManifest manifest) {
+    for (final binding in _bindings) {
+      if (binding.skillId == manifest.id) return binding.enabled;
+    }
+    return manifest.metadata['defaultEnabled'] == true;
+  }
+
+  Future<void> _setSkillEnabled(
+    StorySkillManifest manifest,
+    bool enabled,
+  ) async {
+    final assistantId = _assistantId;
+    if (assistantId == null || _busy) return;
+    await _runBusy(
+      enabled ? '正在启用 ${manifest.name}…' : '正在停用 ${manifest.name}…',
+      () async {
+        await _bindingStore.upsert(
+          StorySkillBinding(
+            assistantId: assistantId,
+            skillId: manifest.id,
+            enabled: enabled,
+          ),
+        );
+        final bindings = await _bindingStore.readForAssistant(assistantId);
+        if (mounted && _assistantId == assistantId) {
+          setState(() => _bindings = bindings);
+        }
+      },
+      reload: false,
+    );
   }
 
   Future<void> _installFromGitHub() async {
@@ -205,6 +277,13 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final assistants = context.watch<AssistantProvider>().assistants;
+    final selectedAssistantId = assistants.any(
+      (assistant) => assistant.id == _assistantId,
+    )
+        ? _assistantId
+        : null;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Skill 管理')),
       body: _loading
@@ -212,6 +291,30 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
+                Text(
+                  'Skill 按 Assistant 独立启用。内置默认 Skill 可以显式关闭；手动 Skill 只有开启后才进入 Story Runtime。',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedAssistantId,
+                  decoration: const InputDecoration(
+                    labelText: 'Assistant',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final assistant in assistants)
+                      DropdownMenuItem<String>(
+                        value: assistant.id,
+                        child: Text(
+                          assistant.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: _busy ? null : _selectAssistant,
+                ),
+                const SizedBox(height: 20),
                 Text(
                   'GitHub 直装固定到具体 commit，并只导入 Prompt / Assets / WorldBooks / Templates。上游若声明 MCP、工具、内存权限或 Hook，会要求改走本地 ZIP 审核。',
                   style: theme.textTheme.bodyMedium,
@@ -249,6 +352,11 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
                 const SizedBox(height: 24),
                 Text('可用 Skills', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 8),
+                if (_manifests.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text('没有可用 Skill。'),
+                  ),
                 for (final manifest in _manifests)
                   _skillCard(manifest, _packageFor(manifest)),
               ],
@@ -262,12 +370,18 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
   ) {
     final theme = Theme.of(context);
     final builtIn = manifest.metadata['builtIn'] == true && package == null;
+    final defaultEnabled = manifest.metadata['defaultEnabled'] == true;
     final managed = package?.isGitHubManaged == true;
     final check = package == null ? null : _updateChecks[_key(package)];
     final description = manifest.description?.trim();
     final subtitle = <String>[
-      builtIn ? '内置' : managed ? 'GitHub' : '本地安装',
+      builtIn
+          ? '内置'
+          : managed
+              ? 'GitHub'
+              : '本地安装',
       'v${manifest.version}',
+      if (defaultEnabled) '默认启用',
       if (managed && package?.sourceRepository != null) package!.sourceRepository!,
     ].join(' · ');
 
@@ -298,8 +412,20 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
               const SizedBox(height: 8),
               Text(description),
             ],
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Expanded(child: Text('在所选 Assistant 中启用')),
+                Switch(
+                  value: _isSkillEnabled(manifest),
+                  onChanged: _busy || _assistantId == null
+                      ? null
+                      : (value) => _setSkillEnabled(manifest, value),
+                ),
+              ],
+            ),
             if (managed) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
                 '当前 ${_shortSha(package!.sourceCommitSha!)}${check == null ? '' : ' · 远端 ${_shortSha(check.latestCommitSha)}'}',
                 style: theme.textTheme.bodySmall,
