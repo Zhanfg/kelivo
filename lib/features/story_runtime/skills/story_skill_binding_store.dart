@@ -2,8 +2,17 @@ import '../../../core/database/business_preferences.dart';
 import '../../../core/services/json_blob_store.dart';
 import 'story_skill_models.dart';
 
+abstract interface class StorySkillBindingRepository {
+  Future<List<StorySkillBinding>> readForAssistant(String assistantId);
+
+  Future<void> upsert(StorySkillBinding binding);
+
+  Future<void> remove({required String assistantId, required String skillId});
+}
+
 /// Persists Assistant <-> Skill bindings and the user's auto-activation choice.
-final class StorySkillBindingStore extends JsonBlobStore<StorySkillBinding> {
+final class StorySkillBindingStore extends JsonBlobStore<StorySkillBinding>
+    implements StorySkillBindingRepository {
   StorySkillBindingStore(BusinessPreferences preferences) : super(preferences);
 
   static const String key = 'story_skill_bindings_v1';
@@ -31,6 +40,7 @@ final class StorySkillBindingStore extends JsonBlobStore<StorySkillBinding> {
     'allow_automatic_activation': item.allowAutomaticActivation,
   };
 
+  @override
   Future<List<StorySkillBinding>> readForAssistant(String assistantId) async {
     final id = _normalizeId(assistantId);
     final result = (await readAll())
@@ -40,6 +50,7 @@ final class StorySkillBindingStore extends JsonBlobStore<StorySkillBinding> {
     return List.unmodifiable(result);
   }
 
+  @override
   Future<void> upsert(StorySkillBinding binding) {
     return runExclusive(() async {
       final items = await readAll();
@@ -66,6 +77,7 @@ final class StorySkillBindingStore extends JsonBlobStore<StorySkillBinding> {
     });
   }
 
+  @override
   Future<void> remove({
     required String assistantId,
     required String skillId,
