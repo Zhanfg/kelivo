@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import '../../core/models/backup.dart';
 import '../../core/providers/backup_provider.dart';
 import '../../core/providers/backup_reminder_provider.dart';
-import '../../core/services/backup/backup_cancel_token.dart';
 import '../../core/services/backup/encrypted_full_backup.dart';
 import '../../core/services/native_file_save.dart';
 import '../../l10n/app_localizations.dart';
@@ -32,7 +31,8 @@ Future<String?> _promptPassword(
         builder: (dialogContext, setDialogState) {
           final passwordValue = password.text;
           final confirmationValue = confirmation.text;
-          final valid = passwordValue.length >= 8 &&
+          final valid =
+              passwordValue.length >= 8 &&
               (!confirm || passwordValue == confirmationValue);
           return AlertDialog(
             title: Text(
@@ -63,7 +63,8 @@ Future<String?> _promptPassword(
                     onChanged: (_) => setDialogState(() {}),
                     decoration: InputDecoration(
                       labelText: zh ? '再次输入密码' : 'Confirm password',
-                      errorText: confirmationValue.isNotEmpty &&
+                      errorText:
+                          confirmationValue.isNotEmpty &&
                               passwordValue != confirmationValue
                           ? (zh ? '两次密码不一致' : 'Passwords do not match')
                           : null,
@@ -110,9 +111,7 @@ Future<RestoreMode?> _chooseRestoreMode(BuildContext context) {
           ListTile(
             title: Text(zh ? '完全覆盖' : 'Overwrite'),
             subtitle: Text(
-              zh
-                  ? '以备份内容替换当前数据。'
-                  : 'Replace current data with the backup.',
+              zh ? '以备份内容替换当前数据。' : 'Replace current data with the backup.',
             ),
             onTap: () => Navigator.of(dialogContext).pop(RestoreMode.overwrite),
           ),
@@ -172,9 +171,7 @@ Future<void> exportEncryptedFullBackupAction(
     }
 
     final savePath = await FilePicker.platform.saveFile(
-      dialogTitle: zh
-          ? '导出完整加密备份'
-          : 'Export encrypted complete backup',
+      dialogTitle: zh ? '导出完整加密备份' : 'Export encrypted complete backup',
       fileName: exported.uri.pathSegments.last,
       type: FileType.custom,
       allowedExtensions: const ['kelivo'],
@@ -216,12 +213,9 @@ Future<void> importEncryptedFullBackupAction(
   final l10n = AppLocalizations.of(context)!;
   final ok = await runBackupTask(
     context,
-    title: _isZh(context)
-        ? '恢复完整加密备份'
-        : 'Restore encrypted complete backup',
-    errorMessage: (error) => l10n.backupPageRestoreFailedMessage(
-      error.toString(),
-    ),
+    title: _isZh(context) ? '恢复完整加密备份' : 'Restore encrypted complete backup',
+    errorMessage: (error) =>
+        l10n.backupPageRestoreFailedMessage(error.toString()),
     task: (handle) => provider.restoreEncryptedFullBackup(
       File(path),
       password: password,

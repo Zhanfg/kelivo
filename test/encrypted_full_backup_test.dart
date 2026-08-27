@@ -10,7 +10,10 @@ void main() {
     final temp = await Directory.systemTemp.createTemp('kelivo_enc_test_');
     try {
       final source = File('${temp.path}/source.zip');
-      final bytes = List<int>.generate(5 * 1024 * 1024 + 137, (index) => (index * 31 + 7) & 0xff);
+      final bytes = List<int>.generate(
+        5 * 1024 * 1024 + 137,
+        (index) => (index * 31 + 7) & 0xff,
+      );
       await source.writeAsBytes(bytes, flush: true);
       final encrypted = await EncryptedFullBackupCodec.encryptFile(
         source: source,

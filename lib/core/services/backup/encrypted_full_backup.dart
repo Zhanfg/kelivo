@@ -24,9 +24,7 @@ import 'backup_task_progress.dart';
 final class EncryptedFullBackupCodec {
   EncryptedFullBackupCodec._();
 
-  static final Uint8List _magic = Uint8List.fromList(
-    ascii.encode('KELIVOEB'),
-  );
+  static final Uint8List _magic = Uint8List.fromList(ascii.encode('KELIVOEB'));
   static const int formatVersion = 1;
   static const int _saltLength = 16;
   static const int _noncePrefixLength = 8;
@@ -41,13 +39,14 @@ final class EncryptedFullBackupCodec {
     required String password,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
+    Directory? temporaryDirectory,
   }) async {
     _validatePassword(password);
     if (!await source.exists()) {
       throw FileSystemException('Backup source does not exist', source.path);
     }
 
-    final temp = await getTemporaryDirectory();
+    final temp = temporaryDirectory ?? await getTemporaryDirectory();
     final work = Directory(
       p.join(
         temp.path,
@@ -127,6 +126,7 @@ final class EncryptedFullBackupCodec {
     required String password,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
+    Directory? temporaryDirectory,
   }) async {
     _validatePassword(password);
     if (!await source.exists()) {
@@ -159,7 +159,7 @@ final class EncryptedFullBackupCodec {
     final secretKey = await _deriveKey(password, salt);
     final cipher = AesGcm.with256bits();
 
-    final temp = await getTemporaryDirectory();
+    final temp = temporaryDirectory ?? await getTemporaryDirectory();
     final work = Directory(
       p.join(
         temp.path,
@@ -194,11 +194,7 @@ final class EncryptedFullBackupCodec {
         late final List<int> clear;
         try {
           clear = await cipher.decrypt(
-            SecretBox(
-              cipherText,
-              nonce: nonce,
-              mac: Mac(macBytes),
-            ),
+            SecretBox(cipherText, nonce: nonce, mac: Mac(macBytes)),
             secretKey: secretKey,
           );
         } catch (_) {
@@ -289,9 +285,7 @@ final class EncryptedFullBackupCodec {
   }
 
   static int _readU32(List<int> source, int offset) {
-    final bytes = source is Uint8List
-        ? source
-        : Uint8List.fromList(source);
+    final bytes = source is Uint8List ? source : Uint8List.fromList(source);
     return ByteData.sublistView(bytes).getUint32(offset, Endian.big);
   }
 
