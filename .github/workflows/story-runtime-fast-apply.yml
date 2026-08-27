@@ -1,0 +1,202 @@
+name: Story Runtime Fast Apply
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+    paths:
+      - .github/workflows/story-runtime-fast-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/story-runtime-foundation
+          fetch-depth: 0
+
+      - name: Apply global prompt and built-in skills
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets/story_skills/lieflat-less-ai-tone
+          curl -fL --retry 3 \
+            "https://raw.githubusercontent.com/larashero3-dotcom/lieflat-less-ai-tone/27d29232f10124db904ca9c0536d0b67cb3b2833/SKILL.md" \
+            -o assets/story_skills/lieflat-less-ai-tone/SKILL.md
+
+          cat > lib/features/story_runtime/skills/built_in_story_skills.dart <<'DART'
+          import 'package:flutter/services.dart' show rootBundle;
+
+          import 'story_skill_models.dart';
+
+          const Set<String> defaultBuiltInStorySkillIds = <String>{
+            'lieflat-less-ai-tone',
+            'story-continuity-basics',
+            'scene-writing-basics',
+          };
+
+          Future<List<StorySkillManifest>> loadBuiltInStorySkills() async {
+            final lessAiTone = await rootBundle.loadString(
+              'assets/story_skills/lieflat-less-ai-tone/SKILL.md',
+            );
+            return <StorySkillManifest>[
+              StorySkillManifest(
+                id: 'lieflat-less-ai-tone',
+                name: '去 AI 味',
+                version: '2026.08.24',
+                description: '默认写作清理 Skill；按上游白名单规则减少 AI 写作痕迹。',
+                instructions: <String>[lessAiTone],
+                activationModes: const <StorySkillActivationMode>{
+                  StorySkillActivationMode.always,
+                },
+                metadata: const <String, Object?>{
+                  'builtIn': true,
+                  'defaultEnabled': true,
+                  'source': 'https://github.com/larashero3-dotcom/lieflat-less-ai-tone',
+                  'sourceCommit': '27d29232f10124db904ca9c0536d0b67cb3b2833',
+                },
+              ),
+              const StorySkillManifest(
+                id: 'story-continuity-basics',
+                name: '叙事连续性',
+                version: '1.0.0',
+                description: '维持人物、时间、地点、物品、伤势与未解决后果的一致性。',
+                instructions: <String>[
+                  '写作时保持既有事实连续：人物身份与关系、时间线、地点、持有物、伤势、承诺和未解决后果不得无故重置；信息不足时不要凭空补造关键事实。',
+                ],
+                activationModes: <StorySkillActivationMode>{
+                  StorySkillActivationMode.always,
+                },
+                metadata: <String, Object?>{
+                  'builtIn': true,
+                  'defaultEnabled': true,
+                },
+              ),
+              const StorySkillManifest(
+                id: 'scene-writing-basics',
+                name: '场景写作基础',
+                version: '1.0.0',
+                description: '让场景推进依靠动作、环境反馈与角色反应，而不是重复总结。',
+                instructions: <String>[
+                  '优先用可观察的动作、环境变化和角色即时反应推进场景；保持既定视角与语体，避免重复概括上一段已经呈现的信息，也不要为了润色擅自增加设定。',
+                ],
+                activationModes: <StorySkillActivationMode>{
+                  StorySkillActivationMode.always,
+                },
+                metadata: <String, Object?>{
+                  'builtIn': true,
+                  'defaultEnabled': true,
+                },
+              ),
+            ];
+          }
+          DART
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'patch anchor missing: {path}: {old[:80]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          # Global request path: prepend Break Armor before the normal system prompt.
+          replace_once(
+              'lib/features/home/services/message_generation_service.dart',
+              "import '../../story_runtime/orchestration/story_mvp_prompt_service.dart';\n",
+              "import '../../story_runtime/orchestration/story_break_armor_mode.dart';\nimport '../../story_runtime/orchestration/story_mvp_prompt_service.dart';\n",
+          )
+          replace_once(
+              'lib/features/home/services/message_generation_service.dart',
+              '    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);\n\n',
+              "    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);\n    StoryBreakArmorMode(\n      contextProvider.read<BusinessPreferences>(),\n    ).prependToSystemPrompt(apiMessages);\n\n",
+          )
+
+          # Story Studio UI switch; global, persisted, default enabled.
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              "import '../agency/story_agency_policy.dart';\n",
+              "import '../agency/story_agency_policy.dart';\nimport '../orchestration/story_break_armor_mode.dart';\n",
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              '  bool _busy = false;\n',
+              '  bool _busy = false;\n  bool _breakArmorEnabled = true;\n',
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              '  late StoryRuntimeStore _runtimeStore;\n',
+              '  late StoryRuntimeStore _runtimeStore;\n  late StoryBreakArmorMode _breakArmorMode;\n',
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              '    final preferences = context.read<BusinessPreferences>();\n    _runtimeStore = StoryRuntimeStore(preferences);\n',
+              '    final preferences = context.read<BusinessPreferences>();\n    _breakArmorMode = StoryBreakArmorMode(preferences);\n    _breakArmorEnabled = _breakArmorMode.enabled;\n    _runtimeStore = StoryRuntimeStore(preferences);\n',
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              '  Future<void> _setStoryEnabled(bool enabled) async {\n',
+              "  Future<void> _setBreakArmorEnabled(bool enabled) async {\n    await _breakArmorMode.setEnabled(enabled);\n    if (mounted) setState(() => _breakArmorEnabled = enabled);\n  }\n\n  Future<void> _setStoryEnabled(bool enabled) async {\n",
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              "                _sectionTitle(context, 'Story Mode'),\n",
+              "                _sectionTitle(context, 'Story Mode'),\n                SwitchListTile(\n                  contentPadding: EdgeInsets.zero,\n                  title: const Text('破甲模式'),\n                  subtitle: const Text('默认开启；对所有模型生效，并在原系统提示词之前注入。'),\n                  value: _breakArmorEnabled,\n                  onChanged: _busy ? null : _setBreakArmorEnabled,\n                ),\n",
+          )
+
+          # Built-in Story Skills: bundled + installed package override by id.
+          replace_once(
+              'lib/features/story_runtime/skills/story_skill_library.dart',
+              "import '../../../utils/app_directories.dart';\n",
+              "import '../../../utils/app_directories.dart';\nimport 'built_in_story_skills.dart';\n",
+          )
+          replace_once(
+              'lib/features/story_runtime/skills/story_skill_library.dart',
+              "    final packages = await _repository.readAll();\n    final manifests = <StorySkillManifest>[];\n    for (final package in packages) {\n      manifests.add(await load(package));\n    }\n",
+              "    final packages = await _repository.readAll();\n    final manifestsById = <String, StorySkillManifest>{\n      for (final manifest in await loadBuiltInStorySkills()) manifest.id: manifest,\n    };\n    for (final package in packages) {\n      final manifest = await load(package);\n      manifestsById[manifest.id] = manifest;\n    }\n    final manifests = manifestsById.values.toList(growable: false);\n",
+          )
+
+          # Default-enabled built-ins participate even before a user creates a binding.
+          replace_once(
+              'lib/features/story_runtime/orchestration/story_mvp_prompt_service.dart',
+              "    final enabledBindingIds = <String>{\n      for (final binding in bindings)\n        if (binding.enabled) binding.skillId,\n    };\n    final skills = _skillResolver.resolve(\n      manifests: manifests,\n      bindings: bindings,\n",
+              "    final effectiveBindings = <StorySkillBinding>[...bindings];\n    final explicitlyBoundIds = <String>{for (final binding in bindings) binding.skillId};\n    for (final manifest in manifests) {\n      if (manifest.metadata['defaultEnabled'] == true &&\n          !explicitlyBoundIds.contains(manifest.id)) {\n        effectiveBindings.add(\n          StorySkillBinding(assistantId: aid, skillId: manifest.id),\n        );\n      }\n    }\n    final enabledBindingIds = <String>{\n      for (final binding in effectiveBindings)\n        if (binding.enabled) binding.skillId,\n    };\n    final skills = _skillResolver.resolve(\n      manifests: manifests,\n      bindings: effectiveBindings,\n",
+          )
+
+          # Bundle the pinned upstream skill asset.
+          replace_once(
+              'pubspec.yaml',
+              '    - assets/html/mark.html\n',
+              '    - assets/html/mark.html\n    - assets/story_skills/\n',
+          )
+          PY
+
+          git diff --check
+
+      - name: Commit applied changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/story_skills/lieflat-less-ai-tone/SKILL.md \
+            lib/features/home/services/message_generation_service.dart \
+            lib/features/story_runtime/orchestration/story_mvp_prompt_service.dart \
+            lib/features/story_runtime/skills/built_in_story_skills.dart \
+            lib/features/story_runtime/skills/story_skill_library.dart \
+            lib/features/story_runtime/ui/story_studio_page.dart \
+            pubspec.yaml
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "feat(story): enable break armor and bundled writing skills"
+          git push origin HEAD:feat/story-runtime-foundation
