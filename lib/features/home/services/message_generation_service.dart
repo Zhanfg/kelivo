@@ -190,20 +190,26 @@ class MessageGenerationService {
     // (same keyword trigger range as before OCR-after-trim). Document/OCR work
     // runs only after the single final context trim below.
     messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
-    StoryBreakArmorMode(
-      contextProvider.read<BusinessPreferences>(),
-    ).prependToSystemPrompt(apiMessages);
+    BusinessPreferences? storyPreferences;
+    try {
+      storyPreferences = contextProvider.read<BusinessPreferences>();
+    } on ProviderNotFoundException {
+      // Story Runtime is opt-in. Plain chat/test contexts do not have to
+      // register its persistence provider.
+      storyPreferences = null;
+    }
+    if (storyPreferences != null) {
+      StoryBreakArmorMode(storyPreferences).prependToSystemPrompt(apiMessages);
 
-    final storyConversationId = (currentConversation?.id ?? '').trim();
-    final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();
-    if (storyConversationId.isNotEmpty && storyAssistantId.isNotEmpty) {
-      final storyPrompt = await StoryMvpPromptService(
-        contextProvider.read<BusinessPreferences>(),
-      ).build(
-        conversationId: storyConversationId,
-        assistantId: storyAssistantId,
-      );
-      _injectStoryMvpSystemPrompt(apiMessages, storyPrompt);
+      final storyConversationId = (currentConversation?.id ?? '').trim();
+      final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();
+      if (storyConversationId.isNotEmpty && storyAssistantId.isNotEmpty) {
+        final storyPrompt = await StoryMvpPromptService(storyPreferences).build(
+          conversationId: storyConversationId,
+          assistantId: storyAssistantId,
+        );
+        _injectStoryMvpSystemPrompt(apiMessages, storyPrompt);
+      }
     }
 
     await messageBuilderService.injectMemoryAndRecentChats(
