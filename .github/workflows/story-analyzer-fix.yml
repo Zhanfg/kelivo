@@ -64,7 +64,7 @@ jobs:
           replace(
               manager,
               '    final description = manifest.description?.trim();\n',
-              '    final description = manifest.description?.trim();\n    final sourceRepository = gitHubPackage?.sourceRepository;\n',
+              '    final description = manifest.description?.trim();\n    final sourceRepository = gitHubPackage == null ? null : gitHubPackage.sourceRepository;\n',
           )
           replace(
               manager,
