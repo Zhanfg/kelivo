@@ -22,7 +22,7 @@ abstract interface class StoryRuntimeSessionRepository {
 /// persistence contract.
 final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState>
     implements StoryRuntimeSessionRepository {
-  StoryRuntimeStore(BusinessPreferences preferences) : super(preferences);
+  StoryRuntimeStore(super.preferences);
 
   static const String key = 'story_runtime_sessions_v1';
 
