@@ -16,7 +16,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../story_runtime/orchestration/story_break_armor_mode.dart';
-import '../../story_runtime/orchestration/story_mvp_prompt_service.dart';
+import '../../story_runtime/orchestration/story_runtime_prompt_service.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/generation_controller.dart';
 import 'ask_user_interaction_service.dart';
@@ -115,7 +115,7 @@ class MessageGenerationService {
     return budget >= 1024;
   }
 
-  void _injectStoryMvpSystemPrompt(
+  void _injectStoryRuntimeSystemPrompt(
     List<Map<String, dynamic>> apiMessages,
     String? storyPrompt,
   ) {
@@ -201,14 +201,14 @@ class MessageGenerationService {
     if (storyPreferences != null) {
       StoryBreakArmorMode(storyPreferences).prependToSystemPrompt(apiMessages);
 
-      final storyConversationId = (currentConversation?.id ?? '').trim();
       final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();
-      if (storyConversationId.isNotEmpty && storyAssistantId.isNotEmpty) {
-        final storyPrompt = await StoryMvpPromptService(storyPreferences).build(
-          conversationId: storyConversationId,
+      if (currentConversation != null && storyAssistantId.isNotEmpty) {
+        final runtime = await StoryRuntimePromptService(storyPreferences).build(
+          conversation: currentConversation,
+          messages: messages,
           assistantId: storyAssistantId,
         );
-        _injectStoryMvpSystemPrompt(apiMessages, storyPrompt);
+        _injectStoryRuntimeSystemPrompt(apiMessages, runtime?.providerText);
       }
     }
 
