@@ -52,7 +52,7 @@ final class StoryPromptCacheDiagnostics {
 
   double get stablePrefixRatio {
     final total = providerVisibleChars;
-    return total == 0 ? 1 : stablePrefixChars / total;
+    return total == 0 ? 1.0 : stablePrefixChars / total;
   }
 }
 
