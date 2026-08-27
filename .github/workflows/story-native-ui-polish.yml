@@ -1,0 +1,51 @@
+name: Story Native UI Polish
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+    paths:
+      - .github/workflows/story-native-ui-polish.yml
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/story-runtime-foundation
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.6'
+          channel: stable
+          cache: true
+      - name: Patch Story surfaces
+        run: python3 tool/story_native_ui_polish.py
+      - name: Format
+        run: dart format lib/features/story_runtime/ui/story_native_settings_widgets.dart lib/features/story_runtime/ui/story_studio_page.dart lib/features/story_runtime/ui/story_skill_manager_page.dart
+      - name: Dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: dart analyze --fatal-infos lib test
+      - name: Story tests
+        run: |
+          flutter test --concurrency=1 \
+            test/story_runtime_foundation_test.dart \
+            test/story_skill_system_test.dart \
+            test/story_voice_routing_test.dart
+      - name: Commit verified polish
+        run: |
+          git rm .github/workflows/story-native-ui-polish.yml tool/story_native_ui_polish.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            lib/features/story_runtime/ui/story_native_settings_widgets.dart \
+            lib/features/story_runtime/ui/story_studio_page.dart \
+            lib/features/story_runtime/ui/story_skill_manager_page.dart
+          git commit -m 'fix(story): align Story surfaces with Kelivo native controls'
+          git push origin HEAD:feat/story-runtime-foundation
