@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../icons/lucide_adapter.dart';
+import 'story_native_settings_widgets.dart';
+
 import '../../../core/database/business_preferences.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../skills/story_skill_binding_store.dart';
@@ -279,88 +282,102 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final assistants = context.watch<AssistantProvider>().assistants;
     final selectedAssistantId =
         assistants.any((assistant) => assistant.id == _assistantId)
         ? _assistantId
         : null;
+    final isZh = Localizations.localeOf(context).languageCode == 'zh';
+    String tr(String zh, String en) => isZh ? zh : en;
+
+    String assistantLabel(String id) {
+      for (final assistant in assistants) {
+        if (assistant.id == id) return assistant.name;
+      }
+      return tr('未选择', 'Not selected');
+    }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Skill 管理')),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppBar(
+        leading: StoryNativeBackButton(tooltip: tr('返回', 'Back')),
+        title: Text(tr('故事技能', 'Story Skills')),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
-                Text(
-                  'Skill 按 Assistant 独立启用。内置默认 Skill 可以显式关闭；手动 Skill 只有开启后才进入 Story Runtime。',
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedAssistantId,
-                  decoration: const InputDecoration(
-                    labelText: 'Assistant',
-                    border: OutlineInputBorder(),
+                StoryNativeSection(
+                  title: tr('技能设置', 'Skill settings'),
+                  first: true,
+                  footer: tr(
+                    'Skill 按 Assistant 独立启用。GitHub 直装固定到具体 commit；涉及 MCP、工具、内存权限或 Hook 的包仍要求本地审核。',
+                    'Skills are enabled per Assistant. GitHub installs are pinned to a commit; packages declaring MCP, tool, memory or hook permissions still require local review.',
                   ),
-                  items: [
-                    for (final assistant in assistants)
-                      DropdownMenuItem<String>(
-                        value: assistant.id,
-                        child: Text(
-                          assistant.name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: _busy ? null : _selectAssistant,
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'GitHub 直装固定到具体 commit，并只导入 Prompt / Assets / WorldBooks / Templates。上游若声明 MCP、工具、内存权限或 Hook，会要求改走本地 ZIP 审核。',
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
                   children: [
-                    FilledButton.icon(
-                      onPressed: _busy ? null : _installFromGitHub,
-                      icon: const Icon(Icons.cloud_download_outlined),
-                      label: const Text('从 GitHub 安装'),
+                    if (assistants.isNotEmpty)
+                      StoryNativeSelectRow<String>(
+                        label: 'Assistant',
+                        icon: Lucide.Bot,
+                        value: selectedAssistantId ?? assistants.first.id,
+                        options: assistants.map((item) => item.id).toList(),
+                        labelFor: assistantLabel,
+                        onSelected: _busy ? null : _selectAssistant,
+                      )
+                    else
+                      StoryNativeRow(
+                        title: tr('没有可用 Assistant', 'No Assistants'),
+                        icon: Lucide.Bot,
+                        enabled: false,
+                      ),
+                    StoryNativeRow(
+                      title: tr('从 GitHub 安装', 'Install from GitHub'),
+                      subtitle: tr(
+                        '解析仓库、固定 commit，并按 Skill manifest 导入。',
+                        'Resolve the repository, pin a commit and import from the Skill manifest.',
+                      ),
+                      icon: Lucide.Plus,
+                      onTap: _busy ? null : _installFromGitHub,
                     ),
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : _checkAll,
-                      icon: const Icon(Icons.refresh_outlined),
-                      label: const Text('检查全部更新'),
+                    StoryNativeRow(
+                      title: tr('检查全部更新', 'Check all updates'),
+                      icon: Lucide.Search,
+                      onTap: _busy ? null : _checkAll,
                     ),
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : _updateAll,
-                      icon: const Icon(Icons.system_update_alt_outlined),
-                      label: const Text('更新全部'),
+                    StoryNativeRow(
+                      title: tr('更新全部', 'Update all'),
+                      subtitle: tr(
+                        '只更新已经确认存在新版本的 GitHub Skill。',
+                        'Updates only GitHub Skills already confirmed to have a newer version.',
+                      ),
+                      icon: Lucide.Download,
+                      onTap: _busy ? null : _updateAll,
                     ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                StoryNativeSection(
+                  title: tr('可用 Skills', 'Available Skills'),
+                  children: [
+                    if (_manifests.isEmpty)
+                      StoryNativeRow(
+                        title: tr('没有可用 Skill', 'No Skills available'),
+                        icon: Lucide.Layers,
+                        enabled: false,
+                      ),
+                    for (final manifest in _manifests)
+                      _skillCard(manifest, _packageFor(manifest)),
                   ],
                 ),
                 if (_busy) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   const LinearProgressIndicator(),
                   if (_status != null) ...[
                     const SizedBox(height: 8),
                     Text(_status!, textAlign: TextAlign.center),
                   ],
                 ],
-                const SizedBox(height: 24),
-                Text('可用 Skills', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 8),
-                if (_manifests.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Text('没有可用 Skill。'),
-                  ),
-                for (final manifest in _manifests)
-                  _skillCard(manifest, _packageFor(manifest)),
               ],
             ),
     );
@@ -370,7 +387,6 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
     StorySkillManifest manifest,
     StoryInstalledSkillPackage? package,
   ) {
-    final theme = Theme.of(context);
     final builtIn = manifest.metadata['builtIn'] == true && package == null;
     final defaultEnabled = manifest.metadata['defaultEnabled'] == true;
     final managed = package?.isGitHubManaged == true;
@@ -386,73 +402,50 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
       'v${manifest.version}',
       if (defaultEnabled) '默认启用',
       if (sourceRepository != null) sourceRepository,
+      if (check?.updateAvailable == true) '有更新',
     ].join(' · ');
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(manifest.name, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 2),
-                      Text(subtitle, style: theme.textTheme.bodySmall),
-                    ],
-                  ),
-                ),
-                if (check?.updateAvailable == true)
-                  const Chip(label: Text('有更新')),
-              ],
-            ),
-            if (description.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(description),
-            ],
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Expanded(child: Text('在所选 Assistant 中启用')),
-                Switch(
-                  value: _isSkillEnabled(manifest),
-                  onChanged: _busy || _assistantId == null
-                      ? null
-                      : (value) => _setSkillEnabled(manifest, value),
-                ),
-              ],
-            ),
-            if (managed) ...[
-              const SizedBox(height: 4),
-              Text(
-                '当前 ${_shortSha(package!.sourceCommitSha!)}${check == null ? '' : ' · 远端 ${_shortSha(check.latestCommitSha)}'}',
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          StoryNativeSwitchRow(
+            title: manifest.name,
+            subtitle: description.isEmpty
+                ? subtitle
+                : '$subtitle\n$description',
+            icon: Lucide.Layers,
+            value: _isSkillEnabled(manifest),
+            onChanged: _busy || _assistantId == null
+                ? null
+                : (value) => _setSkillEnabled(manifest, value),
+          ),
+          if (managed)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 9),
+              child: Wrap(
                 spacing: 8,
+                runSpacing: 8,
                 children: [
-                  TextButton.icon(
-                    onPressed: _busy ? null : () => _checkOne(package),
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('检查更新'),
+                  StoryNativeButton(
+                    label: '检查更新',
+                    icon: Lucide.Search,
+                    enabled: !_busy,
+                    onTap: () => _checkOne(package!),
                   ),
                   if (check?.updateAvailable == true)
-                    FilledButton.tonalIcon(
-                      onPressed: _busy ? null : () => _updateOne(package),
-                      icon: const Icon(Icons.system_update_alt, size: 18),
-                      label: const Text('更新'),
+                    StoryNativeButton(
+                      label: '更新',
+                      icon: Lucide.Download,
+                      primary: true,
+                      enabled: !_busy,
+                      onTap: () => _updateOne(package!),
                     ),
                 ],
               ),
-            ],
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
