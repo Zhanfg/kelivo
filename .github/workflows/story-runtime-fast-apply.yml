@@ -1,4 +1,4 @@
-name: Story Runtime Fast Apply
+name: Story Skills Integration Apply
 
 on:
   push:
@@ -13,86 +13,91 @@ permissions:
 jobs:
   apply:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           ref: feat/story-runtime-foundation
           fetch-depth: 0
 
-      - name: Apply global prompt and built-in skills
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.6'
+          channel: stable
+          cache: true
+
+      - name: Apply Skill Library integration
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p assets/story_skills/lieflat-less-ai-tone
-          curl -fL --retry 3 \
-            "https://raw.githubusercontent.com/larashero3-dotcom/lieflat-less-ai-tone/27d29232f10124db904ca9c0536d0b67cb3b2833/SKILL.md" \
-            -o assets/story_skills/lieflat-less-ai-tone/SKILL.md
 
-          cat > lib/features/story_runtime/skills/built_in_story_skills.dart <<'DART'
-          import 'package:flutter/services.dart' show rootBundle;
-
+          cat > lib/features/story_runtime/skills/story_skill_activation_policy.dart <<'DART'
           import 'story_skill_models.dart';
 
-          const Set<String> defaultBuiltInStorySkillIds = <String>{
-            'lieflat-less-ai-tone',
-            'story-continuity-basics',
-            'scene-writing-basics',
-          };
+          /// Resolves persisted per-assistant overrides against manifest defaults.
+          ///
+          /// An explicit binding always wins, including `enabled: false`. This is
+          /// important for built-in Skills that are enabled by default: removing a
+          /// binding would otherwise make the default immediately turn back on.
+          final class StorySkillActivationPolicy {
+            const StorySkillActivationPolicy._();
 
-          Future<List<StorySkillManifest>> loadBuiltInStorySkills() async {
-            final lessAiTone = await rootBundle.loadString(
-              'assets/story_skills/lieflat-less-ai-tone/SKILL.md',
-            );
-            return <StorySkillManifest>[
-              StorySkillManifest(
-                id: 'lieflat-less-ai-tone',
-                name: '去 AI 味',
-                version: '2026.08.24',
-                description: '默认写作清理 Skill；按上游白名单规则减少 AI 写作痕迹。',
-                instructions: <String>[lessAiTone],
-                activationModes: const <StorySkillActivationMode>{
-                  StorySkillActivationMode.always,
-                },
-                metadata: const <String, Object?>{
-                  'builtIn': true,
-                  'defaultEnabled': true,
-                  'source': 'https://github.com/larashero3-dotcom/lieflat-less-ai-tone',
-                  'sourceCommit': '27d29232f10124db904ca9c0536d0b67cb3b2833',
-                },
-              ),
-              const StorySkillManifest(
-                id: 'story-continuity-basics',
-                name: '叙事连续性',
-                version: '1.0.0',
-                description: '维持人物、时间、地点、物品、伤势与未解决后果的一致性。',
-                instructions: <String>[
-                  '写作时保持既有事实连续：人物身份与关系、时间线、地点、持有物、伤势、承诺和未解决后果不得无故重置；信息不足时不要凭空补造关键事实。',
-                ],
-                activationModes: <StorySkillActivationMode>{
-                  StorySkillActivationMode.always,
-                },
-                metadata: <String, Object?>{
-                  'builtIn': true,
-                  'defaultEnabled': true,
-                },
-              ),
-              const StorySkillManifest(
-                id: 'scene-writing-basics',
-                name: '场景写作基础',
-                version: '1.0.0',
-                description: '让场景推进依靠动作、环境反馈与角色反应，而不是重复总结。',
-                instructions: <String>[
-                  '优先用可观察的动作、环境变化和角色即时反应推进场景；保持既定视角与语体，避免重复概括上一段已经呈现的信息，也不要为了润色擅自增加设定。',
-                ],
-                activationModes: <StorySkillActivationMode>{
-                  StorySkillActivationMode.always,
-                },
-                metadata: <String, Object?>{
-                  'builtIn': true,
-                  'defaultEnabled': true,
-                },
-              ),
-            ];
+            static StorySkillBinding? explicitBinding({
+              required String? assistantId,
+              required String skillId,
+              required Iterable<StorySkillBinding> bindings,
+            }) {
+              final aid = assistantId?.trim();
+              if (aid == null || aid.isEmpty) return null;
+              for (final binding in bindings) {
+                if (binding.assistantId == aid && binding.skillId == skillId) {
+                  return binding;
+                }
+              }
+              return null;
+            }
+
+            static bool isEnabled({
+              required StorySkillManifest manifest,
+              required String? assistantId,
+              required Iterable<StorySkillBinding> bindings,
+            }) {
+              final explicit = explicitBinding(
+                assistantId: assistantId,
+                skillId: manifest.id,
+                bindings: bindings,
+              );
+              if (explicit != null) return explicit.enabled;
+              return manifest.metadata['defaultEnabled'] == true;
+            }
+
+            static List<StorySkillBinding> effectiveBindings({
+              required String assistantId,
+              required Iterable<StorySkillManifest> manifests,
+              required Iterable<StorySkillBinding> bindings,
+            }) {
+              final aid = assistantId.trim();
+              if (aid.isEmpty) return const <StorySkillBinding>[];
+              final result = <StorySkillBinding>[
+                for (final binding in bindings)
+                  if (binding.assistantId == aid) binding,
+              ];
+              final explicitIds = <String>{
+                for (final binding in result) binding.skillId,
+              };
+              for (final manifest in manifests) {
+                if (manifest.metadata['defaultEnabled'] == true &&
+                    !explicitIds.contains(manifest.id)) {
+                  result.add(
+                    StorySkillBinding(assistantId: aid, skillId: manifest.id),
+                  );
+                }
+              }
+              return List<StorySkillBinding>.unmodifiable(result);
+            }
           }
           DART
 
@@ -105,98 +110,495 @@ jobs:
               if new in text:
                   return
               if old not in text:
-                  raise SystemExit(f'patch anchor missing: {path}: {old[:80]!r}')
+                  raise SystemExit(f'patch anchor missing: {path}: {old[:120]!r}')
               p.write_text(text.replace(old, new, 1))
 
-          # Global request path: prepend Break Armor before the normal system prompt.
-          replace_once(
-              'lib/features/home/services/message_generation_service.dart',
-              "import '../../story_runtime/orchestration/story_mvp_prompt_service.dart';\n",
-              "import '../../story_runtime/orchestration/story_break_armor_mode.dart';\nimport '../../story_runtime/orchestration/story_mvp_prompt_service.dart';\n",
-          )
-          replace_once(
-              'lib/features/home/services/message_generation_service.dart',
-              '    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);\n\n',
-              "    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);\n    StoryBreakArmorMode(\n      contextProvider.read<BusinessPreferences>(),\n    ).prependToSystemPrompt(apiMessages);\n\n",
-          )
-
-          # Story Studio UI switch; global, persisted, default enabled.
-          replace_once(
-              'lib/features/story_runtime/ui/story_studio_page.dart',
-              "import '../agency/story_agency_policy.dart';\n",
-              "import '../agency/story_agency_policy.dart';\nimport '../orchestration/story_break_armor_mode.dart';\n",
-          )
-          replace_once(
-              'lib/features/story_runtime/ui/story_studio_page.dart',
-              '  bool _busy = false;\n',
-              '  bool _busy = false;\n  bool _breakArmorEnabled = true;\n',
-          )
-          replace_once(
-              'lib/features/story_runtime/ui/story_studio_page.dart',
-              '  late StoryRuntimeStore _runtimeStore;\n',
-              '  late StoryRuntimeStore _runtimeStore;\n  late StoryBreakArmorMode _breakArmorMode;\n',
-          )
-          replace_once(
-              'lib/features/story_runtime/ui/story_studio_page.dart',
-              '    final preferences = context.read<BusinessPreferences>();\n    _runtimeStore = StoryRuntimeStore(preferences);\n',
-              '    final preferences = context.read<BusinessPreferences>();\n    _breakArmorMode = StoryBreakArmorMode(preferences);\n    _breakArmorEnabled = _breakArmorMode.enabled;\n    _runtimeStore = StoryRuntimeStore(preferences);\n',
-          )
-          replace_once(
-              'lib/features/story_runtime/ui/story_studio_page.dart',
-              '  Future<void> _setStoryEnabled(bool enabled) async {\n',
-              "  Future<void> _setBreakArmorEnabled(bool enabled) async {\n    await _breakArmorMode.setEnabled(enabled);\n    if (mounted) setState(() => _breakArmorEnabled = enabled);\n  }\n\n  Future<void> _setStoryEnabled(bool enabled) async {\n",
-          )
-          replace_once(
-              'lib/features/story_runtime/ui/story_studio_page.dart',
-              "                _sectionTitle(context, 'Story Mode'),\n",
-              "                _sectionTitle(context, 'Story Mode'),\n                SwitchListTile(\n                  contentPadding: EdgeInsets.zero,\n                  title: const Text('破甲模式'),\n                  subtitle: const Text('默认开启；对所有模型生效，并在原系统提示词之前注入。'),\n                  value: _breakArmorEnabled,\n                  onChanged: _busy ? null : _setBreakArmorEnabled,\n                ),\n",
-          )
-
-          # Built-in Story Skills: bundled + installed package override by id.
-          replace_once(
-              'lib/features/story_runtime/skills/story_skill_library.dart',
-              "import '../../../utils/app_directories.dart';\n",
-              "import '../../../utils/app_directories.dart';\nimport 'built_in_story_skills.dart';\n",
-          )
-          replace_once(
-              'lib/features/story_runtime/skills/story_skill_library.dart',
-              "    final packages = await _repository.readAll();\n    final manifests = <StorySkillManifest>[];\n    for (final package in packages) {\n      manifests.add(await load(package));\n    }\n",
-              "    final packages = await _repository.readAll();\n    final manifestsById = <String, StorySkillManifest>{\n      for (final manifest in await loadBuiltInStorySkills()) manifest.id: manifest,\n    };\n    for (final package in packages) {\n      final manifest = await load(package);\n      manifestsById[manifest.id] = manifest;\n    }\n    final manifests = manifestsById.values.toList(growable: false);\n",
-          )
-
-          # Default-enabled built-ins participate even before a user creates a binding.
+          # Runtime and UI share the same default/override policy.
           replace_once(
               'lib/features/story_runtime/orchestration/story_mvp_prompt_service.dart',
-              "    final enabledBindingIds = <String>{\n      for (final binding in bindings)\n        if (binding.enabled) binding.skillId,\n    };\n    final skills = _skillResolver.resolve(\n      manifests: manifests,\n      bindings: bindings,\n",
-              "    final effectiveBindings = <StorySkillBinding>[...bindings];\n    final explicitlyBoundIds = <String>{for (final binding in bindings) binding.skillId};\n    for (final manifest in manifests) {\n      if (manifest.metadata['defaultEnabled'] == true &&\n          !explicitlyBoundIds.contains(manifest.id)) {\n        effectiveBindings.add(\n          StorySkillBinding(assistantId: aid, skillId: manifest.id),\n        );\n      }\n    }\n    final enabledBindingIds = <String>{\n      for (final binding in effectiveBindings)\n        if (binding.enabled) binding.skillId,\n    };\n    final skills = _skillResolver.resolve(\n      manifests: manifests,\n      bindings: effectiveBindings,\n",
+              "import '../skills/story_skill_binding_store.dart';\n",
+              "import '../skills/story_skill_activation_policy.dart';\nimport '../skills/story_skill_binding_store.dart';\n",
+          )
+          replace_once(
+              'lib/features/story_runtime/orchestration/story_mvp_prompt_service.dart',
+              """    final effectiveBindings = <StorySkillBinding>[...bindings];
+    final explicitlyBoundIds = <String>{for (final binding in bindings) binding.skillId};
+    for (final manifest in manifests) {
+      if (manifest.metadata['defaultEnabled'] == true &&
+          !explicitlyBoundIds.contains(manifest.id)) {
+        effectiveBindings.add(
+          StorySkillBinding(assistantId: aid, skillId: manifest.id),
+        );
+      }
+    }
+""",
+              """    final effectiveBindings = StorySkillActivationPolicy.effectiveBindings(
+      assistantId: aid,
+      manifests: manifests,
+      bindings: bindings,
+    );
+""",
           )
 
-          # Bundle the pinned upstream skill asset.
+          # Story Studio: use the unified library, GitHub source service, and one
+          # authoritative enabled-state resolver.
           replace_once(
-              'pubspec.yaml',
-              '    - assets/html/mark.html\n',
-              '    - assets/html/mark.html\n    - assets/story_skills/\n',
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              """import '../skills/story_skill_binding_store.dart';
+import '../skills/story_skill_models.dart';
+import '../skills/story_skill_package_importer.dart';
+import '../skills/story_skill_package_store.dart';
+""",
+              """import '../skills/story_skill_activation_policy.dart';
+import '../skills/story_skill_binding_store.dart';
+import '../skills/story_skill_github_source.dart';
+import '../skills/story_skill_library.dart';
+import '../skills/story_skill_models.dart';
+import '../skills/story_skill_package_importer.dart';
+import '../skills/story_skill_package_store.dart';
+""",
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              "import '../state/story_runtime_store.dart';\n",
+              "import '../state/story_runtime_store.dart';\nimport 'story_skill_github_install_dialog.dart';\n",
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              """  late StorySkillPackageStore _skillPackageStore;
+  late StorySkillPackageImporter _skillImporter;
+  late StorySkillBindingStore _skillBindingStore;
+""",
+              """  late StorySkillPackageStore _skillPackageStore;
+  late StorySkillPackageImporter _skillImporter;
+  late StorySkillLibrary _skillLibrary;
+  late StorySkillGitHubService _skillGitHubService;
+  late StorySkillBindingStore _skillBindingStore;
+""",
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              """  List<StoryInstalledSkillPackage> _skillPackages = const [];
+  List<StorySkillBinding> _skillBindings = const [];
+""",
+              """  List<StoryInstalledSkillPackage> _skillPackages = const [];
+  List<StorySkillManifest> _skillManifests = const [];
+  List<StorySkillBinding> _skillBindings = const [];
+""",
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              """    _skillPackageStore = StorySkillPackageStore(preferences);
+    _skillImporter = StorySkillPackageImporter(repository: _skillPackageStore);
+    _skillBindingStore = StorySkillBindingStore(preferences);
+""",
+              """    _skillPackageStore = StorySkillPackageStore(preferences);
+    _skillImporter = StorySkillPackageImporter(repository: _skillPackageStore);
+    _skillLibrary = StorySkillLibrary(repository: _skillPackageStore);
+    _skillGitHubService = StorySkillGitHubService(
+      repository: _skillPackageStore,
+      importer: _skillImporter,
+    );
+    _skillBindingStore = StorySkillBindingStore(preferences);
+""",
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              """  List<Conversation> _conversations() {
+""",
+              """  @override
+  void dispose() {
+    if (_initialized) _skillGitHubService.close();
+    super.dispose();
+  }
+
+  List<Conversation> _conversations() {
+""",
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              """      final packages = await _skillPackageStore.readAll();
+      final session = conversationId == null
+""",
+              """      final packages = await _skillPackageStore.readAll();
+      final manifests = await _skillLibrary.loadAll();
+      final session = conversationId == null
+""",
+          )
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              """        _skillPackages = packages;
+        _session = session;
+""",
+              """        _skillPackages = packages;
+        _skillManifests = manifests;
+        _session = session;
+""",
+          )
+
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              """  bool _isSkillBound(String skillId) =>
+      _skillBindings.any((item) => item.skillId == skillId && item.enabled);
+
+  Future<void> _setSkillBound(String skillId, bool enabled) async {
+    final assistantId = _selectedAssistantId();
+    if (assistantId == null || assistantId.isEmpty) {
+      _showMessage('当前会话没有可绑定的 Assistant。');
+      return;
+    }
+    if (enabled) {
+      await _skillBindingStore.upsert(
+        StorySkillBinding(assistantId: assistantId, skillId: skillId),
+      );
+    } else {
+      await _skillBindingStore.remove(
+        assistantId: assistantId,
+        skillId: skillId,
+      );
+    }
+    await _reload();
+  }
+""",
+              """  Future<void> _installSkillFromGitHub() async {
+    if (_busy) return;
+    final request = await showStorySkillGitHubInstallDialog(context);
+    if (request == null || !mounted) return;
+    await _runBusy(() async {
+      final result = await _skillGitHubService.install(
+        repositoryUrl: request.repositoryUrl,
+        ref: request.ref,
+        subdirectory: request.subdirectory,
+      );
+      if (!mounted) return;
+      final replaced = result.replacedVersions > 0
+          ? ' 已替换 ${result.replacedVersions} 个旧版本。'
+          : '';
+      _showMessage(
+        'Skill ${result.importResult.manifest.name} 已从 GitHub 安装。$replaced',
+      );
+    });
+  }
+
+  StoryInstalledSkillPackage? _installedSkillPackage(String skillId) {
+    StoryInstalledSkillPackage? matched;
+    for (final package in _skillPackages) {
+      if (package.skillId == skillId) matched = package;
+    }
+    return matched;
+  }
+
+  bool _isSkillEnabled(StorySkillManifest manifest) =>
+      StorySkillActivationPolicy.isEnabled(
+        manifest: manifest,
+        assistantId: _selectedAssistantId(),
+        bindings: _skillBindings,
+      );
+
+  String _skillSourceLabel(StorySkillManifest manifest) {
+    final package = _installedSkillPackage(manifest.id);
+    if (package != null) {
+      if (package.isGitHubManaged) {
+        final repo = package.sourceRepository ?? 'GitHub';
+        final subdirectory = package.sourceSubdirectory;
+        final path = subdirectory == null || subdirectory.isEmpty
+            ? ''
+            : '/$subdirectory';
+        return 'GitHub · $repo$path · v${manifest.version}';
+      }
+      return '本地安装 · v${manifest.version}';
+    }
+    if (manifest.metadata['builtIn'] == true) {
+      return 'Kelivo 内置 · v${manifest.version}';
+    }
+    return 'Skill · v${manifest.version}';
+  }
+
+  Future<void> _checkSkillUpdate(StoryInstalledSkillPackage package) async {
+    if (_busy || !package.isGitHubManaged) return;
+    await _runBusy(() async {
+      final check = await _skillGitHubService.checkForUpdate(package);
+      if (!mounted) return;
+      if (!check.updateAvailable) {
+        _showMessage('该 GitHub Skill 已是最新版本。');
+        return;
+      }
+      final shouldUpdate = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('发现 Skill 更新'),
+          content: Text(
+            '${package.sourceRepository ?? package.skillId} 有新提交。\n'
+            '${check.currentCommitSha.substring(0, 12)} → '
+            '${check.latestCommitSha.substring(0, 12)}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('稍后'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('更新'),
+            ),
+          ],
+        ),
+      );
+      if (shouldUpdate != true) return;
+      final result = await _skillGitHubService.update(package);
+      if (mounted) {
+        _showMessage('Skill ${result.importResult.manifest.name} 已更新。');
+      }
+    });
+  }
+
+  Future<void> _setSkillBound(String skillId, bool enabled) async {
+    final assistantId = _selectedAssistantId();
+    if (assistantId == null || assistantId.isEmpty) {
+      _showMessage('当前会话没有可绑定的 Assistant。');
+      return;
+    }
+    await _skillBindingStore.upsert(
+      StorySkillBinding(
+        assistantId: assistantId,
+        skillId: skillId,
+        enabled: enabled,
+      ),
+    );
+    await _reload();
+  }
+""",
+          )
+
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              """                _sectionTitle(context, 'Skills'),
+                Text(
+                  '导入 Story Skill ZIP。绑定到当前会话所属 Assistant 后，Manual / Always 类型会进入 Story MVP。',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  onPressed: _busy ? null : _importSkill,
+                  icon: const Icon(Icons.extension_outlined),
+                  label: const Text('导入 Skill ZIP'),
+                ),
+                if (_skillPackages.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Text('还没有安装 Story Skill。'),
+                  ),
+                for (final package in _skillPackages)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(package.skillId),
+                    subtitle: Text('v${package.version}'),
+                    value: _isSkillBound(package.skillId),
+                    onChanged: _busy || selectedConversation == null
+                        ? null
+                        : (value) => _setSkillBound(package.skillId, value),
+                  ),
+""",
+              """                _sectionTitle(context, 'Skills'),
+                Text(
+                  '统一显示 Kelivo 内置、GitHub 与本地 Story Skill。内置默认值可被当前 Assistant 显式关闭；GitHub 直装只允许安全的提示词/数据型 Skill。',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _busy ? null : _importSkill,
+                      icon: const Icon(Icons.extension_outlined),
+                      label: const Text('导入 Skill ZIP'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: _busy ? null : _installSkillFromGitHub,
+                      icon: const Icon(Icons.cloud_download_outlined),
+                      label: const Text('从 GitHub 安装'),
+                    ),
+                  ],
+                ),
+                if (_skillManifests.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Text('当前没有可用 Story Skill。'),
+                  ),
+                for (final manifest in _skillManifests)
+                  _skillCard(
+                    manifest,
+                    canBind: selectedConversation != null,
+                  ),
+""",
+          )
+
+          replace_once(
+              'lib/features/story_runtime/ui/story_studio_page.dart',
+              """  Widget _profileCard(StoryReferenceStyleProfile profile) {
+""",
+              """  Widget _skillCard(
+    StorySkillManifest manifest, {
+    required bool canBind,
+  }) {
+    final package = _installedSkillPackage(manifest.id);
+    return Card(
+      child: Column(
+        children: [
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            title: Text(manifest.name),
+            subtitle: Text(
+              '${manifest.description}\n${_skillSourceLabel(manifest)}',
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+            ),
+            value: _isSkillEnabled(manifest),
+            onChanged: _busy || !canBind
+                ? null
+                : (value) => _setSkillBound(manifest.id, value),
+          ),
+          if (package?.isGitHubManaged == true)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+                child: TextButton.icon(
+                  onPressed: _busy ? null : () => _checkSkillUpdate(package!),
+                  icon: const Icon(Icons.system_update_alt_outlined),
+                  label: const Text('检查更新'),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileCard(StoryReferenceStyleProfile profile) {
+""",
+          )
+
+          # Regression coverage for default-enabled built-ins and explicit off.
+          replace_once(
+              'test/story_skill_system_test.dart',
+              "import 'package:Kelivo/features/story_runtime/skills/story_skill_manifest_parser.dart';\n",
+              "import 'package:Kelivo/features/story_runtime/skills/story_skill_activation_policy.dart';\nimport 'package:Kelivo/features/story_runtime/skills/story_skill_manifest_parser.dart';\n",
+          )
+          replace_once(
+              'test/story_skill_system_test.dart',
+              """    test('ordinary Story turn does not expose low-frequency GitHub capability', () {
+""",
+              """    test('default-enabled Skill is active until explicitly disabled', () {
+      const defaultOn = StorySkillManifest(
+        id: 'story.default_on',
+        name: 'Default On',
+        version: '1',
+        activationModes: {StorySkillActivationMode.always},
+        metadata: {'defaultEnabled': true},
+      );
+
+      expect(
+        StorySkillActivationPolicy.isEnabled(
+          manifest: defaultOn,
+          assistantId: 'assistant-1',
+          bindings: const [],
+        ),
+        isTrue,
+      );
+
+      const disabled = [
+        StorySkillBinding(
+          assistantId: 'assistant-1',
+          skillId: 'story.default_on',
+          enabled: false,
+        ),
+      ];
+      expect(
+        StorySkillActivationPolicy.isEnabled(
+          manifest: defaultOn,
+          assistantId: 'assistant-1',
+          bindings: disabled,
+        ),
+        isFalse,
+      );
+
+      final effective = StorySkillActivationPolicy.effectiveBindings(
+        assistantId: 'assistant-1',
+        manifests: const [defaultOn],
+        bindings: disabled,
+      );
+      expect(effective, hasLength(1));
+      expect(effective.single.enabled, isFalse);
+    });
+
+    test('default-enabled Skill gets one synthetic binding when no override exists', () {
+      const defaultOn = StorySkillManifest(
+        id: 'story.default_on',
+        name: 'Default On',
+        version: '1',
+        activationModes: {StorySkillActivationMode.always},
+        metadata: {'defaultEnabled': true},
+      );
+      final effective = StorySkillActivationPolicy.effectiveBindings(
+        assistantId: 'assistant-1',
+        manifests: const [defaultOn],
+        bindings: const [],
+      );
+      final resolved = resolver.resolve(
+        manifests: const [defaultOn],
+        bindings: effective,
+        context: StorySkillActivationContext(
+          assistantId: 'assistant-1',
+          manualEnabledSkillIds: {
+            for (final binding in effective)
+              if (binding.enabled) binding.skillId,
+          },
+        ),
+      );
+
+      expect(effective, hasLength(1));
+      expect(effective.single.enabled, isTrue);
+      expect(resolved.activeSkills.map((skill) => skill.id), ['story.default_on']);
+    });
+
+    test('ordinary Story turn does not expose low-frequency GitHub capability', () {
+""",
           )
           PY
 
+          dart format \
+            lib/features/story_runtime/skills/story_skill_activation_policy.dart \
+            lib/features/story_runtime/orchestration/story_mvp_prompt_service.dart \
+            lib/features/story_runtime/ui/story_studio_page.dart \
+            test/story_skill_system_test.dart
           git diff --check
 
-      - name: Commit applied changes
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze Story Runtime
+        run: dart analyze --fatal-infos lib test
+
+      - name: Test Skill system
+        run: |
+          flutter test \
+            test/story_skill_system_test.dart \
+            test/story_skill_package_test.dart
+
+      - name: Commit verified integration
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/story_skills/lieflat-less-ai-tone/SKILL.md \
-            lib/features/home/services/message_generation_service.dart \
+          rm -f .github/workflows/story-runtime-fast-apply.yml
+          git add \
+            lib/features/story_runtime/skills/story_skill_activation_policy.dart \
             lib/features/story_runtime/orchestration/story_mvp_prompt_service.dart \
-            lib/features/story_runtime/skills/built_in_story_skills.dart \
-            lib/features/story_runtime/skills/story_skill_library.dart \
             lib/features/story_runtime/ui/story_studio_page.dart \
-            pubspec.yaml
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
-          git commit -m "feat(story): enable break armor and bundled writing skills"
+            test/story_skill_system_test.dart
+          git add -u .github/workflows/story-runtime-fast-apply.yml
+          git commit -m "feat(skills): unify built-ins and GitHub management"
           git push origin HEAD:feat/story-runtime-foundation
