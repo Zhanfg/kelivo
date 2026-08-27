@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../utils/url_launcher_ext.dart';
 import '../../../shared/widgets/favicon.dart';
+import '../../story_runtime/ui/story_studio_page.dart';
 
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
@@ -32,6 +33,29 @@ class MorePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              title('Story'),
+              Card(
+                elevation: 0,
+                color: theme.colorScheme.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: cs.outline.withValues(alpha: 0.12)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  leading: const Icon(Icons.auto_stories_outlined),
+                  title: const Text('Story Studio'),
+                  subtitle: const Text('故事模式、参考文本与 Skills'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const StoryStudioPage(),
+                      ),
+                    );
+                  },
+                ),
+              ),
               // LeaderBoard section
               title('LLM排行榜'),
               Row(
