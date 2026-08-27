@@ -8,6 +8,9 @@ import '../../../core/models/conversation.dart';
 import '../../../core/models/memory_entry.dart';
 import '../../../core/services/memory/memory_repository.dart';
 import '../cache/story_prompt_cache_plan.dart';
+import '../mcp/story_mcp_profile.dart';
+import '../mcp/story_mcp_profile_resolver.dart';
+import '../mcp/story_mcp_profile_store.dart';
 import '../memory/story_worldline_memory.dart';
 import '../memory/story_worldline_memory_store.dart';
 import '../reference/story_reference_selection_store.dart';
@@ -34,6 +37,11 @@ final class StoryRuntimePromptResult {
     required this.runtimeStateVersion,
     required this.memoryVersion,
     required this.visibleStoryMemoryCount,
+    required this.mcpProfileId,
+    required this.allowedMcpToolNames,
+    required this.allowedMcpServerIds,
+    required this.includeAssistantMcpDefaults,
+    required this.requireMcpApproval,
   });
 
   final String providerText;
@@ -45,6 +53,11 @@ final class StoryRuntimePromptResult {
   final int runtimeStateVersion;
   final int memoryVersion;
   final int visibleStoryMemoryCount;
+  final String? mcpProfileId;
+  final Set<String> allowedMcpToolNames;
+  final Set<String> allowedMcpServerIds;
+  final bool includeAssistantMcpDefaults;
+  final bool requireMcpApproval;
 }
 
 /// Production Story prompt bridge used by the normal Kelivo send path.
@@ -65,7 +78,9 @@ final class StoryRuntimePromptService {
         repository: StorySkillPackageStore(preferences),
       ),
       _referenceProfileStore = StoryReferenceProfileStore(preferences),
-      _referenceSelectionStore = StoryReferenceSelectionStore(preferences);
+      _referenceSelectionStore = StoryReferenceSelectionStore(preferences),
+      _mcpProfileStore = StoryMcpProfileStore(preferences),
+      _mcpSelectionStore = StoryMcpProfileSelectionStore(preferences);
 
   final StoryRuntimeStore _sessionStore;
   final StoryWorldTreeStore _worldTreeStore;
@@ -76,9 +91,12 @@ final class StoryRuntimePromptService {
   final StorySkillLibrary _skillLibrary;
   final StoryReferenceProfileStore _referenceProfileStore;
   final StoryReferenceSelectionStore _referenceSelectionStore;
+  final StoryMcpProfileStore _mcpProfileStore;
+  final StoryMcpProfileSelectionStore _mcpSelectionStore;
 
   static const StoryWorldlineMemoryResolver _memoryResolver =
       StoryWorldlineMemoryResolver();
+  static const StoryMcpProfileResolver _mcpResolver = StoryMcpProfileResolver();
 
   Future<StoryRuntimePromptResult?> build({
     required Conversation conversation,
@@ -147,17 +165,39 @@ final class StoryRuntimePromptService {
           .where((item) => item.sourceWorldlineId != null)
           .toList(growable: false);
 
+      final mcpSelection = await _mcpSelectionStore.readForConversation(
+        conversation.id,
+      );
+      final selectedMcpProfile = mcpSelection.profileId == null
+          ? null
+          : await _mcpProfileStore.readById(mcpSelection.profileId!);
+      StoryMcpExposurePolicy? mcpExposure;
+
       final assembler = StoryRuntimeAssembler(
         sessionRepository: _sessionStore,
         skillBindingRepository: _skillBindingStore,
         loadSkillManifests: _skillLibrary.loadAll,
         referenceProfileRepository: _referenceProfileStore,
         referenceSelectionRepository: _referenceSelectionStore,
-        resolveHostCapabilities: (_, _) async =>
-            const StoryHostCapabilityResolution(
+        resolveHostCapabilities: (skills, _) async {
+          if (selectedMcpProfile == null) {
+            return const StoryHostCapabilityResolution(
               summary:
-                  'Host capability exposure is resolved by Kelivo; Story does not bypass native tool approval.',
-            ),
+                  'No Story MCP profile is selected; Kelivo Assistant tool exposure remains unchanged.',
+            );
+          }
+          mcpExposure = _mcpResolver.resolve(
+            profile: selectedMcpProfile,
+            skills: skills,
+          );
+          final toolIds = mcpExposure!.allowedToolNames.toList()..sort();
+          return StoryHostCapabilityResolution(
+            toolIds: toolIds,
+            mcpProfileId: mcpExposure!.profileId,
+            summary:
+                'Story MCP profile ${mcpExposure!.profileId} narrows model-visible native MCP routes; execution and approval remain in Kelivo.',
+          );
+        },
       );
       final assembly = await assembler.assemble(
         StoryRuntimeAssemblyRequest(
@@ -218,6 +258,14 @@ final class StoryRuntimePromptService {
         runtimeStateVersion: execution.runtimeStateVersion,
         memoryVersion: tree.memoryVersion,
         visibleStoryMemoryCount: storyScopedMemory.length,
+        mcpProfileId: mcpExposure?.profileId,
+        allowedMcpToolNames:
+            mcpExposure?.allowedToolNames ?? const <String>{},
+        allowedMcpServerIds:
+            mcpExposure?.allowedServerIds ?? const <String>{},
+        includeAssistantMcpDefaults:
+            mcpExposure?.includeAssistantDefaults ?? true,
+        requireMcpApproval: mcpExposure?.requireApproval ?? false,
       );
     } catch (error) {
       await machine.fail(conversationId: conversation.id, error: error);
