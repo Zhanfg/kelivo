@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../utils/url_launcher_ext.dart';
 import '../../../shared/widgets/favicon.dart';
+import '../../story_runtime/ui/story_runtime_control_page.dart';
 import '../../story_runtime/ui/story_skill_manager_page.dart';
 import '../../story_runtime/ui/story_studio_page.dart';
 
@@ -54,6 +55,23 @@ class MorePage extends StatelessWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => const StoryStudioPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    Divider(
+                      height: 1,
+                      color: cs.outline.withValues(alpha: 0.12),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.tune_rounded),
+                      title: const Text('Runtime 控制'),
+                      subtitle: const Text('运行状态、MCP Profile 与 Voice 路由概况'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const StoryRuntimeControlPage(),
                           ),
                         );
                       },
