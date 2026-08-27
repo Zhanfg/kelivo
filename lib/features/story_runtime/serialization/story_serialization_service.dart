@@ -61,6 +61,7 @@ final class StorySerializationService {
   static const Set<String> storyBlobKeys = <String>{
     'story_runtime_sessions_v1',
     'story_runtime_execution_v1',
+    'story_scene_runtime_v1',
     'story_world_trees_v1',
     'story_worldline_memory_v1',
     'story_skill_bindings_v1',
