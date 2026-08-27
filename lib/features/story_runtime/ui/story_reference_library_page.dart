@@ -23,8 +23,7 @@ class StoryReferenceLibraryPage extends StatefulWidget {
       _StoryReferenceLibraryPageState();
 }
 
-class _StoryReferenceLibraryPageState
-    extends State<StoryReferenceLibraryPage> {
+class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
   bool _initialized = false;
   bool _loading = true;
   bool _busy = false;

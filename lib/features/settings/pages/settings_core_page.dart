@@ -596,10 +596,7 @@ Widget _iosNavRow(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             child: Row(
               children: [
-                SizedBox(
-                  width: 36,
-                  child: Icon(icon, size: 20, color: color),
-                ),
+                SizedBox(width: 36, child: Icon(icon, size: 20, color: color)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
