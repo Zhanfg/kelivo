@@ -15,6 +15,7 @@ import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
+import '../../story_runtime/orchestration/story_break_armor_mode.dart';
 import '../../story_runtime/orchestration/story_mvp_prompt_service.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/generation_controller.dart';
@@ -189,6 +190,9 @@ class MessageGenerationService {
     // (same keyword trigger range as before OCR-after-trim). Document/OCR work
     // runs only after the single final context trim below.
     messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+    StoryBreakArmorMode(
+      contextProvider.read<BusinessPreferences>(),
+    ).prependToSystemPrompt(apiMessages);
 
     final storyConversationId = (currentConversation?.id ?? '').trim();
     final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();

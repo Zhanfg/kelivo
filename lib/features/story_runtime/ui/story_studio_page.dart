@@ -8,6 +8,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../agency/story_agency_policy.dart';
+import '../orchestration/story_break_armor_mode.dart';
 import '../reference/story_reference_analysis_service.dart';
 import '../reference/story_reference_import_service.dart';
 import '../reference/story_reference_kelivo_model_runner.dart';
@@ -32,10 +33,12 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
   bool _initialized = false;
   bool _loading = true;
   bool _busy = false;
+  bool _breakArmorEnabled = true;
   String? _selectedConversationId;
   String? _progressText;
 
   late StoryRuntimeStore _runtimeStore;
+  late StoryBreakArmorMode _breakArmorMode;
   late StoryReferenceDocumentStore _documentStore;
   late StoryReferenceProfileStore _profileStore;
   late StoryReferenceSelectionStore _selectionStore;
@@ -57,6 +60,8 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
     if (_initialized) return;
     _initialized = true;
     final preferences = context.read<BusinessPreferences>();
+    _breakArmorMode = StoryBreakArmorMode(preferences);
+    _breakArmorEnabled = _breakArmorMode.enabled;
     _runtimeStore = StoryRuntimeStore(preferences);
     _documentStore = StoryReferenceDocumentStore(preferences);
     _profileStore = StoryReferenceProfileStore(preferences);
@@ -136,6 +141,11 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
     if (value == _selectedConversationId) return;
     setState(() => _selectedConversationId = value);
     await _reload();
+  }
+
+  Future<void> _setBreakArmorEnabled(bool enabled) async {
+    await _breakArmorMode.setEnabled(enabled);
+    if (mounted) setState(() => _breakArmorEnabled = enabled);
   }
 
   Future<void> _setStoryEnabled(bool enabled) async {
@@ -355,6 +365,13 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
                 _sectionTitle(context, 'Story Mode'),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('破甲模式'),
+                  subtitle: const Text('默认开启；对所有模型生效，并在原系统提示词之前注入。'),
+                  value: _breakArmorEnabled,
+                  onChanged: _busy ? null : _setBreakArmorEnabled,
+                ),
                 Text(
                   '选择一个已有会话。Story Mode 只影响被启用的会话，普通 Chat 不变。',
                   style: theme.textTheme.bodyMedium,

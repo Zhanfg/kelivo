@@ -52,13 +52,23 @@ final class StoryMvpPromptService {
 
     final manifests = await manifestsFuture;
     final bindings = await bindingsFuture;
+    final effectiveBindings = <StorySkillBinding>[...bindings];
+    final explicitlyBoundIds = <String>{for (final binding in bindings) binding.skillId};
+    for (final manifest in manifests) {
+      if (manifest.metadata['defaultEnabled'] == true &&
+          !explicitlyBoundIds.contains(manifest.id)) {
+        effectiveBindings.add(
+          StorySkillBinding(assistantId: aid, skillId: manifest.id),
+        );
+      }
+    }
     final enabledBindingIds = <String>{
-      for (final binding in bindings)
+      for (final binding in effectiveBindings)
         if (binding.enabled) binding.skillId,
     };
     final skills = _skillResolver.resolve(
       manifests: manifests,
-      bindings: bindings,
+      bindings: effectiveBindings,
       context: StorySkillActivationContext(
         assistantId: aid,
         manualEnabledSkillIds: enabledBindingIds,

@@ -3,6 +3,7 @@
 import 'dart:io';
 
 import '../../../utils/app_directories.dart';
+import 'built_in_story_skills.dart';
 import 'story_skill_manifest_parser.dart';
 import 'story_skill_models.dart';
 import 'story_skill_package_store.dart';
@@ -27,10 +28,14 @@ final class StorySkillLibrary {
 
   Future<List<StorySkillManifest>> loadAll() async {
     final packages = await _repository.readAll();
-    final manifests = <StorySkillManifest>[];
+    final manifestsById = <String, StorySkillManifest>{
+      for (final manifest in await loadBuiltInStorySkills()) manifest.id: manifest,
+    };
     for (final package in packages) {
-      manifests.add(await load(package));
+      final manifest = await load(package);
+      manifestsById[manifest.id] = manifest;
     }
+    final manifests = manifestsById.values.toList(growable: false);
     manifests.sort((a, b) {
       final id = a.id.compareTo(b.id);
       return id != 0 ? id : a.version.compareTo(b.version);
