@@ -101,7 +101,9 @@ final class StoryReferenceAnalysisService {
     while (pending.length > 1) {
       final batches = <List<StoryReferenceAnalysisSnapshot>>[];
       for (var start = 0; start < pending.length; start += reductionBatchSize) {
-        final end = (start + reductionBatchSize).clamp(0, pending.length);
+        final end = (start + reductionBatchSize)
+            .clamp(0, pending.length)
+            .toInt();
         batches.add(pending.sublist(start, end));
       }
 
@@ -151,23 +153,25 @@ ${chunk.text}
 </reference_fiction>
 ''';
 
-Map<String, Object?> _analysisJson(StoryReferenceAnalysisSnapshot value) =>
-    <String, Object?>{
-      'version': 1,
-      if (value.language != null) 'language': value.language,
-      'aspects': value.aspects.map((item) => item.name).toList()..sort(),
-      'core_traits': value.coreTraits,
-      'sentence_rhythm': value.sentenceRhythm,
-      'paragraphing': value.paragraphing,
-      'diction': value.diction,
-      'narration_methods': value.narrationMethods,
-      'dialogue_methods': value.dialogueMethods,
-      'description_methods': value.descriptionMethods,
-      'action_methods': value.actionMethods,
-      'atmosphere_methods': value.atmosphereMethods,
-      'intimacy_methods': value.intimacyMethods,
-      'interiority_methods': value.interiorityMethods,
-      'pacing_methods': value.pacingMethods,
-      'avoid_patterns': value.avoidPatterns,
-      'metrics': value.metrics,
-    };
+Map<String, Object?> _analysisJson(StoryReferenceAnalysisSnapshot value) {
+  final aspects = value.aspects.map((item) => item.name).toList()..sort();
+  return <String, Object?>{
+    'version': 1,
+    if (value.language != null) 'language': value.language,
+    'aspects': aspects,
+    'core_traits': value.coreTraits,
+    'sentence_rhythm': value.sentenceRhythm,
+    'paragraphing': value.paragraphing,
+    'diction': value.diction,
+    'narration_methods': value.narrationMethods,
+    'dialogue_methods': value.dialogueMethods,
+    'description_methods': value.descriptionMethods,
+    'action_methods': value.actionMethods,
+    'atmosphere_methods': value.atmosphereMethods,
+    'intimacy_methods': value.intimacyMethods,
+    'interiority_methods': value.interiorityMethods,
+    'pacing_methods': value.pacingMethods,
+    'avoid_patterns': value.avoidPatterns,
+    'metrics': value.metrics,
+  };
+}
