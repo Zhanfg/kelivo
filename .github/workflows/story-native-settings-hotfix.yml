@@ -1,0 +1,134 @@
+name: Story Native Settings Hotfix
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+    paths:
+      - .github/workflows/story-native-settings-hotfix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-verify-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/story-runtime-foundation
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.6'
+          channel: stable
+          cache: true
+      - name: Apply native Settings integration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          settings = Path('lib/features/settings/pages/settings_page.dart')
+          settings.write_text("export 'settings_core_page.dart' show SettingsPage;\n")
+
+          core = Path('lib/features/settings/pages/settings_core_page.dart')
+          s = core.read_text()
+          import_anchor = "import '../../world_book/pages/world_book_page.dart';\n"
+          story_imports = (
+              "import '../../story_runtime/ui/story_skill_manager_page.dart';\n"
+              "import '../../story_runtime/ui/story_studio_page.dart';\n"
+          )
+          if story_imports not in s:
+              if import_anchor not in s:
+                  raise SystemExit('settings core import anchor not found')
+              s = s.replace(import_anchor, import_anchor + story_imports, 1)
+
+          label_anchor = "    final settings = context.watch<SettingsProvider>();\n"
+          labels = (
+              "    final languageCode = Localizations.localeOf(context).languageCode;\n"
+              "    final storyModeLabel = languageCode == 'zh' ? '故事模式' : 'Story Mode';\n"
+              "    final storySkillsLabel = languageCode == 'zh' ? '故事技能' : 'Story Skills';\n"
+          )
+          if 'final storyModeLabel =' not in s:
+              if label_anchor not in s:
+                  raise SystemExit('settings core label anchor not found')
+              s = s.replace(label_anchor, label_anchor + labels, 1)
+
+          marker = """              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Zap,
+"""
+          story_rows = """              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.BookOpen,
+                label: storyModeLabel,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StoryStudioPage()),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Layers,
+                label: storySkillsLabel,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const StorySkillManagerPage(),
+                    ),
+                  );
+                },
+              ),
+"""
+          if 'label: storyModeLabel' not in s:
+              if marker not in s:
+                  raise SystemExit('settings core insertion marker not found')
+              s = s.replace(marker, story_rows + marker, 1)
+          core.write_text(s)
+
+          more = Path('lib/features/settings/pages/more_page.dart')
+          m = more.read_text()
+          m = m.replace("import '../../story_runtime/ui/story_runtime_control_page.dart';\n", '')
+          m = m.replace("import '../../story_runtime/ui/story_skill_manager_page.dart';\n", '')
+          m = m.replace("import '../../story_runtime/ui/story_studio_page.dart';\n", '')
+          m2, count = re.subn(
+              r"\s*title\('Story'\),\n\s*Card\(.*?\n\s*// LeaderBoard section",
+              "\n              // LeaderBoard section",
+              m,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f'MorePage Story block removal matched {count} times')
+          more.write_text(m2)
+          PY
+          dart format \
+            lib/features/settings/pages/settings_page.dart \
+            lib/features/settings/pages/settings_core_page.dart \
+            lib/features/settings/pages/more_page.dart
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Static analysis
+        run: dart analyze --fatal-infos lib test
+      - name: Story smoke tests
+        run: flutter test --concurrency=1 test/story_runtime_foundation_test.dart test/story_skill_system_test.dart
+      - name: Commit verified native Settings fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/story-native-settings-hotfix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            lib/features/settings/pages/settings_page.dart \
+            lib/features/settings/pages/settings_core_page.dart \
+            lib/features/settings/pages/more_page.dart
+          git commit -m 'fix(story): integrate Story controls with native Settings UI'
+          git push origin HEAD:feat/story-runtime-foundation
