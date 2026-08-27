@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
+import 'package:provider/provider.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
@@ -13,6 +15,7 @@ import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
+import '../../story_runtime/orchestration/story_mvp_prompt_service.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/generation_controller.dart';
 import 'ask_user_interaction_service.dart';
@@ -111,6 +114,30 @@ class MessageGenerationService {
     return budget >= 1024;
   }
 
+  void _injectStoryMvpSystemPrompt(
+    List<Map<String, dynamic>> apiMessages,
+    String? storyPrompt,
+  ) {
+    final prompt = (storyPrompt ?? '').trim();
+    if (prompt.isEmpty) return;
+    final systemIndex = apiMessages.indexWhere(
+      (message) => (message['role'] ?? '').toString() == 'system',
+    );
+    if (systemIndex == -1) {
+      apiMessages.insert(0, <String, dynamic>{
+        'role': 'system',
+        'content': prompt,
+      });
+      return;
+    }
+    final existing = (apiMessages[systemIndex]['content'] ?? '')
+        .toString()
+        .trim();
+    apiMessages[systemIndex]['content'] = existing.isEmpty
+        ? prompt
+        : '$existing\n\n$prompt';
+  }
+
   /// Prepare API messages with all injections applied.
   Future<PreparedGeneration> prepareApiMessagesWithInjections({
     required List<ChatMessage> messages,
@@ -162,6 +189,19 @@ class MessageGenerationService {
     // (same keyword trigger range as before OCR-after-trim). Document/OCR work
     // runs only after the single final context trim below.
     messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+
+    final storyConversationId = (currentConversation?.id ?? '').trim();
+    final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();
+    if (storyConversationId.isNotEmpty && storyAssistantId.isNotEmpty) {
+      final storyPrompt = await StoryMvpPromptService(
+        contextProvider.read<BusinessPreferences>(),
+      ).build(
+        conversationId: storyConversationId,
+        assistantId: storyAssistantId,
+      );
+      _injectStoryMvpSystemPrompt(apiMessages, storyPrompt);
+    }
+
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,
