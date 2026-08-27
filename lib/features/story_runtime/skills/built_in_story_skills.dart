@@ -18,6 +18,9 @@ Future<List<StorySkillManifest>> loadBuiltInStorySkills() async {
   final visualTaste = await rootBundle.loadString(
     'assets/story_skills/visual-taste-basics/SKILL.md',
   );
+  final githubSerialization = await rootBundle.loadString(
+    'assets/story_skills/github-story-serialization/SKILL.md',
+  );
   return <StorySkillManifest>[
     StorySkillManifest(
       id: 'lieflat-less-ai-tone',
@@ -88,6 +91,32 @@ Future<List<StorySkillManifest>> loadBuiltInStorySkills() async {
         'builtIn': true,
         'defaultEnabled': false,
         'source': 'https://github.com/Leonxlnx/taste-skill',
+      },
+    ),
+    StorySkillManifest(
+      id: 'github-story-serialization',
+      name: 'GitHub Story Serialization',
+      version: '1.0.0',
+      description: '按需导出/恢复版本化 Story bundle，并通过现有 GitHub MCP 做仓库传输。',
+      instructions: <String>[githubSerialization],
+      toolIds: const <String>[
+        'story_export_bundle',
+        'story_restore_bundle',
+      ],
+      activationModes: const <StorySkillActivationMode>{
+        StorySkillActivationMode.manual,
+      },
+      permissions: const <StorySkillPermission>{
+        StorySkillPermission.localTools,
+        StorySkillPermission.mcp,
+        StorySkillPermission.filesystemRead,
+        StorySkillPermission.filesystemWrite,
+      },
+      metadata: const <String, Object?>{
+        'builtIn': true,
+        'defaultEnabled': false,
+        'transport': 'github-mcp',
+        'bundleFormat': 'kelivo-story-bundle',
       },
     ),
   ];
