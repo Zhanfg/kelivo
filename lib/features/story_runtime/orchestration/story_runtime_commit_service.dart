@@ -15,13 +15,23 @@ import '../world_tree/story_world_tree_store.dart';
 /// the World Tree cursor without rewriting the message body.
 final class StoryRuntimeCommitService {
   StoryRuntimeCommitService(BusinessPreferences preferences)
-    : _sessionStore = StoryRuntimeStore(preferences),
-      _executionStore = StoryRuntimeExecutionStore(preferences),
-      _worldTreeStore = StoryWorldTreeStore(preferences);
+    : this.withRepositories(
+        sessionStore: StoryRuntimeStore(preferences),
+        executionStore: StoryRuntimeExecutionStore(preferences),
+        worldTreeStore: StoryWorldTreeStore(preferences),
+      );
 
-  final StoryRuntimeStore _sessionStore;
-  final StoryRuntimeExecutionStore _executionStore;
-  final StoryWorldTreeStore _worldTreeStore;
+  StoryRuntimeCommitService.withRepositories({
+    required StoryRuntimeSessionRepository sessionStore,
+    required StoryRuntimeExecutionRepository executionStore,
+    required StoryWorldTreeRepository worldTreeStore,
+  }) : _sessionStore = sessionStore,
+       _executionStore = executionStore,
+       _worldTreeStore = worldTreeStore;
+
+  final StoryRuntimeSessionRepository _sessionStore;
+  final StoryRuntimeExecutionRepository _executionStore;
+  final StoryWorldTreeRepository _worldTreeStore;
 
   /// Recovery-safe bridge for the current Kelivo lifecycle.
   ///
