@@ -1,6 +1,7 @@
 import '../cache/story_capability_epoch.dart';
 import '../cache/story_prompt_cache_plan.dart';
 import '../cache/story_prompt_compiler.dart';
+import '../parsing/story_response_contract.dart';
 import '../reference/story_reference_models.dart';
 import '../reference/story_reference_profile_compiler.dart';
 import '../reference/story_reference_selection_store.dart';
@@ -194,7 +195,10 @@ final class StoryRuntimeAssembler {
       capabilitySummary: hostCapabilities.summary,
       skillContributions: [if (skillContribution != null) skillContribution],
       referenceProfiles: references,
-      additionalStable: request.additionalStable,
+      additionalStable: <StoryPromptContribution>[
+        storyResponseContractContributionV1,
+        ...request.additionalStable,
+      ],
       appendOnly: request.appendOnly,
       volatile: request.volatile,
       localOnly: request.localOnly,
