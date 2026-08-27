@@ -7,6 +7,7 @@ import '../state/story_runtime_machine.dart';
 import '../state/story_runtime_store.dart';
 import '../state/story_scene_runtime_reducer.dart';
 import '../state/story_scene_runtime_state.dart';
+import '../voice/story_voice_context_store.dart';
 import '../world_tree/story_world_tree_coordinator.dart';
 import '../world_tree/story_world_tree_projection.dart';
 import '../world_tree/story_world_tree_store.dart';
@@ -36,6 +37,7 @@ final class StoryRuntimeCommitService {
         worldTreeStore: StoryWorldTreeStore(preferences),
         sceneRuntimeStore: StorySceneRuntimeStore(preferences),
         messageEventStore: StoryMessageEventStore(preferences),
+        voiceContextStore: StoryVoiceContextHistoryStore(preferences),
       );
 
   StoryRuntimeCommitService.withRepositories({
@@ -44,17 +46,20 @@ final class StoryRuntimeCommitService {
     required StoryWorldTreeRepository worldTreeStore,
     StorySceneRuntimeRepository? sceneRuntimeStore,
     StoryMessageEventStore? messageEventStore,
+    StoryVoiceContextHistoryStore? voiceContextStore,
   }) : _sessionStore = sessionStore,
        _executionStore = executionStore,
        _worldTreeStore = worldTreeStore,
        _sceneRuntimeStore = sceneRuntimeStore,
-       _messageEventStore = messageEventStore;
+       _messageEventStore = messageEventStore,
+       _voiceContextStore = voiceContextStore;
 
   final StoryRuntimeSessionRepository _sessionStore;
   final StoryRuntimeExecutionRepository _executionStore;
   final StoryWorldTreeRepository _worldTreeStore;
   final StorySceneRuntimeRepository? _sceneRuntimeStore;
   final StoryMessageEventStore? _messageEventStore;
+  final StoryVoiceContextHistoryStore? _voiceContextStore;
 
   /// Recovery-safe bridge for the current Kelivo lifecycle.
   Future<void> commitPendingFinalizedTurn(List<ChatMessage> messages) async {
@@ -97,9 +102,11 @@ final class StoryRuntimeCommitService {
     if (execution.phase == StoryRuntimePhase.awaitingUser &&
         execution.currentTurnId == message.id) {
       final existing = await _messageEventStore?.readForMessage(message.id);
+      final visible = _visibleTextIfTrailerPresent(message.content);
+      await _recordVoiceContext(message, visible ?? message.content);
       return StoryFinalizedCommitResult(
         structured: existing != null,
-        visibleText: _visibleTextIfTrailerPresent(message.content),
+        visibleText: visible,
       );
     }
 
@@ -197,6 +204,8 @@ final class StoryRuntimeCommitService {
         }
       }
 
+      await _recordVoiceContext(message, parsed?.visibleText ?? message.content);
+
       await _sessionStore.upsert(
         session.copyWith(
           worldlineId: worldline.id,
@@ -221,6 +230,18 @@ final class StoryRuntimeCommitService {
       rethrow;
     }
   }
+
+  Future<void> _recordVoiceContext(ChatMessage message, String text) async {
+    final store = _voiceContextStore;
+    if (store == null) return;
+    final clean = _stripEmbeddedTrailerBestEffort(text).trim();
+    if (clean.isEmpty) return;
+    await store.record(
+      conversationId: message.conversationId,
+      messageId: message.id,
+      text: clean,
+    );
+  }
 }
 
 String? _visibleTextIfTrailerPresent(String content) {
@@ -232,3 +253,7 @@ String? _visibleTextIfTrailerPresent(String content) {
     return null;
   }
 }
+
+String _stripEmbeddedTrailerBestEffort(String content) =>
+    _visibleTextIfTrailerPresent(content) ??
+    content.replaceAll(RegExp(r'<!--[\s\S]*?-->'), '').trimRight();
