@@ -13,6 +13,7 @@ import 'story_skill_package_importer.dart';
 import 'story_skill_package_store.dart';
 
 typedef StorySkillGitHubRootResolver = Future<Directory> Function();
+typedef StorySkillGitHubTempResolver = Future<Directory> Function();
 
 final class StorySkillGitHubSource {
   const StorySkillGitHubSource({
@@ -143,19 +144,22 @@ final class StorySkillGitHubService {
     required StorySkillPackageImporter importer,
     http.Client? client,
     StorySkillGitHubRootResolver? appDataRootResolver,
+    StorySkillGitHubTempResolver? tempRootResolver,
     this.maxDownloadBytes = 128 * 1024 * 1024,
   }) : _repository = repository,
        _importer = importer,
        _client = client ?? http.Client(),
        _ownsClient = client == null,
        _appDataRootResolver =
-           appDataRootResolver ?? AppDirectories.getAppDataDirectory;
+           appDataRootResolver ?? AppDirectories.getAppDataDirectory,
+       _tempRootResolver = tempRootResolver ?? getTemporaryDirectory;
 
   final StorySkillPackageRepository _repository;
   final StorySkillPackageImporter _importer;
   final http.Client _client;
   final bool _ownsClient;
   final StorySkillGitHubRootResolver _appDataRootResolver;
+  final StorySkillGitHubTempResolver _tempRootResolver;
   final int maxDownloadBytes;
 
   void close() {
@@ -442,7 +446,7 @@ final class StorySkillGitHubService {
       output.add(ArchiveFile(child, bytes.length, bytes));
     }
 
-    final temp = await getTemporaryDirectory();
+    final temp = await _tempRootResolver();
     final dir = await temp.createTemp('kelivo_github_skill_');
     final file = File('${dir.path}/skill.zip');
     final encoded = ZipEncoder().encodeBytes(output);

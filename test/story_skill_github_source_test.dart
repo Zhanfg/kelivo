@@ -45,148 +45,178 @@ void main() {
       );
     });
 
-    test('installs a standard SKILL.md repository in prompt-only safe mode', () async {
-      final zip = _skillArchive(
-        skillMarkdown: '''---
+    test(
+      'installs a standard SKILL.md repository in prompt-only safe mode',
+      () async {
+        final zip = _skillArchive(
+          skillMarkdown: '''---
 name: Humanizer
 description: Make prose more natural.
 ---
 Write with natural rhythm and preserve meaning.
 ''',
-        extraFiles: <String, String>{
-          'prompts/10-check.md': 'Check repetitive sentence scaffolding.',
-          'scripts/ignored.sh': 'echo no',
-        },
-      );
-      final client = _githubClient(zipBySha: <String, List<int>>{_sha1: zip});
-      final importer = StorySkillPackageImporter(
-        repository: repository,
-        appDataRootResolver: () async => tempDir,
-      );
-      final service = StorySkillGitHubService(
-        repository: repository,
-        importer: importer,
-        client: client,
-        appDataRootResolver: () async => tempDir,
-      );
+          extraFiles: <String, String>{
+            'prompts/10-check.md': 'Check repetitive sentence scaffolding.',
+            'scripts/ignored.sh': 'echo no',
+          },
+        );
+        final client = _githubClient(zipBySha: <String, List<int>>{_sha1: zip});
+        final importer = StorySkillPackageImporter(
+          repository: repository,
+          appDataRootResolver: () async => tempDir,
+        );
+        final service = StorySkillGitHubService(
+          repository: repository,
+          importer: importer,
+          client: client,
+          appDataRootResolver: () async => tempDir,
+          tempRootResolver: () async => tempDir,
+        );
 
-      final result = await service.install(
-        repositoryUrl: 'https://github.com/blader/humanizer',
-      );
+        final result = await service.install(
+          repositoryUrl: 'https://github.com/blader/humanizer',
+        );
 
-      expect(result.package.skillId, 'github.blader.humanizer');
-      expect(result.package.version, 'gh-${_sha1.substring(0, 12)}');
-      expect(result.package.isGitHubManaged, isTrue);
-      expect(result.package.sourceRepository, 'blader/humanizer');
-      expect(result.package.sourceCommitSha, _sha1);
-      expect(result.ref, 'main');
-      expect(result.replacedVersions, 0);
+        expect(result.package.skillId, 'github.blader.humanizer');
+        expect(result.package.version, 'gh-${_sha1.substring(0, 12)}');
+        expect(result.package.isGitHubManaged, isTrue);
+        expect(result.package.sourceRepository, 'blader/humanizer');
+        expect(result.package.sourceCommitSha, _sha1);
+        expect(result.ref, 'main');
+        expect(result.replacedVersions, 0);
 
-      final installed = Directory(
-        '${tempDir.path}/${result.package.relativeRoot}',
-      );
-      expect(await File('${installed.path}/SKILL.md').exists(), isTrue);
-      expect(await File('${installed.path}/prompts/10-check.md').exists(), isTrue);
-      expect(await File('${installed.path}/scripts/ignored.sh').exists(), isFalse);
+        final installed = Directory(
+          '${tempDir.path}/${result.package.relativeRoot}',
+        );
+        expect(await File('${installed.path}/SKILL.md').exists(), isTrue);
+        expect(
+          await File('${installed.path}/prompts/10-check.md').exists(),
+          isTrue,
+        );
+        expect(
+          await File('${installed.path}/scripts/ignored.sh').exists(),
+          isFalse,
+        );
 
-      final manifest = jsonDecode(
-        await File('${installed.path}/manifest.json').readAsString(),
-      ) as Map<String, dynamic>;
-      expect(manifest['id'], 'github.blader.humanizer');
-      expect(manifest['permissions'], isNull);
-      expect(
-        (manifest['metadata'] as Map<String, dynamic>)['source_commit_sha'],
-        _sha1,
-      );
-    });
+        final manifest =
+            jsonDecode(
+                  await File('${installed.path}/manifest.json').readAsString(),
+                )
+                as Map<String, dynamic>;
+        expect(manifest['id'], 'github.blader.humanizer');
+        expect(manifest['permissions'], isNull);
+        expect(
+          (manifest['metadata'] as Map<String, dynamic>)['source_commit_sha'],
+          _sha1,
+        );
+      },
+    );
 
-    test('detects a newer commit and atomically retires the old source version', () async {
-      var latestSha = _sha1;
-      final zip1 = _skillArchive(skillMarkdown: 'Version one.');
-      final zip2 = _skillArchive(skillMarkdown: 'Version two.');
-      final client = MockClient((request) async {
-        final path = request.url.path;
-        if (path == '/repos/blader/humanizer') {
-          return http.Response(jsonEncode(<String, Object>{'default_branch': 'main'}), 200);
-        }
-        if (path == '/repos/blader/humanizer/commits/main') {
-          return http.Response(jsonEncode(<String, Object>{'sha': latestSha}), 200);
-        }
-        if (path.endsWith('/zipball/$_sha1')) {
-          return http.Response.bytes(zip1, 200);
-        }
-        if (path.endsWith('/zipball/$_sha2')) {
-          return http.Response.bytes(zip2, 200);
-        }
-        return http.Response('not found', 404);
-      });
-      final importer = StorySkillPackageImporter(
-        repository: repository,
-        appDataRootResolver: () async => tempDir,
-      );
-      final service = StorySkillGitHubService(
-        repository: repository,
-        importer: importer,
-        client: client,
-        appDataRootResolver: () async => tempDir,
-      );
+    test(
+      'detects a newer commit and atomically retires the old source version',
+      () async {
+        var latestSha = _sha1;
+        final zip1 = _skillArchive(skillMarkdown: 'Version one.');
+        final zip2 = _skillArchive(skillMarkdown: 'Version two.');
+        final client = MockClient((request) async {
+          final path = request.url.path;
+          if (path == '/repos/blader/humanizer') {
+            return http.Response(
+              jsonEncode(<String, Object>{'default_branch': 'main'}),
+              200,
+            );
+          }
+          if (path == '/repos/blader/humanizer/commits/main') {
+            return http.Response(
+              jsonEncode(<String, Object>{'sha': latestSha}),
+              200,
+            );
+          }
+          if (path.endsWith('/zipball/$_sha1')) {
+            return http.Response.bytes(zip1, 200);
+          }
+          if (path.endsWith('/zipball/$_sha2')) {
+            return http.Response.bytes(zip2, 200);
+          }
+          return http.Response('not found', 404);
+        });
+        final importer = StorySkillPackageImporter(
+          repository: repository,
+          appDataRootResolver: () async => tempDir,
+        );
+        final service = StorySkillGitHubService(
+          repository: repository,
+          importer: importer,
+          client: client,
+          appDataRootResolver: () async => tempDir,
+          tempRootResolver: () async => tempDir,
+        );
 
-      final first = await service.install(repositoryUrl: 'blader/humanizer');
-      latestSha = _sha2;
-      final check = await service.checkForUpdate(first.package);
-      expect(check.updateAvailable, isTrue);
-      expect(check.latestCommitSha, _sha2);
+        final first = await service.install(repositoryUrl: 'blader/humanizer');
+        latestSha = _sha2;
+        final check = await service.checkForUpdate(first.package);
+        expect(check.updateAvailable, isTrue);
+        expect(check.latestCommitSha, _sha2);
 
-      final second = await service.update(first.package);
-      expect(second.package.sourceCommitSha, _sha2);
-      expect(second.replacedVersions, 1);
-      final records = await repository.readAll();
-      expect(records, hasLength(1));
-      expect(records.single.version, 'gh-${_sha2.substring(0, 12)}');
-      expect(
-        await Directory('${tempDir.path}/${first.package.relativeRoot}').exists(),
-        isFalse,
-      );
-      expect(
-        await Directory('${tempDir.path}/${second.package.relativeRoot}').exists(),
-        isTrue,
-      );
-    });
+        final second = await service.update(first.package);
+        expect(second.package.sourceCommitSha, _sha2);
+        expect(second.replacedVersions, 1);
+        final records = await repository.readAll();
+        expect(records, hasLength(1));
+        expect(records.single.version, 'gh-${_sha2.substring(0, 12)}');
+        expect(
+          await Directory(
+            '${tempDir.path}/${first.package.relativeRoot}',
+          ).exists(),
+          isFalse,
+        );
+        expect(
+          await Directory(
+            '${tempDir.path}/${second.package.relativeRoot}',
+          ).exists(),
+          isTrue,
+        );
+      },
+    );
 
-    test('rejects GitHub packages that try to gain runtime capabilities', () async {
-      final zip = _skillArchive(
-        skillMarkdown: 'Do useful work.',
-        manifest: <String, Object?>{
-          'id': 'dangerous',
-          'name': 'Dangerous',
-          'version': '1',
-          'mcp_servers': <String>['mcp.github'],
-          'permissions': <String>['mcp'],
-        },
-      );
-      final importer = StorySkillPackageImporter(
-        repository: repository,
-        appDataRootResolver: () async => tempDir,
-      );
-      final service = StorySkillGitHubService(
-        repository: repository,
-        importer: importer,
-        client: _githubClient(zipBySha: <String, List<int>>{_sha1: zip}),
-        appDataRootResolver: () async => tempDir,
-      );
+    test(
+      'rejects GitHub packages that try to gain runtime capabilities',
+      () async {
+        final zip = _skillArchive(
+          skillMarkdown: 'Do useful work.',
+          manifest: <String, Object?>{
+            'id': 'dangerous',
+            'name': 'Dangerous',
+            'version': '1',
+            'mcp_servers': <String>['mcp.github'],
+            'permissions': <String>['mcp'],
+          },
+        );
+        final importer = StorySkillPackageImporter(
+          repository: repository,
+          appDataRootResolver: () async => tempDir,
+        );
+        final service = StorySkillGitHubService(
+          repository: repository,
+          importer: importer,
+          client: _githubClient(zipBySha: <String, List<int>>{_sha1: zip}),
+          appDataRootResolver: () async => tempDir,
+          tempRootResolver: () async => tempDir,
+        );
 
-      expect(
-        () => service.install(repositoryUrl: 'blader/humanizer'),
-        throwsA(
-          isA<StorySkillGitHubException>().having(
-            (error) => error.code,
-            'code',
-            'capabilities_require_local_zip_review',
+        expect(
+          () => service.install(repositoryUrl: 'blader/humanizer'),
+          throwsA(
+            isA<StorySkillGitHubException>().having(
+              (error) => error.code,
+              'code',
+              'capabilities_require_local_zip_review',
+            ),
           ),
-        ),
-      );
-      expect(await repository.readAll(), isEmpty);
-    });
+        );
+        expect(await repository.readAll(), isEmpty);
+      },
+    );
   });
 }
 
@@ -220,7 +250,9 @@ List<int> _skillArchive({
   final archive = Archive()
     ..add(ArchiveFile.string('$root/SKILL.md', skillMarkdown));
   if (manifest != null) {
-    archive.add(ArchiveFile.string('$root/manifest.json', jsonEncode(manifest)));
+    archive.add(
+      ArchiveFile.string('$root/manifest.json', jsonEncode(manifest)),
+    );
   }
   for (final entry in extraFiles.entries) {
     archive.add(ArchiveFile.string('$root/${entry.key}', entry.value));
@@ -237,7 +269,10 @@ final class _MemorySkillPackageRepository
       List<StoryInstalledSkillPackage>.unmodifiable(items);
 
   @override
-  Future<StoryInstalledSkillPackage?> read(String skillId, String version) async {
+  Future<StoryInstalledSkillPackage?> read(
+    String skillId,
+    String version,
+  ) async {
     for (final item in items) {
       if (item.skillId == skillId && item.version == version) return item;
     }
@@ -247,7 +282,8 @@ final class _MemorySkillPackageRepository
   @override
   Future<void> upsert(StoryInstalledSkillPackage package) async {
     items.removeWhere(
-      (item) => item.skillId == package.skillId && item.version == package.version,
+      (item) =>
+          item.skillId == package.skillId && item.version == package.version,
     );
     items.add(package);
   }
