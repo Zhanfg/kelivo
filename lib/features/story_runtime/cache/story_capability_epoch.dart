@@ -5,14 +5,15 @@ import 'package:crypto/crypto.dart';
 /// Cache-stable capability snapshot for one Story Runtime epoch.
 ///
 /// A capability epoch should roll only when a meaningful boundary changes the
-/// model-visible capability set (scene/skill/tool/world-book snapshot), never
-/// merely because a Map/Set happened to iterate in a different order.
+/// model-visible capability set (scene/skill/tool/world-book/reference snapshot),
+/// never merely because a Map/Set happened to iterate in a different order.
 final class StoryCapabilityEpoch {
   StoryCapabilityEpoch._({
     required this.epochId,
     required this.worldlineId,
     required this.sceneEpochId,
     required this.activeSkillIds,
+    required this.referenceProfileFingerprints,
     required this.toolIds,
     required this.mcpProfileId,
     required this.worldBookSnapshotId,
@@ -24,6 +25,7 @@ final class StoryCapabilityEpoch {
     required String worldlineId,
     required String sceneEpochId,
     Iterable<String> activeSkillIds = const <String>[],
+    Iterable<String> referenceProfileFingerprints = const <String>[],
     Iterable<String> toolIds = const <String>[],
     String? mcpProfileId,
     String? worldBookSnapshotId,
@@ -34,6 +36,10 @@ final class StoryCapabilityEpoch {
       worldlineId: _requiredId(worldlineId, 'worldlineId'),
       sceneEpochId: _requiredId(sceneEpochId, 'sceneEpochId'),
       activeSkillIds: _canonicalIds(activeSkillIds, 'activeSkillIds'),
+      referenceProfileFingerprints: _canonicalIds(
+        referenceProfileFingerprints,
+        'referenceProfileFingerprints',
+      ),
       toolIds: _canonicalIds(toolIds, 'toolIds'),
       mcpProfileId: _optionalId(mcpProfileId),
       worldBookSnapshotId: _optionalId(worldBookSnapshotId),
@@ -45,6 +51,11 @@ final class StoryCapabilityEpoch {
   final String worldlineId;
   final String sceneEpochId;
   final List<String> activeSkillIds;
+
+  /// Hashes of derived reference-style profiles plus their invocation options.
+  /// Raw reference-book text never belongs in the capability epoch.
+  final List<String> referenceProfileFingerprints;
+
   final List<String> toolIds;
   final String? mcpProfileId;
   final String? worldBookSnapshotId;
@@ -62,6 +73,7 @@ final class StoryCapabilityEpoch {
       'worldline_id': worldlineId,
       'scene_epoch_id': sceneEpochId,
       'skills': activeSkillIds,
+      'reference_profiles': referenceProfileFingerprints,
       'mcp_profile_id': mcpProfileId,
       'tools': toolIds,
       'tool_schema_fingerprint': toolSchemaFingerprint,
@@ -78,6 +90,7 @@ final class StoryCapabilityEpoch {
     'worldline_id': worldlineId,
     'scene_epoch_id': sceneEpochId,
     'skills': activeSkillIds,
+    'reference_profiles': referenceProfileFingerprints,
     'mcp_profile_id': mcpProfileId,
     'tools': toolIds,
     'tool_schema_fingerprint': toolSchemaFingerprint,
