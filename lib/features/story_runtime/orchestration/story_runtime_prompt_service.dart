@@ -55,8 +55,7 @@ final class StoryRuntimePromptResult {
 /// ordering/cache stability to StoryRuntimeAssembler -> StoryPromptCompiler.
 final class StoryRuntimePromptService {
   StoryRuntimePromptService(BusinessPreferences preferences)
-    : _preferences = preferences,
-      _sessionStore = StoryRuntimeStore(preferences),
+    : _sessionStore = StoryRuntimeStore(preferences),
       _worldTreeStore = StoryWorldTreeStore(preferences),
       _worldlineMemoryStore = StoryWorldlineMemoryStore(preferences),
       _executionStore = StoryRuntimeExecutionStore(preferences),
@@ -68,7 +67,6 @@ final class StoryRuntimePromptService {
       _referenceProfileStore = StoryReferenceProfileStore(preferences),
       _referenceSelectionStore = StoryReferenceSelectionStore(preferences);
 
-  final BusinessPreferences _preferences;
   final StoryRuntimeStore _sessionStore;
   final StoryWorldTreeStore _worldTreeStore;
   final StoryWorldlineMemoryStore _worldlineMemoryStore;
