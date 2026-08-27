@@ -128,22 +128,27 @@ extension StoryResolvedSkillPromptProjection on StoryResolvedSkillCapabilities {
     );
   }
 
-  /// Capability material consumed by StoryCapabilityEpoch. MCP server ids stay
-  /// separate from tool ids because server activation can expose several tools.
-  StoryCapabilityMaterial toCapabilityMaterial({
+  /// Builds the epoch only after the host has resolved raw Skill requests into
+  /// one MCP profile, one WorldBook snapshot and one canonical tool schema.
+  StoryCapabilityEpoch toCapabilityEpoch({
+    required String epochId,
     required String sceneEpochId,
     required String worldlineId,
-    Iterable<String> worldBookSnapshotIds = const <String>[],
-    Map<String, String> toolSchemaFingerprints = const <String, String>{},
+    String? mcpProfileId,
+    String? worldBookSnapshotId,
+    String? toolSchemaFingerprint,
   }) {
-    return StoryCapabilityMaterial(
+    return StoryCapabilityEpoch.canonical(
+      epochId: epochId,
       sceneEpochId: sceneEpochId,
       worldlineId: worldlineId,
-      skillIds: [for (final skill in activeSkills) '${skill.id}@${skill.version}'],
-      mcpProfileIds: mcpServerIds,
+      activeSkillIds: [
+        for (final skill in activeSkills) '${skill.id}@${skill.version}',
+      ],
       toolIds: toolIds,
-      worldBookSnapshotIds: worldBookSnapshotIds,
-      toolSchemaFingerprints: toolSchemaFingerprints,
+      mcpProfileId: mcpProfileId,
+      worldBookSnapshotId: worldBookSnapshotId,
+      toolSchemaFingerprint: toolSchemaFingerprint,
     );
   }
 }
