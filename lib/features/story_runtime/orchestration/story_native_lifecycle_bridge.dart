@@ -3,6 +3,8 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/tts/network_tts.dart';
 import '../state/story_runtime_store.dart';
+import '../state/story_scene_runtime_state.dart';
+import '../voice/story_voice_context_store.dart';
 import '../voice/story_voice_models.dart';
 import '../voice/story_voice_routing.dart';
 import '../voice/story_voice_store.dart';
@@ -21,13 +23,17 @@ final class StoryNativeLifecycleBridge {
   StoryNativeLifecycleBridge(BusinessPreferences preferences)
     : _commitService = StoryRuntimeCommitService(preferences),
       _sessionStore = StoryRuntimeStore(preferences),
+      _sceneStore = StorySceneRuntimeStore(preferences),
       _worldTreeStore = StoryWorldTreeStore(preferences),
-      _voiceStore = StoryVoiceRoutingStore(preferences);
+      _voiceStore = StoryVoiceRoutingStore(preferences),
+      _voiceContextStore = StoryVoiceContextHistoryStore(preferences);
 
   final StoryRuntimeCommitService _commitService;
   final StoryRuntimeStore _sessionStore;
+  final StorySceneRuntimeStore _sceneStore;
   final StoryWorldTreeStore _worldTreeStore;
   final StoryVoiceRoutingStore _voiceStore;
+  final StoryVoiceContextHistoryStore _voiceContextStore;
   final StoryVoiceResolver _voiceResolver = const StoryVoiceResolver();
 
   /// Advances Story sidecar state for one successfully finalized native reply.
@@ -49,13 +55,10 @@ final class StoryNativeLifecycleBridge {
     return result;
   }
 
-  /// Applies the Story narrator voice to Kelivo's currently selected network
-  /// TTS service when the assignment targets that exact service.
-  ///
-  /// Returning [selectedService] unchanged is intentional. Story Mode must not
-  /// silently switch credentials/endpoints when the configured narrator points
-  /// at a different service. A future UI may explicitly resolve another native
-  /// service by id and pass it here.
+  /// Applies Story narrator semantics to Kelivo's currently selected network
+  /// TTS service. Playback remains a single native TtsProvider request, so the
+  /// provider's chunking, three-chunk prefetch, seek and replay cache continue
+  /// to work unchanged.
   Future<TtsServiceOptions> routeNarrator({
     required ChatMessage message,
     required TtsServiceOptions selectedService,
@@ -86,8 +89,40 @@ final class StoryNativeLifecycleBridge {
       return selectedService;
     }
 
+    final history = await _voiceContextStore.readForConversation(
+      message.conversationId,
+    );
+    final scene = await _sceneStore.readOrDefault(message.conversationId);
+    final context = history.windowFor(
+      message.id,
+      currentFallback: _stripHiddenComments(message.content),
+      sceneHint: _sceneHint(scene),
+    );
+
     return _voiceResolver
-        .resolve(service: selectedService, assignment: narrator, intent: intent)
+        .resolve(
+          service: selectedService,
+          assignment: narrator,
+          intent: intent,
+          context: context,
+        )
         .service;
   }
+}
+
+String _stripHiddenComments(String input) =>
+    input.replaceAll(RegExp(r'<!--[\s\S]*?-->'), '').trim();
+
+String? _sceneHint(StorySceneRuntimeState scene) {
+  final parts = <String>[];
+  if (scene.location?.trim().isNotEmpty == true) {
+    parts.add('location=${scene.location!.trim()}');
+  }
+  if (scene.timeLabel?.trim().isNotEmpty == true) {
+    parts.add('time=${scene.timeLabel!.trim()}');
+  }
+  if (scene.openLoops.isNotEmpty) {
+    parts.add('open=${scene.openLoops.take(3).join(' | ')}');
+  }
+  return parts.isEmpty ? null : parts.join('; ');
 }
