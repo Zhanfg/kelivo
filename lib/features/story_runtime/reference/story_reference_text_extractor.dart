@@ -55,7 +55,12 @@ final class StoryReferenceTextExtractor {
     final effectiveMime = _resolveMime(resolved, mime);
     final StoryReferenceExtractedText extracted;
     if (effectiveMime == 'application/epub+zip') {
-      extracted = await compute(_extractEpubTask, resolved);
+      final result = await compute(_extractEpubTask, resolved);
+      extracted = StoryReferenceExtractedText(
+        text: result['text'] ?? '',
+        mime: 'application/epub+zip',
+        suggestedTitle: result['title'],
+      );
     } else {
       final text = await DocumentTextExtractor.extractResolved(
         path: resolved,
@@ -95,7 +100,7 @@ final class StoryReferenceImportException implements Exception {
       : 'StoryReferenceImportException($code: $detail)';
 }
 
-StoryReferenceExtractedText _extractEpubTask(String path) {
+Map<String, String?> _extractEpubTask(String path) {
   try {
     final bytes = File(path).readAsBytesSync();
     final archive = ZipDecoder().decodeBytes(bytes, verify: true);
@@ -179,11 +184,10 @@ StoryReferenceExtractedText _extractEpubTask(String path) {
       buffer.write(text);
     }
 
-    return StoryReferenceExtractedText(
-      text: buffer.toString(),
-      mime: 'application/epub+zip',
-      suggestedTitle: title ?? _fileStem(path),
-    );
+    return <String, String?>{
+      'text': buffer.toString(),
+      'title': title ?? _fileStem(path),
+    };
   } on StoryReferenceImportException {
     rethrow;
   } catch (error) {
