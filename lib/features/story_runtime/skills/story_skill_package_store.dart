@@ -8,6 +8,12 @@ final class StoryInstalledSkillPackage {
     required this.relativeRoot,
     required this.packageHash,
     required this.installedAtMs,
+    this.sourceProvider,
+    this.sourceRepository,
+    this.sourceRef,
+    this.sourceSubdirectory,
+    this.sourceCommitSha,
+    this.sourceCheckedAtMs,
   });
 
   final String skillId;
@@ -15,6 +21,45 @@ final class StoryInstalledSkillPackage {
   final String relativeRoot;
   final String packageHash;
   final int installedAtMs;
+  final String? sourceProvider;
+  final String? sourceRepository;
+  final String? sourceRef;
+  final String? sourceSubdirectory;
+  final String? sourceCommitSha;
+  final int? sourceCheckedAtMs;
+
+  bool get isGitHubManaged =>
+      sourceProvider == 'github' &&
+      sourceRepository != null &&
+      sourceRepository!.isNotEmpty &&
+      sourceCommitSha != null &&
+      sourceCommitSha!.isNotEmpty;
+
+  StoryInstalledSkillPackage copyWith({
+    String? skillId,
+    String? version,
+    String? relativeRoot,
+    String? packageHash,
+    int? installedAtMs,
+    String? sourceProvider,
+    String? sourceRepository,
+    String? sourceRef,
+    String? sourceSubdirectory,
+    String? sourceCommitSha,
+    int? sourceCheckedAtMs,
+  }) => StoryInstalledSkillPackage(
+    skillId: skillId ?? this.skillId,
+    version: version ?? this.version,
+    relativeRoot: relativeRoot ?? this.relativeRoot,
+    packageHash: packageHash ?? this.packageHash,
+    installedAtMs: installedAtMs ?? this.installedAtMs,
+    sourceProvider: sourceProvider ?? this.sourceProvider,
+    sourceRepository: sourceRepository ?? this.sourceRepository,
+    sourceRef: sourceRef ?? this.sourceRef,
+    sourceSubdirectory: sourceSubdirectory ?? this.sourceSubdirectory,
+    sourceCommitSha: sourceCommitSha ?? this.sourceCommitSha,
+    sourceCheckedAtMs: sourceCheckedAtMs ?? this.sourceCheckedAtMs,
+  );
 }
 
 abstract interface class StorySkillPackageRepository {
@@ -42,6 +87,12 @@ final class StorySkillPackageStore
         relativeRoot: _requiredString(json, 'relative_root'),
         packageHash: _requiredString(json, 'package_hash'),
         installedAtMs: _requiredInt(json, 'installed_at_ms'),
+        sourceProvider: _optionalString(json, 'source_provider'),
+        sourceRepository: _optionalString(json, 'source_repository'),
+        sourceRef: _optionalString(json, 'source_ref'),
+        sourceSubdirectory: _optionalString(json, 'source_subdirectory'),
+        sourceCommitSha: _optionalString(json, 'source_commit_sha'),
+        sourceCheckedAtMs: _optionalInt(json, 'source_checked_at_ms'),
       );
 
   @override
@@ -52,6 +103,17 @@ final class StorySkillPackageStore
         'relative_root': item.relativeRoot,
         'package_hash': item.packageHash,
         'installed_at_ms': item.installedAtMs,
+        if (item.sourceProvider != null)
+          'source_provider': item.sourceProvider,
+        if (item.sourceRepository != null)
+          'source_repository': item.sourceRepository,
+        if (item.sourceRef != null) 'source_ref': item.sourceRef,
+        if (item.sourceSubdirectory != null)
+          'source_subdirectory': item.sourceSubdirectory,
+        if (item.sourceCommitSha != null)
+          'source_commit_sha': item.sourceCommitSha,
+        if (item.sourceCheckedAtMs != null)
+          'source_checked_at_ms': item.sourceCheckedAtMs,
       };
 
   @override
@@ -116,8 +178,27 @@ String _requiredString(Map<String, dynamic> json, String key) {
   return value.trim();
 }
 
+String? _optionalString(Map<String, dynamic> json, String key) {
+  final value = json[key];
+  if (value == null) return null;
+  if (value is! String) {
+    throw FormatException('invalid_story_skill_package_$key');
+  }
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
+}
+
 int _requiredInt(Map<String, dynamic> json, String key) {
   final value = json[key];
+  if (value is! int || value < 0) {
+    throw FormatException('invalid_story_skill_package_$key');
+  }
+  return value;
+}
+
+int? _optionalInt(Map<String, dynamic> json, String key) {
+  final value = json[key];
+  if (value == null) return null;
   if (value is! int || value < 0) {
     throw FormatException('invalid_story_skill_package_$key');
   }
