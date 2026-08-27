@@ -76,14 +76,19 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
   }
 
   List<Conversation> _conversations() {
-    final conversations = context.read<ChatService>().getAllConversations().toList();
+    final conversations = context
+        .read<ChatService>()
+        .getAllConversations()
+        .toList();
     conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return conversations;
   }
 
   Future<void> _bootstrap() async {
     final conversations = _conversations();
-    _selectedConversationId = conversations.isEmpty ? null : conversations.first.id;
+    _selectedConversationId = conversations.isEmpty
+        ? null
+        : conversations.first.id;
     await _reload();
   }
 
@@ -340,7 +345,9 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showError(Object error) {
@@ -378,7 +385,7 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _selectedConversationId,
+                  initialValue: _selectedConversationId,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: '会话',
@@ -415,7 +422,7 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
                 ),
                 if (_session != null)
                   DropdownButtonFormField<StoryAgencyMode>(
-                    value: _session!.agencyMode,
+                    initialValue: _session!.agencyMode,
                     decoration: const InputDecoration(
                       labelText: '用户自主权',
                       border: OutlineInputBorder(),
@@ -465,7 +472,9 @@ class _StoryStudioPageState extends State<StoryStudioPage> {
                         '${document.characterCount} 字符 · ${document.chunkCount} 分块',
                       ),
                       trailing: FilledButton.tonal(
-                        onPressed: _busy ? null : () => _analyzeReference(document),
+                        onPressed: _busy
+                            ? null
+                            : () => _analyzeReference(document),
                         child: const Text('分析'),
                       ),
                     ),

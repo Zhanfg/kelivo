@@ -1,4 +1,3 @@
-import '../../../core/database/business_preferences.dart';
 import '../../../core/services/json_blob_store.dart';
 import 'story_runtime_state.dart';
 
@@ -34,7 +33,8 @@ final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState>
       StoryRuntimeSessionState.fromJson(json);
 
   @override
-  Map<String, dynamic> encodeItem(StoryRuntimeSessionState item) => item.toJson();
+  Map<String, dynamic> encodeItem(StoryRuntimeSessionState item) =>
+      item.toJson();
 
   @override
   Future<StoryRuntimeSessionState?> readForConversation(
@@ -49,9 +49,7 @@ final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState>
   }
 
   @override
-  Future<StoryRuntimeSessionState> readOrDefault(
-    String conversationId,
-  ) async {
+  Future<StoryRuntimeSessionState> readOrDefault(String conversationId) async {
     final id = _normalizeConversationId(conversationId);
     return await readForConversation(id) ??
         StoryRuntimeSessionState(conversationId: id);

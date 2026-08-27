@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -235,7 +237,9 @@ final class StorySkillGitHubService {
     final resolvedRef = source.ref ?? await _defaultBranch(source);
     final latest = await _resolveCommit(source, resolvedRef);
     await _repository.upsert(
-      package.copyWith(sourceCheckedAtMs: DateTime.now().millisecondsSinceEpoch),
+      package.copyWith(
+        sourceCheckedAtMs: DateTime.now().millisecondsSinceEpoch,
+      ),
     );
     return StorySkillGitHubUpdateCheck(
       currentCommitSha: package.sourceCommitSha!,
@@ -362,9 +366,8 @@ final class StorySkillGitHubService {
     }
 
     final skillRoot = _selectSkillRoot(relative, source.subdirectory);
-    final skillEntry = relative[
-      skillRoot.isEmpty ? 'SKILL.md' : '$skillRoot/SKILL.md'
-    ];
+    final skillEntry =
+        relative[skillRoot.isEmpty ? 'SKILL.md' : '$skillRoot/SKILL.md'];
     if (skillEntry == null || !skillEntry.isFile) {
       throw const StorySkillGitHubException('skill_markdown_missing');
     }
@@ -522,14 +525,15 @@ String _selectSkillRoot(
     );
   }
   if (entries.containsKey('SKILL.md')) return '';
-  final candidates = entries.keys
-      .where((path) => path.endsWith('/SKILL.md'))
-      .map((path) => path.substring(0, path.length - '/SKILL.md'.length))
-      .toList(growable: false)
-    ..sort((a, b) {
-      final depth = a.split('/').length.compareTo(b.split('/').length);
-      return depth != 0 ? depth : a.compareTo(b);
-    });
+  final candidates =
+      entries.keys
+          .where((path) => path.endsWith('/SKILL.md'))
+          .map((path) => path.substring(0, path.length - '/SKILL.md'.length))
+          .toList(growable: false)
+        ..sort((a, b) {
+          final depth = a.split('/').length.compareTo(b.split('/').length);
+          return depth != 0 ? depth : a.compareTo(b);
+        });
   if (candidates.isEmpty) {
     throw const StorySkillGitHubException('skill_markdown_missing');
   }
@@ -580,7 +584,8 @@ String _commonArchiveRoot(Iterable<String> paths) {
 
 String? _safeArchivePath(String raw) {
   final normalized = raw.replaceAll('\\', '/');
-  if (normalized.startsWith('/') || RegExp(r'^[A-Za-z]:/').hasMatch(normalized)) {
+  if (normalized.startsWith('/') ||
+      RegExp(r'^[A-Za-z]:/').hasMatch(normalized)) {
     throw const StorySkillGitHubException('absolute_path_not_allowed');
   }
   final parts = <String>[];
@@ -604,7 +609,10 @@ bool _allowedPackageChild(String value) =>
 String _decodeText(ArchiveFile entry) {
   final bytes = entry.readBytes();
   if (bytes == null) {
-    throw StorySkillGitHubException('package_file_unreadable', detail: entry.name);
+    throw StorySkillGitHubException(
+      'package_file_unreadable',
+      detail: entry.name,
+    );
   }
   return utf8.decode(bytes, allowMalformed: true).trim();
 }
@@ -642,7 +650,9 @@ String? _normalizeSubdirectory(String? value) {
   final normalized = _normalizedOptional(value)?.replaceAll('\\', '/');
   if (normalized == null) return null;
   if (normalized.startsWith('/') ||
-      normalized.split('/').any((part) => part.isEmpty || part == '.' || part == '..')) {
+      normalized
+          .split('/')
+          .any((part) => part.isEmpty || part == '.' || part == '..')) {
     throw const StorySkillGitHubException('subdirectory_invalid');
   }
   return normalized.replaceAll(RegExp(r'/+$'), '');

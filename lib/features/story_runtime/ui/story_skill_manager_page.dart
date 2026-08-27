@@ -259,7 +259,8 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
 
   StoryInstalledSkillPackage? _packageFor(StorySkillManifest manifest) {
     for (final package in _packages.reversed) {
-      if (package.skillId == manifest.id && package.version == manifest.version) {
+      if (package.skillId == manifest.id &&
+          package.version == manifest.version) {
         return package;
       }
     }
@@ -267,7 +268,9 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showError(Object error) {
@@ -278,9 +281,8 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final assistants = context.watch<AssistantProvider>().assistants;
-    final selectedAssistantId = assistants.any(
-      (assistant) => assistant.id == _assistantId,
-    )
+    final selectedAssistantId =
+        assistants.any((assistant) => assistant.id == _assistantId)
         ? _assistantId
         : null;
 
@@ -297,7 +299,7 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: selectedAssistantId,
+                  initialValue: selectedAssistantId,
                   decoration: const InputDecoration(
                     labelText: 'Assistant',
                     border: OutlineInputBorder(),
@@ -373,16 +375,17 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
     final defaultEnabled = manifest.metadata['defaultEnabled'] == true;
     final managed = package?.isGitHubManaged == true;
     final check = package == null ? null : _updateChecks[_key(package)];
-    final description = manifest.description?.trim();
+    final description = manifest.description.trim();
+    final sourceRepository = _githubSourceRepository(package);
     final subtitle = <String>[
       builtIn
           ? '内置'
           : managed
-              ? 'GitHub'
-              : '本地安装',
+          ? 'GitHub'
+          : '本地安装',
       'v${manifest.version}',
       if (defaultEnabled) '默认启用',
-      if (managed && package?.sourceRepository != null) package!.sourceRepository!,
+      if (sourceRepository != null) sourceRepository,
     ].join(' · ');
 
     return Card(
@@ -408,7 +411,7 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
                   const Chip(label: Text('有更新')),
               ],
             ),
-            if (description != null && description.isNotEmpty) ...[
+            if (description.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(description),
             ],
@@ -458,4 +461,10 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
 String _key(StoryInstalledSkillPackage package) =>
     '${package.skillId}@${package.version}';
 
-String _shortSha(String value) => value.length <= 8 ? value : value.substring(0, 8);
+String _shortSha(String value) =>
+    value.length <= 8 ? value : value.substring(0, 8);
+
+String? _githubSourceRepository(StoryInstalledSkillPackage? package) {
+  if (package == null || !package.isGitHubManaged) return null;
+  return package.sourceRepository;
+}

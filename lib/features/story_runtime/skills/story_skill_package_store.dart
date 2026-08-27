@@ -1,4 +1,3 @@
-import '../../../core/database/business_preferences.dart';
 import '../../../core/services/json_blob_store.dart';
 
 final class StoryInstalledSkillPackage {
@@ -96,25 +95,24 @@ final class StorySkillPackageStore
       );
 
   @override
-  Map<String, dynamic> encodeItem(StoryInstalledSkillPackage item) =>
-      <String, dynamic>{
-        'skill_id': item.skillId,
-        'version': item.version,
-        'relative_root': item.relativeRoot,
-        'package_hash': item.packageHash,
-        'installed_at_ms': item.installedAtMs,
-        if (item.sourceProvider != null)
-          'source_provider': item.sourceProvider,
-        if (item.sourceRepository != null)
-          'source_repository': item.sourceRepository,
-        if (item.sourceRef != null) 'source_ref': item.sourceRef,
-        if (item.sourceSubdirectory != null)
-          'source_subdirectory': item.sourceSubdirectory,
-        if (item.sourceCommitSha != null)
-          'source_commit_sha': item.sourceCommitSha,
-        if (item.sourceCheckedAtMs != null)
-          'source_checked_at_ms': item.sourceCheckedAtMs,
-      };
+  Map<String, dynamic> encodeItem(
+    StoryInstalledSkillPackage item,
+  ) => <String, dynamic>{
+    'skill_id': item.skillId,
+    'version': item.version,
+    'relative_root': item.relativeRoot,
+    'package_hash': item.packageHash,
+    'installed_at_ms': item.installedAtMs,
+    if (item.sourceProvider != null) 'source_provider': item.sourceProvider,
+    if (item.sourceRepository != null)
+      'source_repository': item.sourceRepository,
+    if (item.sourceRef != null) 'source_ref': item.sourceRef,
+    if (item.sourceSubdirectory != null)
+      'source_subdirectory': item.sourceSubdirectory,
+    if (item.sourceCommitSha != null) 'source_commit_sha': item.sourceCommitSha,
+    if (item.sourceCheckedAtMs != null)
+      'source_checked_at_ms': item.sourceCheckedAtMs,
+  };
 
   @override
   Future<StoryInstalledSkillPackage?> read(
@@ -136,8 +134,8 @@ final class StorySkillPackageStore
       final next = <StoryInstalledSkillPackage>[];
       var replaced = false;
       for (final item in items) {
-        final same = item.skillId == package.skillId &&
-            item.version == package.version;
+        final same =
+            item.skillId == package.skillId && item.version == package.version;
         if (!same) {
           next.add(item);
           continue;
