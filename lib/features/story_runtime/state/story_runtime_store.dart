@@ -2,13 +2,26 @@ import '../../../core/database/business_preferences.dart';
 import '../../../core/services/json_blob_store.dart';
 import 'story_runtime_state.dart';
 
+abstract interface class StoryRuntimeSessionRepository {
+  Future<StoryRuntimeSessionState?> readForConversation(String conversationId);
+
+  Future<StoryRuntimeSessionState> readOrDefault(String conversationId);
+
+  Future<void> upsert(StoryRuntimeSessionState state);
+
+  Future<void> setEnabled(String conversationId, bool enabled);
+
+  Future<void> removeForConversation(String conversationId);
+}
+
 /// Versioned Story Mode state keyed by conversation id.
 ///
 /// This deliberately uses Kelivo's existing business-preference repository
 /// instead of adding fields to Conversation/Hive/Drift during the foundation
 /// phase. Story Mode can therefore remain opt-in without changing Chat Mode's
 /// persistence contract.
-final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState> {
+final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState>
+    implements StoryRuntimeSessionRepository {
   StoryRuntimeStore(BusinessPreferences preferences) : super(preferences);
 
   static const String key = 'story_runtime_sessions_v1';
@@ -23,6 +36,7 @@ final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState> {
   @override
   Map<String, dynamic> encodeItem(StoryRuntimeSessionState item) => item.toJson();
 
+  @override
   Future<StoryRuntimeSessionState?> readForConversation(
     String conversationId,
   ) async {
@@ -34,6 +48,7 @@ final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState> {
     return null;
   }
 
+  @override
   Future<StoryRuntimeSessionState> readOrDefault(
     String conversationId,
   ) async {
@@ -42,6 +57,7 @@ final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState> {
         StoryRuntimeSessionState(conversationId: id);
   }
 
+  @override
   Future<void> upsert(StoryRuntimeSessionState state) {
     return runExclusive(() async {
       final items = await readAll();
@@ -63,6 +79,7 @@ final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState> {
     });
   }
 
+  @override
   Future<void> setEnabled(String conversationId, bool enabled) {
     return runExclusive(() async {
       final id = _normalizeConversationId(conversationId);
@@ -89,6 +106,7 @@ final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState> {
     });
   }
 
+  @override
   Future<void> removeForConversation(String conversationId) {
     return runExclusive(() async {
       final id = _normalizeConversationId(conversationId);
