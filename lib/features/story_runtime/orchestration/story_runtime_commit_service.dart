@@ -1,41 +1,45 @@
 import '../../../core/database/business_preferences.dart';
 import '../../../core/models/chat_message.dart';
+import '../models/story_runtime_models.dart';
+import '../parsing/story_response_parser.dart';
 import '../state/story_runtime_machine.dart';
 import '../state/story_runtime_store.dart';
+import '../state/story_scene_runtime_reducer.dart';
+import '../state/story_scene_runtime_state.dart';
 import '../world_tree/story_world_tree_coordinator.dart';
 import '../world_tree/story_world_tree_projection.dart';
 import '../world_tree/story_world_tree_store.dart';
 
-/// Commits a successfully finalized native Kelivo assistant reply into the
-/// Story Runtime sidecar state.
+/// Commits a successfully finalized native Kelivo assistant reply into Story
+/// sidecar state without changing Kelivo's ChatMessage schema.
 ///
-/// Story Mode currently asks providers for directly readable prose, not a JSON
-/// response envelope. Consequently this service deliberately treats Kelivo's
-/// finalized message revision as the authoritative turn boundary and advances
-/// the World Tree cursor without rewriting the message body.
+/// Structured v1 Story responses are parsed and reduced into Scene Runtime. A
+/// provider that returns plain prose or malformed Story JSON is treated as a
+/// compatibility fallback: the turn still commits and remains readable, while
+/// machine state simply receives no event-derived patch for that reply.
 final class StoryRuntimeCommitService {
   StoryRuntimeCommitService(BusinessPreferences preferences)
     : this.withRepositories(
         sessionStore: StoryRuntimeStore(preferences),
         executionStore: StoryRuntimeExecutionStore(preferences),
         worldTreeStore: StoryWorldTreeStore(preferences),
+        sceneRuntimeStore: StorySceneRuntimeStore(preferences),
       );
 
   StoryRuntimeCommitService.withRepositories({
     required StoryRuntimeSessionRepository sessionStore,
     required StoryRuntimeExecutionRepository executionStore,
     required StoryWorldTreeRepository worldTreeStore,
-  }) : this._fromRepositories(sessionStore, executionStore, worldTreeStore);
-
-  StoryRuntimeCommitService._fromRepositories(
-    this._sessionStore,
-    this._executionStore,
-    this._worldTreeStore,
-  );
+    StorySceneRuntimeRepository? sceneRuntimeStore,
+  }) : _sessionStore = sessionStore,
+       _executionStore = executionStore,
+       _worldTreeStore = worldTreeStore,
+       _sceneRuntimeStore = sceneRuntimeStore;
 
   final StoryRuntimeSessionRepository _sessionStore;
   final StoryRuntimeExecutionRepository _executionStore;
   final StoryWorldTreeRepository _worldTreeStore;
+  final StorySceneRuntimeRepository? _sceneRuntimeStore;
 
   /// Recovery-safe bridge for the current Kelivo lifecycle.
   ///
@@ -110,7 +114,21 @@ final class StoryRuntimeCommitService {
           currentTurnId: message.id,
         );
       }
+
+      StoryTurn? parsedTurn;
       if (execution.phase == StoryRuntimePhase.parsing) {
+        try {
+          parsedTurn = const StoryResponseParser().parse(
+            message.content,
+            turnId: message.id,
+          );
+        } on StoryResponseParseException {
+          // Compatibility fallback: the native assistant message remains the
+          // readable source of truth, but carries no structured state update.
+          parsedTurn = null;
+        } on FormatException {
+          parsedTurn = null;
+        }
         execution = await machine.transition(
           conversationId: conversationId,
           to: StoryRuntimePhase.applying,
@@ -127,9 +145,7 @@ final class StoryRuntimeCommitService {
         throw StateError('story_worldline_missing_on_finalize');
       }
 
-      final coordinator = StoryWorldTreeCoordinator(
-        repository: _worldTreeStore,
-      );
+      final coordinator = StoryWorldTreeCoordinator(repository: _worldTreeStore);
       final committedTree = await coordinator.syncSelection(
         worldTreeId: tree.worldTreeId,
         worldlineId: worldline.id,
@@ -139,6 +155,22 @@ final class StoryRuntimeCommitService {
         ),
         currentMessageId: message.id,
       );
+
+      final sceneStore = _sceneRuntimeStore;
+      if (sceneStore != null && parsedTurn != null) {
+        final currentScene = await sceneStore.readOrDefault(conversationId);
+        final nextScene = reduceStoryTurnIntoScene(
+          current: currentScene,
+          turn: parsedTurn,
+          worldTreeId: committedTree.worldTreeId,
+          worldlineId: worldline.id,
+        );
+        if (nextScene.revision != currentScene.revision ||
+            nextScene.worldTreeId != currentScene.worldTreeId ||
+            nextScene.worldlineId != currentScene.worldlineId) {
+          await sceneStore.upsert(nextScene);
+        }
+      }
 
       await _sessionStore.upsert(
         session.copyWith(
