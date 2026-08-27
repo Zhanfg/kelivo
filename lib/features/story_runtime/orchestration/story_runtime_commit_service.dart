@@ -23,6 +23,41 @@ final class StoryRuntimeCommitService {
   final StoryRuntimeExecutionStore _executionStore;
   final StoryWorldTreeStore _worldTreeStore;
 
+  /// Recovery-safe bridge for the current Kelivo lifecycle.
+  ///
+  /// The request path records the streaming assistant placeholder id in
+  /// [StoryRuntimeExecutionState.currentTurnId]. On the next Story request the
+  /// same id is present as a non-streaming persisted message after a successful
+  /// finalize. This lets us close the previous Story transaction without
+  /// guessing which historical assistant message belongs to it.
+  Future<void> commitPendingFinalizedTurn(List<ChatMessage> messages) async {
+    if (messages.isEmpty) return;
+    final conversationId = messages.last.conversationId.trim();
+    if (conversationId.isEmpty) return;
+    final execution = await _executionStore.readOrDefault(conversationId);
+    if (execution.phase != StoryRuntimePhase.awaitingModel &&
+        execution.phase != StoryRuntimePhase.parsing &&
+        execution.phase != StoryRuntimePhase.applying) {
+      return;
+    }
+    final turnId = execution.currentTurnId?.trim();
+    if (turnId == null || turnId.isEmpty) return;
+
+    ChatMessage? finalized;
+    for (final message in messages.reversed) {
+      if (message.id != turnId) continue;
+      if (message.role != 'assistant' || message.isStreaming) return;
+      // Successful _finishStreaming always persists durationMs. The error path
+      // deliberately does not, so a failed/cancelled generation cannot be
+      // mistaken for a completed Story turn during recovery.
+      if (message.durationMs == null) return;
+      finalized = message;
+      break;
+    }
+    if (finalized == null) return;
+    await commitAssistantMessage(finalized);
+  }
+
   Future<void> commitAssistantMessage(ChatMessage message) async {
     final conversationId = message.conversationId.trim();
     if (conversationId.isEmpty || message.role != 'assistant') return;
@@ -48,6 +83,12 @@ final class StoryRuntimeCommitService {
         throw StateError(
           'story_finalize_out_of_phase:${execution.phase.name}',
         );
+      }
+      final expectedTurnId = execution.currentTurnId?.trim();
+      if (expectedTurnId != null &&
+          expectedTurnId.isNotEmpty &&
+          expectedTurnId != message.id) {
+        throw StateError('story_finalize_message_mismatch');
       }
 
       if (execution.phase == StoryRuntimePhase.awaitingModel) {
