@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
-import '../../../core/database/business_preferences.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/providers/model_provider.dart';
@@ -10,7 +9,6 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
-import '../../story_runtime/orchestration/story_mvp_prompt_cache.dart';
 import '../services/message_builder_service.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../services/tool_handler_service.dart';
@@ -238,20 +236,10 @@ class GenerationController {
         settings.ocrEnabled &&
         settings.ocrModelProvider != null &&
         settings.ocrModelId != null;
-    final storyPrompt = StoryMvpPromptCache(
-      contextProvider.read<BusinessPreferences>(),
-    ).read(
-      conversationId: assistantMessage.conversationId,
-      assistantId: assistant?.id,
-    );
-    final effectiveApiMessages = _injectStoryMvpPrompt(
-      apiMessages,
-      storyPrompt,
-    );
 
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
-      apiMessages: effectiveApiMessages,
+      apiMessages: apiMessages,
       userImagePaths: userImagePaths,
       allowImagesApiRouting: allowImagesApiRouting,
       providerKey: providerKey,
@@ -269,30 +257,5 @@ class GenerationController {
       ocrActive: ocrActive,
       generateTitleOnFinish: generateTitleOnFinish,
     );
-  }
-
-  List<Map<String, dynamic>> _injectStoryMvpPrompt(
-    List<Map<String, dynamic>> apiMessages,
-    String? storyPrompt,
-  ) {
-    final prompt = (storyPrompt ?? '').trim();
-    if (prompt.isEmpty) return apiMessages;
-
-    final out = [
-      for (final message in apiMessages) Map<String, dynamic>.from(message),
-    ];
-    final systemIndex = out.indexWhere(
-      (message) => (message['role'] ?? '').toString() == 'system',
-    );
-    if (systemIndex == -1) {
-      out.insert(0, <String, dynamic>{'role': 'system', 'content': prompt});
-      return out;
-    }
-
-    final existing = (out[systemIndex]['content'] ?? '').toString().trim();
-    out[systemIndex]['content'] = existing.isEmpty
-        ? prompt
-        : '$existing\n\n$prompt';
-    return out;
   }
 }
