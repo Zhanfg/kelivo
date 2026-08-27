@@ -12,12 +12,22 @@ final class StoryReferenceSelection {
   final List<StoryReferenceInvocation> invocations;
 }
 
+abstract interface class StoryReferenceSelectionRepository {
+  Future<StoryReferenceSelection> readForConversation(String conversationId);
+
+  Future<void> writeForConversation(
+    String conversationId,
+    Iterable<StoryReferenceInvocation> invocations,
+  );
+}
+
 /// Persistent per-conversation Reference Profile selection.
 ///
 /// Turn-scoped invocations are deliberately rejected here: they belong only to
 /// the in-flight request and must not become a hidden long-term style setting.
 final class StoryReferenceSelectionStore
-    extends JsonBlobStore<StoryReferenceSelection> {
+    extends JsonBlobStore<StoryReferenceSelection>
+    implements StoryReferenceSelectionRepository {
   StoryReferenceSelectionStore(BusinessPreferences preferences)
     : super(preferences);
 
@@ -96,6 +106,7 @@ final class StoryReferenceSelectionStore
         ],
       };
 
+  @override
   Future<StoryReferenceSelection> readForConversation(
     String conversationId,
   ) async {
@@ -106,6 +117,7 @@ final class StoryReferenceSelectionStore
     return StoryReferenceSelection(conversationId: id);
   }
 
+  @override
   Future<void> writeForConversation(
     String conversationId,
     Iterable<StoryReferenceInvocation> invocations,
