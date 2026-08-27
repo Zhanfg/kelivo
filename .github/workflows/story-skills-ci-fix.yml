@@ -1,0 +1,337 @@
+name: Story Skills CI Fix
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+    paths:
+      - .github/workflows/story-skills-ci-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/story-runtime-foundation
+          fetch-depth: 0
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.6
+          channel: stable
+          cache: true
+
+      - name: Apply analyzer fixes and GitHub update test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  if new in text:
+                      return
+                  raise SystemExit(f'patch anchor missing: {path}: {old[:100]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          def remove_once(path, old):
+              p = Path(path)
+              text = p.read_text()
+              if old in text:
+                  p.write_text(text.replace(old, '', 1))
+
+          remove_once(
+              'lib/features/story_runtime/skills/story_skill_package_store.dart',
+              "import '../../../core/database/business_preferences.dart';\n",
+          )
+          remove_once(
+              'lib/features/story_runtime/state/story_runtime_store.dart',
+              "import '../../../core/database/business_preferences.dart';\n",
+          )
+
+          replace_once(
+              'lib/features/story_runtime/skills/story_skill_github_source.dart',
+              '''  StorySkillGitHubService({
+    required StorySkillPackageRepository repository,
+    required StorySkillPackageImporter importer,
+    http.Client? client,
+    StorySkillGitHubRootResolver? appDataRootResolver,
+    this.maxDownloadBytes = 128 * 1024 * 1024,
+  }) : _repository = repository,
+       _importer = importer,
+       _client = client ?? http.Client(),
+       _ownsClient = client == null,
+       _appDataRootResolver =
+           appDataRootResolver ?? AppDirectories.getAppDataDirectory;
+''',
+              '''  factory StorySkillGitHubService({
+    required StorySkillPackageRepository repository,
+    required StorySkillPackageImporter importer,
+    http.Client? client,
+    StorySkillGitHubRootResolver? appDataRootResolver,
+    int maxDownloadBytes = 128 * 1024 * 1024,
+  }) {
+    final resolvedClient = client ?? http.Client();
+    return StorySkillGitHubService._(
+      repository,
+      importer,
+      resolvedClient,
+      client == null,
+      appDataRootResolver ?? AppDirectories.getAppDataDirectory,
+      maxDownloadBytes,
+    );
+  }
+
+  StorySkillGitHubService._(
+    this._repository,
+    this._importer,
+    this._client,
+    this._ownsClient,
+    this._appDataRootResolver,
+    this.maxDownloadBytes,
+  );
+''',
+          )
+
+          manager = Path('lib/features/story_runtime/ui/story_skill_manager_page.dart')
+          text = manager.read_text()
+          text = text.replace(
+              'DropdownButtonFormField<String>(\n                  value: selectedAssistantId,',
+              'DropdownButtonFormField<String>(\n                  initialValue: selectedAssistantId,',
+              1,
+          )
+          text = text.replace(
+              "    final description = manifest.description?.trim();\n    final subtitle = <String>[",
+              "    final description = manifest.description?.trim();\n    final sourceRepository = package?.sourceRepository;\n    final subtitle = <String>[",
+              1,
+          )
+          text = text.replace(
+              "      if (managed && package?.sourceRepository != null) package!.sourceRepository!,",
+              "      if (managed && sourceRepository != null) sourceRepository,",
+              1,
+          )
+          manager.write_text(text)
+
+          studio = Path('lib/features/story_runtime/ui/story_studio_page.dart')
+          text = studio.read_text()
+          text = text.replace(
+              'DropdownButtonFormField<String>(\n                  value: _selectedConversationId,',
+              'DropdownButtonFormField<String>(\n                  initialValue: _selectedConversationId,',
+              1,
+          )
+          text = text.replace(
+              'DropdownButtonFormField<StoryAgencyMode>(\n                    value: _session!.agencyMode,',
+              'DropdownButtonFormField<StoryAgencyMode>(\n                    initialValue: _session!.agencyMode,',
+              1,
+          )
+          studio.write_text(text)
+          PY
+
+          cat > test/story_skill_github_source_test.dart <<'DART'
+          import 'dart:convert';
+          import 'dart:io';
+
+          import 'package:archive/archive.dart';
+          import 'package:flutter_test/flutter_test.dart';
+          import 'package:http/http.dart' as http;
+          import 'package:http/testing.dart';
+
+          import 'package:Kelivo/features/story_runtime/skills/story_skill_github_source.dart';
+          import 'package:Kelivo/features/story_runtime/skills/story_skill_package_importer.dart';
+          import 'package:Kelivo/features/story_runtime/skills/story_skill_package_store.dart';
+
+          void main() {
+            group('StorySkillGitHubSource', () {
+              test('parses repository, tree ref and subdirectory', () {
+                final source = StorySkillGitHubSource.parse(
+                  'https://github.com/example/writing-skill/tree/main/skills/humanizer',
+                );
+
+                expect(source.owner, 'example');
+                expect(source.repository, 'writing-skill');
+                expect(source.ref, 'main');
+                expect(source.subdirectory, 'skills/humanizer');
+              });
+
+              test('rejects non-GitHub sources', () {
+                expect(
+                  () => StorySkillGitHubSource.parse('https://example.com/a/b'),
+                  throwsA(
+                    isA<StorySkillGitHubException>().having(
+                      (error) => error.code,
+                      'code',
+                      'repository_url_invalid',
+                    ),
+                  ),
+                );
+              });
+            });
+
+            test('installs, detects a newer commit and replaces the old version', () async {
+              final temp = await Directory.systemTemp.createTemp(
+                'kelivo_github_skill_test_',
+              );
+              addTearDown(() async {
+                if (await temp.exists()) await temp.delete(recursive: true);
+              });
+
+              const firstSha = '1111111111111111111111111111111111111111';
+              const secondSha = '2222222222222222222222222222222222222222';
+              var latestSha = firstSha;
+
+              List<int> zipFor(String sha) {
+                final archive = Archive()
+                  ..add(
+                    ArchiveFile.string(
+                      'example-writing-$sha/SKILL.md',
+                      '''---
+          name: Human Writing Test
+          description: Test writing Skill
+          ---
+          Keep prose direct and specific. Commit: $sha
+          ''',
+                    ),
+                  );
+                return ZipEncoder().encodeBytes(archive);
+              }
+
+              final client = MockClient((request) async {
+                final path = request.url.path;
+                if (path == '/repos/example/writing-skill') {
+                  return http.Response(
+                    jsonEncode(<String, Object?>{'default_branch': 'main'}),
+                    200,
+                    headers: const {'content-type': 'application/json'},
+                  );
+                }
+                if (path == '/repos/example/writing-skill/commits/main') {
+                  return http.Response(
+                    jsonEncode(<String, Object?>{'sha': latestSha}),
+                    200,
+                    headers: const {'content-type': 'application/json'},
+                  );
+                }
+                if (path == '/repos/example/writing-skill/zipball/$firstSha') {
+                  return http.Response.bytes(zipFor(firstSha), 200);
+                }
+                if (path == '/repos/example/writing-skill/zipball/$secondSha') {
+                  return http.Response.bytes(zipFor(secondSha), 200);
+                }
+                return http.Response('not found: $path', 404);
+              });
+
+              final repository = _MemoryPackageRepository();
+              final importer = StorySkillPackageImporter(
+                repository: repository,
+                appDataRootResolver: () async => temp,
+              );
+              final service = StorySkillGitHubService(
+                repository: repository,
+                importer: importer,
+                client: client,
+                appDataRootResolver: () async => temp,
+              );
+              addTearDown(service.close);
+
+              final installed = await service.install(
+                repositoryUrl: 'https://github.com/example/writing-skill',
+              );
+              expect(installed.commitSha, firstSha);
+              expect(installed.package.isGitHubManaged, isTrue);
+              expect(installed.package.sourceRepository, 'example/writing-skill');
+              expect((await repository.readAll()), hasLength(1));
+
+              latestSha = secondSha;
+              final check = await service.checkForUpdate(installed.package);
+              expect(check.updateAvailable, isTrue);
+              expect(check.currentCommitSha, firstSha);
+              expect(check.latestCommitSha, secondSha);
+
+              final updated = await service.update(installed.package);
+              expect(updated.commitSha, secondSha);
+              expect(updated.replacedVersions, 1);
+              final all = await repository.readAll();
+              expect(all, hasLength(1));
+              expect(all.single.sourceCommitSha, secondSha);
+              expect(all.single.version, startsWith('gh-222222222222'));
+            });
+          }
+
+          final class _MemoryPackageRepository
+              implements StorySkillPackageRepository {
+            final List<StoryInstalledSkillPackage> _items = [];
+
+            @override
+            Future<List<StoryInstalledSkillPackage>> readAll() async =>
+                List<StoryInstalledSkillPackage>.unmodifiable(_items);
+
+            @override
+            Future<StoryInstalledSkillPackage?> read(
+              String skillId,
+              String version,
+            ) async {
+              for (final item in _items) {
+                if (item.skillId == skillId && item.version == version) return item;
+              }
+              return null;
+            }
+
+            @override
+            Future<void> upsert(StoryInstalledSkillPackage package) async {
+              _items.removeWhere(
+                (item) =>
+                    item.skillId == package.skillId && item.version == package.version,
+              );
+              _items.add(package);
+            }
+
+            @override
+            Future<void> remove(String skillId, String version) async {
+              _items.removeWhere(
+                (item) => item.skillId == skillId && item.version == version,
+              );
+            }
+          }
+          DART
+
+          dart format \
+            lib/features/story_runtime/skills/story_skill_package_store.dart \
+            lib/features/story_runtime/state/story_runtime_store.dart \
+            lib/features/story_runtime/skills/story_skill_github_source.dart \
+            lib/features/story_runtime/ui/story_skill_manager_page.dart \
+            lib/features/story_runtime/ui/story_studio_page.dart \
+            test/story_skill_github_source_test.dart
+
+      - name: Verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          dart analyze --fatal-infos lib test
+          flutter test \
+            test/story_skill_activation_policy_test.dart \
+            test/story_skill_github_source_test.dart
+
+      - name: Commit verified fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/story-skills-ci-fix.yml
+          git add \
+            lib/features/story_runtime/skills/story_skill_package_store.dart \
+            lib/features/story_runtime/state/story_runtime_store.dart \
+            lib/features/story_runtime/skills/story_skill_github_source.dart \
+            lib/features/story_runtime/ui/story_skill_manager_page.dart \
+            lib/features/story_runtime/ui/story_studio_page.dart \
+            test/story_skill_github_source_test.dart
+          git commit -m "fix(skills): clear analyzer and verify GitHub updates"
+          git push origin HEAD:feat/story-runtime-foundation
