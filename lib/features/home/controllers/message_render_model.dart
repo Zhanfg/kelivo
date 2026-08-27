@@ -1,4 +1,5 @@
 import '../../../core/models/chat_message.dart';
+import '../../story_runtime/parsing/story_readable_projection.dart';
 
 /// Immutable, precomputed input for one logical timeline slot.
 ///
@@ -90,7 +91,7 @@ final class MessageRenderModelProjector {
     final selectedIndex = availableVersions.indexOf(effectiveSelectedVersion);
     return MessageRenderModel(
       slotId: message.groupId ?? message.id,
-      message: message,
+      message: _presentationMessage(message),
       versions: List<ChatMessage>.unmodifiable(sortedVersions),
       availableVersions: List<int>.unmodifiable(availableVersions),
       selectedVersion: effectiveSelectedVersion,
@@ -100,5 +101,16 @@ final class MessageRenderModelProjector {
           contextDividerIndex >= 0 && index == contextDividerIndex,
       isLatestCompleteAssistant: index == latestCompleteAssistantIndex,
     );
+  }
+
+  static ChatMessage _presentationMessage(ChatMessage message) {
+    if (message.role != 'assistant') return message;
+    final projected = projectStoryReadableOrOriginal(
+      message.content,
+      turnId: message.id,
+      streaming: message.isStreaming,
+    );
+    if (projected == message.content) return message;
+    return message.copyWith(content: projected);
   }
 }
