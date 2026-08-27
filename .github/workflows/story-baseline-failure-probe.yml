@@ -48,7 +48,6 @@ jobs:
             test/core/services/backup/restore_previous_plan_test.dart
             test/features/home/controllers/chat_send_race_test.dart
           )
-          overall=0
           rm -f /tmp/baseline-summary.txt
           for file in "${files[@]}"; do
             echo "::group::BASE PROBE $file"
@@ -59,31 +58,47 @@ jobs:
             set -e
             FILE="$file" STATUS="$status" LOG="$log" python3 <<'PY'
           import json, os
+
           path = os.environ['LOG']
           file = os.environ['FILE']
           status = int(os.environ['STATUS'])
           tests = {}
           errors = {}
           failed = []
+
+          def visit(event):
+              if not isinstance(event, dict):
+                  return
+              kind = event.get('type')
+              if kind == 'testStart':
+                  test = event.get('test')
+                  if isinstance(test, dict):
+                      tests[test.get('id')] = test.get('name')
+              elif kind == 'error':
+                  tid = event.get('testID')
+                  errors.setdefault(tid, []).append(
+                      (event.get('error'), event.get('stackTrace'))
+                  )
+              elif kind == 'testDone' and event.get('result') in ('failure', 'error'):
+                  failed.append(event.get('testID'))
+
           with open(path, 'r', errors='replace') as fh:
               for raw in fh:
                   try:
-                      event = json.loads(raw)
+                      payload = json.loads(raw)
                   except Exception:
                       continue
-                  kind = event.get('type')
-                  if kind == 'testStart':
-                      test = event.get('test') or {}
-                      tests[test.get('id')] = test.get('name')
-                  elif kind == 'error':
-                      tid = event.get('testID')
-                      errors.setdefault(tid, []).append((event.get('error'), event.get('stackTrace')))
-                  elif kind == 'testDone' and event.get('result') in ('failure', 'error'):
-                      failed.append(event.get('testID'))
+                  if isinstance(payload, list):
+                      for event in payload:
+                          visit(event)
+                  else:
+                      visit(payload)
+
           # Some machine reporters signal errors without a failing testDone event.
           for tid in errors:
               if tid not in failed:
                   failed.append(tid)
+
           print(f'BASE_STATUS {status} {file}')
           if not failed:
               print('BASE_FAILED_TESTS 0')
@@ -101,12 +116,9 @@ jobs:
               out.write(f'{status}\t{file}\t{len(failed)}\n')
           PY
             echo "::endgroup::"
-            if [ "$status" -ne 0 ]; then overall=1; fi
           done
 
           echo "=== BASELINE FILE SUMMARY ==="
           cat /tmp/baseline-summary.txt
           # Diagnostic workflow succeeds even when base is red; the output is evidence.
           exit 0
-
-# Trigger baseline verification for Story Runtime stabilization.
