@@ -45,6 +45,7 @@ jobs:
           r(ds,"          (entryName: 'fonts', resolveTarget: _getFontsDir),\n        ];","          (entryName: 'fonts', resolveTarget: _getFontsDir),\n          (entryName: 'story_skills', resolveTarget: _getStorySkillsDir),\n        ];")
           r(ds,"    required this.fontsDirPath,\n  });","    required this.fontsDirPath,\n    required this.storySkillsDirPath,\n  });")
           r(ds,"  final String fontsDirPath;\n}","  final String fontsDirPath;\n  final String storySkillsDirPath;\n}")
+          r(ds,"  void writeBackReference(int distance, int count) {\n","  @override\n  void writeBackReference(int distance, int count) {\n")
           r('lib/core/services/backup/restore_bundle_staging.dart',"  static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];","  static const _assetRoots = ['upload', 'images', 'avatars', 'fonts', 'story_skills'];")
           r('lib/core/services/backup/restore_previous_plan.dart',"  static const rootNames = ['upload', 'images', 'avatars', 'fonts'];","  static const rootNames = ['upload', 'images', 'avatars', 'fonts', 'story_skills'];")
           r('pubspec.yaml',"  crypto: ^3.0.3\n","  crypto: ^3.0.3\n  cryptography: ^2.9.0\n")
@@ -61,6 +62,8 @@ jobs:
               if old not in tail: raise SystemExit('decrypt temp anchor missing')
               tail=tail.replace(old,new,1)
           Path(codec).write_text(head+tail)
+          helper='lib/features/backup/encrypted_full_backup_actions.dart'
+          r(helper,"import '../../core/services/backup/backup_cancel_token.dart';\n","")
           ui='lib/features/backup/pages/backup_page.dart'
           r(ui,"import '../../../core/services/backup/data_sync.dart';\n","import '../../../core/services/backup/data_sync.dart';\nimport '../encrypted_full_backup_actions.dart';\n")
           r(ui,"        children: [\n          _iosNavRow(\n            context,\n            icon: Lucide.Export,\n            label: l10n.backupPageExportToFile,","        children: [\n          _iosNavRow(\n            context,\n            icon: Lucide.Export,\n            label: Localizations.localeOf(context).languageCode.startsWith('zh') ? '导出完整加密备份' : 'Export encrypted complete backup',\n            onTap: () => exportEncryptedFullBackupAction(context, vm),\n          ),\n          _iosDivider(context),\n          _iosNavRow(\n            context,\n            icon: Lucide.Import2,\n            label: Localizations.localeOf(context).languageCode.startsWith('zh') ? '恢复完整加密备份' : 'Restore encrypted complete backup',\n            onTap: () => importEncryptedFullBackupAction(context, vm),\n          ),\n          _iosDivider(context),\n          _iosNavRow(\n            context,\n            icon: Lucide.Export,\n            label: l10n.backupPageExportToFile,")
