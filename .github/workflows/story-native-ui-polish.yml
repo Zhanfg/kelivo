@@ -1,4 +1,3 @@
-# trigger native Story surface polish
 name: Story Native UI Polish
 
 on:
@@ -25,6 +24,8 @@ jobs:
           flutter-version: '3.44.6'
           channel: stable
           cache: true
+      - name: Fix patch escaping
+        run: python3 tool/story_native_ui_polish_fix.py
       - name: Patch Story surfaces
         run: python3 tool/story_native_ui_polish.py
       - name: Format
@@ -41,7 +42,7 @@ jobs:
             test/story_voice_routing_test.dart
       - name: Commit verified polish
         run: |
-          git rm .github/workflows/story-native-ui-polish.yml tool/story_native_ui_polish.py
+          git rm .github/workflows/story-native-ui-polish.yml tool/story_native_ui_polish.py tool/story_native_ui_polish_fix.py
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
