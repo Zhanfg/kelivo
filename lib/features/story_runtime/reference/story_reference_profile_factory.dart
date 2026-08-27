@@ -87,15 +87,16 @@ String _profileId(
   StoryReferenceAnalysisSnapshot analysis,
   String name,
 ) {
+  final aspects = analysis.aspects.map((value) => value.name).toList()..sort();
+  final metricKeys = analysis.metrics.keys.toList()..sort();
   final payload = jsonEncode(<String, Object?>{
     'document_id': document.id,
     'source_hash': document.contentHash,
     'name': name,
-    'aspects': analysis.aspects.map((value) => value.name).toList()..sort(),
+    'aspects': aspects,
     'core_traits': analysis.coreTraits,
     'metrics': <String, double>{
-      for (final key in (analysis.metrics.keys.toList()..sort()))
-        key: analysis.metrics[key]!,
+      for (final key in metricKeys) key: analysis.metrics[key]!,
     },
   });
   final hash = sha256.convert(utf8.encode(payload)).toString();
