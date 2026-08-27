@@ -16,4 +16,5 @@ for old, new in replacements.items():
     if old not in s:
         raise SystemExit(f'missing patch target: {old}')
     s = s.replace(old, new, 1)
+s = s.replace('Lucide.GitBranch', 'Lucide.GitFork')
 p.write_text(s)
