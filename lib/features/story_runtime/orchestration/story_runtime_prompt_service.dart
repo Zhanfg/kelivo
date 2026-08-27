@@ -19,6 +19,7 @@ import '../skills/story_skill_binding_store.dart';
 import '../skills/story_skill_library.dart';
 import '../skills/story_skill_package_store.dart';
 import '../state/story_runtime_machine.dart';
+import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
 import '../world_tree/story_world_tree_coordinator.dart';
 import '../world_tree/story_world_tree_models.dart';
@@ -37,6 +38,7 @@ final class StoryRuntimePromptResult {
     required this.runtimeStateVersion,
     required this.memoryVersion,
     required this.visibleStoryMemoryCount,
+    required this.activeSkillIds,
     required this.mcpProfileId,
     required this.allowedMcpToolNames,
     required this.allowedMcpServerIds,
@@ -53,6 +55,7 @@ final class StoryRuntimePromptResult {
   final int runtimeStateVersion;
   final int memoryVersion;
   final int visibleStoryMemoryCount;
+  final Set<String> activeSkillIds;
   final String? mcpProfileId;
   final Set<String> allowedMcpToolNames;
   final Set<String> allowedMcpServerIds;
@@ -258,6 +261,9 @@ final class StoryRuntimePromptService {
         runtimeStateVersion: execution.runtimeStateVersion,
         memoryVersion: tree.memoryVersion,
         visibleStoryMemoryCount: storyScopedMemory.length,
+        activeSkillIds: Set.unmodifiable({
+          for (final skill in assembly.skills.activeSkills) skill.id,
+        }),
         mcpProfileId: mcpExposure?.profileId,
         allowedMcpToolNames:
             mcpExposure?.allowedToolNames ?? const <String>{},
@@ -357,7 +363,7 @@ final class StoryRuntimePromptService {
     return buffer.toString();
   }
 
-  String _storyCoreInstructions(dynamic session) =>
+  String _storyCoreInstructions(StoryRuntimeSessionState session) =>
       '[KELIVO_STORY_RUNTIME_V1]\n'
       'This conversation is in Story Mode. Produce polished original fiction directly readable in Kelivo.\n'
       'SELF is always the real user. Never silently rename SELF, transfer control of SELF to an NPC, or decide consequential SELF choices.\n'
