@@ -1,0 +1,80 @@
++                TextField(
++                  controller: _narratorVoiceController,
++                  enabled: !_busy,
++                  decoration: const InputDecoration(
++                    labelText: 'Voice ID / 音色名',
++                    hintText: '例如 MiMo / Step / Azure / Qwen 的原生 voice id',
++                    border: OutlineInputBorder(),
++                  ),
++                ),
++                const SizedBox(height: 10),
++                TextField(
++                  controller: _narratorPersonaController,
++                  enabled: !_busy,
++                  minLines: 2,
++                  maxLines: 4,
++                  decoration: const InputDecoration(
++                    labelText: '表达描述',
++                    hintText: '例如：冷静、低沉、克制，重要场景略微放慢语速。',
++                    border: OutlineInputBorder(),
++                  ),
++                ),
++                SwitchListTile(
++                  contentPadding: EdgeInsets.zero,
++                  title: const Text('仅当前 Worldline 使用'),
++                  subtitle: Text(
++                    _session?.worldlineId == null
++                        ? '当前还没有可用的 Worldline。'
++                        : '关闭后，同一 World Tree 的其他分支也可复用该旁白。',
++                  ),
++                  value: _narratorWorldlineScoped && _session?.worldlineId != null,
++                  onChanged: _busy || _session?.worldlineId == null
++                      ? null
++                      : (value) => setState(() => _narratorWorldlineScoped = value),
++                ),
++                Row(
++                  children: [
++                    Expanded(
++                      child: FilledButton.icon(
++                        onPressed: _busy || _storyWorldTreeId == null
++                            ? null
++                            : _saveNarratorVoice,
++                        icon: const Icon(Icons.record_voice_over_outlined),
++                        label: const Text('保存旁白音色'),
++                      ),
++                    ),
++                    const SizedBox(width: 8),
++                    TextButton(
++                      onPressed: _busy || _narrator == null
++                          ? null
++                          : _clearNarratorVoice,
++                      child: const Text('清除'),
++                    ),
++                  ],
++                ),
++                if (_storyWorldTreeId == null)
++                  Padding(
++                    padding: const EdgeInsets.only(top: 8),
++                    child: Text(
++                      'Story Voice 会在首个 Story 回合建立 World Tree 后可配置。',
++                      style: theme.textTheme.bodySmall,
++                    ),
++                  ),
++                const SizedBox(height: 24),
+                 _sectionTitle(context, 'Reference Library'),
+                 Text(
+                   '导入小说后先生成抽象 Style Profile。正常 Story 回合不会把整本小说塞进上下文。',
+@@ -524,6 +699,13 @@
+     );
+   }
+ 
++  @override
++  void dispose() {
++    _narratorVoiceController.dispose();
++    _narratorPersonaController.dispose();
++    super.dispose();
++  }
++
+   Widget _profileCard(StoryReferenceStyleProfile profile) {
+     final invocation = _referenceInvocation(profile.id);
+     final enabled = invocation != null;
