@@ -57,7 +57,8 @@ final class StoryBreakArmorMode {
 
   final BusinessPreferences _preferences;
 
-  bool get enabled => _preferences.getBool(storyBreakArmorEnabledKey) ?? true;
+  /// Experimental Story-only override. It is never enabled implicitly.
+  bool get enabled => _preferences.getBool(storyBreakArmorEnabledKey) ?? false;
 
   Future<bool> setEnabled(bool value) =>
       _preferences.setBool(storyBreakArmorEnabledKey, value);
