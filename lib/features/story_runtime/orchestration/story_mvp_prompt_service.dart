@@ -2,6 +2,7 @@ import '../../../core/database/business_preferences.dart';
 import '../reference/story_reference_profile_compiler.dart';
 import '../reference/story_reference_selection_store.dart';
 import '../reference/story_reference_store.dart';
+import '../skills/story_skill_activation_policy.dart';
 import '../skills/story_skill_binding_store.dart';
 import '../skills/story_skill_library.dart';
 import '../skills/story_skill_models.dart';
@@ -52,16 +53,11 @@ final class StoryMvpPromptService {
 
     final manifests = await manifestsFuture;
     final bindings = await bindingsFuture;
-    final effectiveBindings = <StorySkillBinding>[...bindings];
-    final explicitlyBoundIds = <String>{for (final binding in bindings) binding.skillId};
-    for (final manifest in manifests) {
-      if (manifest.metadata['defaultEnabled'] == true &&
-          !explicitlyBoundIds.contains(manifest.id)) {
-        effectiveBindings.add(
-          StorySkillBinding(assistantId: aid, skillId: manifest.id),
-        );
-      }
-    }
+    final effectiveBindings = StorySkillActivationPolicy.effectiveBindings(
+      manifests: manifests,
+      bindings: bindings,
+      assistantId: aid,
+    );
     final enabledBindingIds = <String>{
       for (final binding in effectiveBindings)
         if (binding.enabled) binding.skillId,
