@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import '../parsing/story_response_contract.dart';
+import '../parsing/story_state_update_contract.dart';
 import '../reference/story_reference_profile_compiler.dart';
 import 'story_capability_epoch.dart';
 import 'story_prompt_cache_plan.dart';
@@ -58,6 +59,7 @@ final class StoryPromptCompiler {
         order: 0,
       ),
       storyResponseContractContributionV1,
+      storyStateUpdateContractContributionV1,
       if (sceneBaseline.trim().isNotEmpty)
         StoryPromptContribution(
           id: 'story.scene.baseline',
