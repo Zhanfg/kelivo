@@ -192,6 +192,7 @@ final class StoryWorldlineMemoryResolver {
       }
       return item.entry.updatedAt;
     }
+
     return updated(candidate).isAfter(updated(previous));
   }
 

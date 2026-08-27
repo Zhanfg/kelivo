@@ -34,7 +34,9 @@ final class StoryWorldTreeStore extends JsonBlobStore<StoryWorldTreeState>
   }
 
   @override
-  Future<StoryWorldTreeState?> readForConversation(String conversationId) async {
+  Future<StoryWorldTreeState?> readForConversation(
+    String conversationId,
+  ) async {
     final id = _requiredId(conversationId, 'conversationId');
     for (final item in await readAll()) {
       if (item.worldlineForConversation(id) != null) return item;

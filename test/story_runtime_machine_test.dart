@@ -6,7 +6,9 @@ final class MemoryExecutionRepository
   StoryRuntimeExecutionState? value;
 
   @override
-  Future<StoryRuntimeExecutionState> readOrDefault(String conversationId) async =>
+  Future<StoryRuntimeExecutionState> readOrDefault(
+    String conversationId,
+  ) async =>
       value ?? StoryRuntimeExecutionState(conversationId: conversationId);
 
   @override

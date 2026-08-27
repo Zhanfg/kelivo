@@ -38,48 +38,54 @@ StoryWorldTreeState tree() => StoryWorldTreeState(
 void main() {
   const resolver = StoryWorldlineMemoryResolver();
 
-  test('child sees base memory, inherited ancestor, and child local memory', () {
-    final memories = <MemoryEntry>[
-      memory('global', 'global'),
-      memory('ancestor', 'ancestor'),
-      memory('child', 'child'),
-    ];
-    final resolved = resolver.resolve(
-      tree: tree(),
-      currentWorldlineId: 'child',
-      baseMemories: memories,
-      links: <StoryWorldlineMemoryLink>[
-        StoryWorldlineMemoryLink(
-          memoryId: 'ancestor',
-          sourceWorldlineId: 'root',
-          updatedAt: DateTime.utc(2026, 8, 27),
-        ),
-        StoryWorldlineMemoryLink(
-          memoryId: 'child',
-          sourceWorldlineId: 'child',
-          strategy: StoryMemoryInheritanceStrategy.local,
-          visibilityScope: StoryMemoryVisibilityScope.worldline,
-          updatedAt: DateTime.utc(2026, 8, 27, 1),
-        ),
-      ],
-    );
+  test(
+    'child sees base memory, inherited ancestor, and child local memory',
+    () {
+      final memories = <MemoryEntry>[
+        memory('global', 'global'),
+        memory('ancestor', 'ancestor'),
+        memory('child', 'child'),
+      ];
+      final resolved = resolver.resolve(
+        tree: tree(),
+        currentWorldlineId: 'child',
+        baseMemories: memories,
+        links: <StoryWorldlineMemoryLink>[
+          StoryWorldlineMemoryLink(
+            memoryId: 'ancestor',
+            sourceWorldlineId: 'root',
+            updatedAt: DateTime.utc(2026, 8, 27),
+          ),
+          StoryWorldlineMemoryLink(
+            memoryId: 'child',
+            sourceWorldlineId: 'child',
+            strategy: StoryMemoryInheritanceStrategy.local,
+            visibilityScope: StoryMemoryVisibilityScope.worldline,
+            updatedAt: DateTime.utc(2026, 8, 27, 1),
+          ),
+        ],
+      );
 
-    expect(resolved.map((item) => item.entry.id).toSet(), {
-      'global',
-      'ancestor',
-      'child',
-    });
-    expect(
-      resolved.firstWhere((item) => item.entry.id == 'ancestor').inherited,
-      isTrue,
-    );
-  });
+      expect(resolved.map((item) => item.entry.id).toSet(), {
+        'global',
+        'ancestor',
+        'child',
+      });
+      expect(
+        resolved.firstWhere((item) => item.entry.id == 'ancestor').inherited,
+        isTrue,
+      );
+    },
+  );
 
   test('local and isolated ancestor memories do not leak into child', () {
     final resolved = resolver.resolve(
       tree: tree(),
       currentWorldlineId: 'child',
-      baseMemories: <MemoryEntry>[memory('local', 'x'), memory('isolated', 'y')],
+      baseMemories: <MemoryEntry>[
+        memory('local', 'x'),
+        memory('isolated', 'y'),
+      ],
       links: <StoryWorldlineMemoryLink>[
         StoryWorldlineMemoryLink(
           memoryId: 'local',

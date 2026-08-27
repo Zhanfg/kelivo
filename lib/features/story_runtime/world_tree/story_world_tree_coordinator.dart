@@ -8,8 +8,7 @@ final class StoryWorldTreeCoordinator {
     required StoryWorldTreeRepository repository,
     Uuid uuid = const Uuid(),
     DateTime Function()? now,
-  }) :
-       // Keep the public constructor parameter names stable for callers while
+  }) : // Keep the public constructor parameter names stable for callers while
        // retaining private implementation fields.
        // ignore: prefer_initializing_formals
        _repository = repository,

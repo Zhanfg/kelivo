@@ -75,8 +75,8 @@ final class StoryVoiceAssignment {
         ttsServiceId: (json['ttsServiceId'] as String).trim(),
         voiceId: (json['voiceId'] as String).trim(),
         modelOverride: _optionalString(json['modelOverride']),
-        personaDescription:
-            (json['personaDescription'] as String? ?? '').trim(),
+        personaDescription: (json['personaDescription'] as String? ?? '')
+            .trim(),
         worldlineId: _optionalString(json['worldlineId']),
         revision: (json['revision'] as num?)?.toInt() ?? 0,
         lockContinuity: json['lockContinuity'] != false,

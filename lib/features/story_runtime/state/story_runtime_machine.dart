@@ -106,7 +106,9 @@ final class StoryRuntimeExecutionStore
       item.toJson();
 
   @override
-  Future<StoryRuntimeExecutionState> readOrDefault(String conversationId) async {
+  Future<StoryRuntimeExecutionState> readOrDefault(
+    String conversationId,
+  ) async {
     final id = _required(conversationId);
     for (final item in await readAll()) {
       if (item.conversationId == id) return item;

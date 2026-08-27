@@ -10,30 +10,33 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('StoryRuntimeCommitService', () {
-    test('commits a successful finalized native reply into Story state', () async {
-      final fixture = _Fixture();
-      final service = fixture.service;
-      final message = fixture.finalizedMessage();
+    test(
+      'commits a successful finalized native reply into Story state',
+      () async {
+        final fixture = _Fixture();
+        final service = fixture.service;
+        final message = fixture.finalizedMessage();
 
-      await service.commitPendingFinalizedTurn(<ChatMessage>[message]);
+        await service.commitPendingFinalizedTurn(<ChatMessage>[message]);
 
-      final execution = fixture.execution.value!;
-      expect(execution.phase, StoryRuntimePhase.awaitingUser);
-      expect(execution.currentTurnId, 'assistant-1');
-      expect(execution.runtimeStateVersion, 13);
+        final execution = fixture.execution.value!;
+        expect(execution.phase, StoryRuntimePhase.awaitingUser);
+        expect(execution.currentTurnId, 'assistant-1');
+        expect(execution.runtimeStateVersion, 13);
 
-      final session = fixture.sessions.states['conversation-1']!;
-      expect(session.sceneRevision, 3);
-      expect(session.worldlineId, 'worldline-1');
+        final session = fixture.sessions.states['conversation-1']!;
+        expect(session.sceneRevision, 3);
+        expect(session.worldlineId, 'worldline-1');
 
-      final tree = fixture.worldTrees.state!;
-      expect(tree.currentMessageId, 'assistant-1');
-      expect(
-        tree.currentNodeId,
-        StoryWorldTreeProjection.nodeId('assistant-group', 0),
-      );
-      expect(tree.runtimeStateVersion, 5);
-    });
+        final tree = fixture.worldTrees.state!;
+        expect(tree.currentMessageId, 'assistant-1');
+        expect(
+          tree.currentNodeId,
+          StoryWorldTreeProjection.nodeId('assistant-group', 0),
+        );
+        expect(tree.runtimeStateVersion, 5);
+      },
+    );
 
     test('replaying finalized reconciliation is idempotent', () async {
       final fixture = _Fixture();
@@ -44,7 +47,8 @@ void main() {
       final firstSceneRevision =
           fixture.sessions.states['conversation-1']!.sceneRevision;
       final firstTreeRevision = fixture.worldTrees.state!.runtimeStateVersion;
-      final firstExecutionRevision = fixture.execution.value!.runtimeStateVersion;
+      final firstExecutionRevision =
+          fixture.execution.value!.runtimeStateVersion;
 
       await service.commitPendingFinalizedTurn(<ChatMessage>[message]);
 
@@ -53,7 +57,10 @@ void main() {
         firstSceneRevision,
       );
       expect(fixture.worldTrees.state!.runtimeStateVersion, firstTreeRevision);
-      expect(fixture.execution.value!.runtimeStateVersion, firstExecutionRevision);
+      expect(
+        fixture.execution.value!.runtimeStateVersion,
+        firstExecutionRevision,
+      );
     });
 
     test('does not commit a non-successful finalized-looking reply', () async {
@@ -64,10 +71,7 @@ void main() {
 
       expect(fixture.execution.value!.phase, StoryRuntimePhase.awaitingModel);
       expect(fixture.execution.value!.runtimeStateVersion, 10);
-      expect(
-        fixture.sessions.states['conversation-1']!.sceneRevision,
-        2,
-      );
+      expect(fixture.sessions.states['conversation-1']!.sceneRevision, 2);
       expect(fixture.worldTrees.state!.runtimeStateVersion, 4);
     });
   });
@@ -167,7 +171,9 @@ final class _ExecutionRepository implements StoryRuntimeExecutionRepository {
   StoryRuntimeExecutionState? value;
 
   @override
-  Future<StoryRuntimeExecutionState> readOrDefault(String conversationId) async =>
+  Future<StoryRuntimeExecutionState> readOrDefault(
+    String conversationId,
+  ) async =>
       value ?? StoryRuntimeExecutionState(conversationId: conversationId);
 
   @override
@@ -184,10 +190,14 @@ final class _WorldTreeRepository implements StoryWorldTreeRepository {
       state?.worldTreeId == worldTreeId ? state : null;
 
   @override
-  Future<StoryWorldTreeState?> readForConversation(String conversationId) async {
+  Future<StoryWorldTreeState?> readForConversation(
+    String conversationId,
+  ) async {
     final value = state;
     if (value == null) return null;
-    return value.worldlineForConversation(conversationId) == null ? null : value;
+    return value.worldlineForConversation(conversationId) == null
+        ? null
+        : value;
   }
 
   @override

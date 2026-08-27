@@ -1,7 +1,8 @@
 import '../../../core/services/json_blob_store.dart';
 import 'story_voice_routing.dart';
 
-final class StoryVoiceRoutingStore extends JsonBlobStore<StoryVoiceRoutingState> {
+final class StoryVoiceRoutingStore
+    extends JsonBlobStore<StoryVoiceRoutingState> {
   StoryVoiceRoutingStore(super.preferences);
 
   static const String key = 'story_voice_routing_v1';
@@ -98,7 +99,8 @@ final class StoryVoiceRoutingStore extends JsonBlobStore<StoryVoiceRoutingState>
       worldlineId: worldlineId,
     );
     if (existing == null &&
-        ((ttsServiceId ?? '').trim().isEmpty || (voiceId ?? '').trim().isEmpty)) {
+        ((ttsServiceId ?? '').trim().isEmpty ||
+            (voiceId ?? '').trim().isEmpty)) {
       throw StateError('story_voice_promotion_requires_initial_voice');
     }
     final next = existing == null
@@ -120,12 +122,16 @@ final class StoryVoiceRoutingStore extends JsonBlobStore<StoryVoiceRoutingState>
             voiceId: voiceId?.trim().isNotEmpty == true
                 ? voiceId!.trim()
                 : existing.voiceId,
-            personaDescription: personaDescription ?? existing.personaDescription,
+            personaDescription:
+                personaDescription ?? existing.personaDescription,
             modelOverride: modelOverride?.trim().isNotEmpty == true
                 ? modelOverride!.trim()
                 : existing.modelOverride,
             revision: existing.revision + 1,
           );
-    return upsertCharacterAssignment(worldTreeId: worldTreeId, assignment: next);
+    return upsertCharacterAssignment(
+      worldTreeId: worldTreeId,
+      assignment: next,
+    );
   }
 }

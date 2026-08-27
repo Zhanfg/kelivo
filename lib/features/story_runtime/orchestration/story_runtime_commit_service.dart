@@ -94,9 +94,7 @@ final class StoryRuntimeCommitService {
       if (execution.phase != StoryRuntimePhase.awaitingModel &&
           execution.phase != StoryRuntimePhase.parsing &&
           execution.phase != StoryRuntimePhase.applying) {
-        throw StateError(
-          'story_finalize_out_of_phase:${execution.phase.name}',
-        );
+        throw StateError('story_finalize_out_of_phase:${execution.phase.name}');
       }
       final expectedTurnId = execution.currentTurnId?.trim();
       if (expectedTurnId != null &&
@@ -129,7 +127,9 @@ final class StoryRuntimeCommitService {
         throw StateError('story_worldline_missing_on_finalize');
       }
 
-      final coordinator = StoryWorldTreeCoordinator(repository: _worldTreeStore);
+      final coordinator = StoryWorldTreeCoordinator(
+        repository: _worldTreeStore,
+      );
       final committedTree = await coordinator.syncSelection(
         worldTreeId: tree.worldTreeId,
         worldlineId: worldline.id,

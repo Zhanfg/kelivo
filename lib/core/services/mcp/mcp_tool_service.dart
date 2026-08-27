@@ -35,9 +35,8 @@ class McpToolRouteSnapshot {
 
   bool containsExposedName(String name) => _find(name) != null;
 
-  Set<String> get exposedNames => Set.unmodifiable({
-    for (final route in _routes) route.exposedName,
-  });
+  Set<String> get exposedNames =>
+      Set.unmodifiable({for (final route in _routes) route.exposedName});
 
   /// Narrow an already captured Assistant route snapshot for one request.
   ///
@@ -352,10 +351,7 @@ class McpToolService extends ChangeNotifier {
         }
       } catch (_) {}
     }
-    return McpToolResult(
-      markdown: buf.toString().trim(),
-      imageUris: imageUris,
-    );
+    return McpToolResult(markdown: buf.toString().trim(), imageUris: imageUris);
   }
 
   void _writeEscapedToolText(StringBuffer buf, String text) {

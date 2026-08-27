@@ -34,17 +34,18 @@ final class StoryMcpProfile {
     'metadata': metadata,
   };
 
-  factory StoryMcpProfile.fromJson(Map<String, dynamic> json) => StoryMcpProfile(
-    id: (json['id'] as String).trim(),
-    name: (json['name'] as String? ?? 'MCP Profile').trim(),
-    serverIds: _stringList(json['serverIds']),
-    toolNames: _stringList(json['toolNames']),
-    includeAssistantDefaults: json['includeAssistantDefaults'] == true,
-    requireApproval: json['requireApproval'] != false,
-    metadata: Map<String, Object?>.from(
-      (json['metadata'] as Map?) ?? const <String, Object?>{},
-    ),
-  );
+  factory StoryMcpProfile.fromJson(Map<String, dynamic> json) =>
+      StoryMcpProfile(
+        id: (json['id'] as String).trim(),
+        name: (json['name'] as String? ?? 'MCP Profile').trim(),
+        serverIds: _stringList(json['serverIds']),
+        toolNames: _stringList(json['toolNames']),
+        includeAssistantDefaults: json['includeAssistantDefaults'] == true,
+        requireApproval: json['requireApproval'] != false,
+        metadata: Map<String, Object?>.from(
+          (json['metadata'] as Map?) ?? const <String, Object?>{},
+        ),
+      );
 }
 
 final class StoryMcpProfileSelection {

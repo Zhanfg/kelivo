@@ -189,33 +189,32 @@ final class StoryWorldTreeState {
     'metadata': metadata,
   };
 
-  factory StoryWorldTreeState.fromJson(Map<String, dynamic> json) =>
-      StoryWorldTreeState(
-        worldTreeId: json['worldTreeId'] as String,
-        name: json['name'] as String? ?? 'Story',
-        rootContentHash: json['rootContentHash'] as String? ?? '',
-        headWorldlineId: json['headWorldlineId'] as String,
-        currentNodeId: json['currentNodeId'] as String?,
-        currentMessageId: json['currentMessageId'] as String?,
-        memoryVersion: (json['memoryVersion'] as num?)?.toInt() ?? 0,
-        runtimeStateVersion:
-            (json['runtimeStateVersion'] as num?)?.toInt() ?? 0,
-        worldlines: ((json['worldlines'] as List?) ?? const <Object?>[])
-            .map(
-              (item) => StoryWorldline.fromJson(
-                Map<String, dynamic>.from(item as Map),
-              ),
-            )
-            .toList(growable: false),
-        merges: ((json['merges'] as List?) ?? const <Object?>[])
-            .map(
-              (item) => StoryWorldMergeRecord.fromJson(
-                Map<String, dynamic>.from(item as Map),
-              ),
-            )
-            .toList(growable: false),
-        metadata: Map<String, Object?>.from(
-          (json['metadata'] as Map?) ?? const <String, Object?>{},
-        ),
-      );
+  factory StoryWorldTreeState.fromJson(
+    Map<String, dynamic> json,
+  ) => StoryWorldTreeState(
+    worldTreeId: json['worldTreeId'] as String,
+    name: json['name'] as String? ?? 'Story',
+    rootContentHash: json['rootContentHash'] as String? ?? '',
+    headWorldlineId: json['headWorldlineId'] as String,
+    currentNodeId: json['currentNodeId'] as String?,
+    currentMessageId: json['currentMessageId'] as String?,
+    memoryVersion: (json['memoryVersion'] as num?)?.toInt() ?? 0,
+    runtimeStateVersion: (json['runtimeStateVersion'] as num?)?.toInt() ?? 0,
+    worldlines: ((json['worldlines'] as List?) ?? const <Object?>[])
+        .map(
+          (item) =>
+              StoryWorldline.fromJson(Map<String, dynamic>.from(item as Map)),
+        )
+        .toList(growable: false),
+    merges: ((json['merges'] as List?) ?? const <Object?>[])
+        .map(
+          (item) => StoryWorldMergeRecord.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList(growable: false),
+    metadata: Map<String, Object?>.from(
+      (json['metadata'] as Map?) ?? const <String, Object?>{},
+    ),
+  );
 }

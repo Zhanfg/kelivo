@@ -75,11 +75,7 @@ final class StoryNativeLifecycleBridge {
     }
 
     return _voiceResolver
-        .resolve(
-          service: selectedService,
-          assignment: narrator,
-          intent: intent,
-        )
+        .resolve(service: selectedService, assignment: narrator, intent: intent)
         .service;
   }
 }

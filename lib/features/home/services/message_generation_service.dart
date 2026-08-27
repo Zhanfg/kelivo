@@ -143,22 +143,24 @@ class MessageGenerationService {
   List<Map<String, dynamic>> _storySerializationToolDefinitions(
     ProviderKind kind,
   ) {
-    return StorySerializationTools.definitions().map((definition) {
-      final normalized = Map<String, dynamic>.from(definition);
-      final function = Map<String, dynamic>.from(
-        normalized['function'] as Map,
-      );
-      final parameters = Map<String, dynamic>.from(
-        function['parameters'] as Map,
-      );
-      function['parameters'] =
-          GenerationController.sanitizeToolParametersForProvider(
-            parameters,
-            kind,
+    return StorySerializationTools.definitions()
+        .map((definition) {
+          final normalized = Map<String, dynamic>.from(definition);
+          final function = Map<String, dynamic>.from(
+            normalized['function'] as Map,
           );
-      normalized['function'] = function;
-      return normalized;
-    }).toList(growable: false);
+          final parameters = Map<String, dynamic>.from(
+            function['parameters'] as Map,
+          );
+          function['parameters'] =
+              GenerationController.sanitizeToolParametersForProvider(
+                parameters,
+                kind,
+              );
+          normalized['function'] = function;
+          return normalized;
+        })
+        .toList(growable: false);
   }
 
   /// Prepare API messages with all injections applied.
@@ -230,9 +232,9 @@ class MessageGenerationService {
           assistantId: storyAssistantId,
         );
         if (storyRuntime != null) {
-          StoryBreakArmorMode(storyPreferences).prependToSystemPrompt(
-            apiMessages,
-          );
+          StoryBreakArmorMode(
+            storyPreferences,
+          ).prependToSystemPrompt(apiMessages);
           _injectStoryRuntimeSystemPrompt(
             apiMessages,
             storyRuntime.providerText,

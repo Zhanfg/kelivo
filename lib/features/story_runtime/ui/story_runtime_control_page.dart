@@ -169,17 +169,16 @@ class _StoryRuntimeControlPageState extends State<StoryRuntimeControlPage> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('保留 Assistant 原生 MCP 选择'),
-                  subtitle: const Text('关闭时，Story Mode 只暴露本 Profile 的 allow-list。'),
-                  value: includeAssistantDefaults,
-                  onChanged: (value) => setDialogState(
-                    () => includeAssistantDefaults = value,
+                  subtitle: const Text(
+                    '关闭时，Story Mode 只暴露本 Profile 的 allow-list。',
                   ),
+                  value: includeAssistantDefaults,
+                  onChanged: (value) =>
+                      setDialogState(() => includeAssistantDefaults = value),
                 ),
                 const Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Approval 不会被此页面关闭；执行仍服从 Kelivo 原生审批。',
-                  ),
+                  child: Text('Approval 不会被此页面关闭；执行仍服从 Kelivo 原生审批。'),
                 ),
               ],
             ),
@@ -315,7 +314,10 @@ class _StoryRuntimeControlPageState extends State<StoryRuntimeControlPage> {
                             : _setEnabled,
                       ),
                       const Divider(height: 1),
-                      _statusTile('Execution', _execution?.phase.name ?? 'idle'),
+                      _statusTile(
+                        'Execution',
+                        _execution?.phase.name ?? 'idle',
+                      ),
                       _statusTile(
                         'Runtime revision',
                         '${_execution?.runtimeStateVersion ?? 0}',
@@ -346,7 +348,10 @@ class _StoryRuntimeControlPageState extends State<StoryRuntimeControlPage> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text('MCP Profile', style: theme.textTheme.titleMedium),
+                      child: Text(
+                        'MCP Profile',
+                        style: theme.textTheme.titleMedium,
+                      ),
                     ),
                     TextButton.icon(
                       onPressed: _busy ? null : _createMcpProfile,
@@ -370,7 +375,10 @@ class _StoryRuntimeControlPageState extends State<StoryRuntimeControlPage> {
                     for (final profile in _profiles)
                       DropdownMenuItem<String>(
                         value: profile.id,
-                        child: Text(profile.name, overflow: TextOverflow.ellipsis),
+                        child: Text(
+                          profile.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                   ],
                   onChanged: _conversationId == null || _busy

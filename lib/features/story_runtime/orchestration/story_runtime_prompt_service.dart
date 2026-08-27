@@ -127,7 +127,9 @@ final class StoryRuntimePromptService {
         messages: messages,
       );
       var tree = await _worldTreeStore.readForConversation(conversation.id);
-      final coordinator = StoryWorldTreeCoordinator(repository: _worldTreeStore);
+      final coordinator = StoryWorldTreeCoordinator(
+        repository: _worldTreeStore,
+      );
       tree ??= await coordinator.bootstrap(
         conversationId: conversation.id,
         name: conversation.title,
@@ -275,10 +277,8 @@ final class StoryRuntimePromptService {
           for (final skill in assembly.skills.activeSkills) skill.id,
         }),
         mcpProfileId: mcpExposure?.profileId,
-        allowedMcpToolNames:
-            mcpExposure?.allowedToolNames ?? const <String>{},
-        allowedMcpServerIds:
-            mcpExposure?.allowedServerIds ?? const <String>{},
+        allowedMcpToolNames: mcpExposure?.allowedToolNames ?? const <String>{},
+        allowedMcpServerIds: mcpExposure?.allowedServerIds ?? const <String>{},
         includeAssistantMcpDefaults:
             mcpExposure?.includeAssistantDefaults ?? true,
         requireMcpApproval: mcpExposure?.requireApproval ?? false,
@@ -327,9 +327,7 @@ final class StoryRuntimePromptService {
       }
     }
     return sha256
-        .convert(
-          utf8.encode('${conversationIdSeed(projection)}\n$rootContent'),
-        )
+        .convert(utf8.encode('${conversationIdSeed(projection)}\n$rootContent'))
         .toString();
   }
 

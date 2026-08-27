@@ -99,10 +99,7 @@ Future<List<StorySkillManifest>> loadBuiltInStorySkills() async {
       version: '1.0.0',
       description: '按需导出/恢复版本化 Story bundle，并通过现有 GitHub MCP 做仓库传输。',
       instructions: <String>[githubSerialization],
-      toolIds: const <String>[
-        'story_export_bundle',
-        'story_restore_bundle',
-      ],
+      toolIds: const <String>['story_export_bundle', 'story_restore_bundle'],
       activationModes: const <StorySkillActivationMode>{
         StorySkillActivationMode.manual,
       },
