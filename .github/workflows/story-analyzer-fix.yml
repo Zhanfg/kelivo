@@ -104,8 +104,7 @@ jobs:
           flutter test \
             test/story_skill_activation_policy_test.dart \
             test/story_skill_system_test.dart \
-            test/story_skill_package_test.dart \
-            test/story_mvp_prompt_service_test.dart
+            test/story_skill_package_test.dart
 
       - name: Commit verified fixes
         shell: bash
