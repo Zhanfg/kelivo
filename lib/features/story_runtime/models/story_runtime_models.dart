@@ -41,15 +41,18 @@ enum StoryAvatarKind { initials, localAsset, generated, custom }
 /// player-character id and no mechanism for silently switching control to an
 /// NPC.
 final class StoryActorRef {
-  const StoryActorRef._(this.type, this.characterId);
+  const StoryActorRef.self()
+    : type = StoryActorType.self,
+      characterId = null;
 
-  const StoryActorRef.self() : this._(StoryActorType.self, null);
-
-  const StoryActorRef.world() : this._(StoryActorType.world, null);
+  const StoryActorRef.world()
+    : type = StoryActorType.world,
+      characterId = null;
 
   const StoryActorRef.character(String characterId)
     : assert(characterId != ''),
-      this._(StoryActorType.character, characterId);
+      type = StoryActorType.character,
+      characterId = characterId;
 
   final StoryActorType type;
   final String? characterId;
@@ -97,7 +100,9 @@ final class StoryTextSpan {
 final class StoryAvatarRef {
   const StoryAvatarRef({required this.kind, this.value});
 
-  const StoryAvatarRef.initials() : kind = StoryAvatarKind.initials, value = null;
+  const StoryAvatarRef.initials()
+    : kind = StoryAvatarKind.initials,
+      value = null;
 
   final StoryAvatarKind kind;
   final String? value;
