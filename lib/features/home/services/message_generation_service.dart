@@ -360,7 +360,7 @@ class MessageGenerationService {
         : null;
     ToolCallHandler? onToolCall = nativeOnToolCall;
     if (storySerializationEnabled) {
-      final preferences = storyPreferences!;
+      final preferences = storyPreferences;
       onToolCall = (name, args, {toolCallId}) async {
         if (StorySerializationTools.names.contains(name)) {
           final result = await StorySerializationTools.tryHandle(
