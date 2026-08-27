@@ -16,9 +16,8 @@ abstract interface class StoryRuntimeSessionRepository {
 /// Versioned Story Mode state keyed by conversation id.
 ///
 /// This deliberately uses Kelivo's existing business-preference repository
-/// instead of adding fields to Conversation/Hive/Drift during the foundation
-/// phase. Story Mode can therefore remain opt-in without changing Chat Mode's
-/// persistence contract.
+/// instead of adding fields to Conversation/Hive/Drift. Story Mode therefore
+/// remains opt-in without changing Chat Mode's persistence contract.
 final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState>
     implements StoryRuntimeSessionRepository {
   StoryRuntimeStore(super.preferences);
@@ -77,6 +76,11 @@ final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState>
     });
   }
 
+  /// Explicitly selects Chat (`enabled == false`) or Story (`enabled == true`).
+  ///
+  /// This operation never deletes Story sidecar state. Switching Story off
+  /// merely stops Story Runtime participation for future requests; switching it
+  /// back on can continue the existing World Tree/worldline state.
   @override
   Future<void> setEnabled(String conversationId, bool enabled) {
     return runExclusive(() async {
@@ -90,13 +94,22 @@ final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState>
           continue;
         }
         if (!replaced) {
-          next.add(item.copyWith(enabled: enabled));
+          next.add(
+            item.copyWith(
+              enabled: enabled,
+              modeSelectionCommitted: true,
+            ),
+          );
           replaced = true;
         }
       }
       if (!replaced) {
         next.add(
-          StoryRuntimeSessionState(conversationId: id, enabled: enabled),
+          StoryRuntimeSessionState(
+            conversationId: id,
+            enabled: enabled,
+            modeSelectionCommitted: true,
+          ),
         );
       }
       next.sort((a, b) => a.conversationId.compareTo(b.conversationId));
