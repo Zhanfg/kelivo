@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../utils/url_launcher_ext.dart';
 import '../../../shared/widgets/favicon.dart';
-import '../../story_runtime/ui/story_runtime_control_page.dart';
-import '../../story_runtime/ui/story_skill_manager_page.dart';
-import '../../story_runtime/ui/story_studio_page.dart';
 
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
@@ -35,67 +32,6 @@ class MorePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              title('Story'),
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: cs.outline.withValues(alpha: 0.12)),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.auto_stories_outlined),
-                      title: const Text('Story Studio'),
-                      subtitle: const Text('故事模式、参考文本与 Story Runtime'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const StoryStudioPage(),
-                          ),
-                        );
-                      },
-                    ),
-                    Divider(
-                      height: 1,
-                      color: cs.outline.withValues(alpha: 0.12),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.tune_rounded),
-                      title: const Text('Runtime 控制'),
-                      subtitle: const Text('运行状态、MCP Profile 与 Voice 路由概况'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const StoryRuntimeControlPage(),
-                          ),
-                        );
-                      },
-                    ),
-                    Divider(
-                      height: 1,
-                      color: cs.outline.withValues(alpha: 0.12),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.extension_outlined),
-                      title: const Text('Skill 管理'),
-                      subtitle: const Text('内置、ZIP、GitHub 安装与更新'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const StorySkillManagerPage(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
               // LeaderBoard section
               title('LLM排行榜'),
               Row(

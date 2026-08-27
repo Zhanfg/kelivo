@@ -18,6 +18,8 @@ import '../../backup/pages/backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
+import '../../story_runtime/ui/story_skill_manager_page.dart';
+import '../../story_runtime/ui/story_studio_page.dart';
 import 'network_proxy_page.dart';
 import 'storage_space_page.dart';
 import '../../stats/pages/stats_page.dart';
@@ -35,6 +37,9 @@ class SettingsPage extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
+    final languageCode = Localizations.localeOf(context).languageCode;
+    final storyModeLabel = languageCode == 'zh' ? '故事模式' : 'Story Mode';
+    final storySkillsLabel = languageCode == 'zh' ? '故事技能' : 'Story Skills';
 
     String modeLabel(ThemeMode m) {
       switch (m) {
@@ -270,6 +275,30 @@ class SettingsPage extends StatelessWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const MemorySettingsPage(),
+                    ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.BookOpen,
+                label: storyModeLabel,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StoryStudioPage()),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Layers,
+                label: storySkillsLabel,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const StorySkillManagerPage(),
                     ),
                   );
                 },
