@@ -28,8 +28,7 @@ abstract interface class StoryReferenceSelectionRepository {
 final class StoryReferenceSelectionStore
     extends JsonBlobStore<StoryReferenceSelection>
     implements StoryReferenceSelectionRepository {
-  StoryReferenceSelectionStore(BusinessPreferences preferences)
-    : super(preferences);
+  StoryReferenceSelectionStore(super.preferences);
 
   static const String key = 'story_reference_selections_v1';
 
