@@ -101,6 +101,6 @@ jobs:
           git rm .github/workflows/complete-backup-fast-apply.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pubspec.yaml pubspec.lock lib/core/services/backup/encrypted_full_backup.dart lib/core/providers/backup_provider.dart lib/core/services/backup/data_sync.dart lib/core/services/backup/restore_bundle_staging.dart lib/core/services/backup/restore_previous_plan.dart lib/features/backup/encrypted_full_backup_actions.dart lib/features/backup/pages/backup_page.dart test/encrypted_full_backup_test.dart
+          git add pubspec.yaml lib/core/services/backup/encrypted_full_backup.dart lib/core/providers/backup_provider.dart lib/core/services/backup/data_sync.dart lib/core/services/backup/restore_bundle_staging.dart lib/core/services/backup/restore_previous_plan.dart lib/features/backup/encrypted_full_backup_actions.dart lib/features/backup/pages/backup_page.dart test/encrypted_full_backup_test.dart
           git commit -m "feat(backup): finish encrypted complete backups"
           git push origin HEAD:feat/story-runtime-foundation
