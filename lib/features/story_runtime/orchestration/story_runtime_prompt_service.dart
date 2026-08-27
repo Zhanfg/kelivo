@@ -26,6 +26,7 @@ import '../world_tree/story_world_tree_models.dart';
 import '../world_tree/story_world_tree_projection.dart';
 import '../world_tree/story_world_tree_store.dart';
 import 'story_runtime_assembler.dart';
+import 'story_runtime_commit_service.dart';
 
 final class StoryRuntimePromptResult {
   const StoryRuntimePromptResult({
@@ -83,7 +84,8 @@ final class StoryRuntimePromptService {
       _referenceProfileStore = StoryReferenceProfileStore(preferences),
       _referenceSelectionStore = StoryReferenceSelectionStore(preferences),
       _mcpProfileStore = StoryMcpProfileStore(preferences),
-      _mcpSelectionStore = StoryMcpProfileSelectionStore(preferences);
+      _mcpSelectionStore = StoryMcpProfileSelectionStore(preferences),
+      _commitService = StoryRuntimeCommitService(preferences);
 
   final StoryRuntimeStore _sessionStore;
   final StoryWorldTreeStore _worldTreeStore;
@@ -96,6 +98,7 @@ final class StoryRuntimePromptService {
   final StoryReferenceSelectionStore _referenceSelectionStore;
   final StoryMcpProfileStore _mcpProfileStore;
   final StoryMcpProfileSelectionStore _mcpSelectionStore;
+  final StoryRuntimeCommitService _commitService;
 
   static const StoryWorldlineMemoryResolver _memoryResolver =
       StoryWorldlineMemoryResolver();
@@ -106,8 +109,15 @@ final class StoryRuntimePromptService {
     required List<ChatMessage> messages,
     required String assistantId,
   }) async {
-    final session = await _sessionStore.readOrDefault(conversation.id);
+    var session = await _sessionStore.readOrDefault(conversation.id);
     if (!session.enabled) return null;
+
+    // Close the previous native Kelivo assistant turn before this request starts
+    // a new Story transaction. The commit service matches the exact persisted
+    // placeholder id recorded by the execution state, so this is deterministic
+    // and recovery-safe rather than a "last assistant message" heuristic.
+    await _commitService.commitPendingFinalizedTurn(messages);
+    session = await _sessionStore.readOrDefault(conversation.id);
 
     final machine = StoryRuntimeStateMachine(_executionStore);
     try {
