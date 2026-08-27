@@ -186,3 +186,5 @@ jobs:
             test/core/services/backup/restore_previous_plan_test.dart
           git commit -m 'fix(story): preserve plain chat and backup fixtures'
           git push origin HEAD:feat/story-runtime-foundation
+
+# Triggered after workflow registration.
