@@ -13,8 +13,7 @@ abstract interface class StoryReferenceDocumentRepository {
 final class StoryReferenceDocumentStore
     extends JsonBlobStore<StoryReferenceDocument>
     implements StoryReferenceDocumentRepository {
-  StoryReferenceDocumentStore(BusinessPreferences preferences)
-    : super(preferences);
+  StoryReferenceDocumentStore(super.preferences);
 
   static const String key = 'story_reference_documents_v1';
 
@@ -90,8 +89,7 @@ abstract interface class StoryReferenceProfileRepository {
 final class StoryReferenceProfileStore
     extends JsonBlobStore<StoryReferenceStyleProfile>
     implements StoryReferenceProfileRepository {
-  StoryReferenceProfileStore(BusinessPreferences preferences)
-    : super(preferences);
+  StoryReferenceProfileStore(super.preferences);
 
   static const String key = 'story_reference_profiles_v1';
 
