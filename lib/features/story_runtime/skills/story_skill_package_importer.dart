@@ -37,6 +37,7 @@ final class StorySkillPackageImporter {
     this.parser = const StorySkillManifestParser(),
     this.maxSourceBytes = 128 * 1024 * 1024,
     this.maxExtractedBytes = 256 * 1024 * 1024,
+    this.maxInstructionChars = 200000,
     this.maxFiles = 2048,
   }) : _repository = repository,
        _appDataRootResolver =
@@ -47,6 +48,7 @@ final class StorySkillPackageImporter {
   final StorySkillManifestParser parser;
   final int maxSourceBytes;
   final int maxExtractedBytes;
+  final int maxInstructionChars;
   final int maxFiles;
 
   Future<StorySkillPackageImportResult> importZip(String path) async {
@@ -102,6 +104,13 @@ final class StorySkillPackageImporter {
         skillMarkdown: skillMarkdown,
         promptTexts: promptTexts,
       );
+      final instructionChars = manifest.instructions.fold<int>(
+        0,
+        (sum, instruction) => sum + instruction.length,
+      );
+      if (instructionChars > maxInstructionChars) {
+        throw const StorySkillPackageException('instruction_budget_exceeded');
+      }
 
       final existing = await _repository.read(manifest.id, manifest.version);
       if (existing != null) {
@@ -237,8 +246,7 @@ Map<String, Object?> _extractSkillPackageTask(Map<String, Object?> params) {
         relative.startsWith('templates/');
   }
 
-  final staging = Directory(stagingPath);
-  final promptTexts = <String>[];
+  final promptTextByPath = <String, String>{};
   for (final mapEntry in normalizedEntries.entries) {
     final fullPath = mapEntry.key;
     if (!fullPath.startsWith(rootPrefix)) continue;
@@ -254,10 +262,10 @@ Map<String, Object?> _extractSkillPackageTask(Map<String, Object?> params) {
     if (relative.startsWith('prompts/') &&
         (relative.toLowerCase().endsWith('.md') ||
             relative.toLowerCase().endsWith('.txt'))) {
-      promptTexts.add(utf8.decode(bytes, allowMalformed: true).trim());
+      final text = utf8.decode(bytes, allowMalformed: true).trim();
+      if (text.isNotEmpty) promptTextByPath[relative] = text;
     }
   }
-  promptTexts.removeWhere((text) => text.isEmpty);
 
   final manifestJson = utf8.decode(
     _readArchiveBytes(normalizedEntries[manifestPath]!),
@@ -267,7 +275,8 @@ Map<String, Object?> _extractSkillPackageTask(Map<String, Object?> params) {
     _readArchiveBytes(skillEntry),
     allowMalformed: true,
   ).trim();
-  promptTexts.sort();
+  final promptPaths = promptTextByPath.keys.toList(growable: false)..sort();
+  final promptTexts = [for (final path in promptPaths) promptTextByPath[path]!];
 
   return <String, Object?>{
     'manifest_json': manifestJson,
