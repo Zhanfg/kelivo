@@ -21,6 +21,7 @@ import '../skills/story_skill_package_store.dart';
 import '../state/story_runtime_machine.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
+import '../state/story_scene_runtime_state.dart';
 import '../world_tree/story_world_tree_coordinator.dart';
 import '../world_tree/story_world_tree_models.dart';
 import '../world_tree/story_world_tree_projection.dart';
@@ -45,6 +46,8 @@ final class StoryRuntimePromptResult {
     required this.allowedMcpServerIds,
     required this.includeAssistantMcpDefaults,
     required this.requireMcpApproval,
+    this.sceneId,
+    this.sceneRevision = 0,
   });
 
   final String providerText;
@@ -62,6 +65,8 @@ final class StoryRuntimePromptResult {
   final Set<String> allowedMcpServerIds;
   final bool includeAssistantMcpDefaults;
   final bool requireMcpApproval;
+  final String? sceneId;
+  final int sceneRevision;
 }
 
 /// Production Story prompt bridge used by the normal Kelivo send path.
@@ -73,6 +78,7 @@ final class StoryRuntimePromptResult {
 final class StoryRuntimePromptService {
   StoryRuntimePromptService(BusinessPreferences preferences)
     : _sessionStore = StoryRuntimeStore(preferences),
+      _sceneStore = StorySceneRuntimeStore(preferences),
       _worldTreeStore = StoryWorldTreeStore(preferences),
       _worldlineMemoryStore = StoryWorldlineMemoryStore(preferences),
       _executionStore = StoryRuntimeExecutionStore(preferences),
@@ -88,6 +94,7 @@ final class StoryRuntimePromptService {
       _commitService = StoryRuntimeCommitService(preferences);
 
   final StoryRuntimeStore _sessionStore;
+  final StorySceneRuntimeStore _sceneStore;
   final StoryWorldTreeStore _worldTreeStore;
   final StoryWorldlineMemoryStore _worldlineMemoryStore;
   final StoryRuntimeExecutionStore _executionStore;
@@ -127,9 +134,7 @@ final class StoryRuntimePromptService {
         messages: messages,
       );
       var tree = await _worldTreeStore.readForConversation(conversation.id);
-      final coordinator = StoryWorldTreeCoordinator(
-        repository: _worldTreeStore,
-      );
+      final coordinator = StoryWorldTreeCoordinator(repository: _worldTreeStore);
       tree ??= await coordinator.bootstrap(
         conversationId: conversation.id,
         name: conversation.title,
@@ -156,6 +161,17 @@ final class StoryRuntimePromptService {
       if (session.worldlineId != worldline.id) {
         effectiveSession = session.copyWith(worldlineId: worldline.id);
         await _sessionStore.upsert(effectiveSession);
+      }
+
+      var scene = await _sceneStore.readOrDefault(conversation.id);
+      if (scene.worldTreeId != tree.worldTreeId ||
+          scene.worldlineId != worldline.id) {
+        scene = scene.copyWith(
+          worldTreeId: tree.worldTreeId,
+          worldlineId: worldline.id,
+          revision: scene.revision + 1,
+        );
+        await _sceneStore.upsert(scene);
       }
 
       final memoryLinks = await _worldlineMemoryStore.readForTree(
@@ -219,6 +235,8 @@ final class StoryRuntimePromptService {
           conversationId: conversation.id,
           assistantId: assistantId,
           storyCoreInstructions: _storyCoreInstructions(effectiveSession),
+          sceneBaseline: _sceneBaseline(scene),
+          manualEnabledSkillIds: scene.activeSkillIds.toSet(),
           additionalStable: <StoryPromptContribution>[
             StoryPromptContribution(
               id: 'story.worldline.ancestry',
@@ -241,6 +259,15 @@ final class StoryRuntimePromptService {
                 order: 820,
                 content: _memoryText(storyScopedMemory),
               ),
+            if (scene.openLoops.isNotEmpty ||
+                scene.continuityState.isNotEmpty ||
+                scene.serialState.isNotEmpty)
+              StoryPromptContribution(
+                id: 'story.scene.dynamic',
+                stability: StoryPromptStability.volatile,
+                order: 840,
+                content: _sceneDynamicText(scene),
+              ),
           ],
           localOnly: <StoryPromptContribution>[
             StoryPromptContribution(
@@ -248,12 +275,23 @@ final class StoryRuntimePromptService {
               stability: StoryPromptStability.localOnly,
               order: 1000,
               content:
-                  'worldTree=${tree.worldTreeId};memoryVersion=${tree.memoryVersion};runtimeStateVersion=${tree.runtimeStateVersion}',
+                  'worldTree=${tree.worldTreeId};memoryVersion=${tree.memoryVersion};runtimeStateVersion=${tree.runtimeStateVersion};sceneRevision=${scene.revision}',
             ),
           ],
         ),
       );
       if (assembly == null) return null;
+
+      final resolvedSkillIds = <String>{
+        for (final skill in assembly.skills.activeSkills) skill.id,
+      };
+      if (!_sameStringSet(scene.activeSkillIds, resolvedSkillIds)) {
+        scene = scene.copyWith(
+          activeSkillIds: resolvedSkillIds.toList()..sort(),
+          revision: scene.revision + 1,
+        );
+        await _sceneStore.upsert(scene);
+      }
 
       final execution = await machine.transition(
         conversationId: conversation.id,
@@ -273,15 +311,15 @@ final class StoryRuntimePromptService {
         runtimeStateVersion: execution.runtimeStateVersion,
         memoryVersion: tree.memoryVersion,
         visibleStoryMemoryCount: storyScopedMemory.length,
-        activeSkillIds: Set.unmodifiable({
-          for (final skill in assembly.skills.activeSkills) skill.id,
-        }),
+        activeSkillIds: Set.unmodifiable(resolvedSkillIds),
         mcpProfileId: mcpExposure?.profileId,
         allowedMcpToolNames: mcpExposure?.allowedToolNames ?? const <String>{},
         allowedMcpServerIds: mcpExposure?.allowedServerIds ?? const <String>{},
         includeAssistantMcpDefaults:
             mcpExposure?.includeAssistantDefaults ?? true,
         requireMcpApproval: mcpExposure?.requireApproval ?? false,
+        sceneId: scene.sceneId,
+        sceneRevision: scene.revision,
       );
     } catch (error) {
       await machine.fail(conversationId: conversation.id, error: error);
@@ -337,16 +375,11 @@ final class StoryRuntimePromptService {
       : '${projection.selectedPath.first.groupId}@${projection.selectedPath.first.version}';
 
   String _ancestryText(StoryWorldTreeState tree, String worldlineId) {
-    final ancestry = <String>[];
-    final seen = <String>{};
-    String? cursor = worldlineId;
-    while (cursor != null && seen.add(cursor)) {
-      ancestry.add(cursor);
-      cursor = tree.worldlineById(cursor)?.parentWorldlineId;
-    }
+    final ancestry = tree.ancestryOf(worldlineId);
     return '[STORY_WORLDLINE]\n'
         'tree=${tree.worldTreeId}\n'
         'worldline=$worldlineId\n'
+        'mainline=${tree.mainlineWorldlineId ?? ''}\n'
         'ancestry=${ancestry.join('>')}\n'
         '[/STORY_WORLDLINE]';
   }
@@ -359,11 +392,37 @@ final class StoryRuntimePromptService {
       'memory_version=${tree.memoryVersion}\n'
       '[/STORY_CURSOR]';
 
+  String _sceneBaseline(StorySceneRuntimeState scene) {
+    final participants = scene.participantCharacterIds.join(',');
+    return '[STORY_SCENE_BASELINE]\n'
+        'scene=${scene.sceneId ?? ''}\n'
+        'location=${scene.location ?? ''}\n'
+        'time=${scene.timeLabel ?? ''}\n'
+        'participants=$participants\n'
+        'pov=${scene.pov}\n'
+        '[/STORY_SCENE_BASELINE]';
+  }
+
+  String _sceneDynamicText(StorySceneRuntimeState scene) {
+    final buffer = StringBuffer('[STORY_SCENE_DYNAMIC]\n');
+    if (scene.openLoops.isNotEmpty) {
+      buffer.writeln('open_loops=${scene.openLoops.join(' | ')}');
+    }
+    if (scene.continuityState.isNotEmpty) {
+      buffer.writeln('continuity=${jsonEncode(scene.continuityState)}');
+    }
+    if (scene.serialState.isNotEmpty) {
+      buffer.writeln('serial=${jsonEncode(scene.serialState)}');
+    }
+    buffer.write('[/STORY_SCENE_DYNAMIC]');
+    return buffer.toString();
+  }
+
   String _memoryText(List<StoryResolvedMemory> memories) {
     final buffer = StringBuffer('[STORY_WORLDLINE_MEMORY]\n');
     for (final item in memories) {
       buffer.writeln(
-        'source=${item.sourceWorldlineId};inherited=${item.inherited};type=${item.entry.type.name}',
+        'source=${item.sourceWorldlineId};inherited=${item.inherited};type=${item.entry.type.name};source_kind=${item.sourceKind.name};valid_from_message=${item.validFromMessageId ?? ''};checkpoint=${item.sourceCheckpointId ?? ''}',
       );
       buffer.writeln(item.entry.content.trim());
     }
@@ -379,4 +438,9 @@ final class StoryRuntimePromptService {
       'Use World Tree and worldline memory only as continuity context. Do not expose internal runtime tags, ids, cache data, schemas, tool routing, or implementation notes to the user.\n'
       'Agency mode: ${session.agencyMode.name}. Manual forbids invented SELF action/dialogue; balanced permits only trivial connective behavior; cinematic still forbids major goals, consent, commitments, irreversible actions, and consequential SELF dialogue.\n'
       '[/KELIVO_STORY_RUNTIME_V1]';
+}
+
+bool _sameStringSet(Iterable<String> left, Set<String> right) {
+  final leftSet = left.toSet();
+  return leftSet.length == right.length && leftSet.containsAll(right);
 }
