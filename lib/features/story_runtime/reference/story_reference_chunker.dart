@@ -90,9 +90,7 @@ final class StoryReferenceChunker {
   }
 
   List<String> _splitOversizeParagraph(String paragraph) {
-    final sentences = paragraph.split(
-      RegExp(r'(?<=[。！？!?\.])\s*'),
-    );
+    final sentences = _splitSentences(paragraph);
     final result = <String>[];
     final buffer = StringBuffer();
 
@@ -109,7 +107,14 @@ final class StoryReferenceChunker {
         flush();
         var start = 0;
         while (start < value.length) {
-          final end = (start + maxChars).clamp(0, value.length);
+          var end = (start + maxChars).clamp(0, value.length).toInt();
+          if (end < value.length &&
+              end > start &&
+              _isLowSurrogate(value.codeUnitAt(end)) &&
+              _isHighSurrogate(value.codeUnitAt(end - 1))) {
+            end--;
+          }
+          if (end <= start) end = value.length;
           result.add(value.substring(start, end));
           start = end;
         }
@@ -137,6 +142,30 @@ String normalizeReferenceText(String value) {
       .replaceAll(RegExp(r'\n +'), '\n')
       .replaceAll(RegExp(r'\n{4,}'), '\n\n\n')
       .trim();
+}
+
+List<String> _splitSentences(String value) {
+  final result = <String>[];
+  final buffer = StringBuffer();
+  const terminators = <int>{
+    0x3002, // 。
+    0xFF01, // ！
+    0xFF1F, // ？
+    0x002E, // .
+    0x0021, // !
+    0x003F, // ?
+  };
+  for (var index = 0; index < value.length; index++) {
+    final unit = value.codeUnitAt(index);
+    buffer.writeCharCode(unit);
+    if (!terminators.contains(unit)) continue;
+    final sentence = buffer.toString().trim();
+    if (sentence.isNotEmpty) result.add(sentence);
+    buffer.clear();
+  }
+  final tail = buffer.toString().trim();
+  if (tail.isNotEmpty) result.add(tail);
+  return result;
 }
 
 String _safeTail(String value, int maxChars) {
