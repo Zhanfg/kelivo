@@ -1,0 +1,432 @@
+name: Complete Backup Fast Apply
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+    paths:
+      - .github/workflows/complete-backup-fast-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/story-runtime-foundation
+          fetch-depth: 0
+
+      - name: Apply complete-backup integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'patch anchor missing: {path}: {old[:120]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          ds = 'lib/core/services/backup/data_sync.dart'
+          replace_once(ds,
+            "      final fontsDirPath = (await _getFontsDir()).path;\n",
+            "      final fontsDirPath = (await _getFontsDir()).path;\n      final storySkillsDirPath = (await _getStorySkillsDir()).path;\n")
+          replace_once(ds,
+            "          fontsDirPath: fontsDirPath,\n        ),",
+            "          fontsDirPath: fontsDirPath,\n          storySkillsDirPath: storySkillsDirPath,\n        ),")
+          replace_once(ds,
+            "      fontsDirPath: args.fontsDirPath,\n      ctx: ctx,",
+            "      fontsDirPath: args.fontsDirPath,\n      storySkillsDirPath: args.storySkillsDirPath,\n      ctx: ctx,")
+          replace_once(ds,
+            "    required String fontsDirPath,\n    BackupIsolateContext? ctx,",
+            "    required String fontsDirPath,\n    required String storySkillsDirPath,\n    BackupIsolateContext? ctx,")
+          replace_once(ds,
+            "    final fontFiles = includeFiles ? _listFilesSync(fontsDirPath) : const <File>[];\n    var totalBytes = _fileSizeSync(settingsPath) + _fileSizeSync(databasePath);\n    for (final file in [...uploadFiles, ...avatarFiles, ...imageFiles, ...fontFiles]) {",
+            "    final fontFiles = includeFiles ? _listFilesSync(fontsDirPath) : const <File>[];\n    final storySkillFiles = includeFiles\n        ? _listFilesSync(storySkillsDirPath)\n        : const <File>[];\n    var totalBytes = _fileSizeSync(settingsPath) + _fileSizeSync(databasePath);\n    for (final file in [\n      ...uploadFiles,\n      ...avatarFiles,\n      ...imageFiles,\n      ...fontFiles,\n      ...storySkillFiles,\n    ]) {")
+          replace_once(ds,
+            "        _addDirectoryToZip(\n          writer,\n          fontsDirPath,\n          'fonts',\n          entries,\n          collisionKeys,\n          files: fontFiles,\n        );\n      }",
+            "        _addDirectoryToZip(\n          writer,\n          fontsDirPath,\n          'fonts',\n          entries,\n          collisionKeys,\n          files: fontFiles,\n        );\n        _addDirectoryToZip(\n          writer,\n          storySkillsDirPath,\n          'story_skills',\n          entries,\n          collisionKeys,\n          files: storySkillFiles,\n        );\n      }")
+          replace_once(ds,
+            "          name.startsWith('images/') ||\n          name.startsWith('fonts/');",
+            "          name.startsWith('images/') ||\n          name.startsWith('fonts/') ||\n          name.startsWith('story_skills/');")
+          replace_once(ds,
+            "              name.startsWith('images/') ||\n              name.startsWith('fonts/'))) {",
+            "              name.startsWith('images/') ||\n              name.startsWith('fonts/') ||\n              name.startsWith('story_skills/'))) {")
+          replace_once(ds,
+            "  Future<Directory> _getFontsDir() async {\n    return await AppDirectories.getFontsDirectory();\n  }\n",
+            "  Future<Directory> _getFontsDir() async {\n    return await AppDirectories.getFontsDirectory();\n  }\n\n  Future<Directory> _getStorySkillsDir() async {\n    final root = await AppDirectories.getAppDataDirectory();\n    return Directory(p.join(root.path, 'story_skills'));\n  }\n")
+          replace_once(ds,
+            "  /// Copies the backup's asset payload directories (upload/images/avatars/\n  /// fonts) into the live directories without deleting anything already",
+            "  /// Copies the backup's asset payload directories (upload/images/avatars/\n  /// fonts/story_skills) into the live directories without deleting anything already")
+          replace_once(ds,
+            "          (entryName: 'fonts', resolveTarget: _getFontsDir),\n        ];",
+            "          (entryName: 'fonts', resolveTarget: _getFontsDir),\n          (entryName: 'story_skills', resolveTarget: _getStorySkillsDir),\n        ];")
+          replace_once(ds,
+            "    required this.fontsDirPath,\n  });",
+            "    required this.fontsDirPath,\n    required this.storySkillsDirPath,\n  });")
+          replace_once(ds,
+            "  final String fontsDirPath;\n}",
+            "  final String fontsDirPath;\n  final String storySkillsDirPath;\n}")
+
+          replace_once(
+            'lib/core/services/backup/restore_bundle_staging.dart',
+            "  static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];",
+            "  static const _assetRoots = [\n    'upload',\n    'images',\n    'avatars',\n    'fonts',\n    'story_skills',\n  ];")
+          replace_once(
+            'lib/core/services/backup/restore_previous_plan.dart',
+            "  static const rootNames = ['upload', 'images', 'avatars', 'fonts'];",
+            "  static const rootNames = [\n    'upload',\n    'images',\n    'avatars',\n    'fonts',\n    'story_skills',\n  ];")
+
+          replace_once(
+            'pubspec.yaml',
+            "  crypto: ^3.0.3\n",
+            "  crypto: ^3.0.3\n  cryptography: ^2.9.0\n")
+
+          codec = 'lib/core/services/backup/encrypted_full_backup.dart'
+          replace_once(codec,
+            "    BackupProgressSink? onProgress,\n    BackupCancelToken? cancelToken,\n  }) async {\n    _validatePassword(password);\n    if (!await source.exists()) {",
+            "    BackupProgressSink? onProgress,\n    BackupCancelToken? cancelToken,\n    Directory? temporaryDirectory,\n  }) async {\n    _validatePassword(password);\n    if (!await source.exists()) {")
+          replace_once(codec,
+            "    final temp = await getTemporaryDirectory();\n    final work = Directory(\n      p.join(\n        temp.path,\n        'kelivo_encrypted_",
+            "    final temp = temporaryDirectory ?? await getTemporaryDirectory();\n    final work = Directory(\n      p.join(\n        temp.path,\n        'kelivo_encrypted_")
+          # second method signature and temp directory
+          text = Path(codec).read_text()
+          marker = "  static Future<File> decryptToTemporaryFile({"
+          start = text.index(marker)
+          tail = text[start:]
+          old = "    BackupProgressSink? onProgress,\n    BackupCancelToken? cancelToken,\n  }) async {"
+          new = "    BackupProgressSink? onProgress,\n    BackupCancelToken? cancelToken,\n    Directory? temporaryDirectory,\n  }) async {"
+          if new not in tail:
+              if old not in tail: raise SystemExit('decrypt signature anchor missing')
+              tail = tail.replace(old, new, 1)
+          old2 = "    final temp = await getTemporaryDirectory();\n    final work = Directory(\n      p.join(\n        temp.path,\n        'kelivo_decrypted_"
+          new2 = "    final temp = temporaryDirectory ?? await getTemporaryDirectory();\n    final work = Directory(\n      p.join(\n        temp.path,\n        'kelivo_decrypted_"
+          if new2 not in tail:
+              if old2 not in tail: raise SystemExit('decrypt temp anchor missing')
+              tail = tail.replace(old2, new2, 1)
+          Path(codec).write_text(text[:start] + tail)
+
+          ui = 'lib/features/backup/pages/backup_page.dart'
+          replace_once(ui,
+            "import '../../../core/services/backup/data_sync.dart';\n",
+            "import '../../../core/services/backup/data_sync.dart';\nimport '../../../core/services/backup/encrypted_full_backup.dart';\n")
+          replace_once(ui,
+            "        children: [\n          _iosNavRow(\n            context,\n            icon: Lucide.Export,\n            label: l10n.backupPageExportToFile,",
+            "        children: [\n          _iosNavRow(\n            context,\n            icon: Lucide.Export,\n            label: Localizations.localeOf(context).languageCode.startsWith('zh')\n                ? '导出完整加密备份'\n                : 'Export encrypted complete backup',\n            onTap: () => _doExportEncryptedFull(context, vm),\n          ),\n          _iosDivider(context),\n          _iosNavRow(\n            context,\n            icon: Lucide.Import2,\n            label: Localizations.localeOf(context).languageCode.startsWith('zh')\n                ? '恢复完整加密备份'\n                : 'Restore encrypted complete backup',\n            onTap: () => _doImportEncryptedFull(context, vm),\n          ),\n          _iosDivider(context),\n          _iosNavRow(\n            context,\n            icon: Lucide.Export,\n            label: l10n.backupPageExportToFile,")
+
+          methods = r'''
+  Future<String?> _promptEncryptedBackupPassword(
+    BuildContext context, {
+    required bool confirm,
+  }) async {
+    final zh = Localizations.localeOf(context).languageCode.startsWith('zh');
+    final password = TextEditingController();
+    final confirmation = TextEditingController();
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            final passwordValue = password.text;
+            final confirmValue = confirmation.text;
+            final valid =
+                passwordValue.length >= 8 &&
+                (!confirm || passwordValue == confirmValue);
+            return AlertDialog(
+              title: Text(
+                confirm
+                    ? (zh ? '设置备份密码' : 'Set backup password')
+                    : (zh ? '输入备份密码' : 'Enter backup password'),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: password,
+                    obscureText: true,
+                    autofocus: true,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: InputDecoration(
+                      labelText: zh ? '密码' : 'Password',
+                      helperText: zh
+                          ? '至少 8 个字符；密码不会写入备份。'
+                          : 'At least 8 characters. The password is never stored in the backup.',
+                    ),
+                  ),
+                  if (confirm) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: confirmation,
+                      obscureText: true,
+                      onChanged: (_) => setDialogState(() {}),
+                      decoration: InputDecoration(
+                        labelText: zh ? '再次输入密码' : 'Confirm password',
+                        errorText: confirmValue.isNotEmpty &&
+                                passwordValue != confirmValue
+                            ? (zh ? '两次密码不一致' : 'Passwords do not match')
+                            : null,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(zh ? '取消' : 'Cancel'),
+                ),
+                FilledButton(
+                  onPressed: valid
+                      ? () => Navigator.of(dialogContext).pop(passwordValue)
+                      : null,
+                  child: Text(confirm
+                      ? (zh ? '加密导出' : 'Encrypt & export')
+                      : (zh ? '继续' : 'Continue')),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } finally {
+      password.dispose();
+      confirmation.dispose();
+    }
+  }
+
+  Future<void> _doExportEncryptedFull(
+    BuildContext context,
+    BackupProvider vm,
+  ) async {
+    final password = await _promptEncryptedBackupPassword(
+      context,
+      confirm: true,
+    );
+    if (password == null || !context.mounted) return;
+    final zh = Localizations.localeOf(context).languageCode.startsWith('zh');
+    File? file;
+    final ok = await runBackupTask(
+      context,
+      title: zh ? '导出完整加密备份' : 'Export encrypted complete backup',
+      task: (handle) async {
+        file = await vm.exportEncryptedFullBackup(
+          password: password,
+          onProgress: handle.report,
+          cancelToken: handle.cancelToken,
+        );
+      },
+    );
+    if (!ok || file == null) return;
+    final exported = file!;
+    try {
+      if (!context.mounted) return;
+      if (Platform.isAndroid || Platform.isIOS) {
+        final saved = await NativeFileSave.saveFileFromPath(
+          sourcePath: exported.path,
+          fileName: exported.uri.pathSegments.last,
+        );
+        if (saved && context.mounted) {
+          await context.read<BackupReminderProvider>().recordBackupCompleted();
+        }
+      } else {
+        final savePath = await FilePicker.platform.saveFile(
+          dialogTitle: zh
+              ? '导出完整加密备份'
+              : 'Export encrypted complete backup',
+          fileName: exported.uri.pathSegments.last,
+          type: FileType.custom,
+          allowedExtensions: const ['kelivo'],
+        );
+        if (savePath != null) {
+          await File(savePath).parent.create(recursive: true);
+          await exported.copy(savePath);
+          if (context.mounted) {
+            await context.read<BackupReminderProvider>().recordBackupCompleted();
+          }
+        }
+      }
+    } catch (error) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: NotificationType.error,
+      );
+    } finally {
+      await EncryptedFullBackupCodec.cleanupTemporaryFile(file);
+    }
+  }
+
+  Future<void> _doImportEncryptedFull(
+    BuildContext context,
+    BackupProvider vm,
+  ) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['kelivo'],
+    );
+    final path = result?.files.single.path;
+    if (path == null || !context.mounted) return;
+    final password = await _promptEncryptedBackupPassword(
+      context,
+      confirm: false,
+    );
+    if (password == null || !context.mounted) return;
+    final mode = await _chooseImportModeDialog(context);
+    if (mode == null || !context.mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      await _runWithImportingOverlay(
+        context,
+        (handle) => vm.restoreEncryptedFullBackup(
+          File(path),
+          password: password,
+          mode: mode,
+          onProgress: handle.report,
+          cancelToken: handle.cancelToken,
+        ),
+      );
+    } catch (error) {
+      if (error is BackupCancelledException) return;
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.backupPageRestoreFailedMessage(error.toString()),
+        type: NotificationType.error,
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    await showBackupRestartRequiredDialog(
+      context,
+      skippedConversations: vm.skippedConversations,
+    );
+  }
+
+'''
+          replace_once(ui,
+            "  Future<void> _doImportCherry(BuildContext context) async {\n",
+            methods + "  Future<void> _doImportCherry(BuildContext context) async {\n")
+          PY
+
+          cat > test/encrypted_full_backup_test.dart <<'DART'
+          import 'dart:io';
+
+          import 'package:Kelivo/core/services/backup/encrypted_full_backup.dart';
+          import 'package:flutter_test/flutter_test.dart';
+
+          void main() {
+            TestWidgetsFlutterBinding.ensureInitialized();
+
+            test('encrypted complete backup round-trips and authenticates', () async {
+              final temp = await Directory.systemTemp.createTemp('kelivo_enc_test_');
+              try {
+                final source = File('${temp.path}/source.zip');
+                final bytes = List<int>.generate(
+                  5 * 1024 * 1024 + 137,
+                  (index) => (index * 31 + 7) & 0xff,
+                );
+                await source.writeAsBytes(bytes, flush: true);
+
+                final encrypted = await EncryptedFullBackupCodec.encryptFile(
+                  source: source,
+                  password: 'correct horse battery staple',
+                  temporaryDirectory: temp,
+                );
+                expect(encrypted.path.endsWith('.kelivo'), isTrue);
+                expect(await encrypted.readAsBytes(), isNot(contains(bytes.take(64))));
+
+                final restored =
+                    await EncryptedFullBackupCodec.decryptToTemporaryFile(
+                  source: encrypted,
+                  password: 'correct horse battery staple',
+                  temporaryDirectory: temp,
+                );
+                expect(await restored.readAsBytes(), bytes);
+              } finally {
+                if (await temp.exists()) await temp.delete(recursive: true);
+              }
+            });
+
+            test('encrypted complete backup rejects wrong password', () async {
+              final temp = await Directory.systemTemp.createTemp('kelivo_enc_bad_');
+              try {
+                final source = File('${temp.path}/source.zip')
+                  ..writeAsBytesSync(List<int>.generate(4096, (i) => i & 0xff));
+                final encrypted = await EncryptedFullBackupCodec.encryptFile(
+                  source: source,
+                  password: 'correct password',
+                  temporaryDirectory: temp,
+                );
+                expect(
+                  () => EncryptedFullBackupCodec.decryptToTemporaryFile(
+                    source: encrypted,
+                    password: 'wrong password',
+                    temporaryDirectory: temp,
+                  ),
+                  throwsA(isA<FormatException>()),
+                );
+              } finally {
+                if (await temp.exists()) await temp.delete(recursive: true);
+              }
+            });
+          }
+          DART
+
+          git diff --check
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.6'
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies and format
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          dart format \
+            lib/core/services/backup/encrypted_full_backup.dart \
+            lib/core/providers/backup_provider.dart \
+            lib/core/services/backup/data_sync.dart \
+            lib/core/services/backup/restore_bundle_staging.dart \
+            lib/core/services/backup/restore_previous_plan.dart \
+            lib/features/backup/pages/backup_page.dart \
+            test/encrypted_full_backup_test.dart
+          git diff --check
+
+      - name: Analyze changed backup code
+        run: dart analyze --fatal-infos lib/core/services/backup lib/core/providers/backup_provider.dart lib/features/backup/pages/backup_page.dart test/encrypted_full_backup_test.dart
+
+      - name: Test encrypted complete backup
+        run: flutter test test/encrypted_full_backup_test.dart
+
+      - name: Commit verified integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/complete-backup-fast-apply.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            pubspec.yaml pubspec.lock \
+            lib/core/services/backup/encrypted_full_backup.dart \
+            lib/core/providers/backup_provider.dart \
+            lib/core/services/backup/data_sync.dart \
+            lib/core/services/backup/restore_bundle_staging.dart \
+            lib/core/services/backup/restore_previous_plan.dart \
+            lib/features/backup/pages/backup_page.dart \
+            test/encrypted_full_backup_test.dart
+          git commit -m "feat(backup): finish encrypted complete backups"
+          git push origin HEAD:feat/story-runtime-foundation
