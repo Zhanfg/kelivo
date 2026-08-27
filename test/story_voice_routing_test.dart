@@ -1,4 +1,5 @@
 import 'package:Kelivo/core/services/tts/network_tts.dart';
+import 'package:Kelivo/features/story_runtime/voice/story_voice_context.dart';
 import 'package:Kelivo/features/story_runtime/voice/story_voice_models.dart';
 import 'package:Kelivo/features/story_runtime/voice/story_voice_routing.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,8 +49,58 @@ void main() {
       expect(routed.instruction, contains('fear'));
       expect(routed.instruction, contains('trembling'));
       expect(resolved.assignmentRevision, 3);
+      expect(resolved.cacheIdentity, isNotEmpty);
     },
   );
+
+  test('MiMo context changes instruction and semantic cache identity', () {
+    final base = MimoTtsOptions(
+      id: 'mimo-main',
+      enabled: true,
+      name: 'MiMo',
+      apiKey: 'secret',
+      baseUrl: 'https://example.invalid/v1',
+      model: 'mimo-v2.5-tts',
+      voice: 'base',
+      stream: true,
+    );
+    const assignment = StoryVoiceAssignment(
+      characterId: 'npc-1',
+      ttsServiceId: 'mimo-main',
+      voiceId: 'voice-a',
+      personaDescription: 'Quiet and precise.',
+    );
+    const contextA = StoryVoiceContextWindow(
+      previous: '门关上了。',
+      current: '别出声。',
+      next: '脚步声靠近。',
+      sceneHint: 'dark corridor',
+    );
+    const contextB = StoryVoiceContextWindow(
+      previous: '门关上了。',
+      current: '别出声。',
+      next: '四周恢复安静。',
+      sceneHint: 'dark corridor',
+    );
+
+    final a = const StoryVoiceResolver().resolve(
+      service: base,
+      assignment: assignment,
+      context: contextA,
+    );
+    final b = const StoryVoiceResolver().resolve(
+      service: base,
+      assignment: assignment,
+      context: contextB,
+    );
+    final routed = a.service as MimoTtsOptions;
+
+    expect(routed.stream, isTrue);
+    expect(routed.instruction, contains('门关上了'));
+    expect(routed.instruction, contains('别出声'));
+    expect(routed.instruction, contains('脚步声靠近'));
+    expect(a.cacheIdentity, isNot(b.cacheIdentity));
+  });
 
   test('explicit model override does not mutate the configured service', () {
     final base = MimoTtsOptions(
