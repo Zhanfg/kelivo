@@ -10,6 +10,7 @@ import '../services/chat/chat_service.dart';
 import '../services/backup/backup_cancel_token.dart';
 import '../services/backup/backup_task_progress.dart';
 import '../services/backup/data_sync.dart';
+import '../services/backup/encrypted_full_backup.dart';
 
 class BackupProvider extends ChangeNotifier {
   final DataSync _dataSync;
@@ -131,6 +132,75 @@ class BackupProvider extends ChangeNotifier {
     onProgress: onProgress,
     cancelToken: cancelToken,
   );
+
+  Future<File> exportEncryptedFullBackup({
+    required String password,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+  }) async {
+    _busy = true;
+    _message = null;
+    notifyListeners();
+    File? plainBackup;
+    try {
+      plainBackup = await _dataSync.exportToFile(
+        const WebDavConfig(includeChats: true, includeFiles: true),
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+      final encrypted = await EncryptedFullBackupCodec.encryptFile(
+        source: plainBackup,
+        password: password,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+      _message = 'Encrypted complete backup ready';
+      return encrypted;
+    } catch (e) {
+      _message = e.toString();
+      rethrow;
+    } finally {
+      await DataSync.cleanupTemporaryBackupFile(plainBackup);
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> restoreEncryptedFullBackup(
+    File file, {
+    required String password,
+    RestoreMode mode = RestoreMode.overwrite,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+  }) async {
+    _busy = true;
+    _message = null;
+    notifyListeners();
+    File? decrypted;
+    try {
+      decrypted = await EncryptedFullBackupCodec.decryptToTemporaryFile(
+        source: file,
+        password: password,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+      await _dataSync.restoreFromLocalFile(
+        decrypted,
+        const WebDavConfig(includeChats: true, includeFiles: true),
+        mode: mode,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+      _message = 'Encrypted complete backup restored';
+    } catch (e) {
+      _message = e.toString();
+      rethrow;
+    } finally {
+      await EncryptedFullBackupCodec.cleanupTemporaryFile(decrypted);
+      _busy = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> restoreFromLocalFile(
     File file, {
