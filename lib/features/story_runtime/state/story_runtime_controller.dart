@@ -9,9 +9,10 @@ import 'story_runtime_store.dart';
 /// Conversation switches are generation-token guarded so a slow storage read
 /// from an older conversation cannot overwrite the newly selected state.
 final class StoryRuntimeController extends ChangeNotifier {
-  StoryRuntimeController({required StoryRuntimeStore store}) : _store = store;
+  StoryRuntimeController({required StoryRuntimeSessionRepository store})
+    : _store = store;
 
-  final StoryRuntimeStore _store;
+  final StoryRuntimeSessionRepository _store;
 
   StoryRuntimeSessionState? _state;
   String? _attachedConversationId;
