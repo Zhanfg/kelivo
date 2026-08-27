@@ -301,7 +301,7 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         leading: StoryNativeBackButton(tooltip: tr('返回', 'Back')),
-        title: Text(tr('故事技能', 'Story Skills')),
+        title: const Text('Skills'),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -309,11 +309,11 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
                 StoryNativeSection(
-                  title: tr('技能设置', 'Skill settings'),
+                  title: tr('Skill 设置', 'Skill settings'),
                   first: true,
                   footer: tr(
-                    'Skill 按 Assistant 独立启用。GitHub 直装固定到具体 commit；涉及 MCP、工具、内存权限或 Hook 的包仍要求本地审核。',
-                    'Skills are enabled per Assistant. GitHub installs are pinned to a commit; packages declaring MCP, tool, memory or hook permissions still require local review.',
+                    'Skills 按 Assistant 独立启用，是 Kelivo 的独立能力层；它不属于故事模式。GitHub 直装固定到具体 commit，涉及 MCP、工具、内存权限或 Hook 的包仍要求本地审核。',
+                    'Skills are an independent Kelivo capability layer enabled per Assistant; they do not belong to Story Mode. GitHub installs are pinned to a commit, and packages declaring MCP, tool, memory or hook permissions still require local review.',
                   ),
                   children: [
                     if (assistants.isNotEmpty)
@@ -337,12 +337,12 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
                         '解析仓库、固定 commit，并按 Skill manifest 导入。',
                         'Resolve the repository, pin a commit and import from the Skill manifest.',
                       ),
-                      icon: Lucide.Plus,
+                      icon: Lucide.GitFork,
                       onTap: _busy ? null : _installFromGitHub,
                     ),
                     StoryNativeRow(
                       title: tr('检查全部更新', 'Check all updates'),
-                      icon: Lucide.Search,
+                      icon: Lucide.RefreshCw,
                       onTap: _busy ? null : _checkAll,
                     ),
                     StoryNativeRow(
@@ -363,7 +363,7 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
                     if (_manifests.isEmpty)
                       StoryNativeRow(
                         title: tr('没有可用 Skill', 'No Skills available'),
-                        icon: Lucide.Layers,
+                        icon: Lucide.Box,
                         enabled: false,
                       ),
                     for (final manifest in _manifests)
@@ -415,7 +415,7 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
             subtitle: description.isEmpty
                 ? subtitle
                 : '$subtitle\n$description',
-            icon: Lucide.Layers,
+            icon: Lucide.Wrench,
             value: _isSkillEnabled(manifest),
             onChanged: _busy || _assistantId == null
                 ? null
@@ -430,7 +430,7 @@ class _StorySkillManagerPageState extends State<StorySkillManagerPage> {
                 children: [
                   StoryNativeButton(
                     label: '检查更新',
-                    icon: Lucide.Search,
+                    icon: Lucide.RefreshCw,
                     enabled: !_busy,
                     onTap: () => _checkOne(package!),
                   ),
