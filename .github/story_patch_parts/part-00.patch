@@ -1,0 +1,79 @@
+--- a/lib/features/home/controllers/home_page_controller.dart
++++ b/lib/features/home/controllers/home_page_controller.dart
+@@ -4,6 +4,7 @@
+ import 'package:flutter/services.dart';
+ import 'package:provider/provider.dart';
+ import 'package:image_picker/image_picker.dart';
++import '../../../core/database/business_preferences.dart';
+ import '../../../core/database/chat_database_repository.dart';
+ import '../../../core/models/chat_input_data.dart';
+ import '../../../core/models/chat_message.dart';
+@@ -49,6 +50,7 @@
+ import '../utils/chat_layout_constants.dart';
+ import '../widgets/chat_input_bar.dart';
+ import '../../model/widgets/model_select_sheet.dart';
++import '../../story_runtime/orchestration/story_native_lifecycle_bridge.dart';
+ 
+ enum ChatSelectionMode { share, delete }
+ 
+@@ -1713,6 +1715,7 @@
+ 
+   void _handleAssistantMessageFinished(ChatMessage message) {
+     if (!_context.mounted || message.role != 'assistant') return;
++    unawaited(_commitStoryFinalizedAssistant(message));
+     final settings = _context.read<SettingsProvider>();
+     final shouldNotify = NotificationService.shouldShowChatCompleted(
+       isAndroid: _isAndroid,
+@@ -1739,6 +1742,17 @@
+     }
+   }
+ 
++  Future<void> _commitStoryFinalizedAssistant(ChatMessage message) async {
++    try {
++      final preferences = _context.read<BusinessPreferences>();
++      await StoryNativeLifecycleBridge(
++        preferences,
++      ).commitFinalizedAssistant(message);
++    } catch (error) {
++      debugPrint('Story finalize bridge failed: $error');
++    }
++  }
++
+   Future<void> _showChatCompletedNotification({
+     required String conversationId,
+     required String title,
+@@ -1793,6 +1807,25 @@
+       mode: sp.ttsTextSelectionMode,
+     );
+     if (text.trim().isEmpty) return;
++
++    final selectedService = sp.selectedTtsService;
++    if (selectedService != null && selectedService.enabled) {
++      var routedService = selectedService;
++      try {
++        final preferences = _context.read<BusinessPreferences>();
++        routedService = await StoryNativeLifecycleBridge(
++          preferences,
++        ).routeNarrator(
++          message: message,
++          selectedService: selectedService,
++        );
++      } catch (error) {
++        debugPrint('Story narrator routing failed: $error');
++      }
++      await tts.speakWithNetworkService(routedService, text);
++      return;
++    }
++
+     await tts.speak(text);
+   }
+ 
+--- a/lib/features/story_runtime/ui/story_studio_page.dart
++++ b/lib/features/story_runtime/ui/story_studio_page.dart
+@@ -21,6 +21,9 @@
+ import '../skills/story_skill_package_store.dart';
+ import '../state/story_runtime_state.dart';
+ import '../state/story_runtime_store.dart';
++import '../voice/story_voice_routing.dart';
++import '../voice/story_voice_store.dart';
++import '../world_tree/story_world_tree_store.dart';
