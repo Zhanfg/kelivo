@@ -62,3 +62,5 @@ jobs:
           fi
           git commit -m 'fix(story): preserve plain chat and backup fixtures'
           git push origin HEAD:feat/story-runtime-foundation
+
+# structural-fix-run
