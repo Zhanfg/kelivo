@@ -40,7 +40,10 @@ final class StoryResponseParser {
 
     final root = _asStringMap(decoded, code: 'root_not_object');
     final version = root['version'];
-    if (version is! num || version.toInt() != 1) {
+    if (version is! num ||
+        version.isNaN ||
+        version.isInfinite ||
+        version != 1) {
       throw const StoryResponseParseException('unsupported_version');
     }
 
@@ -223,7 +226,9 @@ final class StoryResponseParser {
       throw const StoryResponseParseException('invalid_timeout');
     }
     final millis = value.toInt();
-    if (millis <= 0 || millis > maxTimeout.inMilliseconds) {
+    if (value != millis ||
+        millis <= 0 ||
+        millis > maxTimeout.inMilliseconds) {
       throw const StoryResponseParseException('timeout_out_of_range');
     }
     return Duration(milliseconds: millis);
@@ -262,16 +267,10 @@ void _validateActorForType(StoryEventType type, StoryActorRef actor) {
         throw const StoryResponseParseException('world_event_actor_mismatch');
       }
     case StoryEventType.dialogue:
-      if (actor.isWorld) {
-        throw const StoryResponseParseException('dialogue_actor_mismatch');
-      }
     case StoryEventType.expression:
-      if (!actor.isCharacter) {
-        throw const StoryResponseParseException('expression_actor_mismatch');
-      }
     case StoryEventType.action:
       if (actor.isWorld) {
-        throw const StoryResponseParseException('action_actor_mismatch');
+        throw const StoryResponseParseException('actor_event_mismatch');
       }
     case StoryEventType.choiceSet:
       if (!actor.isSelf) {
