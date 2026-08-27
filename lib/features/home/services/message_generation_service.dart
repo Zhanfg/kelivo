@@ -17,6 +17,7 @@ import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../story_runtime/orchestration/story_break_armor_mode.dart';
 import '../../story_runtime/orchestration/story_runtime_prompt_service.dart';
+import '../../story_runtime/serialization/story_serialization_tools.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/generation_controller.dart';
 import 'ask_user_interaction_service.dart';
@@ -139,6 +140,27 @@ class MessageGenerationService {
         : '$existing\n\n$prompt';
   }
 
+  List<Map<String, dynamic>> _storySerializationToolDefinitions(
+    ProviderKind kind,
+  ) {
+    return StorySerializationTools.definitions().map((definition) {
+      final normalized = Map<String, dynamic>.from(definition);
+      final function = Map<String, dynamic>.from(
+        normalized['function'] as Map,
+      );
+      final parameters = Map<String, dynamic>.from(
+        function['parameters'] as Map,
+      );
+      function['parameters'] =
+          GenerationController.sanitizeToolParametersForProvider(
+            parameters,
+            kind,
+          );
+      normalized['function'] = function;
+      return normalized;
+    }).toList(growable: false);
+  }
+
   /// Prepare API messages with all injections applied.
   Future<PreparedGeneration> prepareApiMessagesWithInjections({
     required List<ChatMessage> messages,
@@ -200,8 +222,6 @@ class MessageGenerationService {
       storyPreferences = null;
     }
     if (storyPreferences != null) {
-      StoryBreakArmorMode(storyPreferences).prependToSystemPrompt(apiMessages);
-
       final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();
       if (currentConversation != null && storyAssistantId.isNotEmpty) {
         storyRuntime = await StoryRuntimePromptService(storyPreferences).build(
@@ -209,10 +229,15 @@ class MessageGenerationService {
           messages: messages,
           assistantId: storyAssistantId,
         );
-        _injectStoryRuntimeSystemPrompt(
-          apiMessages,
-          storyRuntime?.providerText,
-        );
+        if (storyRuntime != null) {
+          StoryBreakArmorMode(storyPreferences).prependToSystemPrompt(
+            apiMessages,
+          );
+          _injectStoryRuntimeSystemPrompt(
+            apiMessages,
+            storyRuntime.providerText,
+          );
+        }
       }
     }
 
@@ -314,7 +339,16 @@ class MessageGenerationService {
       hasBuiltInSearch,
       mcpRouteSnapshot: mcpRouteSnapshot,
     );
-    final onToolCall = toolDefs.isNotEmpty
+    final storySerializationEnabled =
+        storyPreferences != null &&
+        storyRuntime != null &&
+        StorySerializationTools.enabledFor(storyRuntime.activeSkillIds) &&
+        generationController.isToolModel(providerKey, modelId);
+    if (storySerializationEnabled) {
+      toolDefs.addAll(_storySerializationToolDefinitions(kind));
+    }
+
+    final nativeOnToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
             settings,
             assistant,
@@ -324,6 +358,38 @@ class MessageGenerationService {
             mcpRouteSnapshot: mcpRouteSnapshot,
           )
         : null;
+    ToolCallHandler? onToolCall = nativeOnToolCall;
+    if (storySerializationEnabled && storyPreferences != null) {
+      final preferences = storyPreferences;
+      onToolCall = (name, args, {toolCallId}) async {
+        if (StorySerializationTools.names.contains(name)) {
+          final result = await StorySerializationTools.tryHandle(
+            name: name,
+            arguments: args,
+            preferences: preferences,
+            approveRestore: () async {
+              final approval = approvalService;
+              if (approval == null) return false;
+              final providedId = toolCallId?.trim();
+              final decision = await approval.requestApproval(
+                toolCallId: providedId != null && providedId.isNotEmpty
+                    ? providedId
+                    : '${name}_${DateTime.now().microsecondsSinceEpoch}',
+                toolName: name,
+                arguments: args,
+                conversationId: currentConversation?.id,
+              );
+              return decision.approved;
+            },
+          );
+          if (result != null) return result;
+        }
+        if (nativeOnToolCall != null) {
+          return nativeOnToolCall(name, args, toolCallId: toolCallId);
+        }
+        return null;
+      };
+    }
 
     return PreparedGeneration(
       apiMessages: apiMessages,
