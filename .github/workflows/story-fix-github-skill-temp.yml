@@ -1,0 +1,162 @@
+name: Story GitHub Skill Temp Resolver Fix
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+    paths:
+      - .github/workflows/story-fix-github-skill-temp.yml
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+
+jobs:
+  fix-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/story-runtime-foundation
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Apply injectable temporary-root fix
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          source_path = Path('lib/features/story_runtime/skills/story_skill_github_source.dart')
+          test_path = Path('test/story_skill_github_source_test.dart')
+          source = source_path.read_text()
+          test = test_path.read_text()
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 match, found {count}')
+              return text.replace(old, new, 1)
+
+          source = replace_once(
+              source,
+              'typedef StorySkillGitHubRootResolver = Future<Directory> Function();\n',
+              'typedef StorySkillGitHubRootResolver = Future<Directory> Function();\n'
+              'typedef StorySkillGitHubTempResolver = Future<Directory> Function();\n',
+              'temp resolver typedef',
+          )
+          source = replace_once(
+              source,
+              '    StorySkillGitHubRootResolver? appDataRootResolver,\n'
+              '    this.maxDownloadBytes = 128 * 1024 * 1024,\n',
+              '    StorySkillGitHubRootResolver? appDataRootResolver,\n'
+              '    StorySkillGitHubTempResolver? tempRootResolver,\n'
+              '    this.maxDownloadBytes = 128 * 1024 * 1024,\n',
+              'constructor parameter',
+          )
+          source = replace_once(
+              source,
+              '       _appDataRootResolver =\n'
+              '           appDataRootResolver ?? AppDirectories.getAppDataDirectory;\n',
+              '       _appDataRootResolver =\n'
+              '           appDataRootResolver ?? AppDirectories.getAppDataDirectory,\n'
+              '       _tempRootResolver = tempRootResolver ?? getTemporaryDirectory;\n',
+              'constructor initializer',
+          )
+          source = replace_once(
+              source,
+              '  final StorySkillGitHubRootResolver _appDataRootResolver;\n'
+              '  final int maxDownloadBytes;\n',
+              '  final StorySkillGitHubRootResolver _appDataRootResolver;\n'
+              '  final StorySkillGitHubTempResolver _tempRootResolver;\n'
+              '  final int maxDownloadBytes;\n',
+              'temp resolver field',
+          )
+          source = replace_once(
+              source,
+              '    final temp = await getTemporaryDirectory();\n',
+              '    final temp = await _tempRootResolver();\n',
+              'temporary directory lookup',
+          )
+
+          marker = '      final service = StorySkillGitHubService(\n'
+          starts = []
+          pos = 0
+          while True:
+              idx = test.find(marker, pos)
+              if idx < 0:
+                  break
+              starts.append(idx)
+              pos = idx + len(marker)
+          if len(starts) != 3:
+              raise SystemExit(f'service constructors: expected 3, found {len(starts)}')
+
+          # Scoped line insertion: only touch appDataRootResolver inside each service constructor.
+          offset = 0
+          for original_start in starts:
+              start = original_start + offset
+              end = test.find('      );', start)
+              if end < 0:
+                  raise SystemExit('service constructor terminator not found')
+              block = test[start:end]
+              old = '        appDataRootResolver: () async => tempDir,\n'
+              if block.count(old) != 1:
+                  raise SystemExit('service appDataRootResolver: expected exactly one match')
+              new = old + '        tempRootResolver: () async => tempDir,\n'
+              updated = block.replace(old, new, 1)
+              test = test[:start] + updated + test[end:]
+              offset += len(updated) - len(block)
+
+          source_path.write_text(source)
+          test_path.write_text(test)
+          PY
+
+      - name: Format changed Dart
+        run: dart format lib/features/story_runtime/skills/story_skill_github_source.dart test/story_skill_github_source_test.dart
+
+      - name: Static analysis
+        run: dart analyze --fatal-infos lib test
+
+      - name: Test GitHub Skill source
+        run: flutter test --reporter expanded test/story_skill_github_source_test.dart
+
+      - name: Test Story runtime suite
+        run: |
+          flutter test \
+            test/story_runtime_foundation_test.dart \
+            test/story_runtime_state_test.dart \
+            test/story_runtime_controller_test.dart \
+            test/story_capability_epoch_test.dart \
+            test/story_prompt_compiler_test.dart \
+            test/story_response_parser_test.dart \
+            test/story_skill_system_test.dart \
+            test/story_skill_package_test.dart \
+            test/story_skill_github_source_test.dart \
+            test/story_reference_library_test.dart \
+            test/story_reference_epub_test.dart \
+            test/story_runtime_assembler_test.dart
+
+      - name: Commit verified fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/story-fix-github-skill-temp.yml
+          git add lib/features/story_runtime/skills/story_skill_github_source.dart test/story_skill_github_source_test.dart
+          git diff --cached --check
+          git commit -m "fix(story): inject GitHub Skill temporary root"
+          git push origin HEAD:feat/story-runtime-foundation
