@@ -28,7 +28,7 @@ jobs:
           from pathlib import Path
           def r(path, old, new):
               p = Path(path); text = p.read_text()
-              if new in text: return
+              if new and new in text: return
               if old not in text: raise SystemExit(f'anchor missing: {path}: {old[:100]!r}')
               p.write_text(text.replace(old, new, 1))
           ds='lib/core/services/backup/data_sync.dart'
@@ -63,7 +63,10 @@ jobs:
               tail=tail.replace(old,new,1)
           Path(codec).write_text(head+tail)
           helper='lib/features/backup/encrypted_full_backup_actions.dart'
-          r(helper,"import '../../core/services/backup/backup_cancel_token.dart';\n","")
+          helper_path=Path(helper)
+          helper_text=helper_path.read_text()
+          helper_text=helper_text.replace("import '../../core/services/backup/backup_cancel_token.dart';\n", "", 1)
+          helper_path.write_text(helper_text)
           ui='lib/features/backup/pages/backup_page.dart'
           r(ui,"import '../../../core/services/backup/data_sync.dart';\n","import '../../../core/services/backup/data_sync.dart';\nimport '../encrypted_full_backup_actions.dart';\n")
           r(ui,"        children: [\n          _iosNavRow(\n            context,\n            icon: Lucide.Export,\n            label: l10n.backupPageExportToFile,","        children: [\n          _iosNavRow(\n            context,\n            icon: Lucide.Export,\n            label: Localizations.localeOf(context).languageCode.startsWith('zh') ? '导出完整加密备份' : 'Export encrypted complete backup',\n            onTap: () => exportEncryptedFullBackupAction(context, vm),\n          ),\n          _iosDivider(context),\n          _iosNavRow(\n            context,\n            icon: Lucide.Import2,\n            label: Localizations.localeOf(context).languageCode.startsWith('zh') ? '恢复完整加密备份' : 'Restore encrypted complete backup',\n            onTap: () => importEncryptedFullBackupAction(context, vm),\n          ),\n          _iosDivider(context),\n          _iosNavRow(\n            context,\n            icon: Lucide.Export,\n            label: l10n.backupPageExportToFile,")
