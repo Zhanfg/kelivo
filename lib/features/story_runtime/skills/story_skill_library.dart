@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:io';
 
 import '../../../utils/app_directories.dart';
