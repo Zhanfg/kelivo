@@ -67,8 +67,13 @@ final class StoryRuntimeController extends ChangeNotifier {
 
   Future<void> setEnabled(bool enabled) {
     return _mutate((current) {
-      if (current.enabled == enabled) return current;
-      return current.copyWith(enabled: enabled);
+      if (current.enabled == enabled && current.modeSelectionCommitted) {
+        return current;
+      }
+      return current.copyWith(
+        enabled: enabled,
+        modeSelectionCommitted: true,
+      );
     });
   }
 
