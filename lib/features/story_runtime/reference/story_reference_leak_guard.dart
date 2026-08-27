@@ -3,14 +3,15 @@ import 'story_reference_analysis_parser.dart';
 /// Rejects derived profiles that appear to copy distinctive source wording.
 ///
 /// This is a local post-check, not a semantic copyright classifier. It catches
-/// accidental verbatim carry-over before a profile becomes callable.
+/// accidental verbatim carry-over before a profile becomes callable without
+/// building an O(book-length) set of substring objects in memory.
 final class StoryReferenceLeakGuard {
   const StoryReferenceLeakGuard({
-    this.cjkWindow = 12,
-    this.wordWindow = 6,
+    this.eastAsianWindow = 16,
+    this.wordWindow = 8,
   });
 
-  final int cjkWindow;
+  final int eastAsianWindow;
   final int wordWindow;
 
   StoryReferenceLeakCheck check({
@@ -19,22 +20,34 @@ final class StoryReferenceLeakGuard {
   }) {
     final source = _normalize(sourceText);
     if (source.isEmpty) return const StoryReferenceLeakCheck.safe();
+    final compactSource = source.replaceAll(RegExp(r'\s+'), '');
+    final sourceWords = ' ${_latinWords(source).join(' ')} ';
 
-    final cjkNgrams = _cjkNgrams(source, cjkWindow);
-    final wordNgrams = _wordNgrams(source, wordWindow);
     for (final field in analysis.allTextFields) {
       final candidate = _normalize(field);
       if (candidate.isEmpty) continue;
 
-      final cjkMatch = _firstCjkOverlap(candidate, cjkNgrams, cjkWindow);
-      if (cjkMatch != null) {
+      final exact = _exactCandidateOverlap(candidate, source);
+      if (exact != null) {
         return StoryReferenceLeakCheck.blocked(
-          reasonCode: 'source_phrase_overlap_cjk',
-          matchedFragment: cjkMatch,
+          reasonCode: 'source_phrase_overlap_exact',
+          matchedFragment: exact,
         );
       }
 
-      final wordMatch = _firstWordOverlap(candidate, wordNgrams, wordWindow);
+      final eastAsianMatch = _sampledEastAsianOverlap(
+        candidate,
+        compactSource,
+        eastAsianWindow,
+      );
+      if (eastAsianMatch != null) {
+        return StoryReferenceLeakCheck.blocked(
+          reasonCode: 'source_phrase_overlap_east_asian',
+          matchedFragment: eastAsianMatch,
+        );
+      }
+
+      final wordMatch = _sampledWordOverlap(candidate, sourceWords, wordWindow);
       if (wordMatch != null) {
         return StoryReferenceLeakCheck.blocked(
           reasonCode: 'source_phrase_overlap_words',
@@ -70,68 +83,63 @@ String _normalize(String value) => value
     .replaceAll(RegExp(r'[“”"‘’`]+'), '')
     .trim();
 
-Set<String> _cjkNgrams(String source, int window) {
-  if (window <= 0) return const <String>{};
-  final compact = source.replaceAll(RegExp(r'\s+'), '');
-  final runes = compact.runes.toList(growable: false);
-  if (runes.length < window) return const <String>{};
-  final result = <String>{};
-  for (var i = 0; i <= runes.length - window; i++) {
-    final fragment = String.fromCharCodes(runes.sublist(i, i + window));
-    if (_containsCjk(fragment)) result.add(fragment);
+String? _exactCandidateOverlap(String candidate, String source) {
+  final runeCount = candidate.runes.length;
+  final wordCount = _latinWords(candidate).length;
+  if (runeCount >= 24 || wordCount >= 10) {
+    if (source.contains(candidate)) return candidate;
   }
-  return result;
+  return null;
 }
 
-Set<String> _wordNgrams(String source, int window) {
-  if (window <= 0) return const <String>{};
-  final words = source
-      .split(RegExp(r'[^\p{L}\p{N}_]+', unicode: true))
-      .where((word) => word.isNotEmpty)
-      .toList(growable: false);
-  if (words.length < window) return const <String>{};
-  return {
-    for (var i = 0; i <= words.length - window; i++)
-      words.sublist(i, i + window).join(' '),
-  };
-}
-
-String? _firstCjkOverlap(
+String? _sampledEastAsianOverlap(
   String candidate,
-  Set<String> sourceNgrams,
+  String compactSource,
   int window,
 ) {
-  if (sourceNgrams.isEmpty || window <= 0) return null;
+  if (window <= 0) return null;
   final compact = candidate.replaceAll(RegExp(r'\s+'), '');
   final runes = compact.runes.toList(growable: false);
-  if (runes.length < window) return null;
-  for (var i = 0; i <= runes.length - window; i++) {
-    final fragment = String.fromCharCodes(runes.sublist(i, i + window));
-    if (_containsCjk(fragment) && sourceNgrams.contains(fragment)) {
+  if (runes.length < window || !_containsEastAsian(compact)) return null;
+
+  for (final start in _sampleStarts(runes.length, window)) {
+    final fragment = String.fromCharCodes(runes.sublist(start, start + window));
+    if (_containsEastAsian(fragment) && compactSource.contains(fragment)) {
       return fragment;
     }
   }
   return null;
 }
 
-String? _firstWordOverlap(
+String? _sampledWordOverlap(
   String candidate,
-  Set<String> sourceNgrams,
+  String sourceWords,
   int window,
 ) {
-  if (sourceNgrams.isEmpty || window <= 0) return null;
-  final words = candidate
-      .split(RegExp(r'[^\p{L}\p{N}_]+', unicode: true))
-      .where((word) => word.isNotEmpty)
-      .toList(growable: false);
+  if (window <= 0) return null;
+  final words = _latinWords(candidate);
   if (words.length < window) return null;
-  for (var i = 0; i <= words.length - window; i++) {
-    final fragment = words.sublist(i, i + window).join(' ');
-    if (sourceNgrams.contains(fragment)) return fragment;
+  for (final start in _sampleStarts(words.length, window)) {
+    final fragment = words.sublist(start, start + window).join(' ');
+    if (sourceWords.contains(' $fragment ')) return fragment;
   }
   return null;
 }
 
-bool _containsCjk(String value) => RegExp(
-  r'[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]',
+List<int> _sampleStarts(int length, int window) {
+  final maxStart = length - window;
+  if (maxStart <= 0) return const <int>[0];
+  final middle = maxStart ~/ 2;
+  final values = <int>{0, middle, maxStart}.toList(growable: false)..sort();
+  return values;
+}
+
+List<String> _latinWords(String value) => value
+    .replaceAll(RegExp(r'[^a-z0-9_]+'), ' ')
+    .split(' ')
+    .where((word) => word.isNotEmpty)
+    .toList(growable: false);
+
+bool _containsEastAsian(String value) => RegExp(
+  r'[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]',
 ).hasMatch(value);
