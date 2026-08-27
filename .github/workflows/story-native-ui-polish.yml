@@ -42,7 +42,7 @@ jobs:
             test/story_voice_routing_test.dart
       - name: Commit verified polish
         run: |
-          git rm .github/workflows/story-native-ui-polish.yml tool/story_native_ui_polish.py tool/story_native_ui_polish_fix.py
+          git rm -f .github/workflows/story-native-ui-polish.yml tool/story_native_ui_polish.py tool/story_native_ui_polish_fix.py
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
@@ -52,4 +52,4 @@ jobs:
           git commit -m 'fix(story): align Story surfaces with Kelivo native controls'
           git push origin HEAD:feat/story-runtime-foundation
 
-# rerun after Lucide icon compatibility fix
+# rerun after verified cleanup fix
