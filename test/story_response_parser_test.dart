@@ -9,8 +9,7 @@ void main() {
 
   group('StoryResponseParser', () {
     test('preserves story event order and second-person SELF', () {
-      final turn = parser.parse(
-        '''
+      final turn = parser.parse('''
         {
           "version": 1,
           "events": [
@@ -31,9 +30,7 @@ void main() {
             }
           ]
         }
-        ''',
-        turnId: 'turn-7',
-      );
+        ''', turnId: 'turn-7');
 
       expect(turn.id, 'turn-7');
       expect(turn.events.map((event) => event.id), [
@@ -48,31 +45,30 @@ void main() {
     });
 
     test('accepts fenced JSON defensively', () {
-      final turn = parser.parse(
-        '''```json
+      final turn = parser.parse('''```json
 {"version":1,"events":[{"type":"dialogue","actor":{"type":"self"},"text":[{"text":"听见了。"}]}]}
-```''',
-        turnId: 'turn-fenced',
-      );
+```''', turnId: 'turn-fenced');
 
       expect(turn.events.single.type, StoryEventType.dialogue);
       expect(turn.events.single.actor.isSelf, isTrue);
     });
 
-    test('SELF expression remains valid without inventing a player character', () {
-      final turn = parser.parse(
-        '''{"version":1,"events":[{"type":"expression","actor":{"type":"self"},"text":[{"text":"皱了皱眉。"}]}]}''',
-        turnId: 'turn-self-expression',
-      );
+    test(
+      'SELF expression remains valid without inventing a player character',
+      () {
+        final turn = parser.parse(
+          '''{"version":1,"events":[{"type":"expression","actor":{"type":"self"},"text":[{"text":"皱了皱眉。"}]}]}''',
+          turnId: 'turn-self-expression',
+        );
 
-      expect(turn.events.single.type, StoryEventType.expression);
-      expect(turn.events.single.actor.isSelf, isTrue);
-      expect(turn.events.single.actor.characterId, isNull);
-    });
+        expect(turn.events.single.type, StoryEventType.expression);
+        expect(turn.events.single.actor.isSelf, isTrue);
+        expect(turn.events.single.actor.characterId, isNull);
+      },
+    );
 
     test('parses timed choice set without making it a generic chat reply', () {
-      final turn = parser.parse(
-        '''
+      final turn = parser.parse('''
         {
           "version": 1,
           "events": [
@@ -88,9 +84,7 @@ void main() {
             }
           ]
         }
-        ''',
-        turnId: 'turn-choice',
-      );
+        ''', turnId: 'turn-choice');
 
       final event = turn.events.single;
       expect(event.type, StoryEventType.choiceSet);
@@ -101,8 +95,7 @@ void main() {
     });
 
     test('unknown visual effects degrade without corrupting story text', () {
-      final turn = parser.parse(
-        '''
+      final turn = parser.parse('''
         {
           "version": 1,
           "events": [
@@ -120,9 +113,7 @@ void main() {
             }
           ]
         }
-        ''',
-        turnId: 'turn-forward',
-      );
+        ''', turnId: 'turn-forward');
 
       final span = turn.events.single.text.single;
       expect(span.text, '门后还有东西。');
@@ -133,8 +124,7 @@ void main() {
 
     test('rejects an NPC id attached to SELF', () {
       expect(
-        () => parser.parse(
-          '''
+        () => parser.parse('''
           {
             "version": 1,
             "events": [
@@ -145,9 +135,7 @@ void main() {
               }
             ]
           }
-          ''',
-          turnId: 'turn-invalid-self',
-        ),
+          ''', turnId: 'turn-invalid-self'),
         throwsA(
           isA<StoryResponseParseException>().having(
             (error) => error.code,
@@ -176,17 +164,14 @@ void main() {
 
     test('rejects a consequential-looking choice without actual options', () {
       expect(
-        () => parser.parse(
-          '''
+        () => parser.parse('''
           {
             "version": 1,
             "events": [
               {"type": "choice_set", "actor": {"type": "self"}}
             ]
           }
-          ''',
-          turnId: 'turn-empty-choice',
-        ),
+          ''', turnId: 'turn-empty-choice'),
         throwsA(
           isA<StoryResponseParseException>().having(
             (error) => error.code,
@@ -236,10 +221,7 @@ void main() {
   });
 
   test('story output contract is a frozen cache contribution', () {
-    expect(
-      storyResponseContractContributionV1.stability.name,
-      'frozen',
-    );
+    expect(storyResponseContractContributionV1.stability.name, 'frozen');
     expect(storyResponseContractV1, contains('Never invent or switch'));
     expect(storyResponseContractV1, contains('Do not serialize reasoning'));
   });

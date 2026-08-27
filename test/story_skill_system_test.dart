@@ -105,19 +105,22 @@ void main() {
       ),
     ];
 
-    test('ordinary Story turn does not expose low-frequency GitHub capability', () {
-      final resolved = resolver.resolve(
-        manifests: const [lowLatencyStory, githubSerial],
-        bindings: bindings,
-        context: const StorySkillActivationContext(
-          assistantId: 'assistant-1',
-        ),
-      );
+    test(
+      'ordinary Story turn does not expose low-frequency GitHub capability',
+      () {
+        final resolved = resolver.resolve(
+          manifests: const [lowLatencyStory, githubSerial],
+          bindings: bindings,
+          context: const StorySkillActivationContext(
+            assistantId: 'assistant-1',
+          ),
+        );
 
-      expect(resolved.activeSkills.map((skill) => skill.id), ['story.base']);
-      expect(resolved.mcpServerIds, isEmpty);
-      expect(resolved.toolIds, isEmpty);
-    });
+        expect(resolved.activeSkills.map((skill) => skill.id), ['story.base']);
+        expect(resolved.mcpServerIds, isEmpty);
+        expect(resolved.toolIds, isEmpty);
+      },
+    );
 
     test('SERIAL_DUE activates GitHub profile deterministically', () {
       final resolved = resolver.resolve(
@@ -137,31 +140,32 @@ void main() {
       expect(resolved.toolIds, ['tool.repo_status']);
     });
 
-    test('manual binding can disable automatic activation without disabling skill', () {
-      final resolved = resolver.resolve(
-        manifests: const [lowLatencyStory],
-        bindings: const [
-          StorySkillBinding(
+    test(
+      'manual binding can disable automatic activation without disabling skill',
+      () {
+        final resolved = resolver.resolve(
+          manifests: const [lowLatencyStory],
+          bindings: const [
+            StorySkillBinding(
+              assistantId: 'assistant-1',
+              skillId: 'story.base',
+              allowAutomaticActivation: false,
+            ),
+          ],
+          context: const StorySkillActivationContext(
             assistantId: 'assistant-1',
-            skillId: 'story.base',
-            allowAutomaticActivation: false,
           ),
-        ],
-        context: const StorySkillActivationContext(
-          assistantId: 'assistant-1',
-        ),
-      );
+        );
 
-      expect(resolved.activeSkills, isEmpty);
-    });
+        expect(resolved.activeSkills, isEmpty);
+      },
+    );
 
     test('active instructions become epoch-stable prompt material', () {
       final resolved = resolver.resolve(
         manifests: const [lowLatencyStory],
         bindings: bindings,
-        context: const StorySkillActivationContext(
-          assistantId: 'assistant-1',
-        ),
+        context: const StorySkillActivationContext(assistantId: 'assistant-1'),
       );
       final contribution = resolved.toPromptContribution();
 
@@ -170,24 +174,27 @@ void main() {
       expect(contribution.content, contains('Use second-person story pacing.'));
     });
 
-    test('Skill result can join reference fingerprints in one capability epoch', () {
-      final resolved = resolver.resolve(
-        manifests: const [lowLatencyStory],
-        bindings: bindings,
-        context: const StorySkillActivationContext(
-          assistantId: 'assistant-1',
-        ),
-      );
-      final epoch = resolved.toCapabilityEpoch(
-        epochId: 'epoch-1',
-        sceneEpochId: 'scene-1',
-        worldlineId: 'wl-main',
-        referenceProfileFingerprints: const ['ref-fingerprint'],
-      );
+    test(
+      'Skill result can join reference fingerprints in one capability epoch',
+      () {
+        final resolved = resolver.resolve(
+          manifests: const [lowLatencyStory],
+          bindings: bindings,
+          context: const StorySkillActivationContext(
+            assistantId: 'assistant-1',
+          ),
+        );
+        final epoch = resolved.toCapabilityEpoch(
+          epochId: 'epoch-1',
+          sceneEpochId: 'scene-1',
+          worldlineId: 'wl-main',
+          referenceProfileFingerprints: const ['ref-fingerprint'],
+        );
 
-      expect(epoch.referenceProfileFingerprints, ['ref-fingerprint']);
-      expect(epoch.activeSkillIds, ['story.base@1']);
-    });
+        expect(epoch.referenceProfileFingerprints, ['ref-fingerprint']);
+        expect(epoch.activeSkillIds, ['story.base@1']);
+      },
+    );
   });
 
   test('Agency policy remains independent from Skill activation', () {

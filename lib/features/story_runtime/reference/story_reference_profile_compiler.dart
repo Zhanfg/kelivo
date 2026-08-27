@@ -84,7 +84,9 @@ final class StoryReferenceProfileCompiler {
     );
 
     void add(String label, Iterable<String> values) {
-      final cleaned = values.map((value) => value.trim()).where((v) => v.isNotEmpty);
+      final cleaned = values
+          .map((value) => value.trim())
+          .where((v) => v.isNotEmpty);
       if (cleaned.isEmpty) return;
       buffer.writeln('$label:');
       for (final value in cleaned) {

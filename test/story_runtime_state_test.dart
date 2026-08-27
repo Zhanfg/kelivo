@@ -34,32 +34,38 @@ void main() {
       expect(decoded.sceneRevision, 7);
     });
 
-    test('copyWith can clear epoch/worldline without changing opt-in state', () {
-      const state = StoryRuntimeSessionState(
-        conversationId: 'conv-3',
-        enabled: true,
-        worldlineId: 'wl-branch',
-        sceneEpochId: 'scene-9',
-      );
+    test(
+      'copyWith can clear epoch/worldline without changing opt-in state',
+      () {
+        const state = StoryRuntimeSessionState(
+          conversationId: 'conv-3',
+          enabled: true,
+          worldlineId: 'wl-branch',
+          sceneEpochId: 'scene-9',
+        );
 
-      final next = state.copyWith(
-        clearWorldlineId: true,
-        clearSceneEpochId: true,
-      );
+        final next = state.copyWith(
+          clearWorldlineId: true,
+          clearSceneEpochId: true,
+        );
 
-      expect(next.enabled, isTrue);
-      expect(next.worldlineId, isNull);
-      expect(next.sceneEpochId, isNull);
-    });
+        expect(next.enabled, isTrue);
+        expect(next.worldlineId, isNull);
+        expect(next.sceneEpochId, isNull);
+      },
+    );
 
-    test('rejects future schema versions instead of silently corrupting state', () {
-      expect(
-        () => StoryRuntimeSessionState.fromJson({
-          'schema_version': 999,
-          'conversation_id': 'conv-future',
-        }),
-        throwsFormatException,
-      );
-    });
+    test(
+      'rejects future schema versions instead of silently corrupting state',
+      () {
+        expect(
+          () => StoryRuntimeSessionState.fromJson({
+            'schema_version': 999,
+            'conversation_id': 'conv-future',
+          }),
+          throwsFormatException,
+        );
+      },
+    );
   });
 }

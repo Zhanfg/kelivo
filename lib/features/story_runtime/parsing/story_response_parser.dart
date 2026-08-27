@@ -58,10 +58,7 @@ final class StoryResponseParser {
     var totalTextChars = 0;
     final events = <StoryEvent>[];
     for (var index = 0; index < rawEvents.length; index++) {
-      final eventMap = _asStringMap(
-        rawEvents[index],
-        code: 'event_not_object',
-      );
+      final eventMap = _asStringMap(rawEvents[index], code: 'event_not_object');
       final parsed = _parseEvent(
         eventMap,
         eventId: '${normalizedTurnId}_e$index',
@@ -226,9 +223,7 @@ final class StoryResponseParser {
       throw const StoryResponseParseException('invalid_timeout');
     }
     final millis = value.toInt();
-    if (value != millis ||
-        millis <= 0 ||
-        millis > maxTimeout.inMilliseconds) {
+    if (value != millis || millis <= 0 || millis > maxTimeout.inMilliseconds) {
       throw const StoryResponseParseException('timeout_out_of_range');
     }
     return Duration(milliseconds: millis);

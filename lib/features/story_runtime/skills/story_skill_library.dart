@@ -29,7 +29,8 @@ final class StorySkillLibrary {
   Future<List<StorySkillManifest>> loadAll() async {
     final packages = await _repository.readAll();
     final manifestsById = <String, StorySkillManifest>{
-      for (final manifest in await loadBuiltInStorySkills()) manifest.id: manifest,
+      for (final manifest in await loadBuiltInStorySkills())
+        manifest.id: manifest,
     };
     for (final package in packages) {
       final manifest = await load(package);
@@ -67,7 +68,10 @@ final class StorySkillLibrary {
     final promptFiles = <File>[];
     final promptsDir = Directory('${root.path}/prompts');
     if (await promptsDir.exists()) {
-      await for (final entity in promptsDir.list(recursive: true, followLinks: false)) {
+      await for (final entity in promptsDir.list(
+        recursive: true,
+        followLinks: false,
+      )) {
         if (entity is! File) continue;
         final lower = entity.path.toLowerCase();
         if (lower.endsWith('.md') || lower.endsWith('.txt')) {

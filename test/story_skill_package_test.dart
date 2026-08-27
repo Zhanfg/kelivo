@@ -20,15 +20,15 @@ void main() {
       if (await tempDir.exists()) await tempDir.delete(recursive: true);
     });
 
-    test('installs manifest, SKILL.md and prompt files as one capability package', () async {
-      final zip = await _writeArchive(
-        tempDir,
-        'skill.zip',
-        Archive()
-          ..add(
-            ArchiveFile.string(
-              'NovelSkill/manifest.json',
-              '''{
+    test(
+      'installs manifest, SKILL.md and prompt files as one capability package',
+      () async {
+        final zip = await _writeArchive(
+          tempDir,
+          'skill.zip',
+          Archive()
+            ..add(
+              ArchiveFile.string('NovelSkill/manifest.json', '''{
                 "schema_version": 1,
                 "id": "story.novel",
                 "name": "Novel Skill",
@@ -36,62 +36,67 @@ void main() {
                 "mcp_servers": ["mcp.story"],
                 "permissions": ["mcp"],
                 "activation": {"modes": ["manual", "director"]}
-              }''',
+              }'''),
+            )
+            ..add(
+              ArchiveFile.string(
+                'NovelSkill/SKILL.md',
+                'Keep scene continuity and preserve second-person SELF.',
+              ),
+            )
+            ..add(
+              ArchiveFile.string(
+                'NovelSkill/prompts/20_dialogue.md',
+                'Dialogue should keep subtext concise.',
+              ),
+            )
+            ..add(
+              ArchiveFile.string(
+                'NovelSkill/prompts/10_scene.md',
+                'Resolve scene state before narration.',
+              ),
+            )
+            ..add(
+              ArchiveFile.string('NovelSkill/assets/readme.txt', 'data asset'),
+            )
+            ..add(
+              ArchiveFile.string(
+                'NovelSkill/scripts/ignored.sh',
+                'echo should-never-be-executed-or-extracted',
+              ),
             ),
-          )
-          ..add(
-            ArchiveFile.string(
-              'NovelSkill/SKILL.md',
-              'Keep scene continuity and preserve second-person SELF.',
-            ),
-          )
-          ..add(
-            ArchiveFile.string(
-              'NovelSkill/prompts/20_dialogue.md',
-              'Dialogue should keep subtext concise.',
-            ),
-          )
-          ..add(
-            ArchiveFile.string(
-              'NovelSkill/prompts/10_scene.md',
-              'Resolve scene state before narration.',
-            ),
-          )
-          ..add(
-            ArchiveFile.string(
-              'NovelSkill/assets/readme.txt',
-              'data asset',
-            ),
-          )
-          ..add(
-            ArchiveFile.string(
-              'NovelSkill/scripts/ignored.sh',
-              'echo should-never-be-executed-or-extracted',
-            ),
-          ),
-      );
+        );
 
-      final importer = StorySkillPackageImporter(
-        repository: repository,
-        appDataRootResolver: () async => tempDir,
-      );
-      final result = await importer.importZip(zip.path);
+        final importer = StorySkillPackageImporter(
+          repository: repository,
+          appDataRootResolver: () async => tempDir,
+        );
+        final result = await importer.importZip(zip.path);
 
-      expect(result.deduplicated, isFalse);
-      expect(result.manifest.id, 'story.novel');
-      expect(result.manifest.instructions, [
-        'Keep scene continuity and preserve second-person SELF.',
-        'Resolve scene state before narration.',
-        'Dialogue should keep subtext concise.',
-      ]);
-      expect(result.package.relativeRoot, 'story_skills/story.novel/1.0.0');
+        expect(result.deduplicated, isFalse);
+        expect(result.manifest.id, 'story.novel');
+        expect(result.manifest.instructions, [
+          'Keep scene continuity and preserve second-person SELF.',
+          'Resolve scene state before narration.',
+          'Dialogue should keep subtext concise.',
+        ]);
+        expect(result.package.relativeRoot, 'story_skills/story.novel/1.0.0');
 
-      final installed = Directory('${tempDir.path}/${result.package.relativeRoot}');
-      expect(await File('${installed.path}/manifest.json').exists(), isTrue);
-      expect(await File('${installed.path}/SKILL.md').exists(), isTrue);
-      expect(await File('${installed.path}/prompts/10_scene.md').exists(), isTrue);
-      expect(await File('${installed.path}/scripts/ignored.sh').exists(), isFalse);
-    });
+        final installed = Directory(
+          '${tempDir.path}/${result.package.relativeRoot}',
+        );
+        expect(await File('${installed.path}/manifest.json').exists(), isTrue);
+        expect(await File('${installed.path}/SKILL.md').exists(), isTrue);
+        expect(
+          await File('${installed.path}/prompts/10_scene.md').exists(),
+          isTrue,
+        );
+        expect(
+          await File('${installed.path}/scripts/ignored.sh').exists(),
+          isFalse,
+        );
+      },
+    );
 
     test('same package hash deduplicates the same id and version', () async {
       final zip = await _writeArchive(
@@ -184,11 +189,7 @@ void main() {
   });
 }
 
-Future<File> _writeArchive(
-  Directory root,
-  String name,
-  Archive archive,
-) async {
+Future<File> _writeArchive(Directory root, String name, Archive archive) async {
   final bytes = ZipEncoder().encodeBytes(archive);
   final file = File('${root.path}/$name');
   await file.writeAsBytes(bytes, flush: true);
@@ -204,7 +205,10 @@ final class _MemorySkillPackageRepository
       List.unmodifiable(items);
 
   @override
-  Future<StoryInstalledSkillPackage?> read(String skillId, String version) async {
+  Future<StoryInstalledSkillPackage?> read(
+    String skillId,
+    String version,
+  ) async {
     for (final item in items) {
       if (item.skillId == skillId && item.version == version) return item;
     }
@@ -214,7 +218,8 @@ final class _MemorySkillPackageRepository
   @override
   Future<void> upsert(StoryInstalledSkillPackage package) async {
     items.removeWhere(
-      (item) => item.skillId == package.skillId && item.version == package.version,
+      (item) =>
+          item.skillId == package.skillId && item.version == package.version,
     );
     items.add(package);
   }

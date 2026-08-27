@@ -31,7 +31,8 @@ final class StoryReferenceKelivoModelRunner {
       StoryReferenceAnalysisStage.analyzeChunk => 'REFERENCE_ANALYZE',
       StoryReferenceAnalysisStage.reduce => 'REFERENCE_REDUCE',
     };
-    final prompt = '''
+    final prompt =
+        '''
 ${request.instructions.trim()}
 
 [$stageLabel]

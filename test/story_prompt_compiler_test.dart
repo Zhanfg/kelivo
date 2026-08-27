@@ -9,69 +9,81 @@ import 'package:Kelivo/features/story_runtime/reference/story_reference_profile_
 void main() {
   const compiler = StoryPromptCompiler();
 
-  test('orders frozen and epoch-stable material before volatile runtime data', () {
-    final referenceProfile = const StoryReferenceProfileCompiler().compile(
-      profiles: const [
-        StoryReferenceStyleProfile(
-          id: 'style-1',
-          documentId: 'doc-1',
-          name: 'Style',
-          sourceContentHash: 'hash',
-          createdAtMs: 1,
-          aspects: {StoryReferenceAspect.dialogue},
-          dialogueMethods: ['Keep dialogue concise and indirect.'],
-        ),
-      ],
-      invocations: const [
-        StoryReferenceInvocation(profileId: 'style-1'),
-      ],
-    );
-    final epoch = StoryCapabilityEpoch.canonical(
-      epochId: 'epoch-1',
-      worldlineId: 'wl-main',
-      sceneEpochId: 'scene-1',
-      activeSkillIds: const ['skill.base@1'],
-      referenceProfileFingerprints: [referenceProfile.single.fingerprint],
-    );
+  test(
+    'orders frozen and epoch-stable material before volatile runtime data',
+    () {
+      final referenceProfile = const StoryReferenceProfileCompiler().compile(
+        profiles: const [
+          StoryReferenceStyleProfile(
+            id: 'style-1',
+            documentId: 'doc-1',
+            name: 'Style',
+            sourceContentHash: 'hash',
+            createdAtMs: 1,
+            aspects: {StoryReferenceAspect.dialogue},
+            dialogueMethods: ['Keep dialogue concise and indirect.'],
+          ),
+        ],
+        invocations: const [StoryReferenceInvocation(profileId: 'style-1')],
+      );
+      final epoch = StoryCapabilityEpoch.canonical(
+        epochId: 'epoch-1',
+        worldlineId: 'wl-main',
+        sceneEpochId: 'scene-1',
+        activeSkillIds: const ['skill.base@1'],
+        referenceProfileFingerprints: [referenceProfile.single.fingerprint],
+      );
 
-    final result = compiler.compile(
-      capabilityEpoch: epoch,
-      storyCoreInstructions: 'Second-person story core.',
-      sceneBaseline: 'Scene: station platform at night.',
-      skillContributions: const [
-        StoryPromptContribution(
-          id: 'story.skills.active',
-          stability: StoryPromptStability.epochStable,
-          content: 'Skill instructions.',
-          order: 300,
-        ),
-      ],
-      referenceProfiles: referenceProfile,
-      volatile: const [
-        StoryPromptContribution(
-          id: 'story.runtime.delta',
-          stability: StoryPromptStability.volatile,
-          content: 'Current transient runtime delta.',
-        ),
-      ],
-      localOnly: const [
-        StoryPromptContribution(
-          id: 'story.local.voice',
-          stability: StoryPromptStability.localOnly,
-          content: 'Never send this voice cache.',
-        ),
-      ],
-    );
+      final result = compiler.compile(
+        capabilityEpoch: epoch,
+        storyCoreInstructions: 'Second-person story core.',
+        sceneBaseline: 'Scene: station platform at night.',
+        skillContributions: const [
+          StoryPromptContribution(
+            id: 'story.skills.active',
+            stability: StoryPromptStability.epochStable,
+            content: 'Skill instructions.',
+            order: 300,
+          ),
+        ],
+        referenceProfiles: referenceProfile,
+        volatile: const [
+          StoryPromptContribution(
+            id: 'story.runtime.delta',
+            stability: StoryPromptStability.volatile,
+            content: 'Current transient runtime delta.',
+          ),
+        ],
+        localOnly: const [
+          StoryPromptContribution(
+            id: 'story.local.voice',
+            stability: StoryPromptStability.localOnly,
+            content: 'Never send this voice cache.',
+          ),
+        ],
+      );
 
-    final ids = result.plan.providerSections.map((section) => section.id).toList();
-    expect(ids.indexOf('story.core.v1'), lessThan(ids.indexOf('story.scene.baseline')));
-    expect(
-      ids.indexOf('story.reference.style-1'),
-      lessThan(ids.indexOf('story.runtime.delta')),
-    );
-    expect(result.providerText, isNot(contains('Never send this voice cache.')));
-    expect(result.stablePrefixText, isNot(contains('Current transient runtime delta.')));
-  });
+      final ids = result.plan.providerSections
+          .map((section) => section.id)
+          .toList();
+      expect(
+        ids.indexOf('story.core.v1'),
+        lessThan(ids.indexOf('story.scene.baseline')),
+      );
+      expect(
+        ids.indexOf('story.reference.style-1'),
+        lessThan(ids.indexOf('story.runtime.delta')),
+      );
+      expect(
+        result.providerText,
+        isNot(contains('Never send this voice cache.')),
+      );
+      expect(
+        result.stablePrefixText,
+        isNot(contains('Current transient runtime delta.')),
+      );
+    },
+  );
 
   test('volatile changes keep the stable prefix fingerprint reusable', () {
     final epoch = StoryCapabilityEpoch.canonical(

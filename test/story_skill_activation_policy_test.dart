@@ -68,19 +68,14 @@ void main() {
     final resolved = resolver.resolve(
       manifests: const [defaultSkill],
       bindings: effective,
-      context: const StorySkillActivationContext(
-        assistantId: 'assistant-1',
-      ),
+      context: const StorySkillActivationContext(assistantId: 'assistant-1'),
     );
     expect(resolved.activeSkills, isEmpty);
   });
 
   test('manual Skill activates only after explicit enable', () {
     const bindings = [
-      StorySkillBinding(
-        assistantId: 'assistant-1',
-        skillId: 'visual-taste',
-      ),
+      StorySkillBinding(assistantId: 'assistant-1', skillId: 'visual-taste'),
     ];
     final effective = StorySkillActivationPolicy.effectiveBindings(
       manifests: const [manualSkill],

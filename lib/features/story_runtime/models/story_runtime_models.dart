@@ -41,13 +41,9 @@ enum StoryAvatarKind { initials, localAsset, generated, custom }
 /// player-character id and no mechanism for silently switching control to an
 /// NPC.
 final class StoryActorRef {
-  const StoryActorRef.self()
-    : type = StoryActorType.self,
-      characterId = null;
+  const StoryActorRef.self() : type = StoryActorType.self, characterId = null;
 
-  const StoryActorRef.world()
-    : type = StoryActorType.world,
-      characterId = null;
+  const StoryActorRef.world() : type = StoryActorType.world, characterId = null;
 
   const StoryActorRef.character(String characterId)
     : assert(characterId != ''),

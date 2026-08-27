@@ -86,28 +86,40 @@ void main() {
       if (await tempDir.exists()) await tempDir.delete(recursive: true);
     });
 
-    test('stores only a relative normalized-text path and deduplicates by hash', () async {
-      final service = StoryReferenceImportService(
-        repository: documents,
-        appDataRootResolver: () async => tempDir,
-      );
+    test(
+      'stores only a relative normalized-text path and deduplicates by hash',
+      () async {
+        final service = StoryReferenceImportService(
+          repository: documents,
+          appDataRootResolver: () async => tempDir,
+        );
 
-      final first = await service.importPastedText(
-        title: '测试小说',
-        text: '第一章\n\n这是用于风格分析的正文。',
-      );
-      final second = await service.importPastedText(
-        title: '另一个标题',
-        text: '第一章\n\n这是用于风格分析的正文。',
-      );
+        final first = await service.importPastedText(
+          title: '测试小说',
+          text: '第一章\n\n这是用于风格分析的正文。',
+        );
+        final second = await service.importPastedText(
+          title: '另一个标题',
+          text: '第一章\n\n这是用于风格分析的正文。',
+        );
 
-      expect(first.deduplicated, isFalse);
-      expect(second.deduplicated, isTrue);
-      expect(second.document.id, first.document.id);
-      expect(first.document.normalizedRelativePath, startsWith('story_reference_library/'));
-      expect(first.document.normalizedRelativePath, isNot(startsWith(tempDir.path)));
-      expect(await service.readNormalizedText(first.document), contains('用于风格分析'));
-    });
+        expect(first.deduplicated, isFalse);
+        expect(second.deduplicated, isTrue);
+        expect(second.document.id, first.document.id);
+        expect(
+          first.document.normalizedRelativePath,
+          startsWith('story_reference_library/'),
+        );
+        expect(
+          first.document.normalizedRelativePath,
+          isNot(startsWith(tempDir.path)),
+        );
+        expect(
+          await service.readNormalizedText(first.document),
+          contains('用于风格分析'),
+        );
+      },
+    );
   });
 
   group('Callable reference profiles', () {
@@ -150,7 +162,10 @@ void main() {
       expect(contribution.stability, StoryPromptStability.epochStable);
       expect(contribution.content, contains('DIALOGUE:'));
       expect(contribution.content, contains('DESCRIPTION:'));
-      expect(contribution.content, isNot(contains('MATURE_RELATIONSHIP_CRAFT:')));
+      expect(
+        contribution.content,
+        isNot(contains('MATURE_RELATIONSHIP_CRAFT:')),
+      );
       expect(contribution.content, contains('Produce original prose'));
     });
 
@@ -201,7 +216,9 @@ void main() {
   test('analysis pipeline reduces chunks and persists one profile', () async {
     final documents = _MemoryDocumentRepository();
     final profiles = _MemoryProfileRepository();
-    final tempDir = await Directory.systemTemp.createTemp('kelivo_reference_analysis_');
+    final tempDir = await Directory.systemTemp.createTemp(
+      'kelivo_reference_analysis_',
+    );
     addTearDown(() async {
       if (await tempDir.exists()) await tempDir.delete(recursive: true);
     });
@@ -212,10 +229,7 @@ void main() {
     );
     final imported = await importService.importPastedText(
       title: '长文本',
-      text: List.filled(
-        12,
-        '场景在变化，人物通过动作和停顿推进交流，环境细节保持简洁。',
-      ).join('\n\n'),
+      text: List.filled(12, '场景在变化，人物通过动作和停顿推进交流，环境细节保持简洁。').join('\n\n'),
     );
     final source = await importService.readNormalizedText(imported.document);
     var analysisCalls = 0;
@@ -266,7 +280,8 @@ final class _MemoryDocumentRepository
   final List<StoryReferenceDocument> items = <StoryReferenceDocument>[];
 
   @override
-  Future<List<StoryReferenceDocument>> readAll() async => List.unmodifiable(items);
+  Future<List<StoryReferenceDocument>> readAll() async =>
+      List.unmodifiable(items);
 
   @override
   Future<StoryReferenceDocument?> readById(String id) async {
@@ -301,7 +316,8 @@ final class _MemoryProfileRepository
   final List<StoryReferenceStyleProfile> items = <StoryReferenceStyleProfile>[];
 
   @override
-  Future<List<StoryReferenceStyleProfile>> readAll() async => List.unmodifiable(items);
+  Future<List<StoryReferenceStyleProfile>> readAll() async =>
+      List.unmodifiable(items);
 
   @override
   Future<StoryReferenceStyleProfile?> readById(String id) async {
@@ -312,7 +328,9 @@ final class _MemoryProfileRepository
   }
 
   @override
-  Future<List<StoryReferenceStyleProfile>> readForDocument(String documentId) async =>
+  Future<List<StoryReferenceStyleProfile>> readForDocument(
+    String documentId,
+  ) async =>
       List.unmodifiable(items.where((item) => item.documentId == documentId));
 
   @override

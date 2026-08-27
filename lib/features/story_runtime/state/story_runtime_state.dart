@@ -115,11 +115,7 @@ String? _readOptionalString(Object? value) {
   return trimmed.isEmpty ? null : trimmed;
 }
 
-int _readInt(
-  Map<String, dynamic> json,
-  String key, {
-  required int fallback,
-}) {
+int _readInt(Map<String, dynamic> json, String key, {required int fallback}) {
   final value = json[key];
   if (value == null) return fallback;
   if (value is! num || value.isNaN || value.isInfinite) {

@@ -168,16 +168,16 @@ Map<String, String?> _extractEpubTask(String path) {
 
     final buffer = StringBuffer();
     final paths = spine.isNotEmpty
-        ? [for (final id in spine) if (manifest[id] != null) manifest[id]!]
+        ? [
+            for (final id in spine)
+              if (manifest[id] != null) manifest[id]!,
+          ]
         : manifest.values.toList(growable: false);
 
     for (final itemPath in paths) {
       final entry = byName[itemPath];
       if (entry == null || !entry.isFile) continue;
-      final raw = utf8.decode(
-        _readArchiveBytes(entry),
-        allowMalformed: true,
-      );
+      final raw = utf8.decode(_readArchiveBytes(entry), allowMalformed: true);
       final text = _extractXhtmlText(raw);
       if (text.isEmpty) continue;
       if (buffer.isNotEmpty) buffer.write('\n\n');
@@ -235,7 +235,10 @@ String _extractXhtmlText(String raw) {
   // Some EPUBs contain HTML that is not strict XML. This fallback is used only
   // for text extraction and never executed as markup.
   return raw
-      .replaceAll(RegExp(r'<script[\s\S]*?</script>', caseSensitive: false), ' ')
+      .replaceAll(
+        RegExp(r'<script[\s\S]*?</script>', caseSensitive: false),
+        ' ',
+      )
       .replaceAll(RegExp(r'<style[\s\S]*?</style>', caseSensitive: false), ' ')
       .replaceAll(RegExp(r'<[^>]+>'), ' ')
       .replaceAll(RegExp(r'\s+'), ' ')

@@ -122,7 +122,9 @@ final class StoryRuntimeAssembler {
   final StoryPromptCompiler promptCompiler;
 
   /// Returns null when the conversation has not opted into Story Mode.
-  Future<StoryRuntimeAssembly?> assemble(StoryRuntimeAssemblyRequest request) async {
+  Future<StoryRuntimeAssembly?> assemble(
+    StoryRuntimeAssemblyRequest request,
+  ) async {
     final conversationId = _required(request.conversationId, 'conversationId');
     final assistantId = _required(request.assistantId, 'assistantId');
     final session = await sessionRepository.readOrDefault(conversationId);
@@ -164,7 +166,8 @@ final class StoryRuntimeAssembler {
     final hostCapabilities = await resolveHostCapabilities(skills, session);
     final epochStableReferenceFingerprints = <String>[
       for (final reference in references)
-        if (reference.contribution.stability == StoryPromptStability.epochStable)
+        if (reference.contribution.stability ==
+            StoryPromptStability.epochStable)
           reference.fingerprint,
     ];
     final worldlineId = session.worldlineId ?? 'story.default.worldline';
@@ -189,9 +192,7 @@ final class StoryRuntimeAssembler {
       storyCoreInstructions: request.storyCoreInstructions,
       sceneBaseline: request.sceneBaseline,
       capabilitySummary: hostCapabilities.summary,
-      skillContributions: [
-        if (skillContribution != null) skillContribution,
-      ],
+      skillContributions: [if (skillContribution != null) skillContribution],
       referenceProfiles: references,
       additionalStable: request.additionalStable,
       appendOnly: request.appendOnly,

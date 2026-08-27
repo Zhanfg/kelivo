@@ -15,7 +15,8 @@ final class StorySkillActivationPolicy {
     required String assistantId,
   }) {
     for (final binding in bindings) {
-      if (binding.assistantId == assistantId && binding.skillId == manifest.id) {
+      if (binding.assistantId == assistantId &&
+          binding.skillId == manifest.id) {
         return binding.enabled;
       }
     }
@@ -36,10 +37,7 @@ final class StorySkillActivationPolicy {
       if (manifest.metadata['defaultEnabled'] == true &&
           !explicitIds.contains(manifest.id)) {
         result.add(
-          StorySkillBinding(
-            assistantId: assistantId,
-            skillId: manifest.id,
-          ),
+          StorySkillBinding(assistantId: assistantId, skillId: manifest.id),
         );
       }
     }

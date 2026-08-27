@@ -79,10 +79,7 @@ final class StoryReferenceDocument {
       title: _requiredString(json, 'title'),
       sourceKind: sourceKind,
       contentHash: _requiredString(json, 'content_hash'),
-      normalizedRelativePath: _requiredString(
-        json,
-        'normalized_relative_path',
-      ),
+      normalizedRelativePath: _requiredString(json, 'normalized_relative_path'),
       characterCount: _nonNegativeInt(json, 'character_count'),
       chunkCount: _nonNegativeInt(json, 'chunk_count'),
       importedAtMs: _nonNegativeInt(json, 'imported_at_ms'),

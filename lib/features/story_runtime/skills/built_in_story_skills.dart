@@ -23,8 +23,7 @@ Future<List<StorySkillManifest>> loadBuiltInStorySkills() async {
       id: 'lieflat-less-ai-tone',
       name: 'Human Writing Core · 去 AI 味',
       version: '2026.08.27',
-      description:
-          '默认写作 Skill：保留实测白名单规则，并融合中英文 anti-slop、风格保真、任务路由与事实守恒。',
+      description: '默认写作 Skill：保留实测白名单规则，并融合中英文 anti-slop、风格保真、任务路由与事实守恒。',
       instructions: <String>[lessAiTone, humanWritingCore],
       activationModes: const <StorySkillActivationMode>{
         StorySkillActivationMode.always,
@@ -61,10 +60,7 @@ Future<List<StorySkillManifest>> loadBuiltInStorySkills() async {
       activationModes: <StorySkillActivationMode>{
         StorySkillActivationMode.always,
       },
-      metadata: <String, Object?>{
-        'builtIn': true,
-        'defaultEnabled': true,
-      },
+      metadata: <String, Object?>{'builtIn': true, 'defaultEnabled': true},
     ),
     const StorySkillManifest(
       id: 'scene-writing-basics',
@@ -77,10 +73,7 @@ Future<List<StorySkillManifest>> loadBuiltInStorySkills() async {
       activationModes: <StorySkillActivationMode>{
         StorySkillActivationMode.always,
       },
-      metadata: <String, Object?>{
-        'builtIn': true,
-        'defaultEnabled': true,
-      },
+      metadata: <String, Object?>{'builtIn': true, 'defaultEnabled': true},
     ),
     StorySkillManifest(
       id: 'visual-taste-basics',

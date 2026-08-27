@@ -75,12 +75,12 @@ Future<StorySkillGitHubInstallRequest?> showStorySkillGitHubInstallDialog(
               FilledButton(
                 onPressed: valid
                     ? () => Navigator.of(dialogContext).pop(
-                          StorySkillGitHubInstallRequest(
-                            repositoryUrl: repository.text.trim(),
-                            ref: _optional(ref.text),
-                            subdirectory: _optional(subdirectory.text),
-                          ),
-                        )
+                        StorySkillGitHubInstallRequest(
+                          repositoryUrl: repository.text.trim(),
+                          ref: _optional(ref.text),
+                          subdirectory: _optional(subdirectory.text),
+                        ),
+                      )
                     : null,
                 child: const Text('安装'),
               ),

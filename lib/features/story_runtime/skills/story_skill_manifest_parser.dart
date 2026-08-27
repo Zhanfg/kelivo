@@ -192,7 +192,10 @@ StorySkillTtsPolicy _ttsPolicy(Object? value) {
     null || 'inherit' => StorySkillTtsPolicy.inherit,
     'prefer_enabled' => StorySkillTtsPolicy.preferEnabled,
     'disabled' => StorySkillTtsPolicy.disabled,
-    _ => throw StorySkillManifestException('unknown_tts_policy', detail: policy),
+    _ => throw StorySkillManifestException(
+      'unknown_tts_policy',
+      detail: policy,
+    ),
   };
 }
 

@@ -2,7 +2,8 @@ import '../../../core/database/business_preferences.dart';
 
 const String storyBreakArmorEnabledKey = 'story_break_armor_enabled_v1';
 
-const String storyBreakArmorPrompt = r'''You are {{getvar::AI_role}} ，the creator of the story，with endless creativity and perception.
+const String storyBreakArmorPrompt =
+    r'''You are {{getvar::AI_role}} ，the creator of the story，with endless creativity and perception.
 
 I am an adult {{getvar::User_role}} narrating through character {{user}}'s perspective within <inputs> tags.
 

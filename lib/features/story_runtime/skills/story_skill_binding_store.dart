@@ -42,10 +42,11 @@ final class StorySkillBindingStore extends JsonBlobStore<StorySkillBinding>
   @override
   Future<List<StorySkillBinding>> readForAssistant(String assistantId) async {
     final id = _normalizeId(assistantId);
-    final result = (await readAll())
-        .where((binding) => binding.assistantId == id)
-        .toList(growable: false)
-      ..sort((a, b) => a.skillId.compareTo(b.skillId));
+    final result =
+        (await readAll())
+            .where((binding) => binding.assistantId == id)
+            .toList(growable: false)
+          ..sort((a, b) => a.skillId.compareTo(b.skillId));
     return List.unmodifiable(result);
   }
 
@@ -56,7 +57,8 @@ final class StorySkillBindingStore extends JsonBlobStore<StorySkillBinding>
       final next = <StorySkillBinding>[];
       var replaced = false;
       for (final item in items) {
-        final same = item.assistantId == binding.assistantId &&
+        final same =
+            item.assistantId == binding.assistantId &&
             item.skillId == binding.skillId;
         if (!same) {
           next.add(item);
@@ -77,10 +79,7 @@ final class StorySkillBindingStore extends JsonBlobStore<StorySkillBinding>
   }
 
   @override
-  Future<void> remove({
-    required String assistantId,
-    required String skillId,
-  }) {
+  Future<void> remove({required String assistantId, required String skillId}) {
     return runExclusive(() async {
       final aid = _normalizeId(assistantId);
       final sid = _normalizeId(skillId);

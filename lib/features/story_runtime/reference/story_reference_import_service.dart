@@ -53,7 +53,8 @@ final class StoryReferenceImportService {
     String? language,
   }) async {
     final extracted = await _extractor.extract(path: path, mime: mime);
-    final resolvedTitle = _normalizeTitle(title) ??
+    final resolvedTitle =
+        _normalizeTitle(title) ??
         _normalizeTitle(extracted.suggestedTitle) ??
         'Reference';
     final fileName = path.replaceAll('\\', '/').split('/').last.trim();

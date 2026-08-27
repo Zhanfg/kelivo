@@ -76,8 +76,9 @@ final class StoryPromptCachePlan {
 
     final sections = byId.values.toList(growable: false)
       ..sort((a, b) {
-        final stabilityOrder =
-            _stabilityOrder(a.stability).compareTo(_stabilityOrder(b.stability));
+        final stabilityOrder = _stabilityOrder(
+          a.stability,
+        ).compareTo(_stabilityOrder(b.stability));
         if (stabilityOrder != 0) return stabilityOrder;
         final explicitOrder = a.order.compareTo(b.order);
         if (explicitOrder != 0) return explicitOrder;

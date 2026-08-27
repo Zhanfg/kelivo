@@ -9,68 +9,77 @@ import 'package:Kelivo/features/story_runtime/state/story_runtime_store.dart';
 
 void main() {
   group('StoryRuntimeController', () {
-    test('serializes rapid mutations without dropping earlier changes', () async {
-      final repository = _FakeStoryRuntimeRepository();
-      final controller = StoryRuntimeController(store: repository);
-      await controller.attachConversation('conv-1');
+    test(
+      'serializes rapid mutations without dropping earlier changes',
+      () async {
+        final repository = _FakeStoryRuntimeRepository();
+        final controller = StoryRuntimeController(store: repository);
+        await controller.attachConversation('conv-1');
 
-      final enable = controller.setEnabled(true);
-      final agency = controller.setAgencyMode(StoryAgencyMode.cinematic);
-      await Future.wait([enable, agency]);
+        final enable = controller.setEnabled(true);
+        final agency = controller.setAgencyMode(StoryAgencyMode.cinematic);
+        await Future.wait([enable, agency]);
 
-      expect(controller.isEnabled, isTrue);
-      expect(controller.agencyMode, StoryAgencyMode.cinematic);
-      expect(repository.states['conv-1']?.enabled, isTrue);
-      expect(
-        repository.states['conv-1']?.agencyMode,
-        StoryAgencyMode.cinematic,
-      );
-    });
+        expect(controller.isEnabled, isTrue);
+        expect(controller.agencyMode, StoryAgencyMode.cinematic);
+        expect(repository.states['conv-1']?.enabled, isTrue);
+        expect(
+          repository.states['conv-1']?.agencyMode,
+          StoryAgencyMode.cinematic,
+        );
+      },
+    );
 
-    test('a delayed old conversation cannot overwrite a newer attachment', () async {
-      final repository = _FakeStoryRuntimeRepository();
-      final delayedA = Completer<StoryRuntimeSessionState>();
-      repository.delayedReads['conv-a'] = delayedA;
+    test(
+      'a delayed old conversation cannot overwrite a newer attachment',
+      () async {
+        final repository = _FakeStoryRuntimeRepository();
+        final delayedA = Completer<StoryRuntimeSessionState>();
+        repository.delayedReads['conv-a'] = delayedA;
 
-      final controller = StoryRuntimeController(store: repository);
-      final attachA = controller.attachConversation('conv-a');
-      expect(controller.attachedConversationId, 'conv-a');
-      expect(controller.isLoading, isTrue);
+        final controller = StoryRuntimeController(store: repository);
+        final attachA = controller.attachConversation('conv-a');
+        expect(controller.attachedConversationId, 'conv-a');
+        expect(controller.isLoading, isTrue);
 
-      await controller.attachConversation('conv-b');
-      expect(controller.attachedConversationId, 'conv-b');
-      expect(controller.state?.conversationId, 'conv-b');
-      expect(controller.isLoading, isFalse);
+        await controller.attachConversation('conv-b');
+        expect(controller.attachedConversationId, 'conv-b');
+        expect(controller.state?.conversationId, 'conv-b');
+        expect(controller.isLoading, isFalse);
 
-      delayedA.complete(
-        const StoryRuntimeSessionState(
-          conversationId: 'conv-a',
-          enabled: true,
-          agencyMode: StoryAgencyMode.cinematic,
-        ),
-      );
-      await attachA;
+        delayedA.complete(
+          const StoryRuntimeSessionState(
+            conversationId: 'conv-a',
+            enabled: true,
+            agencyMode: StoryAgencyMode.cinematic,
+          ),
+        );
+        await attachA;
 
-      expect(controller.attachedConversationId, 'conv-b');
-      expect(controller.state?.conversationId, 'conv-b');
-      expect(controller.isEnabled, isFalse);
-      expect(controller.agencyMode, StoryAgencyMode.balanced);
-    });
+        expect(controller.attachedConversationId, 'conv-b');
+        expect(controller.state?.conversationId, 'conv-b');
+        expect(controller.isEnabled, isFalse);
+        expect(controller.agencyMode, StoryAgencyMode.balanced);
+      },
+    );
 
-    test('read failure clears loading state for the active conversation', () async {
-      final repository = _FakeStoryRuntimeRepository();
-      repository.readErrors['conv-bad'] = StateError('storage failed');
-      final controller = StoryRuntimeController(store: repository);
+    test(
+      'read failure clears loading state for the active conversation',
+      () async {
+        final repository = _FakeStoryRuntimeRepository();
+        repository.readErrors['conv-bad'] = StateError('storage failed');
+        final controller = StoryRuntimeController(store: repository);
 
-      await expectLater(
-        controller.attachConversation('conv-bad'),
-        throwsA(isA<StateError>()),
-      );
+        await expectLater(
+          controller.attachConversation('conv-bad'),
+          throwsA(isA<StateError>()),
+        );
 
-      expect(controller.attachedConversationId, 'conv-bad');
-      expect(controller.isLoading, isFalse);
-      expect(controller.state, isNull);
-    });
+        expect(controller.attachedConversationId, 'conv-bad');
+        expect(controller.isLoading, isFalse);
+        expect(controller.state, isNull);
+      },
+    );
 
     test('scene epoch mutation remains conversation scoped', () async {
       final repository = _FakeStoryRuntimeRepository();

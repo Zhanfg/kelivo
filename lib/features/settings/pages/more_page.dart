@@ -58,7 +58,10 @@ class MorePage extends StatelessWidget {
                         );
                       },
                     ),
-                    Divider(height: 1, color: cs.outline.withValues(alpha: 0.12)),
+                    Divider(
+                      height: 1,
+                      color: cs.outline.withValues(alpha: 0.12),
+                    ),
                     ListTile(
                       leading: const Icon(Icons.extension_outlined),
                       title: const Text('Skill 管理'),

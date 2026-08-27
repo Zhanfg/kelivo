@@ -215,13 +215,17 @@ Map<String, Object?> _extractSkillPackageTask(Map<String, Object?> params) {
     }
   }
 
-  final manifestCandidates = normalizedEntries.keys
-      .where((path) => path == 'manifest.json' || path.endsWith('/manifest.json'))
-      .toList(growable: false)
-    ..sort((a, b) {
-      final depth = _pathDepth(a).compareTo(_pathDepth(b));
-      return depth != 0 ? depth : a.compareTo(b);
-    });
+  final manifestCandidates =
+      normalizedEntries.keys
+          .where(
+            (path) =>
+                path == 'manifest.json' || path.endsWith('/manifest.json'),
+          )
+          .toList(growable: false)
+        ..sort((a, b) {
+          final depth = _pathDepth(a).compareTo(_pathDepth(b));
+          return depth != 0 ? depth : a.compareTo(b);
+        });
   if (manifestCandidates.isEmpty) {
     throw const StorySkillPackageException('manifest_missing');
   }
@@ -273,10 +277,9 @@ Map<String, Object?> _extractSkillPackageTask(Map<String, Object?> params) {
     _readArchiveBytes(normalizedEntries[manifestPath]!),
     allowMalformed: true,
   );
-  final skillMarkdown = utf8.decode(
-    _readArchiveBytes(skillEntry),
-    allowMalformed: true,
-  ).trim();
+  final skillMarkdown = utf8
+      .decode(_readArchiveBytes(skillEntry), allowMalformed: true)
+      .trim();
   final promptPaths = promptTextByPath.keys.toList(growable: false)..sort();
   final promptTexts = [for (final path in promptPaths) promptTextByPath[path]!];
 
@@ -325,14 +328,18 @@ StorySkillManifest _withPackageInstructions(
 List<int> _readArchiveBytes(ArchiveFile file) {
   final bytes = file.readBytes();
   if (bytes == null) {
-    throw StorySkillPackageException('package_file_unreadable', detail: file.name);
+    throw StorySkillPackageException(
+      'package_file_unreadable',
+      detail: file.name,
+    );
   }
   return bytes;
 }
 
 String? _safeArchivePath(String value) {
   final normalized = value.replaceAll('\\', '/');
-  if (normalized.startsWith('/') || RegExp(r'^[A-Za-z]:/').hasMatch(normalized)) {
+  if (normalized.startsWith('/') ||
+      RegExp(r'^[A-Za-z]:/').hasMatch(normalized)) {
     throw const StorySkillPackageException('absolute_path_not_allowed');
   }
   final parts = <String>[];

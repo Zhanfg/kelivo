@@ -111,11 +111,7 @@ String? _sampledEastAsianOverlap(
   return null;
 }
 
-String? _sampledWordOverlap(
-  String candidate,
-  String sourceWords,
-  int window,
-) {
+String? _sampledWordOverlap(String candidate, String sourceWords, int window) {
   if (window <= 0) return null;
   final words = _latinWords(candidate);
   if (words.length < window) return null;

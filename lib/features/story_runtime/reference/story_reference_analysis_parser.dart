@@ -74,7 +74,10 @@ final class StoryReferenceAnalysisParser {
     try {
       decoded = jsonDecode(source);
     } on FormatException catch (error) {
-      throw StoryReferenceAnalysisException('invalid_json', detail: error.message);
+      throw StoryReferenceAnalysisException(
+        'invalid_json',
+        detail: error.message,
+      );
     }
     if (decoded is! Map) {
       throw const StoryReferenceAnalysisException('root_not_object');
@@ -112,15 +115,24 @@ final class StoryReferenceAnalysisParser {
       for (final entry in metricsRaw.entries) {
         final key = entry.key.toString().trim();
         if (key.isEmpty || !RegExp(r'^[a-z0-9_]{1,64}$').hasMatch(key)) {
-          throw StoryReferenceAnalysisException('invalid_metric_name', detail: key);
+          throw StoryReferenceAnalysisException(
+            'invalid_metric_name',
+            detail: key,
+          );
         }
         final value = entry.value;
         if (value is! num || value.isNaN || value.isInfinite) {
-          throw StoryReferenceAnalysisException('invalid_metric_value', detail: key);
+          throw StoryReferenceAnalysisException(
+            'invalid_metric_value',
+            detail: key,
+          );
         }
         final normalized = value.toDouble();
         if (normalized < 0 || normalized > 1) {
-          throw StoryReferenceAnalysisException('metric_out_of_range', detail: key);
+          throw StoryReferenceAnalysisException(
+            'metric_out_of_range',
+            detail: key,
+          );
         }
         metrics[key] = normalized;
       }
