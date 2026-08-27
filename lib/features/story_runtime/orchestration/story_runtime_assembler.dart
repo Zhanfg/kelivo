@@ -11,6 +11,7 @@ import '../skills/story_skill_models.dart';
 import '../skills/story_skill_resolver.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
+import 'story_low_latency_policy.dart';
 
 typedef StorySkillManifestLoader = Future<List<StorySkillManifest>> Function();
 
@@ -83,6 +84,7 @@ final class StoryRuntimeAssembly {
     required this.skills,
     required this.references,
     required this.hostCapabilities,
+    required this.lowLatencyPolicy,
     required this.prompt,
   });
 
@@ -90,6 +92,7 @@ final class StoryRuntimeAssembly {
   final StoryResolvedSkillCapabilities skills;
   final List<StoryCompiledReferenceProfile> references;
   final StoryHostCapabilityResolution hostCapabilities;
+  final StoryLowLatencyPolicy lowLatencyPolicy;
   final StoryPromptCompilation prompt;
 }
 
@@ -152,6 +155,7 @@ final class StoryRuntimeAssembler {
         manualEnabledSkillIds: request.manualEnabledSkillIds,
       ),
     );
+    final lowLatencyPolicy = StoryLowLatencyPolicy.fromSkills(skills);
 
     final profiles = await profilesFuture;
     final selection = await selectionFuture;
@@ -209,6 +213,7 @@ final class StoryRuntimeAssembler {
       skills: skills,
       references: references,
       hostCapabilities: hostCapabilities,
+      lowLatencyPolicy: lowLatencyPolicy,
       prompt: prompt,
     );
   }
