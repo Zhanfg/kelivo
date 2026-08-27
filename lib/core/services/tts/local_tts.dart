@@ -131,7 +131,7 @@ final class MossLocalModelStore {
     io.File? manifestFile;
     for (final candidate in _manifestCandidates) {
       final file = io.File(p.join(root.path, candidate));
-      if (await file.isFile()) {
+      if (await file.exists()) {
         manifestFile = file;
         break;
       }
@@ -168,11 +168,11 @@ final class MossLocalModelStore {
       _stringValue(modelFiles['tokenizer_model']) ?? 'tokenizer.model',
     );
 
-    if (!await ttsMeta.isFile()) missing.add(ttsMeta.path);
-    if (!await codecMeta.isFile()) missing.add(codecMeta.path);
-    if (!await tokenizer.isFile()) missing.add(tokenizer.path);
+    if (!await ttsMeta.exists()) missing.add(ttsMeta.path);
+    if (!await codecMeta.exists()) missing.add(codecMeta.path);
+    if (!await tokenizer.exists()) missing.add(tokenizer.path);
 
-    if (await ttsMeta.isFile()) {
+    if (await ttsMeta.exists()) {
       try {
         final meta = _jsonMap(jsonDecode(await ttsMeta.readAsString()));
         final files = _jsonMap(meta['files']);
@@ -187,7 +187,7 @@ final class MossLocalModelStore {
             continue;
           }
           final file = io.File(p.join(ttsMeta.parent.path, relative));
-          if (!await file.isFile()) missing.add(file.path);
+          if (!await file.exists()) missing.add(file.path);
         }
         if (!await _hasExternalDataFile(ttsMeta.parent)) {
           missing.add('${ttsMeta.parent.path}${p.separator}*.data');
@@ -197,7 +197,7 @@ final class MossLocalModelStore {
       }
     }
 
-    if (await codecMeta.isFile()) {
+    if (await codecMeta.exists()) {
       try {
         final meta = _jsonMap(jsonDecode(await codecMeta.readAsString()));
         final files = _jsonMap(meta['files']);
@@ -206,7 +206,7 @@ final class MossLocalModelStore {
           missing.add('${codecMeta.path}:files.decode_full');
         } else {
           final file = io.File(p.join(codecMeta.parent.path, relative));
-          if (!await file.isFile()) missing.add(file.path);
+          if (!await file.exists()) missing.add(file.path);
         }
         if (!await _hasExternalDataFile(codecMeta.parent)) {
           missing.add('${codecMeta.parent.path}${p.separator}*.data');
@@ -218,7 +218,7 @@ final class MossLocalModelStore {
 
     return MossLocalModelValidation(
       rootPath: root.path,
-      tokenizerPath: await tokenizer.isFile() ? tokenizer.path : null,
+      tokenizerPath: await tokenizer.exists() ? tokenizer.path : null,
       missingPaths: missing,
     );
   }
