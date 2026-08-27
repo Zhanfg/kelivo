@@ -58,9 +58,28 @@ jobs:
           replace(manager, '                  value: selectedAssistantId,\n', '                  initialValue: selectedAssistantId,\n')
           replace(
               manager,
-              "      if (managed && package?.sourceRepository != null) package!.sourceRepository!,\n",
-              "      if (managed && package.sourceRepository != null) package.sourceRepository!,\n",
+              '    final managed = package?.isGitHubManaged == true;\n',
+              '    final gitHubPackage = package != null && package.isGitHubManaged ? package : null;\n',
           )
+          replace(
+              manager,
+              '    final description = manifest.description?.trim();\n',
+              '    final description = manifest.description?.trim();\n    final sourceRepository = gitHubPackage?.sourceRepository;\n',
+          )
+          replace(
+              manager,
+              "      builtIn\n          ? '内置'\n          : managed\n              ? 'GitHub'\n              : '本地安装',\n",
+              "      builtIn\n          ? '内置'\n          : gitHubPackage != null\n              ? 'GitHub'\n              : '本地安装',\n",
+          )
+          replace(
+              manager,
+              "      if (managed && package?.sourceRepository != null) package!.sourceRepository!,\n",
+              "      if (sourceRepository != null) sourceRepository,\n",
+          )
+          replace(manager, '            if (managed) ...[\n', '            if (gitHubPackage != null) ...[\n')
+          replace(manager, 'package!.sourceCommitSha!', 'gitHubPackage.sourceCommitSha!')
+          replace(manager, '() => _checkOne(package)', '() => _checkOne(gitHubPackage)')
+          replace(manager, '() => _updateOne(package)', '() => _updateOne(gitHubPackage)')
 
           studio = 'lib/features/story_runtime/ui/story_studio_page.dart'
           replace(studio, '                  value: _selectedConversationId,\n', '                  initialValue: _selectedConversationId,\n')
