@@ -32,6 +32,14 @@ StoryWorldTreeState tree() => StoryWorldTreeState(
       baseSnapshotId: 's1',
       createdAt: DateTime.utc(2026, 8, 27, 1),
     ),
+    StoryWorldline(
+      id: 'sibling',
+      conversationId: 'c-sibling',
+      parentWorldlineId: 'root',
+      branchPointMessageId: 'm1',
+      baseSnapshotId: 's1',
+      createdAt: DateTime.utc(2026, 8, 27, 2),
+    ),
   ],
 );
 
@@ -104,6 +112,22 @@ void main() {
     expect(resolved, isEmpty);
   });
 
+  test('sibling worldline facts never leak into current ancestry', () {
+    final resolved = resolver.resolve(
+      tree: tree(),
+      currentWorldlineId: 'child',
+      baseMemories: <MemoryEntry>[memory('sibling-fact', 'secret sibling fact')],
+      links: <StoryWorldlineMemoryLink>[
+        StoryWorldlineMemoryLink(
+          memoryId: 'sibling-fact',
+          sourceWorldlineId: 'sibling',
+          updatedAt: DateTime.utc(2026, 8, 27),
+        ),
+      ],
+    );
+    expect(resolved, isEmpty);
+  });
+
   test('nearest worldline wins an entity conflict', () {
     final resolved = resolver.resolve(
       tree: tree(),
@@ -129,5 +153,31 @@ void main() {
     );
     expect(resolved, hasLength(1));
     expect(resolved.single.entry.id, 'child-name');
+  });
+
+  test('provenance round-trips and survives resolution', () {
+    final link = StoryWorldlineMemoryLink(
+      memoryId: 'fact',
+      sourceWorldlineId: 'child',
+      validFromMessageId: 'm-7',
+      validFromNodeId: 'g@2',
+      sourceKind: StoryMemorySourceKind.checkpoint,
+      sourceEventId: 'event-7',
+      sourceCheckpointId: 'cp-2',
+      updatedAt: DateTime.utc(2026, 8, 27, 3),
+    );
+    final decoded = StoryWorldlineMemoryLink.fromJson(link.toJson());
+    expect(decoded.validFromMessageId, 'm-7');
+    expect(decoded.sourceCheckpointId, 'cp-2');
+
+    final resolved = resolver.resolve(
+      tree: tree(),
+      currentWorldlineId: 'child',
+      baseMemories: <MemoryEntry>[memory('fact', 'remember me')],
+      links: <StoryWorldlineMemoryLink>[decoded],
+    );
+    expect(resolved.single.sourceKind, StoryMemorySourceKind.checkpoint);
+    expect(resolved.single.sourceEventId, 'event-7');
+    expect(resolved.single.validFromNodeId, 'g@2');
   });
 }
