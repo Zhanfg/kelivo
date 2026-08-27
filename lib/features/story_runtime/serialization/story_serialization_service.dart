@@ -64,6 +64,7 @@ final class StorySerializationService {
     'story_scene_runtime_v1',
     'story_world_trees_v1',
     'story_worldline_memory_v1',
+    'story_message_events_v1',
     'story_skill_bindings_v1',
     'story_skill_packages_v1',
     'story_reference_documents_v1',
@@ -72,6 +73,7 @@ final class StorySerializationService {
     'story_mcp_profiles_v1',
     'story_mcp_profile_selections_v1',
     'story_voice_routing_v1',
+    'story_voice_context_history_v1',
   };
 
   Future<StorySerializationBundle> exportBundle() async {
