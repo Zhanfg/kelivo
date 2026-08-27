@@ -27,7 +27,7 @@ abstract interface class StorySkillPackageRepository {
 final class StorySkillPackageStore
     extends JsonBlobStore<StoryInstalledSkillPackage>
     implements StorySkillPackageRepository {
-  StorySkillPackageStore(BusinessPreferences preferences) : super(preferences);
+  StorySkillPackageStore(super.preferences);
 
   static const String key = 'story_skill_packages_v1';
 
