@@ -5,6 +5,8 @@ enum StoryMemoryInheritanceStrategy { inherited, local, isolated }
 
 enum StoryMemoryVisibilityScope { global, ancestry, worldline }
 
+enum StoryMemorySourceKind { inferred, message, event, checkpoint, manual }
+
 final class StoryWorldlineMemoryLink {
   const StoryWorldlineMemoryLink({
     required this.memoryId,
@@ -14,6 +16,11 @@ final class StoryWorldlineMemoryLink {
     this.visibilityScope = StoryMemoryVisibilityScope.ancestry,
     this.strategy = StoryMemoryInheritanceStrategy.inherited,
     this.entityKey,
+    this.validFromMessageId,
+    this.validFromNodeId,
+    this.sourceKind = StoryMemorySourceKind.inferred,
+    this.sourceEventId,
+    this.sourceCheckpointId,
   });
 
   final String memoryId;
@@ -22,6 +29,16 @@ final class StoryWorldlineMemoryLink {
   final StoryMemoryVisibilityScope visibilityScope;
   final StoryMemoryInheritanceStrategy strategy;
   final String? entityKey;
+
+  /// Native Kelivo message/node identity at which this memory becomes valid.
+  final String? validFromMessageId;
+  final String? validFromNodeId;
+
+  /// Provenance is kept separate from MemoryEntry so normal Kelivo Memory stays
+  /// unchanged and Story can explain exactly where a worldline fact came from.
+  final StoryMemorySourceKind sourceKind;
+  final String? sourceEventId;
+  final String? sourceCheckpointId;
   final DateTime updatedAt;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -32,6 +49,11 @@ final class StoryWorldlineMemoryLink {
     'visibilityScope': visibilityScope.name,
     'strategy': strategy.name,
     if (entityKey != null) 'entityKey': entityKey,
+    if (validFromMessageId != null) 'validFromMessageId': validFromMessageId,
+    if (validFromNodeId != null) 'validFromNodeId': validFromNodeId,
+    'sourceKind': sourceKind.name,
+    if (sourceEventId != null) 'sourceEventId': sourceEventId,
+    if (sourceCheckpointId != null) 'sourceCheckpointId': sourceCheckpointId,
     'updatedAt': updatedAt.toIso8601String(),
   };
 
@@ -49,6 +71,14 @@ final class StoryWorldlineMemoryLink {
           orElse: () => StoryMemoryInheritanceStrategy.inherited,
         ),
         entityKey: json['entityKey'] as String?,
+        validFromMessageId: json['validFromMessageId'] as String?,
+        validFromNodeId: json['validFromNodeId'] as String?,
+        sourceKind: StoryMemorySourceKind.values.firstWhere(
+          (value) => value.name == json['sourceKind'],
+          orElse: () => StoryMemorySourceKind.inferred,
+        ),
+        sourceEventId: json['sourceEventId'] as String?,
+        sourceCheckpointId: json['sourceCheckpointId'] as String?,
         updatedAt: DateTime.parse(json['updatedAt'] as String),
       );
 }
@@ -62,6 +92,11 @@ final class StoryResolvedMemory {
     required this.distance,
     this.inheritedFromWorldlineId,
     this.entityKey,
+    this.validFromMessageId,
+    this.validFromNodeId,
+    this.sourceKind = StoryMemorySourceKind.inferred,
+    this.sourceEventId,
+    this.sourceCheckpointId,
   });
 
   final MemoryEntry entry;
@@ -70,6 +105,11 @@ final class StoryResolvedMemory {
   final StoryMemoryVisibilityScope visibilityScope;
   final StoryMemoryInheritanceStrategy strategy;
   final String? entityKey;
+  final String? validFromMessageId;
+  final String? validFromNodeId;
+  final StoryMemorySourceKind sourceKind;
+  final String? sourceEventId;
+  final String? sourceCheckpointId;
   final int distance;
 
   bool get inherited => distance > 0;
@@ -80,8 +120,9 @@ final class StoryResolvedMemory {
 /// Existing active global/assistant memories remain visible exactly as before.
 /// Story-specific metadata only controls memories explicitly linked to a
 /// worldline. Child worldlines inherit ancestor links unless a link is local or
-/// isolated. Conflicts sharing the same entityKey use the nearest worldline,
-/// then the most recently updated link.
+/// isolated. Sibling-worldline facts are excluded because they are outside the
+/// current ancestry. Conflicts sharing the same entityKey use the nearest
+/// worldline, then the most recently updated link.
 final class StoryWorldlineMemoryResolver {
   const StoryWorldlineMemoryResolver();
 
@@ -91,7 +132,7 @@ final class StoryWorldlineMemoryResolver {
     required List<MemoryEntry> baseMemories,
     required List<StoryWorldlineMemoryLink> links,
   }) {
-    final ancestry = _ancestry(tree, currentWorldlineId);
+    final ancestry = tree.ancestryOf(currentWorldlineId);
     final distanceByWorldline = <String, int>{
       for (var index = 0; index < ancestry.length; index++)
         ancestry[index]: index,
@@ -119,17 +160,7 @@ final class StoryWorldlineMemoryResolver {
       final distance = distanceByWorldline[link.sourceWorldlineId];
       if (distance == null) {
         if (link.visibilityScope != StoryMemoryVisibilityScope.global) continue;
-        resolved.add(
-          StoryResolvedMemory(
-            entry: entry,
-            sourceWorldlineId: link.sourceWorldlineId,
-            inheritedFromWorldlineId: link.inheritedFromWorldlineId,
-            visibilityScope: link.visibilityScope,
-            strategy: link.strategy,
-            entityKey: link.entityKey,
-            distance: 1 << 19,
-          ),
-        );
+        resolved.add(_resolved(entry, link, distance: 1 << 19));
         continue;
       }
       if (distance > 0 &&
@@ -139,16 +170,13 @@ final class StoryWorldlineMemoryResolver {
         continue;
       }
       resolved.add(
-        StoryResolvedMemory(
-          entry: entry,
-          sourceWorldlineId: link.sourceWorldlineId,
+        _resolved(
+          entry,
+          link,
+          distance: distance,
           inheritedFromWorldlineId: distance > 0
               ? link.sourceWorldlineId
               : link.inheritedFromWorldlineId,
-          visibilityScope: link.visibilityScope,
-          strategy: link.strategy,
-          entityKey: link.entityKey,
-          distance: distance,
         ),
       );
     }
@@ -175,6 +203,27 @@ final class StoryWorldlineMemoryResolver {
     return List.unmodifiable(result);
   }
 
+  StoryResolvedMemory _resolved(
+    MemoryEntry entry,
+    StoryWorldlineMemoryLink link, {
+    required int distance,
+    String? inheritedFromWorldlineId,
+  }) => StoryResolvedMemory(
+    entry: entry,
+    sourceWorldlineId: link.sourceWorldlineId,
+    inheritedFromWorldlineId:
+        inheritedFromWorldlineId ?? link.inheritedFromWorldlineId,
+    visibilityScope: link.visibilityScope,
+    strategy: link.strategy,
+    entityKey: link.entityKey,
+    validFromMessageId: link.validFromMessageId,
+    validFromNodeId: link.validFromNodeId,
+    sourceKind: link.sourceKind,
+    sourceEventId: link.sourceEventId,
+    sourceCheckpointId: link.sourceCheckpointId,
+    distance: distance,
+  );
+
   bool _prefer(
     StoryResolvedMemory candidate,
     StoryResolvedMemory previous,
@@ -194,23 +243,5 @@ final class StoryWorldlineMemoryResolver {
     }
 
     return updated(candidate).isAfter(updated(previous));
-  }
-
-  List<String> _ancestry(StoryWorldTreeState tree, String currentWorldlineId) {
-    final result = <String>[];
-    final seen = <String>{};
-    String? cursor = currentWorldlineId;
-    while (cursor != null) {
-      if (!seen.add(cursor)) {
-        throw StateError('Worldline ancestry contains a cycle at $cursor.');
-      }
-      final worldline = tree.worldlineById(cursor);
-      if (worldline == null) {
-        throw StateError('Unknown worldline in ancestry: $cursor');
-      }
-      result.add(cursor);
-      cursor = worldline.parentWorldlineId;
-    }
-    return result;
   }
 }
