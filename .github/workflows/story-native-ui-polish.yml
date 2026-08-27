@@ -51,3 +51,5 @@ jobs:
             lib/features/story_runtime/ui/story_skill_manager_page.dart
           git commit -m 'fix(story): align Story surfaces with Kelivo native controls'
           git push origin HEAD:feat/story-runtime-foundation
+
+# rerun after Lucide icon compatibility fix
