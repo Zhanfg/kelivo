@@ -108,7 +108,7 @@ StoryReferenceExtractedText _extractEpubTask(String path) {
       throw const StoryReferenceImportException('epub_container_missing');
     }
     final containerXml = XmlDocument.parse(
-      utf8.decode(container.content as List<int>, allowMalformed: true),
+      utf8.decode(_readArchiveBytes(container), allowMalformed: true),
     );
     final rootFile = containerXml.descendants
         .whereType<XmlElement>()
@@ -128,7 +128,7 @@ StoryReferenceExtractedText _extractEpubTask(String path) {
       throw const StoryReferenceImportException('epub_package_missing');
     }
     final opf = XmlDocument.parse(
-      utf8.decode(opfFile.content as List<int>, allowMalformed: true),
+      utf8.decode(_readArchiveBytes(opfFile), allowMalformed: true),
     );
     final opfDir = normalizedOpfPath.contains('/')
         ? normalizedOpfPath.substring(0, normalizedOpfPath.lastIndexOf('/') + 1)
@@ -170,7 +170,7 @@ StoryReferenceExtractedText _extractEpubTask(String path) {
       final entry = byName[itemPath];
       if (entry == null || !entry.isFile) continue;
       final raw = utf8.decode(
-        entry.content as List<int>,
+        _readArchiveBytes(entry),
         allowMalformed: true,
       );
       final text = _extractXhtmlText(raw);
@@ -192,6 +192,17 @@ StoryReferenceExtractedText _extractEpubTask(String path) {
       detail: error.toString(),
     );
   }
+}
+
+List<int> _readArchiveBytes(ArchiveFile file) {
+  final bytes = file.readBytes();
+  if (bytes == null) {
+    throw StoryReferenceImportException(
+      'epub_entry_unreadable',
+      detail: file.name,
+    );
+  }
+  return bytes;
 }
 
 String _extractXhtmlText(String raw) {
@@ -256,7 +267,7 @@ String _resolveMime(String path, String? explicit) {
 String _normalizeArchivePath(String value) {
   final segments = <String>[];
   for (final raw in value.replaceAll('\\', '/').split('/')) {
-    final segment = Uri.decodeComponent(raw).trim();
+    final segment = _safeDecodeComponent(raw).trim();
     if (segment.isEmpty || segment == '.') continue;
     if (segment == '..') {
       if (segments.isNotEmpty) segments.removeLast();
@@ -265,6 +276,14 @@ String _normalizeArchivePath(String value) {
     segments.add(segment);
   }
   return segments.join('/');
+}
+
+String _safeDecodeComponent(String value) {
+  try {
+    return Uri.decodeComponent(value);
+  } catch (_) {
+    return value;
+  }
 }
 
 String _fileStem(String path) {
