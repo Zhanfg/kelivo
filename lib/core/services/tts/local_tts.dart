@@ -34,8 +34,8 @@ TtsBackendChoice resolveTtsBackend({
 }) {
   switch (mode) {
     case TtsBackendMode.automatic:
-      // Once the user has a local model, never silently send the text to a
-      // remote TTS service merely because the local runtime failed to start.
+      // A downloaded local model is a privacy boundary: do not silently send
+      // text to a remote service if the local runtime happens to fail.
       if (localInstalled) {
         return localReady
             ? TtsBackendChoice.local
@@ -144,29 +144,28 @@ final class MossLocalModelStore {
       );
     }
 
-    final manifest = jsonDecode(await manifestFile.readAsString());
-    if (manifest is! Map) {
+    final manifest = _jsonMap(jsonDecode(await manifestFile.readAsString()));
+    if (manifest.isEmpty) {
       return MossLocalModelValidation(
         rootPath: root.path,
         tokenizerPath: null,
         missingPaths: const <String>['invalid browser_poc_manifest.json'],
       );
     }
-    final manifestMap = Map<String, dynamic>.from(manifest);
     final manifestDir = manifestFile.parent;
-    final modelFiles = _stringMap(manifestMap['model_files']);
+    final modelFiles = _jsonMap(manifest['model_files']);
     final ttsMeta = await _resolveManifestRelativeFile(
       manifestDir,
-      modelFiles['tts_meta'] ?? 'tts_browser_onnx_meta.json',
+      _stringValue(modelFiles['tts_meta']) ?? 'tts_browser_onnx_meta.json',
     );
     final codecMeta = await _resolveManifestRelativeFile(
       manifestDir,
-      modelFiles['codec_meta'] ??
+      _stringValue(modelFiles['codec_meta']) ??
           '../MOSS-Audio-Tokenizer-Nano-ONNX/codec_browser_onnx_meta.json',
     );
     final tokenizer = await _resolveManifestRelativeFile(
       manifestDir,
-      modelFiles['tokenizer_model'] ?? 'tokenizer.model',
+      _stringValue(modelFiles['tokenizer_model']) ?? 'tokenizer.model',
     );
 
     if (!await ttsMeta.isFile()) missing.add(ttsMeta.path);
@@ -175,14 +174,14 @@ final class MossLocalModelStore {
 
     if (await ttsMeta.isFile()) {
       try {
-        final meta = _stringMap(jsonDecode(await ttsMeta.readAsString()));
-        final files = _stringMap(meta['files']);
+        final meta = _jsonMap(jsonDecode(await ttsMeta.readAsString()));
+        final files = _jsonMap(meta['files']);
         for (final key in const <String>[
           'prefill',
           'decode_step',
           'local_fixed_sampled_frame',
         ]) {
-          final relative = files[key];
+          final relative = _stringValue(files[key]);
           if (relative == null || relative.isEmpty) {
             missing.add('${ttsMeta.path}:files.$key');
             continue;
@@ -200,9 +199,9 @@ final class MossLocalModelStore {
 
     if (await codecMeta.isFile()) {
       try {
-        final meta = _stringMap(jsonDecode(await codecMeta.readAsString()));
-        final files = _stringMap(meta['files']);
-        final relative = files['decode_full'];
+        final meta = _jsonMap(jsonDecode(await codecMeta.readAsString()));
+        final files = _jsonMap(meta['files']);
+        final relative = _stringValue(files['decode_full']);
         if (relative == null || relative.isEmpty) {
           missing.add('${codecMeta.path}:files.decode_full');
         } else {
@@ -224,12 +223,15 @@ final class MossLocalModelStore {
     );
   }
 
-  static Map<String, String> _stringMap(Object? value) {
-    if (value is! Map) return const <String, String>{};
-    return <String, String>{
-      for (final entry in value.entries)
-        entry.key.toString(): entry.value?.toString() ?? '',
-    };
+  static Map<String, dynamic> _jsonMap(Object? value) {
+    if (value is! Map) return const <String, dynamic>{};
+    return Map<String, dynamic>.from(value);
+  }
+
+  static String? _stringValue(Object? value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
   }
 
   static Future<io.File> _resolveManifestRelativeFile(
