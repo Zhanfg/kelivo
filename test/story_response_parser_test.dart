@@ -59,6 +59,17 @@ void main() {
       expect(turn.events.single.actor.isSelf, isTrue);
     });
 
+    test('SELF expression remains valid without inventing a player character', () {
+      final turn = parser.parse(
+        '''{"version":1,"events":[{"type":"expression","actor":{"type":"self"},"text":[{"text":"皱了皱眉。"}]}]}''',
+        turnId: 'turn-self-expression',
+      );
+
+      expect(turn.events.single.type, StoryEventType.expression);
+      expect(turn.events.single.actor.isSelf, isTrue);
+      expect(turn.events.single.actor.characterId, isNull);
+    });
+
     test('parses timed choice set without making it a generic chat reply', () {
       final turn = parser.parse(
         '''
@@ -147,6 +158,22 @@ void main() {
       );
     });
 
+    test('rejects non-integral protocol versions instead of truncating them', () {
+      expect(
+        () => parser.parse(
+          '''{"version":1.5,"events":[{"type":"narration","actor":{"type":"world"},"text":[{"text":"x"}]}]}''',
+          turnId: 'turn-version',
+        ),
+        throwsA(
+          isA<StoryResponseParseException>().having(
+            (error) => error.code,
+            'code',
+            'unsupported_version',
+          ),
+        ),
+      );
+    });
+
     test('rejects a consequential-looking choice without actual options', () {
       expect(
         () => parser.parse(
@@ -165,6 +192,22 @@ void main() {
             (error) => error.code,
             'code',
             'choice_set_without_choices',
+          ),
+        ),
+      );
+    });
+
+    test('rejects fractional timeout milliseconds', () {
+      expect(
+        () => parser.parse(
+          '''{"version":1,"events":[{"type":"dialogue","actor":{"type":"character","character_id":"char_1"},"text":[{"text":"快回答。"}],"timeout_ms":2500.5}]}''',
+          turnId: 'turn-fractional-timeout',
+        ),
+        throwsA(
+          isA<StoryResponseParseException>().having(
+            (error) => error.code,
+            'code',
+            'timeout_out_of_range',
           ),
         ),
       );
