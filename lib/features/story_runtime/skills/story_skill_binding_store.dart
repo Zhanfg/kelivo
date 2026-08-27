@@ -13,7 +13,7 @@ abstract interface class StorySkillBindingRepository {
 /// Persists Assistant <-> Skill bindings and the user's auto-activation choice.
 final class StorySkillBindingStore extends JsonBlobStore<StorySkillBinding>
     implements StorySkillBindingRepository {
-  StorySkillBindingStore(BusinessPreferences preferences) : super(preferences);
+  StorySkillBindingStore(super.preferences);
 
   static const String key = 'story_skill_bindings_v1';
 
