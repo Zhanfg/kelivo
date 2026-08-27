@@ -1,0 +1,110 @@
+name: Story Baseline Failure Probe
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+    paths:
+      - .github/workflows/story-baseline-failure-probe.yml
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+  BASE_SHA: '034be86c85e62dfee9c3938c0151df4d77202814'
+
+jobs:
+  baseline-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout PR base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASE_SHA }}
+          fetch-depth: 1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Probe legacy failing files on base
+        shell: bash
+        run: |
+          set -uo pipefail
+          files=(
+            test/core/services/backup/backup_progress_kernel_test.dart
+            test/core/services/backup/restore_bundle_mover_test.dart
+            test/core/services/backup/restore_receipt_test.dart
+            test/core/services/backup/restore_bundle_staging_test.dart
+            test/core/services/backup/restore_previous_builder_test.dart
+            test/core/services/backup/restore_previous_plan_test.dart
+            test/features/home/controllers/chat_send_race_test.dart
+          )
+          overall=0
+          rm -f /tmp/baseline-summary.txt
+          for file in "${files[@]}"; do
+            echo "::group::BASE PROBE $file"
+            log="/tmp/$(basename "$file").machine.log"
+            set +e
+            flutter test --concurrency=1 --machine "$file" > "$log" 2>&1
+            status=$?
+            set -e
+            FILE="$file" STATUS="$status" LOG="$log" python3 <<'PY'
+          import json, os
+          path = os.environ['LOG']
+          file = os.environ['FILE']
+          status = int(os.environ['STATUS'])
+          tests = {}
+          errors = {}
+          failed = []
+          with open(path, 'r', errors='replace') as fh:
+              for raw in fh:
+                  try:
+                      event = json.loads(raw)
+                  except Exception:
+                      continue
+                  kind = event.get('type')
+                  if kind == 'testStart':
+                      test = event.get('test') or {}
+                      tests[test.get('id')] = test.get('name')
+                  elif kind == 'error':
+                      tid = event.get('testID')
+                      errors.setdefault(tid, []).append((event.get('error'), event.get('stackTrace')))
+                  elif kind == 'testDone' and event.get('result') in ('failure', 'error'):
+                      failed.append(event.get('testID'))
+          # Some machine reporters signal errors without a failing testDone event.
+          for tid in errors:
+              if tid not in failed:
+                  failed.append(tid)
+          print(f'BASE_STATUS {status} {file}')
+          if not failed:
+              print('BASE_FAILED_TESTS 0')
+          else:
+              print(f'BASE_FAILED_TESTS {len(failed)}')
+              for tid in failed:
+                  print('FAILED:', tests.get(tid, f'<test id {tid}>'))
+                  for error, stack in errors.get(tid, []):
+                      if error:
+                          print('ERROR:', str(error).replace('\n', ' ')[:1200])
+                      if stack:
+                          lines = str(stack).splitlines()[:8]
+                          print('STACK:', ' | '.join(lines))
+          with open('/tmp/baseline-summary.txt', 'a') as out:
+              out.write(f'{status}\t{file}\t{len(failed)}\n')
+          PY
+            echo "::endgroup::"
+            if [ "$status" -ne 0 ]; then overall=1; fi
+          done
+
+          echo "=== BASELINE FILE SUMMARY ==="
+          cat /tmp/baseline-summary.txt
+          # Diagnostic workflow succeeds even when base is red; the output is evidence.
+          exit 0
