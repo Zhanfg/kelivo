@@ -34,6 +34,38 @@ class McpToolRouteSnapshot {
   }
 
   bool containsExposedName(String name) => _find(name) != null;
+
+  Set<String> get exposedNames => Set.unmodifiable({
+    for (final route in _routes) route.exposedName,
+  });
+
+  /// Narrow an already captured Assistant route snapshot for one request.
+  ///
+  /// Story Mode uses this to reduce model-visible MCP capabilities without
+  /// changing the Assistant's persisted MCP selection. Execution still uses
+  /// the same immutable snapshot, route identity checks and approval gates.
+  McpToolRouteSnapshot filtered({
+    Set<String> allowedToolNames = const <String>{},
+    Set<String> allowedServerIds = const <String>{},
+    bool includeUnlisted = false,
+  }) {
+    if (includeUnlisted) return this;
+    final normalizedTools = allowedToolNames
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+    final normalizedServers = allowedServerIds
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+    return McpToolRouteSnapshot._([
+      for (final route in _routes)
+        if (normalizedServers.contains(route.server.id) ||
+            normalizedTools.contains(route.exposedName) ||
+            normalizedTools.contains(route.tool.name))
+          route,
+    ]);
+  }
 }
 
 class McpToolService extends ChangeNotifier {
