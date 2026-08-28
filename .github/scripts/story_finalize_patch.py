@@ -184,6 +184,82 @@ def patch_skill_discovery() -> None:
     path.write_text(text)
 
 
+def patch_lucide_aliases() -> None:
+    path = Path('lib/icons/lucide_adapter.dart')
+    text = path.read_text()
+    if 'static const IconData CircleCheck =' in text:
+        return
+    anchor = '  static const IconData Coins = lucide.LucideIcons.coins;\n}'
+    aliases = "\n".join(
+        [
+            '  static const IconData Coins = lucide.LucideIcons.coins;',
+            '  static const IconData CircleCheck = CheckCircle;',
+            '  static const IconData HardDriveDownload = Download;',
+            '  static const IconData FolderInput = Import2;',
+            '  static const IconData CircleOff = XCircle;',
+            '  static const IconData Users = User;',
+            '  static const IconData Cpu = Activity;',
+            '  static const IconData Cloud = Network;',
+            '}',
+        ]
+    )
+    if anchor not in text:
+        raise RuntimeError('Lucide adapter anchor missing')
+    path.write_text(text.replace(anchor, aliases, 1))
+
+
+def patch_voice_context_nullability() -> None:
+    path = Path(
+        'lib/features/story_runtime/orchestration/story_native_lifecycle_bridge.dart'
+    )
+    text = path.read_text()
+    old = '  Future<StoryVoiceContextWindow> resolveNarratorContext('
+    new = '  Future<StoryVoiceContextWindow?> resolveNarratorContext('
+    if old in text:
+        text = text.replace(old, new, 1)
+    elif new not in text:
+        raise RuntimeError('Narrator context return type anchor missing')
+    path.write_text(text)
+
+
+def patch_transition_lint() -> None:
+    path = Path(
+        'lib/features/story_runtime/orchestration/story_mode_transition_service.dart'
+    )
+    text = path.read_text()
+    directive = '// ignore_for_file: prefer_initializing_formals\n\n'
+    if not text.startswith('// ignore_for_file: prefer_initializing_formals'):
+        text = directive + text
+    path.write_text(text)
+
+
+def patch_voice_manager_async_context() -> None:
+    path = Path('lib/features/story_runtime/ui/story_voice_manager_page.dart')
+    text = path.read_text()
+    marker = "    final zh = Localizations.localeOf(context).languageCode == 'zh';\n"
+    prefs_line = '    final preferences = context.read<BusinessPreferences>();\n'
+    start = text.find('  Future<void> _editSelectedCharacters() async {')
+    end = text.find('  Future<void> _saveAssignment({', start)
+    if start < 0 or end < 0:
+        raise RuntimeError('Voice batch edit function anchor missing')
+    block = text[start:end]
+    if prefs_line not in block:
+        if marker not in block:
+            raise RuntimeError('Voice batch preferences anchor missing')
+        block = block.replace(marker, marker + prefs_line, 1)
+    block = block.replace(
+        'final store = StoryVoiceRoutingStore(context.read<BusinessPreferences>());',
+        'final store = StoryVoiceRoutingStore(preferences);',
+        1,
+    )
+    text = text[:start] + block + text[end:]
+    path.write_text(text)
+
+
 if __name__ == '__main__':
     patch_home_controller()
     patch_skill_discovery()
+    patch_lucide_aliases()
+    patch_voice_context_nullability()
+    patch_transition_lint()
+    patch_voice_manager_async_context()
