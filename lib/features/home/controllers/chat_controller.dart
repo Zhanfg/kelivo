@@ -98,6 +98,17 @@ class ChatController extends ChangeNotifier {
   final Set<String> _loadingConversationIds = <String>{};
   Set<String> get loadingConversationIds => _loadingConversationIds;
 
+  /// Conversations whose local stream delivery is paused.
+  ///
+  /// This is intentionally a transport-consumer pause. Providers do not expose
+  /// a universal upstream inference pause, so this must not be treated as a
+  /// token-saving remote pause.
+  final Set<String> _pausedConversationIds = <String>{};
+  Set<String> get pausedConversationIds => _pausedConversationIds;
+
+  bool isConversationPaused(String conversationId) =>
+      _pausedConversationIds.contains(conversationId);
+
   /// Active stream subscriptions per conversation.
   final Map<String, StreamSubscription<dynamic>> _conversationStreams =
       <String, StreamSubscription<dynamic>>{};
@@ -1125,6 +1136,7 @@ class ChatController extends ChangeNotifier {
       _loadingConversationIds.add(conversationId);
     } else {
       _loadingConversationIds.remove(conversationId);
+      _pausedConversationIds.remove(conversationId);
     }
     if (prev != loading) {
       notifyListeners();
@@ -1157,11 +1169,43 @@ class ChatController extends ChangeNotifier {
     StreamSubscription<dynamic> subscription,
   ) {
     _conversationStreams[conversationId] = subscription;
+    _pausedConversationIds.remove(conversationId);
   }
+
+  /// Pause local delivery of the active stream.
+  ///
+  /// The provider request may continue producing data while the Dart
+  /// subscription is paused; buffered events are delivered on resume.
+  bool pauseStreamSubscription(String conversationId) {
+    final sub = _conversationStreams[conversationId];
+    if (sub == null || _pausedConversationIds.contains(conversationId)) {
+      return false;
+    }
+    sub.pause();
+    _pausedConversationIds.add(conversationId);
+    notifyListeners();
+    return true;
+  }
+
+  bool resumeStreamSubscription(String conversationId) {
+    final sub = _conversationStreams[conversationId];
+    if (sub == null || !_pausedConversationIds.remove(conversationId)) {
+      return false;
+    }
+    sub.resume();
+    notifyListeners();
+    return true;
+  }
+
+  bool toggleStreamSubscriptionPaused(String conversationId) =>
+      isConversationPaused(conversationId)
+      ? resumeStreamSubscription(conversationId)
+      : pauseStreamSubscription(conversationId);
 
   /// Cancel and remove a stream subscription.
   Future<void> cancelStreamSubscription(String conversationId) async {
     final sub = _conversationStreams.remove(conversationId);
+    _pausedConversationIds.remove(conversationId);
     await sub?.cancel();
   }
 
@@ -1171,6 +1215,7 @@ class ChatController extends ChangeNotifier {
       await sub.cancel();
     }
     _conversationStreams.clear();
+    _pausedConversationIds.clear();
   }
 
   // ============================================================================

@@ -118,6 +118,8 @@ class ChatInputBar extends StatefulWidget {
     this.mediaController,
     this.asrProvider,
     this.loading = false,
+    this.generationPaused = false,
+    this.onToggleGenerationPaused,
     this.onGuide,
     this.hasQueuedInput = false,
     this.queuedPreviewText,
@@ -182,6 +184,8 @@ class ChatInputBar extends StatefulWidget {
   final ChatInputBarController? mediaController;
   final AsrProvider? asrProvider;
   final bool loading;
+  final bool generationPaused;
+  final VoidCallback? onToggleGenerationPaused;
   final bool hasQueuedInput;
   final String? queuedPreviewText;
   final List<QueuedChatInput> queuedInputs;
@@ -2974,6 +2978,48 @@ class _ChatInputBarState extends State<ChatInputBar>
                             ),
                             const SizedBox(height: AppSpacing.xs),
                           ],
+                          if (showGenerationDraftActions)
+                            Padding(
+                              key: const ValueKey(
+                                'composer-generation-actions',
+                              ),
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.xs,
+                                0,
+                                AppSpacing.xs,
+                                AppSpacing.xs,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  _CompactActionPill(
+                                    label:
+                                        Localizations.localeOf(
+                                              context,
+                                            ).languageCode ==
+                                            'zh'
+                                        ? '加入队列'
+                                        : 'Queue',
+                                    icon: Lucide.ListOrdered,
+                                    onTap: _handleSend,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  _CompactActionPill(
+                                    label:
+                                        Localizations.localeOf(
+                                              context,
+                                            ).languageCode ==
+                                            'zh'
+                                        ? '立即引导'
+                                        : 'Guide',
+                                    icon: Lucide.MessageCirclePlus,
+                                    onTap: widget.onGuide == null
+                                        ? null
+                                        : _handleGuide,
+                                  ),
+                                ],
+                              ),
+                            ),
                           if (hasDocs || hasImages)
                             _buildInlineAttachmentPreviews(context, isDark),
                           // Input field with expand/collapse button
@@ -3269,8 +3315,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                               ),
                                               const SizedBox(width: 8),
                                             ],
-                                            if (isMobileLayout &&
-                                                !showGenerationDraftActions) ...[
+                                            if (isMobileLayout) ...[
                                               Builder(
                                                 builder: (_) {
                                                   final anchorKey = GlobalKey(
@@ -3284,6 +3329,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     child: Container(
                                                       key: anchorKey,
                                                       child: _CompactIconButton(
+                                                        key: const ValueKey(
+                                                          'composer-reasoning-button',
+                                                        ),
                                                         tooltip:
                                                             widget
                                                                 .supportsReasoning
@@ -3337,8 +3385,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                               ),
                                               const SizedBox(width: 8),
                                             ],
-                                            if (showVoiceInput &&
-                                                !showGenerationDraftActions) ...[
+                                            if (showVoiceInput) ...[
                                               _CompactIconButton(
                                                 tooltip: AppLocalizations.of(
                                                   context,
@@ -3364,34 +3411,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                                               ),
                                               const SizedBox(width: 8),
                                             ],
-                                            if (showGenerationDraftActions) ...[
-                                              _CompactActionPill(
-                                                label:
-                                                    Localizations.localeOf(
-                                                          context,
-                                                        ).languageCode ==
-                                                        'zh'
-                                                    ? '加入队列'
-                                                    : 'Queue',
-                                                icon: Lucide.ListOrdered,
-                                                onTap: _handleSend,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              _CompactActionPill(
-                                                label:
-                                                    Localizations.localeOf(
-                                                          context,
-                                                        ).languageCode ==
-                                                        'zh'
-                                                    ? '立即引导'
-                                                    : 'Guide',
-                                                icon: Lucide.MessageCirclePlus,
-                                                onTap: widget.onGuide == null
-                                                    ? null
-                                                    : _handleGuide,
-                                              ),
-                                              const SizedBox(width: 6),
-                                            ],
                                             _CompactSendButton(
                                               enabled:
                                                   (hasText ||
@@ -3400,10 +3419,10 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                   !_hasUnreadyImages &&
                                                   !widget.loading,
                                               loading: widget.loading,
+                                              paused: widget.generationPaused,
                                               onSend: _handleSend,
-                                              onStop: widget.loading
-                                                  ? widget.onStop
-                                                  : null,
+                                              onTogglePaused: widget
+                                                  .onToggleGenerationPaused,
                                               color: theme.colorScheme.primary,
                                               icon: Lucide.ArrowUp,
                                               tooltip: widget.sendButtonTooltip,
@@ -3774,6 +3793,7 @@ class _OverflowAction {
 // New compact button for the integrated input bar
 class _CompactIconButton extends StatelessWidget {
   const _CompactIconButton({
+    super.key,
     required this.icon,
     this.onTap,
     this.onLongPress,
@@ -3954,7 +3974,9 @@ class _CompactActionPill extends StatelessWidget {
   }
 }
 
-// New compact send button for the integrated input bar
+// Primary Composer task button: Send while idle, Pause/Resume while
+// generation is active. Pause is a local stream-delivery pause; it is not
+// represented as a provider-side inference suspension.
 class _CompactSendButton extends StatelessWidget {
   const _CompactSendButton({
     required this.enabled,
@@ -3962,14 +3984,16 @@ class _CompactSendButton extends StatelessWidget {
     required this.color,
     required this.icon,
     this.loading = false,
-    this.onStop,
+    this.paused = false,
+    this.onTogglePaused,
     this.tooltip,
   });
 
   final bool enabled;
   final bool loading;
+  final bool paused;
   final VoidCallback onSend;
-  final VoidCallback? onStop;
+  final VoidCallback? onTogglePaused;
   final Color color;
   final IconData icon;
   final String? tooltip;
@@ -3977,19 +4001,17 @@ class _CompactSendButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = (enabled || loading)
-        ? color
-        : cs.onSurface.withValues(alpha: 0.12);
-    final fg = (enabled || loading)
-        ? cs.onPrimary
-        : cs.onSurface.withValues(alpha: 0.38);
+    final active = enabled || loading;
+    final bg = active ? color : cs.onSurface.withValues(alpha: 0.12);
+    final fg = active ? cs.onPrimary : cs.onSurface.withValues(alpha: 0.38);
 
     final button = Material(
+      key: const ValueKey('composer-primary-task'),
       color: bg,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: loading ? onStop : (enabled ? onSend : null),
+        onTap: loading ? onTogglePaused : (enabled ? onSend : null),
         child: Padding(
           padding: const EdgeInsets.all(7),
           child: AnimatedSwitcher(
@@ -3999,12 +4021,11 @@ class _CompactSendButton extends StatelessWidget {
               child: FadeTransition(opacity: anim, child: child),
             ),
             child: loading
-                ? SvgPicture.asset(
-                    key: const ValueKey('stop'),
-                    'assets/icons/stop.svg',
-                    width: 18,
-                    height: 18,
-                    colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                ? Icon(
+                    paused ? Lucide.Play : Lucide.Pause,
+                    key: ValueKey(paused ? 'resume' : 'pause'),
+                    size: 18,
+                    color: fg,
                   )
                 : Icon(icon, key: const ValueKey('send'), size: 18, color: fg),
           ),

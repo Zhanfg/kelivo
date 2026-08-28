@@ -37,6 +37,8 @@ class ChatInputSection extends StatelessWidget {
     required this.mediaController,
     required this.isTablet,
     required this.isLoading,
+    this.isGenerationPaused = false,
+    this.onToggleGenerationPaused,
     required this.isToolModel,
     required this.isReasoningModel,
     required this.isReasoningEnabled,
@@ -82,6 +84,8 @@ class ChatInputSection extends StatelessWidget {
   final ChatInputBarController mediaController;
   final bool isTablet;
   final bool isLoading;
+  final bool isGenerationPaused;
+  final VoidCallback? onToggleGenerationPaused;
 
   final IsToolModelCallback isToolModel;
   final IsReasoningModelCallback isReasoningModel;
@@ -197,6 +201,8 @@ class ChatInputSection extends StatelessWidget {
           onSend: onSend,
           onGuide: onGuide,
           loading: isLoading,
+          generationPaused: isGenerationPaused,
+          onToggleGenerationPaused: onToggleGenerationPaused,
           sendButtonTooltip: sendButtonTooltip,
           hasQueuedInput: hasQueuedInput,
           queuedPreviewText: queuedPreviewText,

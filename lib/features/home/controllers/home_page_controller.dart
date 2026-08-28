@@ -339,6 +339,9 @@ class HomePageController extends ChangeNotifier {
 
   bool get isCurrentConversationLoading =>
       _viewModel.isCurrentConversationLoading;
+  bool get isCurrentConversationGenerating =>
+      _viewModel.isCurrentConversationGenerating;
+  bool get isCurrentGenerationPaused => _viewModel.isCurrentGenerationPaused;
 
   QueuedChatInput? get currentQueuedInput => _viewModel.currentQueuedInput;
   List<QueuedChatInput> get currentQueuedInputs =>
@@ -1092,6 +1095,12 @@ class HomePageController extends ChangeNotifier {
       message,
       allowImagesApiRouting: _mediaController.allowImagesApiRouting,
     );
+  }
+
+  void toggleGenerationPaused() {
+    if (_viewModel.toggleCurrentGenerationPaused()) {
+      notifyListeners();
+    }
   }
 
   Future<void> cancelStreaming() async {

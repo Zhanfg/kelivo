@@ -25,6 +25,8 @@ void main() {
     AssistantProvider? assistantProvider,
     ChatInputBarController? mediaController,
     bool loading = false,
+    bool generationPaused = false,
+    VoidCallback? onToggleGenerationPaused,
     bool hasQueuedInput = false,
     String? queuedPreviewText,
     List<QueuedChatInput> queuedInputs = const <QueuedChatInput>[],
@@ -68,6 +70,8 @@ void main() {
             onSend: onSend,
             onGuide: onGuide,
             loading: loading,
+            generationPaused: generationPaused,
+            onToggleGenerationPaused: onToggleGenerationPaused,
             hasQueuedInput: hasQueuedInput,
             queuedPreviewText: queuedPreviewText,
             queuedInputs: queuedInputs,
@@ -141,6 +145,87 @@ void main() {
 
     expect(guided?.text, 'change direction');
     expect(controller.text, isEmpty);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('生成草稿操作附着在文本上方且底栏保留推理入口', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = TextEditingController(text: 'change direction');
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        loading: true,
+        onToggleGenerationPaused: () {},
+        onSend: (_) async => ChatInputSubmissionResult.queued,
+        onGuide: (_) async => ChatInputSubmissionResult.sent,
+      ),
+    );
+    await tester.pump();
+
+    final generationActions = find.byKey(
+      const ValueKey('composer-generation-actions'),
+    );
+    final textField = find.byType(TextField);
+    final reasoning = find.byKey(const ValueKey('composer-reasoning-button'));
+
+    expect(generationActions, findsOneWidget);
+    expect(reasoning, findsOneWidget);
+    expect(
+      tester.getTopLeft(generationActions).dy,
+      lessThan(tester.getTopLeft(textField).dy),
+    );
+    expect(find.byKey(const ValueKey('pause')), findsOneWidget);
+    expect(find.byKey(const ValueKey('stop')), findsNothing);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('生成主按钮切换 Pause 和 Resume 而不是 Stop', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    var toggles = 0;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        loading: true,
+        onToggleGenerationPaused: () => toggles++,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('pause')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('composer-primary-task')));
+    await tester.pump();
+    expect(toggles, 1);
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        loading: true,
+        generationPaused: true,
+        onToggleGenerationPaused: () => toggles++,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('resume')), findsOneWidget);
+    expect(find.byKey(const ValueKey('stop')), findsNothing);
 
     controller.dispose();
     focusNode.dispose();

@@ -222,6 +222,24 @@ class HomeViewModel extends ChangeNotifier {
         !_chatActions.isStopping(cid);
   }
 
+  /// Composer-visible generation state. Guide handoff remains visually
+  /// generating across cancel -> immediate continuation.
+  bool get isCurrentConversationGenerating =>
+      isCurrentConversationLoading || _isGuidingInput;
+
+  bool get isCurrentGenerationPaused {
+    final cid = currentConversation?.id;
+    return cid != null && _chatController.isConversationPaused(cid);
+  }
+
+  bool toggleCurrentGenerationPaused() {
+    final cid = currentConversation?.id;
+    if (cid == null || !_chatController.isConversationLoading(cid)) {
+      return false;
+    }
+    return _chatController.toggleStreamSubscriptionPaused(cid);
+  }
+
   QueuedChatInput? get currentQueuedInput {
     final cid = currentConversation?.id;
     if (cid == null) return null;
@@ -460,8 +478,16 @@ class HomeViewModel extends ChangeNotifier {
       return sendMessage(input);
     }
 
+    if (_chatController.isConversationPaused(conversation.id)) {
+      _chatController.resumeStreamSubscription(conversation.id);
+    }
     _isGuidingInput = true;
+    notifyListeners();
     try {
+      // No provider-independent mid-request instruction channel exists here.
+      // Keep already streamed assistant content, terminate the active request,
+      // append the guide as a user turn, and immediately continue generation.
+      // The Composer remains in one visual generating state for the handoff.
       await _chatActions.cancelStreaming(conversation);
       final success = await _sendMessageToConversation(input, conversation);
       return success
@@ -469,6 +495,7 @@ class HomeViewModel extends ChangeNotifier {
           : ChatInputSubmissionResult.rejected;
     } finally {
       _isGuidingInput = false;
+      notifyListeners();
       if (!_chatController.isConversationLoading(conversation.id)) {
         unawaited(_drainQueuedInputIfReady(conversation.id));
       }
