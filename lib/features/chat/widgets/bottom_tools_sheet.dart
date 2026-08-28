@@ -21,6 +21,10 @@ class BottomToolsSheet extends StatelessWidget {
     this.onCamera,
     this.onPhotos,
     this.onUpload,
+    this.onSearch,
+    this.onMcp,
+    this.onQuickPhrase,
+    this.onManageQuickPhrases,
     this.onClear,
     this.clearLabel,
     this.assistantId,
@@ -29,6 +33,10 @@ class BottomToolsSheet extends StatelessWidget {
   final VoidCallback? onCamera;
   final VoidCallback? onPhotos;
   final VoidCallback? onUpload;
+  final VoidCallback? onSearch;
+  final VoidCallback? onMcp;
+  final VoidCallback? onQuickPhrase;
+  final VoidCallback? onManageQuickPhrases;
   final VoidCallback? onClear;
   final String? clearLabel;
   final String? assistantId;
@@ -38,6 +46,47 @@ class BottomToolsSheet extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final bg = Theme.of(context).colorScheme.surface;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
+
+    Widget secondaryAction({
+      required IconData icon,
+      required String label,
+      VoidCallback? onTap,
+      VoidCallback? onLongPress,
+    }) {
+      final cs = Theme.of(context).colorScheme;
+      return SizedBox(
+        height: 48,
+        child: IosCardPress(
+          borderRadius: BorderRadius.circular(14),
+          baseColor: cs.surface,
+          duration: const Duration(milliseconds: 220),
+          onTap: onTap,
+          onLongPress: onLongPress,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: cs.onSurface),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: AppFontWeights.medium,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ),
+              Icon(
+                Lucide.ChevronRight,
+                size: 18,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     Widget roundedAction({
       required IconData icon,
@@ -137,6 +186,30 @@ class BottomToolsSheet extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (onSearch != null ||
+                        onMcp != null ||
+                        onQuickPhrase != null) ...[
+                      const SizedBox(height: 8),
+                      if (onSearch != null)
+                        secondaryAction(
+                          icon: Lucide.Globe,
+                          label: l10n.chatInputBarOnlineSearchTooltip,
+                          onTap: onSearch,
+                        ),
+                      if (onMcp != null)
+                        secondaryAction(
+                          icon: Lucide.Hammer,
+                          label: l10n.chatInputBarMcpServersTooltip,
+                          onTap: onMcp,
+                        ),
+                      if (onQuickPhrase != null)
+                        secondaryAction(
+                          icon: Lucide.Zap,
+                          label: l10n.chatInputBarQuickPhraseTooltip,
+                          onTap: onQuickPhrase,
+                          onLongPress: onManageQuickPhrases,
+                        ),
+                    ],
                     const SizedBox(height: 12),
                     _LearningAndClearSection(
                       clearLabel: clearLabel,

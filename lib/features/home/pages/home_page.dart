@@ -1821,6 +1821,35 @@ class _HomePageState extends State<HomePage>
               Navigator.of(ctx).maybePop();
               _controller.onPickFiles();
             },
+            onSearch: () async {
+              await Navigator.of(ctx).maybePop();
+              if (!mounted) return;
+              _openSearchSettings();
+            },
+            onMcp: assistantId == null
+                ? null
+                : () async {
+                    await Navigator.of(ctx).maybePop();
+                    if (!mounted) return;
+                    final assistant = context
+                        .read<AssistantProvider>()
+                        .currentAssistant;
+                    if (assistant != null) {
+                      showAssistantMcpSheet(context, assistantId: assistant.id);
+                    }
+                  },
+            onQuickPhrase: () async {
+              await Navigator.of(ctx).maybePop();
+              if (!mounted) return;
+              await _showQuickPhraseMenu();
+            },
+            onManageQuickPhrases: () async {
+              await Navigator.of(ctx).maybePop();
+              if (!mounted) return;
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const QuickPhrasesPage()),
+              );
+            },
             onClear: () async {
               await Navigator.of(ctx).maybePop();
               _showContextManagementSheet();
