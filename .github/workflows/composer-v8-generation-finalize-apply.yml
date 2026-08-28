@@ -27,6 +27,21 @@ jobs:
         run: |
           set -euo pipefail
           python3 .github/patches/composer-v8-generation-finalize.py
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('lib/features/home/widgets/chat_input_bar.dart')
+          text = path.read_text(encoding='utf-8')
+          old = """class _CompactSendButton extends StatelessWidget {
+            const _CompactSendButton({
+              super.key,
+              required this.enabled,"""
+          new = """class _CompactSendButton extends StatelessWidget {
+            const _CompactSendButton({
+              required this.enabled,"""
+          if text.count(old) != 1:
+              raise SystemExit(f'compact-send-key: expected 1 match, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
           git diff --check
           ! grep -q 'StoryModeChatChip' lib/features/home/widgets/chat_input_section.dart
           grep -q "composer-generation-actions" lib/features/home/widgets/chat_input_bar.dart
