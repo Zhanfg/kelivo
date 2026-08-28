@@ -5,6 +5,10 @@ on:
     branches: [feat/story-runtime-foundation]
     paths:
       - '.github/patches/composer-phase1.py'
+      - '.github/patches/composer-phase1-fix.py'
+      - '.github/workflows/composer-native-phase1-apply.yml'
+      - 'lib/features/home/composer/composer_fullscreen_editor.dart'
+      - 'test/features/home/widgets/chat_input_bar_mobile_composer_test.dart'
 
 permissions:
   contents: write
@@ -43,6 +47,7 @@ jobs:
         run: |
           dart format \
             lib/features/home/widgets/chat_input_bar.dart \
+            lib/features/home/composer/composer_fullscreen_editor.dart \
             test/features/home/widgets/chat_input_bar_mobile_composer_test.dart
 
       - name: Analyze Composer slice

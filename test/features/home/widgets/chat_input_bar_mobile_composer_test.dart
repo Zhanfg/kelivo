@@ -56,8 +56,6 @@ void main() {
     );
   }
 
-  setUp(() {});
-
   testWidgets('mobile idle composer exposes only four primary entrances', (
     tester,
   ) async {
@@ -76,14 +74,19 @@ void main() {
     );
     await tester.pump();
 
+    final context = tester.element(find.byType(ChatInputBar));
+    final l10n = AppLocalizations.of(context)!;
+
     expect(find.byIcon(Lucide.Plus), findsOneWidget);
-    expect(find.byTooltip('Reasoning strength'), findsOneWidget);
+    expect(
+      find.byTooltip(l10n.chatInputBarReasoningStrengthTooltip),
+      findsOneWidget,
+    );
     expect(find.byTooltip('Voice input'), findsOneWidget);
     expect(find.byIcon(Lucide.ArrowUp), findsOneWidget);
 
-    // Search/MCP/etc. remain secondary capabilities and must not occupy the
-    // persistent mobile action row.
-    expect(find.byTooltip('Online search'), findsNothing);
+    // Secondary capabilities stay out of the persistent mobile row.
+    expect(find.byIcon(Lucide.Globe), findsNothing);
   });
 
   testWidgets('six visual lines expose fullscreen editing and preserve draft', (
@@ -114,9 +117,10 @@ void main() {
     final fields = find.byType(TextField);
     expect(fields, findsWidgets);
     await tester.enterText(fields.last, 'edited in fullscreen');
+    expect(controller.text, 'edited in fullscreen');
+
     await tester.tap(find.byTooltip('Collapse editor'));
     await tester.pumpAndSettle();
-
     expect(controller.text, 'edited in fullscreen');
   });
 }
