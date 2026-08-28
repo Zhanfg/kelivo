@@ -14,7 +14,11 @@ void main() {
 
     for (final asset in assets) {
       final contents = await rootBundle.loadString(asset);
-      expect(contents.trim(), isNotEmpty, reason: 'Missing or empty asset: $asset');
+      expect(
+        contents.trim(),
+        isNotEmpty,
+        reason: 'Missing or empty asset: $asset',
+      );
     }
   });
 }

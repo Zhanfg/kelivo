@@ -52,7 +52,10 @@ void main() {
 
     final screenWidth = tester.getSize(find.byType(Scaffold)).width;
     final controlRect = tester.getRect(find.byKey(controlKey));
-    expect(controlRect.center.dx, moreOrLessEquals(screenWidth / 2, epsilon: 0.5));
+    expect(
+      controlRect.center.dx,
+      moreOrLessEquals(screenWidth / 2, epsilon: 0.5),
+    );
 
     await tester.tap(find.byKey(storyTargetKey));
     await tester.pump();
