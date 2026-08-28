@@ -101,10 +101,23 @@ final class MossLocalModelValidation {
   bool get isValid => tokenizerPath != null && missingPaths.isEmpty;
 }
 
-/// Local-only MOSS model discovery and validation.
+final class MossLocalModelInstallResult {
+  const MossLocalModelInstallResult({
+    required this.rootPath,
+    required this.validation,
+  });
+
+  final String rootPath;
+  final MossLocalModelValidation validation;
+}
+
+/// Local-only MOSS model discovery, validation and installation.
 ///
-/// This class intentionally has no HTTP dependency. Calling [validate] or
-/// [isInstalled] can never contact GitHub, Hugging Face, or a cloud TTS API.
+/// This class intentionally has no HTTP dependency. Calling [validate],
+/// [isInstalled] or [installFromDirectory] never contacts GitHub, Hugging Face,
+/// or a cloud TTS API. Installation copies a user-selected model folder into
+/// Kelivo's application support directory, validates a staging copy first and
+/// only then swaps it into the live location.
 final class MossLocalModelStore {
   MossLocalModelStore({this.rootDirectory});
 
@@ -129,6 +142,113 @@ final class MossLocalModelStore {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<MossLocalModelInstallResult> installFromDirectory(
+    String sourcePath,
+  ) async {
+    final normalizedSourcePath = p.normalize(sourcePath.trim());
+    if (normalizedSourcePath.isEmpty) {
+      throw ArgumentError.value(sourcePath, 'sourcePath');
+    }
+    final source = io.Directory(normalizedSourcePath);
+    if (!await source.exists()) {
+      throw StateError('Selected MOSS model folder does not exist.');
+    }
+
+    final sourceValidation = await MossLocalModelStore(
+      rootDirectory: source,
+    ).validate();
+    if (!sourceValidation.isValid) {
+      throw StateError(
+        'Selected MOSS model folder is incomplete: '
+        '${sourceValidation.missingPaths.join(', ')}',
+      );
+    }
+
+    final target = await resolveRootDirectory();
+    final sourceAbsolute = p.normalize(source.absolute.path);
+    final targetAbsolute = p.normalize(target.absolute.path);
+    if (p.equals(sourceAbsolute, targetAbsolute)) {
+      return MossLocalModelInstallResult(
+        rootPath: target.path,
+        validation: sourceValidation,
+      );
+    }
+    if (p.isWithin(sourceAbsolute, targetAbsolute) ||
+        p.isWithin(targetAbsolute, sourceAbsolute)) {
+      throw StateError(
+        'Choose a model source folder outside Kelivo local TTS storage.',
+      );
+    }
+
+    await target.parent.create(recursive: true);
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final staging = io.Directory('${target.path}.install-$stamp');
+    final backup = io.Directory('${target.path}.backup-$stamp');
+    try {
+      if (await staging.exists()) await staging.delete(recursive: true);
+      await staging.create(recursive: true);
+      await _copyDirectory(source, staging);
+
+      final stagedValidation = await MossLocalModelStore(
+        rootDirectory: staging,
+      ).validate();
+      if (!stagedValidation.isValid) {
+        throw StateError(
+          'Copied MOSS model failed validation: '
+          '${stagedValidation.missingPaths.join(', ')}',
+        );
+      }
+
+      var backedUp = false;
+      if (await target.exists()) {
+        if (await backup.exists()) await backup.delete(recursive: true);
+        await target.rename(backup.path);
+        backedUp = true;
+      }
+      try {
+        await staging.rename(target.path);
+      } catch (_) {
+        if (backedUp && await backup.exists() && !await target.exists()) {
+          await backup.rename(target.path);
+        }
+        rethrow;
+      }
+      if (await backup.exists()) await backup.delete(recursive: true);
+
+      final installedValidation = await validate();
+      if (!installedValidation.isValid) {
+        throw StateError(
+          'Installed MOSS model failed final validation: '
+          '${installedValidation.missingPaths.join(', ')}',
+        );
+      }
+      return MossLocalModelInstallResult(
+        rootPath: target.path,
+        validation: installedValidation,
+      );
+    } finally {
+      if (await staging.exists()) {
+        try {
+          await staging.delete(recursive: true);
+        } catch (_) {}
+      }
+      if (await backup.exists()) {
+        // A backup is only left here after a failed operation. Restore it when
+        // possible rather than silently deleting the last valid model.
+        try {
+          if (!await target.exists()) {
+            await backup.rename(target.path);
+          }
+        } catch (_) {}
+      }
+    }
+  }
+
+  Future<void> removeInstalledModel() async {
+    final target = await resolveRootDirectory();
+    if (await target.exists()) await target.delete(recursive: true);
   }
 
   Future<MossLocalModelValidation> validate() async {
@@ -227,6 +347,23 @@ final class MossLocalModelStore {
       tokenizerPath: await tokenizer.exists() ? tokenizer.path : null,
       missingPaths: missing,
     );
+  }
+
+  static Future<void> _copyDirectory(
+    io.Directory source,
+    io.Directory destination,
+  ) async {
+    await for (final entity in source.list(followLinks: false)) {
+      final name = p.basename(entity.path);
+      final nextPath = p.join(destination.path, name);
+      if (entity is io.Directory) {
+        final next = io.Directory(nextPath);
+        await next.create(recursive: true);
+        await _copyDirectory(entity, next);
+      } else if (entity is io.File) {
+        await entity.copy(nextPath);
+      }
+    }
   }
 
   static Map<String, dynamic> _jsonMap(Object? value) {
