@@ -122,7 +122,8 @@ dependencies:
   math_expressions: ^2.6.2
 
   # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
+  # Use with the CupertinoIcons class font, you can use the icons in
+  # the material Icons class.
   cupertino_icons: ^1.0.8
   restart_app: ^1.8.3
   drift: ^2.34.0
@@ -153,9 +154,9 @@ dependency_overrides:
   # Prevent the location from being accessed continuously on Windows
   permission_handler_windows:
     path: ./dependencies/flutter-permission-handler/permission_handler_windows
-  # Keep sherpa's federated native packages aligned with the Dart API. Their
-  # caret constraints otherwise resolve newer binaries (macOS 13.4/15.5).
-  sherpa_onnx_android: 1.12.20
+  # Android 1.12.37 bundles ONNX Runtime 1.24.3, matching MOSS local TTS.
+  # Keep the other federated native packages on the macOS-compatible baseline.
+  sherpa_onnx_android: 1.12.37
   sherpa_onnx_ios: 1.12.20
   sherpa_onnx_linux: 1.12.20
   sherpa_onnx_macos: 1.12.20
@@ -210,8 +211,7 @@ flutter:
   #       - asset: fonts/TrajanPro-Bold.ttf
   #         weight: 700
   #
-  # For details regarding fonts from package dependencies,
-  # see https://flutter.dev/to/font-from-package
+  # For details regarding fonts from package dependencies, see https://flutter.dev/to/font-from-package
 
 #  fonts:
 #    - family: JetBrainsMono
