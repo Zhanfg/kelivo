@@ -153,9 +153,9 @@ dependency_overrides:
   # Prevent the location from being accessed continuously on Windows
   permission_handler_windows:
     path: ./dependencies/flutter-permission-handler/permission_handler_windows
-  # Android 1.12.37 bundles ONNX Runtime 1.24.3, matching MOSS local TTS.
-  # Keep the other federated native packages on the macOS-compatible baseline.
-  sherpa_onnx_android: 1.12.37
+  # Use the newest published monolithic Android package so it can share
+  # ONNX Runtime 1.23.2 with MOSS without migrating sherpa's package layout.
+  sherpa_onnx_android: 1.12.36
   sherpa_onnx_ios: 1.12.20
   sherpa_onnx_linux: 1.12.20
   sherpa_onnx_macos: 1.12.20
@@ -191,7 +191,7 @@ flutter:
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
-  # For details regarding adding assets from package dependencies, see
+  # For details regarding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
 
   # To add custom fonts to your application, add a fonts section here. Each entry in this list should have a
