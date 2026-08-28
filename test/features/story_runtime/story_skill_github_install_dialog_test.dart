@@ -1,6 +1,6 @@
+import 'package:Kelivo/features/story_runtime/ui/story_skill_github_install_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kelivo/features/story_runtime/ui/story_skill_github_install_dialog.dart';
 
 void main() {
   testWidgets(
