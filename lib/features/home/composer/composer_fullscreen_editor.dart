@@ -60,8 +60,7 @@ class _ComposerFullscreenEditorState extends State<ComposerFullscreenEditor> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final canSend =
-        _controller.text.trim().isNotEmpty || widget.hasDraftMedia;
+    final canSend = _controller.text.trim().isNotEmpty || widget.hasDraftMedia;
 
     return PopScope(
       onPopInvokedWithResult: (didPop, result) {
@@ -136,10 +135,10 @@ class _ComposerFullscreenEditorState extends State<ComposerFullscreenEditor> {
                           _finish(ComposerFullscreenAction.model),
                       childBuilder: widget.supportsReasoning
                           ? (color) => ReasoningIcons.budgetIcon(
-                                widget.reasoningBudget,
-                                size: 20,
-                                color: color,
-                              )
+                              widget.reasoningBudget,
+                              size: 20,
+                              color: color,
+                            )
                           : null,
                     ),
                     const SizedBox(width: 8),
@@ -147,8 +146,7 @@ class _ComposerFullscreenEditorState extends State<ComposerFullscreenEditor> {
                       _ActionButton(
                         tooltip: 'Voice input',
                         icon: Lucide.Mic,
-                        onTap: () =>
-                            _finish(ComposerFullscreenAction.voice),
+                        onTap: () => _finish(ComposerFullscreenAction.voice),
                       ),
                       const SizedBox(width: 8),
                     ],
@@ -198,7 +196,8 @@ class _ActionButton extends StatelessWidget {
     final background = primary
         ? (enabled ? cs.primary : cs.surfaceContainerHighest)
         : Colors.transparent;
-    final child = childBuilder?.call(foreground) ??
+    final child =
+        childBuilder?.call(foreground) ??
         Icon(icon, size: 20, color: foreground);
 
     return Tooltip(

@@ -34,6 +34,7 @@ import '../../../utils/app_directories.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../composer/composer_fullscreen_editor.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -200,7 +201,6 @@ class ChatInputBar extends StatefulWidget {
 class _ChatInputBarState extends State<ChatInputBar>
     with WidgetsBindingObserver {
   late TextEditingController _controller;
-  bool _isExpanded = false; // Track expand/collapse state for input field
   // The ASR provider owns microphone capture. This widget only owns the
   // composer presentation and an exact snapshot used by Cancel.
   final List<double> _voiceLevels = <double>[];
@@ -618,15 +618,71 @@ class _ChatInputBarState extends State<ChatInputBar>
     return l10n.chatInputBarHint;
   }
 
-  /// Returns the number of lines in the input text (minimum 1).
-  int get _lineCount {
-    final text = _controller.text;
-    if (text.isEmpty) return 1;
-    return text.split('\n').length;
+  int _visualLineCount(BuildContext context, double maxWidth) {
+    final value = _controller.text;
+    if (value.isEmpty) return 1;
+    final isDesktop =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final painter = TextPainter(
+      text: TextSpan(
+        text: value,
+        style: TextStyle(fontSize: isDesktop ? 14 : 15),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: math.max(48, maxWidth));
+    return math.max(1, painter.computeLineMetrics().length);
   }
 
-  /// Whether to show the expand/collapse button (when text has 3+ lines).
-  bool get _showExpandButton => _lineCount >= 3;
+  Future<void> _openFullscreenEditor() async {
+    if (_composerLocked || _ownsVoiceSession) return;
+    final settings = context.read<SettingsProvider>();
+    final selectedAsrService = settings.selectedAsrService;
+    final asr = widget.asrProvider;
+    final canUseVoice =
+        asr != null &&
+        selectedAsrService != null &&
+        asr.canUse(selectedAsrService) &&
+        !widget.loading;
+
+    final action = await showDialog<ComposerFullscreenAction>(
+      context: context,
+      useSafeArea: false,
+      builder: (_) => ComposerFullscreenEditor(
+        initialValue: _controller.value,
+        onDraftChanged: (value) {
+          if (!mounted) return;
+          _controller.value = value;
+        },
+        supportsReasoning: widget.supportsReasoning,
+        reasoningBudget: widget.reasoningBudget,
+        hasDraftMedia: _hasDraftMedia,
+        canOpenMore: widget.onMore != null,
+        canUseVoice: canUseVoice,
+      ),
+    );
+    if (!mounted) return;
+
+    switch (action) {
+      case ComposerFullscreenAction.more:
+        widget.onMore?.call();
+        break;
+      case ComposerFullscreenAction.reasoning:
+        widget.onConfigureReasoning?.call();
+        break;
+      case ComposerFullscreenAction.model:
+        widget.onSelectModel?.call();
+        break;
+      case ComposerFullscreenAction.voice:
+        await _startVoiceInput();
+        break;
+      case ComposerFullscreenAction.send:
+        await _handleSend();
+        break;
+      case null:
+        break;
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Voice input
@@ -2555,6 +2611,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     final size = MediaQuery.sizeOf(context);
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final bool isMobileLayout = size.width < AppBreakpoints.tablet;
+    final visualTextWidth = math.max(48.0, size.width - 72.0);
+    final showExpandButton = _visualLineCount(context, visualTextWidth) >= 6;
     final double visibleHeight = size.height - viewInsets.bottom;
     final double attachmentPreviewHeight = (hasDocs || hasImages)
         ? AppSpacing.sm +
@@ -2748,7 +2806,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                 _composerLocked ||
                                                 _ownsVoiceSession,
                                             minLines: 1,
-                                            maxLines: _isExpanded ? 25 : 5,
+                                            maxLines: 6,
                                             // On mobile, optionally show "Send" on the return key and submit on tap.
                                             // Still keep multiline so pasted text preserves line breaks.
                                             keyboardType:
@@ -2800,21 +2858,15 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 ),
                               ),
                               // Expand/Collapse icon button (only shown when 3+ lines)
-                              if (_showExpandButton)
+                              if (showExpandButton)
                                 Positioned(
                                   top: 10,
                                   right: 12,
                                   child: GestureDetector(
-                                    onTap: () {
-                                      setState(
-                                        () => _isExpanded = !_isExpanded,
-                                      );
-                                      _ensureCaretVisible();
-                                    },
+                                    onTap: () =>
+                                        unawaited(_openFullscreenEditor()),
                                     child: Icon(
-                                      _isExpanded
-                                          ? Lucide.ChevronsDownUp
-                                          : Lucide.ChevronsUpDown,
+                                      Lucide.Maximize2,
                                       size: 16,
                                       color: theme.colorScheme.onSurface
                                           .withValues(alpha: 0.45),
@@ -2854,14 +2906,27 @@ class _ChatInputBarState extends State<ChatInputBar>
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         // Responsive left action bar that overflows into a + menu on desktop
-                                        Expanded(
-                                          child: _buildResponsiveLeftActions(
-                                            context,
+                                        if (!isMobileLayout)
+                                          Expanded(
+                                            child: _buildResponsiveLeftActions(
+                                              context,
+                                            ),
+                                          )
+                                        else if (widget.showMoreButton)
+                                          _CompactIconButton(
+                                            tooltip: AppLocalizations.of(
+                                              context,
+                                            )!.chatInputBarMoreTooltip,
+                                            icon: Lucide.Plus,
+                                            active: widget.moreOpen,
+                                            onTap: _composerLocked
+                                                ? null
+                                                : widget.onMore,
                                           ),
-                                        ),
                                         Row(
                                           children: [
-                                            if (widget.showMoreButton) ...[
+                                            if (widget.showMoreButton &&
+                                                !isMobileLayout) ...[
                                               _CompactIconButton(
                                                 tooltip: AppLocalizations.of(
                                                   context,
@@ -2905,6 +2970,45 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                         color: c,
                                                       ),
                                                     ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                            ],
+                                            if (isMobileLayout) ...[
+                                              _CompactIconButton(
+                                                tooltip:
+                                                    widget.supportsReasoning
+                                                    ? AppLocalizations.of(
+                                                        context,
+                                                      )!.chatInputBarReasoningStrengthTooltip
+                                                    : AppLocalizations.of(
+                                                        context,
+                                                      )!.chatInputBarSelectModelTooltip,
+                                                icon: widget.supportsReasoning
+                                                    ? Lucide.Brain
+                                                    : Lucide.Boxes,
+                                                active:
+                                                    widget.supportsReasoning &&
+                                                    widget.reasoningActive,
+                                                onTap: _composerLocked
+                                                    ? null
+                                                    : (widget.supportsReasoning
+                                                          ? widget
+                                                                .onConfigureReasoning
+                                                          : widget
+                                                                .onSelectModel),
+                                                onLongPress: _composerLocked
+                                                    ? null
+                                                    : widget.onSelectModel,
+                                                childBuilder:
+                                                    widget.supportsReasoning
+                                                    ? (
+                                                        color,
+                                                      ) => ReasoningIcons.budgetIcon(
+                                                        widget.reasoningBudget,
+                                                        size: 20,
+                                                        color: color,
+                                                      )
+                                                    : null,
                                               ),
                                               const SizedBox(width: 8),
                                             ],
