@@ -101,10 +101,12 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
     required StoryVoiceAssignment? current,
     required bool narrator,
   }) async {
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final preferences = context.read<BusinessPreferences>();
     final treeId = _worldTreeId;
     if (treeId == null) {
       _message(
-        Localizations.localeOf(context).languageCode == 'zh'
+        zh
             ? '开始故事后即可固定声音。'
             : 'Start the story before assigning a persistent voice.',
       );
@@ -112,7 +114,7 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
     }
     if (_services.isEmpty) {
       _message(
-        Localizations.localeOf(context).languageCode == 'zh'
+        zh
             ? '请先在声音服务中启用至少一个声音来源。'
             : 'Enable at least one voice source first.',
       );
@@ -133,9 +135,7 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
 
     setState(() => _busy = true);
     try {
-      final store = StoryVoiceRoutingStore(
-        context.read<BusinessPreferences>(),
-      );
+      final store = StoryVoiceRoutingStore(preferences);
       final state = await store.readOrDefault(treeId);
       final assignment = StoryVoiceAssignment(
         characterId: characterId,
@@ -165,9 +165,7 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
       await _reload();
     } catch (_) {
       _message(
-        Localizations.localeOf(context).languageCode == 'zh'
-            ? '保存声音失败。'
-            : 'Could not save the voice.',
+        zh ? '保存声音失败。' : 'Could not save the voice.',
       );
     } finally {
       if (mounted) setState(() => _busy = false);
