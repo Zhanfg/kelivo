@@ -9,13 +9,14 @@ import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
 import 'story_character_manager_page.dart';
 import 'story_conversation_mode_control.dart';
+import 'story_reference_library_page.dart';
 import 'story_skill_manager_page.dart';
 import 'story_voice_manager_page.dart';
 
 /// Product-level Story quick tools shown above the native input bar.
 ///
-/// The toolbar intentionally exposes only user-facing concepts. Runtime ids,
-/// provider readiness, cache state and other internal diagnostics stay hidden.
+/// This is the single first-level Story tool surface. Story settings must not
+/// duplicate these destinations as a second navigation hierarchy.
 class StoryModeChatChip extends StatefulWidget {
   const StoryModeChatChip({super.key, required this.conversationId});
 
@@ -122,6 +123,11 @@ class _StoryQuickTools extends StatelessWidget {
         label: zh ? '声音' : 'Voices',
         icon: Lucide.Volume2,
         page: StoryVoiceManagerPage(conversationId: conversationId),
+      ),
+      _StoryToolSpec(
+        label: zh ? '参考' : 'References',
+        icon: Lucide.BookOpenText,
+        page: const StoryReferenceLibraryPage(),
       ),
       _StoryToolSpec(
         label: zh ? '技能' : 'Skills',
