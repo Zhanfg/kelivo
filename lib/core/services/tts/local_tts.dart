@@ -7,6 +7,14 @@ import 'package:moss_local_tts/moss_local_tts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+/// Compatibility helper for the local-first TTS integration. Dart's [io.File]
+/// exposes [io.File.exists] rather than `isFile`; keeping this extension lets
+/// the imported TTS coordinator use the same intent without touching playback
+/// behavior.
+extension FileExistenceCompatibility on io.File {
+  Future<bool> isFile() => exists();
+}
+
 enum TtsBackendMode {
   automatic('auto'),
   localOnly('local'),
@@ -268,6 +276,8 @@ final class MossLocalTtsBackend implements LocalTtsBackend {
     this.cpuThreads = 2,
     this.maxFrames = 375,
   }) : modelStore = modelStore ?? MossLocalModelStore(),
+       // Keep the public constructor parameter stable while satisfying callers.
+       // ignore: prefer_initializing_formals
        _nativeBridge = nativeBridge;
 
   final MossLocalModelStore modelStore;
