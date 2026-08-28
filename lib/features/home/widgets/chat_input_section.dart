@@ -48,6 +48,8 @@ class ChatInputSection extends StatelessWidget {
     this.onLongPressMcp,
     this.onOpenSearch,
     this.onConfigureReasoning,
+    this.onReasoningBudgetChanged,
+    this.onComposerModelChanged,
     this.onSend,
     this.onStop,
     this.hasQueuedInput = false,
@@ -88,6 +90,9 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onLongPressMcp;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
+  final Future<void> Function(int budget)? onReasoningBudgetChanged;
+  final Future<void> Function(String providerKey, String modelId)?
+  onComposerModelChanged;
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
   final VoidCallback? onStop;
   final bool hasQueuedInput;
@@ -154,6 +159,16 @@ class ChatInputSection extends StatelessWidget {
           mediaController: mediaController,
           asrProvider: asr,
           onConfigureReasoning: onConfigureReasoning,
+          onReasoningBudgetChanged: onReasoningBudgetChanged,
+          onComposerModelChanged: onComposerModelChanged,
+          currentModelProvider: pk,
+          currentModelId: mid,
+          supportsXhighReasoning: pk != null && mid != null
+              ? settings.supportsXhighReasoning(pk, mid)
+              : false,
+          supportsMaxReasoning: pk != null && mid != null
+              ? settings.supportsMaxReasoning(pk, mid)
+              : false,
           reasoningActive: isReasoningEnabled(
             (context
                     .watch<AssistantProvider>()

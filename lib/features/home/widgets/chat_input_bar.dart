@@ -35,6 +35,7 @@ import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../composer/composer_fullscreen_editor.dart';
+import '../composer/composer_reasoning_popover.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -102,6 +103,12 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenSearch,
     this.onMore,
     this.onConfigureReasoning,
+    this.onReasoningBudgetChanged,
+    this.onComposerModelChanged,
+    this.currentModelProvider,
+    this.currentModelId,
+    this.supportsXhighReasoning = false,
+    this.supportsMaxReasoning = false,
     this.moreOpen = false,
     this.focusNode,
     this.modelIcon,
@@ -154,6 +161,12 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
   final VoidCallback? onConfigureReasoning;
+  final ComposerReasoningBudgetChanged? onReasoningBudgetChanged;
+  final ComposerModelChanged? onComposerModelChanged;
+  final String? currentModelProvider;
+  final String? currentModelId;
+  final bool supportsXhighReasoning;
+  final bool supportsMaxReasoning;
   final bool moreOpen;
   final FocusNode? focusNode;
   final Widget? modelIcon;
@@ -632,6 +645,43 @@ class _ChatInputBarState extends State<ChatInputBar>
       textScaler: MediaQuery.textScalerOf(context),
     )..layout(maxWidth: math.max(48, maxWidth));
     return math.max(1, painter.computeLineMetrics().length);
+  }
+
+  Future<void> _openComposerReasoning({
+    required GlobalKey anchorKey,
+    required LayerLink anchorLink,
+  }) async {
+    if (_composerLocked || _ownsVoiceSession || widget.loading) return;
+    if (!widget.supportsReasoning) {
+      widget.onSelectModel?.call();
+      return;
+    }
+    final onBudgetChanged = widget.onReasoningBudgetChanged;
+    if (onBudgetChanged == null) {
+      widget.onConfigureReasoning?.call();
+      return;
+    }
+    final renderObject = anchorKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) {
+      widget.onConfigureReasoning?.call();
+      return;
+    }
+    final anchorRect =
+        renderObject.localToGlobal(Offset.zero) & renderObject.size;
+    final settings = context.read<SettingsProvider>();
+    await showComposerReasoningPopover(
+      context,
+      anchorLink: anchorLink,
+      anchorRect: anchorRect,
+      currentBudget: widget.reasoningBudget,
+      supportsXhigh: widget.supportsXhighReasoning,
+      supportsMax: widget.supportsMaxReasoning,
+      currentProviderKey: widget.currentModelProvider,
+      currentModelId: widget.currentModelId,
+      modelOptions: buildComposerModelOptions(settings),
+      onBudgetChanged: onBudgetChanged,
+      onModelChanged: widget.onComposerModelChanged,
+    );
   }
 
   Future<void> _openFullscreenEditor() async {
@@ -2974,41 +3024,69 @@ class _ChatInputBarState extends State<ChatInputBar>
                                               const SizedBox(width: 8),
                                             ],
                                             if (isMobileLayout) ...[
-                                              _CompactIconButton(
-                                                tooltip:
-                                                    widget.supportsReasoning
-                                                    ? AppLocalizations.of(
-                                                        context,
-                                                      )!.chatInputBarReasoningStrengthTooltip
-                                                    : AppLocalizations.of(
-                                                        context,
-                                                      )!.chatInputBarSelectModelTooltip,
-                                                icon: widget.supportsReasoning
-                                                    ? Lucide.Brain
-                                                    : Lucide.Boxes,
-                                                active:
-                                                    widget.supportsReasoning &&
-                                                    widget.reasoningActive,
-                                                onTap: _composerLocked
-                                                    ? null
-                                                    : (widget.supportsReasoning
-                                                          ? widget
-                                                                .onConfigureReasoning
-                                                          : widget
-                                                                .onSelectModel),
-                                                onLongPress: _composerLocked
-                                                    ? null
-                                                    : widget.onSelectModel,
-                                                childBuilder:
-                                                    widget.supportsReasoning
-                                                    ? (
-                                                        color,
-                                                      ) => ReasoningIcons.budgetIcon(
-                                                        widget.reasoningBudget,
-                                                        size: 20,
-                                                        color: color,
-                                                      )
-                                                    : null,
+                                              Builder(
+                                                builder: (_) {
+                                                  final anchorKey = GlobalKey(
+                                                    debugLabel:
+                                                        'composer-reasoning-anchor',
+                                                  );
+                                                  final anchorLink =
+                                                      LayerLink();
+                                                  return CompositedTransformTarget(
+                                                    link: anchorLink,
+                                                    child: Container(
+                                                      key: anchorKey,
+                                                      child: _CompactIconButton(
+                                                        tooltip:
+                                                            widget
+                                                                .supportsReasoning
+                                                            ? AppLocalizations.of(
+                                                                context,
+                                                              )!.chatInputBarReasoningStrengthTooltip
+                                                            : AppLocalizations.of(
+                                                                context,
+                                                              )!.chatInputBarSelectModelTooltip,
+                                                        icon:
+                                                            widget
+                                                                .supportsReasoning
+                                                            ? Lucide.Brain
+                                                            : Lucide.Boxes,
+                                                        active:
+                                                            widget
+                                                                .supportsReasoning &&
+                                                            widget
+                                                                .reasoningActive,
+                                                        onTap: _composerLocked
+                                                            ? null
+                                                            : () => unawaited(
+                                                                _openComposerReasoning(
+                                                                  anchorKey:
+                                                                      anchorKey,
+                                                                  anchorLink:
+                                                                      anchorLink,
+                                                                ),
+                                                              ),
+                                                        onLongPress:
+                                                            _composerLocked
+                                                            ? null
+                                                            : widget
+                                                                  .onSelectModel,
+                                                        childBuilder:
+                                                            widget
+                                                                .supportsReasoning
+                                                            ? (
+                                                                color,
+                                                              ) => ReasoningIcons.budgetIcon(
+                                                                widget
+                                                                    .reasoningBudget,
+                                                                size: 20,
+                                                                color: color,
+                                                              )
+                                                            : null,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
                                               ),
                                               const SizedBox(width: 8),
                                             ],

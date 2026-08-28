@@ -10,10 +10,8 @@ import '../../../theme/app_font_weights.dart';
 import 'composer_reasoning_level.dart';
 
 typedef ComposerReasoningBudgetChanged = Future<void> Function(int budget);
-typedef ComposerModelChanged = Future<void> Function(
-  String providerKey,
-  String modelId,
-);
+typedef ComposerModelChanged =
+    Future<void> Function(String providerKey, String modelId);
 
 class ComposerModelOption {
   const ComposerModelOption({
@@ -68,7 +66,8 @@ List<ComposerModelOption> buildComposerModelOptions(SettingsProvider settings) {
 
 Future<void> showComposerReasoningPopover(
   BuildContext context, {
-  required GlobalKey anchorKey,
+  required LayerLink anchorLink,
+  required Rect anchorRect,
   required int? currentBudget,
   required bool supportsXhigh,
   required bool supportsMax,
@@ -78,10 +77,6 @@ Future<void> showComposerReasoningPopover(
   required ComposerReasoningBudgetChanged onBudgetChanged,
   ComposerModelChanged? onModelChanged,
 }) async {
-  final renderObject = anchorKey.currentContext?.findRenderObject();
-  if (renderObject is! RenderBox || !renderObject.hasSize) return;
-  final anchorRect = renderObject.localToGlobal(Offset.zero) & renderObject.size;
-
   await showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
@@ -89,6 +84,7 @@ Future<void> showComposerReasoningPopover(
     barrierColor: Colors.transparent,
     transitionDuration: const Duration(milliseconds: 160),
     pageBuilder: (dialogContext, _, __) => _ComposerReasoningPopover(
+      anchorLink: anchorLink,
       anchorRect: anchorRect,
       currentBudget: currentBudget,
       supportsXhigh: supportsXhigh,
@@ -105,14 +101,7 @@ Future<void> showComposerReasoningPopover(
         curve: Curves.easeOutCubic,
         reverseCurve: Curves.easeInCubic,
       );
-      return FadeTransition(
-        opacity: curved,
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.96, end: 1).animate(curved),
-          alignment: Alignment.bottomCenter,
-          child: child,
-        ),
-      );
+      return FadeTransition(opacity: curved, child: child);
     },
   );
 }
@@ -121,6 +110,7 @@ enum _AdvancedPane { reasoning, model }
 
 class _ComposerReasoningPopover extends StatefulWidget {
   const _ComposerReasoningPopover({
+    required this.anchorLink,
     required this.anchorRect,
     required this.currentBudget,
     required this.supportsXhigh,
@@ -132,6 +122,7 @@ class _ComposerReasoningPopover extends StatefulWidget {
     required this.onModelChanged,
   });
 
+  final LayerLink anchorLink;
   final Rect anchorRect;
   final int? currentBudget;
   final bool supportsXhigh;
@@ -147,8 +138,7 @@ class _ComposerReasoningPopover extends StatefulWidget {
       _ComposerReasoningPopoverState();
 }
 
-class _ComposerReasoningPopoverState
-    extends State<_ComposerReasoningPopover> {
+class _ComposerReasoningPopoverState extends State<_ComposerReasoningPopover> {
   late ComposerReasoningLevel _selectedLevel;
   late double _manualSliderValue;
   bool _advanced = false;
@@ -238,13 +228,7 @@ class _ComposerReasoningPopoverState
       180.0,
       math.min(430.0, widget.anchorRect.top - 20),
     );
-    final left = (widget.anchorRect.center.dx - totalWidth / 2)
-        .clamp(
-          12.0,
-          math.max(12.0, size.width - totalWidth - 12),
-        )
-        .toDouble();
-    final bottom = math.max(12.0, size.height - widget.anchorRect.top + 8);
+    final horizontalOffset = size.width - 12 - widget.anchorRect.right;
 
     return Material(
       type: MaterialType.transparency,
@@ -256,13 +240,20 @@ class _ComposerReasoningPopoverState
               onTap: () => Navigator.of(context).pop(),
             ),
           ),
-          Positioned(
-            left: left,
-            bottom: bottom,
-            width: totalWidth,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: maxHeight),
-              child: _advanced ? _buildAdvanced(context) : _buildPrimary(context),
+          CompositedTransformFollower(
+            link: widget.anchorLink,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.topRight,
+            followerAnchor: Alignment.bottomRight,
+            offset: Offset(horizontalOffset, -8),
+            child: SizedBox(
+              width: totalWidth,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxHeight),
+                child: _advanced
+                    ? _buildAdvanced(context)
+                    : _buildPrimary(context),
+              ),
             ),
           ),
         ],
@@ -321,8 +312,12 @@ class _ComposerReasoningPopoverState
                   inactiveTrackColor: cs.surfaceContainerHighest,
                   thumbColor: cs.primary,
                   overlayColor: cs.primary.withValues(alpha: 0.10),
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 16,
+                  ),
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 7,
+                  ),
                 ),
                 child: Slider(
                   key: const ValueKey('composer-reasoning-slider'),
@@ -373,7 +368,10 @@ class _ComposerReasoningPopoverState
               label: Text(l10n.modelDetailSheetAdvancedTab),
               style: TextButton.styleFrom(
                 alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
               ),
             ),
           ],
@@ -401,7 +399,8 @@ class _ComposerReasoningPopoverState
                     icon: Lucide.Boxes,
                     label: l10n.chatInputBarSelectModelTooltip,
                     selected: _advancedPane == _AdvancedPane.model,
-                    onTap: () => setState(() => _advancedPane = _AdvancedPane.model),
+                    onTap: () =>
+                        setState(() => _advancedPane = _AdvancedPane.model),
                   ),
                   _rootTile(
                     context,
@@ -461,10 +460,9 @@ class _ComposerReasoningPopoverState
                       size: 18,
                       color: _selectedLevel == level
                           ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.68),
+                          : Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.68),
                     ),
               label: _labelFor(l10n, level),
               selected: _selectedLevel == level,
@@ -571,9 +569,7 @@ class _ComposerReasoningPopoverState
                       fontWeight: selected
                           ? AppFontWeights.semibold
                           : AppFontWeights.medium,
-                      color: selected
-                          ? cs.onSecondaryContainer
-                          : cs.onSurface,
+                      color: selected ? cs.onSecondaryContainer : cs.onSurface,
                     ),
                   ),
                 ),

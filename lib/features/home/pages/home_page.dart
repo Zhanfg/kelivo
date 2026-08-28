@@ -1517,6 +1517,8 @@ class _HomePageState extends State<HomePage>
           );
         }
       },
+      onReasoningBudgetChanged: _setComposerReasoningBudget,
+      onComposerModelChanged: _setComposerModel,
       onSend: (text) async {
         final result = await _controller.sendMessage(text);
         if (!mounted) return result;
@@ -1738,6 +1740,37 @@ class _HomePageState extends State<HomePage>
     } else {
       showSearchSettingsSheet(context);
     }
+  }
+
+  Future<void> _setComposerReasoningBudget(int budget) async {
+    final settings = context.read<SettingsProvider>();
+    await settings.setThinkingBudget(budget);
+    if (!mounted) return;
+    final assistantProvider = context.read<AssistantProvider>();
+    final assistant = assistantProvider.currentAssistant;
+    if (assistant != null && assistant.thinkingBudget != budget) {
+      await assistantProvider.updateAssistant(
+        assistant.copyWith(thinkingBudget: budget),
+      );
+    }
+  }
+
+  Future<void> _setComposerModel(String providerKey, String modelId) async {
+    final assistantProvider = context.read<AssistantProvider>();
+    final assistant = assistantProvider.currentAssistant;
+    if (assistant != null) {
+      await assistantProvider.updateAssistant(
+        assistant.copyWith(
+          chatModelProvider: providerKey,
+          chatModelId: modelId,
+        ),
+      );
+      return;
+    }
+    await context.read<SettingsProvider>().setCurrentModel(
+      providerKey,
+      modelId,
+    );
   }
 
   Future<void> _openReasoningSettings() async {

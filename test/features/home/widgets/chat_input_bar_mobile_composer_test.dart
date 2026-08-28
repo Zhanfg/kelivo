@@ -27,6 +27,7 @@ void main() {
     required SettingsProvider settings,
     required AsrProvider asr,
     required TextEditingController controller,
+    Future<void> Function(int budget)? onReasoningBudgetChanged,
   }) {
     return MultiProvider(
       providers: [
@@ -46,9 +47,14 @@ void main() {
             asrProvider: asr,
             onMore: () {},
             onConfigureReasoning: () {},
+            onReasoningBudgetChanged: onReasoningBudgetChanged ?? (_) async {},
             onSelectModel: () {},
             reasoningBudget: -1,
             supportsReasoning: true,
+            currentModelProvider: 'ProviderA',
+            currentModelId: 'model-a',
+            supportsXhighReasoning: true,
+            supportsMaxReasoning: false,
             onSend: (_) async => ChatInputSubmissionResult.rejected,
           ),
         ),
@@ -87,6 +93,46 @@ void main() {
 
     // Secondary capabilities stay out of the persistent mobile row.
     expect(find.byIcon(Lucide.Globe), findsNothing);
+  });
+
+  testWidgets('mobile reasoning button opens the anchored local popover', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final p = await providers();
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    addTearDown(p.asr.dispose);
+    int? chosenBudget;
+
+    await tester.pumpWidget(
+      harness(
+        settings: p.settings,
+        asr: p.asr,
+        controller: controller,
+        onReasoningBudgetChanged: (budget) async {
+          chosenBudget = budget;
+        },
+      ),
+    );
+    await tester.pump();
+
+    final context = tester.element(find.byType(ChatInputBar));
+    final l10n = AppLocalizations.of(context)!;
+    await tester.tap(find.byTooltip(l10n.chatInputBarReasoningStrengthTooltip));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('composer-reasoning-slider')),
+      findsOneWidget,
+    );
+    expect(find.text(l10n.modelDetailSheetAdvancedTab), findsOneWidget);
+    expect(find.textContaining('Speed'), findsNothing);
+    expect(chosenBudget, isNull);
   });
 
   testWidgets('six visual lines expose fullscreen editing and preserve draft', (
