@@ -10,14 +10,17 @@ void main() {
     expect(delivery.isRealtime, isFalse);
   });
 
-  test('classifies HTTP segment recognizers as progressive segmented preview', () {
-    for (final kind in [AsrServiceKind.mimo, AsrServiceKind.step]) {
-      final delivery = asrTranscriptDeliveryForKind(kind);
-      expect(delivery, AsrTranscriptDelivery.segmented);
-      expect(delivery.supportsLivePreview, isTrue);
-      expect(delivery.isRealtime, isFalse);
-    }
-  });
+  test(
+    'classifies HTTP segment recognizers as progressive segmented preview',
+    () {
+      for (final kind in [AsrServiceKind.mimo, AsrServiceKind.step]) {
+        final delivery = asrTranscriptDeliveryForKind(kind);
+        expect(delivery, AsrTranscriptDelivery.segmented);
+        expect(delivery.supportsLivePreview, isTrue);
+        expect(delivery.isRealtime, isFalse);
+      }
+    },
+  );
 
   test('classifies system and websocket recognizers as realtime preview', () {
     for (final kind in [

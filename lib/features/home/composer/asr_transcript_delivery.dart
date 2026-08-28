@@ -18,8 +18,8 @@ AsrTranscriptDelivery asrTranscriptDeliveryFor(AsrServiceOptions options) {
 AsrTranscriptDelivery asrTranscriptDeliveryForKind(AsrServiceKind kind) {
   return switch (kind) {
     AsrServiceKind.sherpaOnnx => AsrTranscriptDelivery.finalOnly,
-    AsrServiceKind.mimo || AsrServiceKind.step =>
-      AsrTranscriptDelivery.segmented,
+    AsrServiceKind.mimo ||
+    AsrServiceKind.step => AsrTranscriptDelivery.segmented,
     AsrServiceKind.system ||
     AsrServiceKind.openAiRealtime ||
     AsrServiceKind.dashScope ||

@@ -8,21 +8,12 @@ void main() {
         composerReasoningLevelForBudget(null),
         ComposerReasoningLevel.auto,
       );
-      expect(
-        composerReasoningLevelForBudget(-1),
-        ComposerReasoningLevel.auto,
-      );
+      expect(composerReasoningLevelForBudget(-1), ComposerReasoningLevel.auto);
     });
 
     test('maps standard presets to the six-level vocabulary', () {
-      expect(
-        composerReasoningLevelForBudget(0),
-        ComposerReasoningLevel.off,
-      );
-      expect(
-        composerReasoningLevelForBudget(1024),
-        ComposerReasoningLevel.low,
-      );
+      expect(composerReasoningLevelForBudget(0), ComposerReasoningLevel.off);
+      expect(composerReasoningLevelForBudget(1024), ComposerReasoningLevel.low);
       expect(
         composerReasoningLevelForBudget(16000),
         ComposerReasoningLevel.medium,
@@ -42,10 +33,7 @@ void main() {
     });
 
     test('does not require custom budgets to be rewritten before display', () {
-      expect(
-        composerReasoningLevelForBudget(2048),
-        ComposerReasoningLevel.low,
-      );
+      expect(composerReasoningLevelForBudget(2048), ComposerReasoningLevel.low);
       expect(
         composerReasoningLevelForBudget(20000),
         ComposerReasoningLevel.medium,

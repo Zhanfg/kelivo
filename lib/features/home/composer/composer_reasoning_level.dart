@@ -46,11 +46,12 @@ int budgetForComposerReasoningLevel(
     ComposerReasoningLevel.low => composerReasoningLowBudget,
     ComposerReasoningLevel.medium => composerReasoningMediumBudget,
     ComposerReasoningLevel.high => composerReasoningHighBudget,
-    ComposerReasoningLevel.max => supportsMax
-        ? composerReasoningMaxBudget
-        : supportsXhigh
-        ? composerReasoningXhighBudget
-        : composerReasoningHighBudget,
+    ComposerReasoningLevel.max =>
+      supportsMax
+          ? composerReasoningMaxBudget
+          : supportsXhigh
+          ? composerReasoningXhighBudget
+          : composerReasoningHighBudget,
   };
 }
 
