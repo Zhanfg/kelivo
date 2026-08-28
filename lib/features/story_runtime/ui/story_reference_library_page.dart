@@ -7,6 +7,7 @@ import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../../model/widgets/model_select_sheet.dart';
 import '../reference/story_reference_analysis_service.dart';
 import '../reference/story_reference_import_service.dart';
 import '../reference/story_reference_kelivo_model_runner.dart';
@@ -29,6 +30,8 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
   bool _busy = false;
   String? _selectedConversationId;
   String? _progressText;
+  String? _analysisProviderKey;
+  String? _analysisModelId;
 
   late StoryReferenceDocumentStore _documentStore;
   late StoryReferenceProfileStore _profileStore;
@@ -38,6 +41,8 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
   List<StoryReferenceDocument> _documents = const [];
   List<StoryReferenceStyleProfile> _profiles = const [];
   List<StoryReferenceInvocation> _selectedReferences = const [];
+  final Set<String> _selectedDocumentIds = <String>{};
+  final Set<String> _selectedProfileIds = <String>{};
 
   @override
   void didChangeDependencies() {
@@ -45,6 +50,9 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
     if (_initialized) return;
     _initialized = true;
     final preferences = context.read<BusinessPreferences>();
+    final settings = context.read<SettingsProvider>();
+    _analysisProviderKey = settings.currentModelProvider?.trim();
+    _analysisModelId = settings.currentModelId?.trim();
     _documentStore = StoryReferenceDocumentStore(preferences);
     _profileStore = StoryReferenceProfileStore(preferences);
     _selectionStore = StoryReferenceSelectionStore(preferences);
@@ -81,10 +89,14 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
           ? null
           : await _selectionStore.readForConversation(conversationId);
       if (!mounted) return;
+      final documentIds = documents.map((item) => item.id).toSet();
+      final profileIds = profiles.map((item) => item.id).toSet();
       setState(() {
         _documents = documents;
         _profiles = profiles;
         _selectedReferences = selection?.invocations ?? const [];
+        _selectedDocumentIds.removeWhere((id) => !documentIds.contains(id));
+        _selectedProfileIds.removeWhere((id) => !profileIds.contains(id));
         _loading = false;
       });
     } catch (error) {
@@ -100,64 +112,166 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
     await _reload();
   }
 
+  Future<void> _pickAnalysisModel() async {
+    if (_busy) return;
+    final settings = context.read<SettingsProvider>();
+    final initialProvider = _analysisProviderKey ?? settings.currentModelProvider;
+    final initialModel = _analysisModelId ?? settings.currentModelId;
+    final selected = await showModelSelector(
+      context,
+      initialProviderKey: initialProvider,
+      initialModelId: initialModel,
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _analysisProviderKey = selected.providerKey;
+      _analysisModelId = selected.modelId;
+    });
+  }
+
+  String _analysisModelLabel(SettingsProvider settings) {
+    final provider = _analysisProviderKey?.trim();
+    final model = _analysisModelId?.trim();
+    if (provider == null || provider.isEmpty || model == null || model.isEmpty) {
+      return '未选择';
+    }
+    final config = settings.getProviderConfig(provider);
+    final rawOverride = config.modelOverrides[model];
+    if (rawOverride is Map) {
+      final overrideName = rawOverride['name']?.toString().trim();
+      if (overrideName != null && overrideName.isNotEmpty) {
+        return '$overrideName · ${config.name}';
+      }
+    }
+    final providerName = config.name.trim().isEmpty ? provider : config.name.trim();
+    return '$model · $providerName';
+  }
+
   Future<void> _importReference() async {
     if (_busy) return;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['txt', 'md', 'markdown', 'pdf', 'docx', 'epub'],
-      allowMultiple: false,
+      allowMultiple: true,
     );
-    final path = result?.files.single.path;
-    if (path == null || path.trim().isEmpty) return;
+    final paths = result?.files
+            .map((file) => file.path?.trim())
+            .whereType<String>()
+            .where((path) => path.isNotEmpty)
+            .toList(growable: false) ??
+        const <String>[];
+    if (paths.isEmpty) return;
 
     await _runBusy(() async {
-      final imported = await _referenceImportService.importFile(path: path);
-      if (mounted) {
-        _showMessage(
-          imported.deduplicated
-              ? '参考文本已存在，已复用。'
-              : '参考文本已导入。现在可以分析成 Style Profile。',
+      var importedCount = 0;
+      var reusedCount = 0;
+      for (var index = 0; index < paths.length; index++) {
+        if (mounted) {
+          setState(() => _progressText = '导入 ${index + 1} / ${paths.length}');
+        }
+        final imported = await _referenceImportService.importFile(
+          path: paths[index],
         );
+        _selectedDocumentIds.add(imported.document.id);
+        if (imported.deduplicated) {
+          reusedCount++;
+        } else {
+          importedCount++;
+        }
+      }
+      if (mounted) {
+        _showMessage('已导入 $importedCount 本，复用 $reusedCount 本；已自动选中，可直接批量分析。');
       }
     });
   }
 
-  Future<void> _analyzeReference(StoryReferenceDocument document) async {
-    if (_busy) return;
+  Future<void> _analyzeSelectedDocuments() async {
+    final selected = _documents
+        .where((item) => _selectedDocumentIds.contains(item.id))
+        .toList(growable: false);
+    if (selected.isEmpty) {
+      _showMessage('请先选择至少一个参考文本。');
+      return;
+    }
+    await _analyzeDocuments(selected);
+  }
+
+  Future<void> _analyzeDocuments(
+    List<StoryReferenceDocument> documents,
+  ) async {
+    if (_busy || documents.isEmpty) return;
     final settings = context.read<SettingsProvider>();
-    final provider = settings.currentModelProvider?.trim();
-    final model = settings.currentModelId?.trim();
+    final provider = _analysisProviderKey?.trim();
+    final model = _analysisModelId?.trim();
     if (provider == null ||
         provider.isEmpty ||
         model == null ||
         model.isEmpty) {
-      _showMessage('请先在 Kelivo 中选择一个聊天模型，再分析参考文本。');
+      _showMessage('请先选择用于参考文本分析的模型。');
       return;
     }
 
+    final runner = StoryReferenceKelivoModelRunner(
+      settings: settings,
+      providerKey: provider,
+      modelId: model,
+    );
+    const service = StoryReferenceAnalysisService();
     await _runBusy(() async {
-      final source = await _referenceImportService.readNormalizedText(document);
-      final runner = StoryReferenceKelivoModelRunner(
-        settings: settings,
-        providerKey: provider,
-        modelId: model,
-      );
-      const service = StoryReferenceAnalysisService();
-      await service.analyzeAndSave(
-        document: document,
-        sourceText: source,
-        runModel: runner.call,
-        profileRepository: _profileStore,
-        onProgress: (stage, completed, total) {
-          if (!mounted) return;
-          setState(() {
-            _progressText = stage == StoryReferenceAnalysisStage.analyzeChunk
-                ? '分析文本 $completed / $total'
-                : '汇总风格 $completed / $total';
-          });
-        },
-      );
-      if (mounted) _showMessage('Style Profile 已生成。');
+      for (var documentIndex = 0;
+          documentIndex < documents.length;
+          documentIndex++) {
+        final document = documents[documentIndex];
+        final source = await _referenceImportService.readNormalizedText(document);
+        await service.analyzeAndSave(
+          document: document,
+          sourceText: source,
+          runModel: runner.call,
+          profileRepository: _profileStore,
+          onProgress: (stage, completed, total) {
+            if (!mounted) return;
+            final stageText = stage == StoryReferenceAnalysisStage.analyzeChunk
+                ? '分析分块'
+                : '汇总风格';
+            setState(() {
+              _progressText =
+                  '${documentIndex + 1} / ${documents.length} · ${document.title}\n$stageText $completed / $total';
+            });
+          },
+        );
+      }
+      if (mounted) {
+        _showMessage('已完成 ${documents.length} 个参考文本的真实模型分析。');
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedDocuments() async {
+    if (_busy || _selectedDocumentIds.isEmpty) return;
+    final ids = Set<String>.from(_selectedDocumentIds);
+    final profilesToRemove = _profiles
+        .where((profile) => ids.contains(profile.documentId))
+        .map((profile) => profile.id)
+        .toSet();
+    await _runBusy(() async {
+      for (final profileId in profilesToRemove) {
+        await _profileStore.remove(profileId);
+      }
+      for (final documentId in ids) {
+        await _referenceImportService.deleteDocument(documentId);
+      }
+      final conversationId = _selectedConversationId;
+      if (conversationId != null && profilesToRemove.isNotEmpty) {
+        await _selectionStore.writeForConversation(
+          conversationId,
+          _selectedReferences.where(
+            (item) => !profilesToRemove.contains(item.profileId),
+          ),
+        );
+      }
+      _selectedDocumentIds.clear();
+      _selectedProfileIds.removeAll(profilesToRemove);
+      if (mounted) _showMessage('已删除 ${ids.length} 个参考文本及其 Style Profile。');
     });
   }
 
@@ -188,6 +302,58 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
     }
     await _selectionStore.writeForConversation(conversationId, next);
     await _reload();
+  }
+
+  Future<void> _setSelectedProfilesEnabled(bool enabled) async {
+    final conversationId = _selectedConversationId;
+    if (conversationId == null || _selectedProfileIds.isEmpty || _busy) return;
+    final selectedProfiles = {
+      for (final profile in _profiles)
+        if (_selectedProfileIds.contains(profile.id)) profile.id: profile,
+    };
+    await _runBusy(() async {
+      final next = <StoryReferenceInvocation>[
+        for (final invocation in _selectedReferences)
+          if (!selectedProfiles.containsKey(invocation.profileId)) invocation,
+      ];
+      if (enabled) {
+        for (final profile in selectedProfiles.values) {
+          final existing = _referenceInvocation(profile.id);
+          next.add(
+            StoryReferenceInvocation(
+              profileId: profile.id,
+              strength: existing?.strength ?? 0.65,
+              enabledAspects: existing?.enabledAspects.isNotEmpty == true
+                  ? existing!.enabledAspects
+                  : profile.aspects,
+            ),
+          );
+        }
+      }
+      await _selectionStore.writeForConversation(conversationId, next);
+      if (mounted) {
+        _showMessage(enabled ? '已批量启用 Style Profile。' : '已批量停用 Style Profile。');
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedProfiles() async {
+    if (_selectedProfileIds.isEmpty || _busy) return;
+    final ids = Set<String>.from(_selectedProfileIds);
+    await _runBusy(() async {
+      for (final id in ids) {
+        await _profileStore.remove(id);
+      }
+      final conversationId = _selectedConversationId;
+      if (conversationId != null) {
+        await _selectionStore.writeForConversation(
+          conversationId,
+          _selectedReferences.where((item) => !ids.contains(item.profileId)),
+        );
+      }
+      _selectedProfileIds.clear();
+      if (mounted) _showMessage('已删除 ${ids.length} 个 Style Profile。');
+    });
   }
 
   Future<void> _setReferenceStrength(
@@ -234,6 +400,51 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
     }
   }
 
+  void _toggleDocumentSelection(String id, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedDocumentIds.add(id);
+      } else {
+        _selectedDocumentIds.remove(id);
+      }
+    });
+  }
+
+  void _toggleProfileSelection(String id, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedProfileIds.add(id);
+      } else {
+        _selectedProfileIds.remove(id);
+      }
+    });
+  }
+
+  void _toggleAllDocuments() {
+    setState(() {
+      if (_documents.isNotEmpty &&
+          _selectedDocumentIds.length == _documents.length) {
+        _selectedDocumentIds.clear();
+      } else {
+        _selectedDocumentIds
+          ..clear()
+          ..addAll(_documents.map((item) => item.id));
+      }
+    });
+  }
+
+  void _toggleAllProfiles() {
+    setState(() {
+      if (_profiles.isNotEmpty && _selectedProfileIds.length == _profiles.length) {
+        _selectedProfileIds.clear();
+      } else {
+        _selectedProfileIds
+          ..clear()
+          ..addAll(_profiles.map((item) => item.id));
+      }
+    });
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(
       context,
@@ -247,6 +458,7 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
   @override
   Widget build(BuildContext context) {
     final conversations = _conversations();
+    final settings = context.watch<SettingsProvider>();
     final isZh = Localizations.localeOf(context).languageCode == 'zh';
     String tr(String zh, String en) => isZh ? zh : en;
 
@@ -261,6 +473,11 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
       return tr('未命名会话', 'Untitled conversation');
     }
 
+    final allDocumentsSelected = _documents.isNotEmpty &&
+        _selectedDocumentIds.length == _documents.length;
+    final allProfilesSelected =
+        _profiles.isNotEmpty && _selectedProfileIds.length == _profiles.length;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -273,11 +490,27 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
                 StoryNativeSection(
-                  title: tr('应用目标', 'Apply to'),
+                  title: tr('分析模型', 'Analysis model'),
                   first: true,
                   footer: tr(
-                    '参考文本库全局保存；Style Profile 可按会话独立启用。它是独立能力，不属于故事模式设置。',
-                    'Reference texts are stored globally; Style Profiles can be enabled per conversation. This is an independent capability, not a Story Mode setting.',
+                    '这里选择的模型只用于参考文本分析，不会改动当前聊天模型。',
+                    'This model is used only for reference analysis and does not change the active chat model.',
+                  ),
+                  children: [
+                    StoryNativeRow(
+                      title: tr('用于分析的模型', 'Model for analysis'),
+                      subtitle: _analysisModelLabel(settings),
+                      icon: Lucide.Bot,
+                      onTap: _busy ? null : _pickAnalysisModel,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                StoryNativeSection(
+                  title: tr('应用目标', 'Apply to'),
+                  footer: tr(
+                    '参考文本库全局保存；Style Profile 可按会话独立启用。',
+                    'Reference texts are stored globally; Style Profiles can be enabled per conversation.',
                   ),
                   children: [
                     if (conversations.isNotEmpty)
@@ -306,19 +539,54 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
                 StoryNativeSection(
                   title: tr('参考文本库', 'Reference Library'),
                   footer: tr(
-                    '导入后可生成抽象 Style Profile；正常推理不会把整本原文直接塞进上下文。',
-                    'Imports can be compiled into abstract Style Profiles; normal inference does not inject the full source text.',
+                    '支持一次选择多本书。分析会逐本执行真实模型调用并生成抽象 Style Profile。',
+                    'Select multiple books at once. Analysis executes real model calls for each document and generates abstract Style Profiles.',
                   ),
                   children: [
                     StoryNativeRow(
-                      title: tr('导入小说 / 文本', 'Import novel / text'),
+                      title: tr('批量导入小说 / 文本', 'Import novels / texts'),
                       subtitle: tr(
-                        '支持 TXT、Markdown、PDF、DOCX、EPUB。',
-                        'Supports TXT, Markdown, PDF, DOCX and EPUB.',
+                        '支持 TXT、Markdown、PDF、DOCX、EPUB，可一次多选。',
+                        'Supports TXT, Markdown, PDF, DOCX and EPUB with multi-select.',
                       ),
                       icon: Lucide.Import,
                       onTap: _busy ? null : _importReference,
                     ),
+                    if (_documents.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            StoryNativeButton(
+                              label: allDocumentsSelected
+                                  ? tr('取消全选', 'Clear all')
+                                  : tr('全选', 'Select all'),
+                              icon: Lucide.ListChecks,
+                              enabled: !_busy,
+                              onTap: _toggleAllDocuments,
+                            ),
+                            StoryNativeButton(
+                              label: tr(
+                                '分析所选 (${_selectedDocumentIds.length})',
+                                'Analyze selected (${_selectedDocumentIds.length})',
+                              ),
+                              icon: Lucide.Search,
+                              primary: true,
+                              enabled: !_busy && _selectedDocumentIds.isNotEmpty,
+                              onTap: _analyzeSelectedDocuments,
+                            ),
+                            StoryNativeButton(
+                              label: tr('删除所选', 'Delete selected'),
+                              icon: Lucide.Trash2,
+                              enabled: !_busy && _selectedDocumentIds.isNotEmpty,
+                              onTap: _deleteSelectedDocuments,
+                            ),
+                          ],
+                        ),
+                      ),
                     if (_documents.isEmpty)
                       StoryNativeRow(
                         title: tr('还没有参考文本', 'No reference texts'),
@@ -326,19 +594,13 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
                         enabled: false,
                       ),
                     for (final document in _documents)
-                      StoryNativeRow(
-                        title: document.title,
-                        subtitle: tr(
-                          '${document.characterCount} 字符 · ${document.chunkCount} 分块',
-                          '${document.characterCount} characters · ${document.chunkCount} chunks',
-                        ),
-                        icon: Lucide.NotebookTabs,
-                        trailing: StoryNativeButton(
-                          label: tr('分析', 'Analyze'),
-                          icon: Lucide.Search,
-                          enabled: !_busy,
-                          onTap: () => _analyzeReference(document),
-                        ),
+                      _SelectableDocumentRow(
+                        document: document,
+                        selected: _selectedDocumentIds.contains(document.id),
+                        enabled: !_busy,
+                        onSelected: (value) =>
+                            _toggleDocumentSelection(document.id, value),
+                        onAnalyze: () => _analyzeDocuments([document]),
                       ),
                   ],
                 ),
@@ -346,6 +608,47 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
                 StoryNativeSection(
                   title: 'Style Profiles',
                   children: [
+                    if (_profiles.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            StoryNativeButton(
+                              label: allProfilesSelected
+                                  ? tr('取消全选', 'Clear all')
+                                  : tr('全选', 'Select all'),
+                              icon: Lucide.ListChecks,
+                              enabled: !_busy,
+                              onTap: _toggleAllProfiles,
+                            ),
+                            StoryNativeButton(
+                              label: tr('批量启用', 'Enable selected'),
+                              icon: Lucide.Check,
+                              primary: true,
+                              enabled: !_busy &&
+                                  _selectedConversationId != null &&
+                                  _selectedProfileIds.isNotEmpty,
+                              onTap: () => _setSelectedProfilesEnabled(true),
+                            ),
+                            StoryNativeButton(
+                              label: tr('批量停用', 'Disable selected'),
+                              icon: Lucide.CircleOff,
+                              enabled: !_busy &&
+                                  _selectedConversationId != null &&
+                                  _selectedProfileIds.isNotEmpty,
+                              onTap: () => _setSelectedProfilesEnabled(false),
+                            ),
+                            StoryNativeButton(
+                              label: tr('删除所选', 'Delete selected'),
+                              icon: Lucide.Trash2,
+                              enabled: !_busy && _selectedProfileIds.isNotEmpty,
+                              onTap: _deleteSelectedProfiles,
+                            ),
+                          ],
+                        ),
+                      ),
                     if (_profiles.isEmpty)
                       StoryNativeRow(
                         title: tr('还没有 Style Profile', 'No Style Profiles'),
@@ -371,61 +674,170 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
   Widget _profileCard(StoryReferenceStyleProfile profile) {
     final invocation = _referenceInvocation(profile.id);
     final enabled = invocation != null;
+    final selected = _selectedProfileIds.contains(profile.id);
     final aspects = profile.aspects.map((item) => item.name).toList()..sort();
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Column(
-        children: [
-          StoryNativeSwitchRow(
-            title: profile.name,
-            subtitle: aspects.isEmpty ? '抽象写作风格' : aspects.join(' · '),
-            icon: Lucide.Sparkles,
-            value: enabled,
-            onChanged: _busy || _selectedConversationId == null
-                ? null
-                : (value) => _setReferenceEnabled(profile, value),
-          ),
-          if (invocation != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 12, 8),
-              child: Row(
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+          child: Column(
+            children: [
+              Row(
                 children: [
-                  const Text('参考强度'),
+                  Checkbox(
+                    value: selected,
+                    onChanged: _busy
+                        ? null
+                        : (value) =>
+                            _toggleProfileSelection(profile.id, value == true),
+                  ),
                   Expanded(
-                    child: Slider(
-                      value: invocation.strength,
-                      min: 0.1,
-                      max: 1,
-                      divisions: 9,
-                      label: invocation.strength.toStringAsFixed(1),
-                      onChanged: _busy
+                    child: InkWell(
+                      onTap: _busy
                           ? null
-                          : (value) => setState(() {
-                              _selectedReferences = [
-                                for (final item in _selectedReferences)
-                                  if (item.profileId == profile.id)
-                                    StoryReferenceInvocation(
-                                      profileId: item.profileId,
-                                      strength: value,
-                                      enabledAspects: item.enabledAspects,
-                                    )
-                                  else
-                                    item,
-                              ];
-                            }),
-                      onChangeEnd: _busy
-                          ? null
-                          : (value) => _setReferenceStrength(profile, value),
+                          : () => _toggleProfileSelection(profile.id, !selected),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(profile.name),
+                            const SizedBox(height: 2),
+                            Text(
+                              aspects.isEmpty
+                                  ? '抽象写作风格'
+                                  : aspects.join(' · '),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                  SizedBox(
-                    width: 34,
-                    child: Text(invocation.strength.toStringAsFixed(1)),
+                  Switch(
+                    value: enabled,
+                    onChanged: _busy || _selectedConversationId == null
+                        ? null
+                        : (value) => _setReferenceEnabled(profile, value),
                   ),
                 ],
               ),
-            ),
-        ],
+              if (invocation != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(44, 0, 4, 6),
+                  child: Row(
+                    children: [
+                      const Text('参考强度'),
+                      Expanded(
+                        child: Slider(
+                          value: invocation.strength,
+                          min: 0.1,
+                          max: 1,
+                          divisions: 9,
+                          label: invocation.strength.toStringAsFixed(1),
+                          onChanged: _busy
+                              ? null
+                              : (value) => setState(() {
+                                  _selectedReferences = [
+                                    for (final item in _selectedReferences)
+                                      if (item.profileId == profile.id)
+                                        StoryReferenceInvocation(
+                                          profileId: item.profileId,
+                                          strength: value,
+                                          enabledAspects: item.enabledAspects,
+                                        )
+                                      else
+                                        item,
+                                  ];
+                                }),
+                          onChangeEnd: _busy
+                              ? null
+                              : (value) =>
+                                  _setReferenceStrength(profile, value),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 34,
+                        child: Text(invocation.strength.toStringAsFixed(1)),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectableDocumentRow extends StatelessWidget {
+  const _SelectableDocumentRow({
+    required this.document,
+    required this.selected,
+    required this.enabled,
+    required this.onSelected,
+    required this.onAnalyze,
+  });
+
+  final StoryReferenceDocument document;
+  final bool selected;
+  final bool enabled;
+  final ValueChanged<bool> onSelected;
+  final VoidCallback onAnalyze;
+
+  @override
+  Widget build(BuildContext context) {
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? () => onSelected(!selected) : null,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+          child: Row(
+            children: [
+              Checkbox(
+                value: selected,
+                onChanged: enabled ? (value) => onSelected(value == true) : null,
+              ),
+              Icon(Lucide.NotebookTabs, size: 20, color: cs.onSurfaceVariant),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(document.title),
+                    const SizedBox(height: 2),
+                    Text(
+                      zh
+                          ? '${document.characterCount} 字符 · ${document.chunkCount} 分块'
+                          : '${document.characterCount} characters · ${document.chunkCount} chunks',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              StoryNativeButton(
+                label: zh ? '分析' : 'Analyze',
+                icon: Lucide.Search,
+                enabled: enabled,
+                onTap: onAnalyze,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
