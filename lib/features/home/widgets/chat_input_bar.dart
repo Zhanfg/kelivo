@@ -118,9 +118,14 @@ class ChatInputBar extends StatefulWidget {
     this.mediaController,
     this.asrProvider,
     this.loading = false,
+    this.onGuide,
     this.hasQueuedInput = false,
     this.queuedPreviewText,
+    this.queuedInputs = const <QueuedChatInput>[],
     this.onCancelQueuedInput,
+    this.onRemoveQueuedInput,
+    this.onClearQueuedInputs,
+    this.onReorderQueuedInput,
     this.reasoningActive = false,
     this.reasoningBudget,
     this.supportsReasoning = true,
@@ -155,6 +160,7 @@ class ChatInputBar extends StatefulWidget {
   });
 
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
+  final Future<ChatInputSubmissionResult> Function(ChatInputData)? onGuide;
   final VoidCallback? onStop;
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
@@ -178,7 +184,11 @@ class ChatInputBar extends StatefulWidget {
   final bool loading;
   final bool hasQueuedInput;
   final String? queuedPreviewText;
+  final List<QueuedChatInput> queuedInputs;
   final VoidCallback? onCancelQueuedInput;
+  final ValueChanged<int>? onRemoveQueuedInput;
+  final VoidCallback? onClearQueuedInputs;
+  final void Function(int oldIndex, int newIndex)? onReorderQueuedInput;
   final bool reasoningActive;
   final int? reasoningBudget;
   final bool supportsReasoning;
@@ -266,7 +276,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
 
-  bool get _composerLocked => widget.hasQueuedInput;
+  bool get _composerLocked => false;
 
   Color _inputFillColor({
     required ThemeData theme,
@@ -1140,7 +1150,28 @@ class _ChatInputBarState extends State<ChatInputBar>
     );
   }
 
-  Future<void> _handleSend() async {
+  Future<void> _showQueueManager() async {
+    if (widget.queuedInputs.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => _QueuedInputManager(
+        inputs: widget.queuedInputs,
+        onRemove: widget.onRemoveQueuedInput,
+        onClear: widget.onClearQueuedInputs,
+        onReorder: widget.onReorderQueuedInput,
+      ),
+    );
+  }
+
+  Future<void> _handleSend() => _submitDraft(widget.onSend);
+
+  Future<void> _handleGuide() => _submitDraft(widget.onGuide);
+
+  Future<void> _submitDraft(
+    Future<ChatInputSubmissionResult> Function(ChatInputData)? submit,
+  ) async {
     if (_isSubmitting ||
         _hasUnreadyImages ||
         _ownsVoiceSession ||
@@ -1169,7 +1200,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     });
     try {
       final result =
-          await widget.onSend?.call(
+          await submit?.call(
             ChatInputData(
               text: text,
               imagePaths: submittedImages.map((image) => image.path).toList(),
@@ -2848,6 +2879,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     final hasText = _controller.text.trim().isNotEmpty;
     final hasImages = _images.isNotEmpty;
     final hasDocs = _docs.isNotEmpty;
+    final showGenerationDraftActions =
+        widget.loading && (hasText || hasImages || hasDocs);
     _supportsImagesApiRouting(context);
     final size = MediaQuery.sizeOf(context);
     final viewInsets = MediaQuery.viewInsetsOf(context);
@@ -2898,12 +2931,17 @@ class _ChatInputBarState extends State<ChatInputBar>
           children: [
             if (widget.hasQueuedInput) ...[
               _QueuedInputBanner(
-                label: AppLocalizations.of(context)!.chatInputBarQueuedPending,
+                label: widget.queuedInputs.length > 1
+                    ? '${AppLocalizations.of(context)!.chatInputBarQueuedPending} · ${widget.queuedInputs.length}'
+                    : AppLocalizations.of(context)!.chatInputBarQueuedPending,
                 previewText: widget.queuedPreviewText,
                 cancelLabel: AppLocalizations.of(
                   context,
                 )!.chatInputBarQueuedCancel,
                 onCancel: widget.onCancelQueuedInput,
+                onManage: widget.queuedInputs.isEmpty
+                    ? null
+                    : () => unawaited(_showQueueManager()),
               ),
               const SizedBox(height: AppSpacing.xs),
             ],
@@ -3229,7 +3267,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                               ),
                                               const SizedBox(width: 8),
                                             ],
-                                            if (isMobileLayout) ...[
+                                            if (isMobileLayout &&
+                                                !showGenerationDraftActions) ...[
                                               Builder(
                                                 builder: (_) {
                                                   final anchorKey = GlobalKey(
@@ -3296,7 +3335,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                               ),
                                               const SizedBox(width: 8),
                                             ],
-                                            if (showVoiceInput) ...[
+                                            if (showVoiceInput &&
+                                                !showGenerationDraftActions) ...[
                                               _CompactIconButton(
                                                 tooltip: AppLocalizations.of(
                                                   context,
@@ -3321,6 +3361,34 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     isMobileLayout,
                                               ),
                                               const SizedBox(width: 8),
+                                            ],
+                                            if (showGenerationDraftActions) ...[
+                                              _CompactActionPill(
+                                                label:
+                                                    Localizations.localeOf(
+                                                          context,
+                                                        ).languageCode ==
+                                                        'zh'
+                                                    ? '加入队列'
+                                                    : 'Queue',
+                                                icon: Lucide.ListOrdered,
+                                                onTap: _handleSend,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              _CompactActionPill(
+                                                label:
+                                                    Localizations.localeOf(
+                                                          context,
+                                                        ).languageCode ==
+                                                        'zh'
+                                                    ? '立即引导'
+                                                    : 'Guide',
+                                                icon: Lucide.MessageCirclePlus,
+                                                onTap: widget.onGuide == null
+                                                    ? null
+                                                    : _handleGuide,
+                                              ),
+                                              const SizedBox(width: 6),
                                             ],
                                             _CompactSendButton(
                                               enabled:
@@ -3386,12 +3454,14 @@ class _QueuedInputBanner extends StatelessWidget {
     required this.cancelLabel,
     this.previewText,
     this.onCancel,
+    this.onManage,
   });
 
   final String label;
   final String cancelLabel;
   final String? previewText;
   final VoidCallback? onCancel;
+  final VoidCallback? onManage;
 
   @override
   Widget build(BuildContext context) {
@@ -3400,78 +3470,200 @@ class _QueuedInputBanner extends StatelessWidget {
     final preview = previewText?.trim();
     final hasPreview = preview != null && preview.isNotEmpty;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? theme.colorScheme.onSurface.withValues(alpha: 0.08)
-            : theme.colorScheme.surface.withValues(alpha: 0.84),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.16),
+    return IosCardPress(
+      onTap: onManage,
+      borderRadius: BorderRadius.circular(16),
+      baseColor: Colors.transparent,
+      padding: EdgeInsets.zero,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark
+              ? theme.colorScheme.onSurface.withValues(alpha: 0.08)
+              : theme.colorScheme.surface.withValues(alpha: 0.84),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.16),
+          ),
         ),
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(
-              Icons.schedule_rounded,
-              size: 16,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: AppFontWeights.semibold,
-                  ),
-                ),
-                if (hasPreview) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    preview,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.72,
-                      ),
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          IosCardPress(
-            onTap: onCancel,
-            borderRadius: BorderRadius.circular(10),
-            baseColor: Colors.transparent,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.xs,
-            ),
-            child: Text(
-              cancelLabel,
-              style: theme.textTheme.bodySmall?.copyWith(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(
+                Icons.schedule_rounded,
+                size: 16,
                 color: theme.colorScheme.primary,
-                fontWeight: AppFontWeights.semibold,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                  if (hasPreview) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      preview,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.72,
+                        ),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            IosCardPress(
+              onTap: onCancel,
+              borderRadius: BorderRadius.circular(10),
+              baseColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xs,
+              ),
+              child: Text(
+                cancelLabel,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QueuedInputManager extends StatefulWidget {
+  const _QueuedInputManager({
+    required this.inputs,
+    this.onRemove,
+    this.onClear,
+    this.onReorder,
+  });
+
+  final List<QueuedChatInput> inputs;
+  final ValueChanged<int>? onRemove;
+  final VoidCallback? onClear;
+  final void Function(int oldIndex, int newIndex)? onReorder;
+
+  @override
+  State<_QueuedInputManager> createState() => _QueuedInputManagerState();
+}
+
+class _QueuedInputManagerState extends State<_QueuedInputManager> {
+  late final List<QueuedChatInput> _inputs = List.of(widget.inputs);
+
+  String _preview(QueuedChatInput queued) {
+    final text = queued.input.text.trim();
+    if (text.isNotEmpty) return text;
+    if (queued.input.documents.isNotEmpty) {
+      return queued.input.documents.first.fileName;
+    }
+    return '${queued.input.imagePaths.length} image(s)';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.56,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${l10n.chatInputBarQueuedPending} · ${_inputs.length}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: AppFontWeights.semibold,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: widget.onClear == null
+                        ? null
+                        : () {
+                            widget.onClear!();
+                            Navigator.of(context).pop();
+                          },
+                    child: Text(l10n.chatInputBarQueuedCancel),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ReorderableListView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                itemCount: _inputs.length,
+                onReorderItem: (oldIndex, newIndex) {
+                  if (oldIndex == newIndex) return;
+                  final item = _inputs.removeAt(oldIndex);
+                  _inputs.insert(newIndex, item);
+                  widget.onReorder?.call(oldIndex, newIndex);
+                  setState(() {});
+                },
+                itemBuilder: (context, index) {
+                  final queued = _inputs[index];
+                  return Card(
+                    key: ObjectKey(queued),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: ReorderableDragStartListener(
+                        index: index,
+                        child: const Icon(Lucide.GripVertical, size: 18),
+                      ),
+                      title: Text(
+                        _preview(queued),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: IconButton(
+                        tooltip: MaterialLocalizations.of(
+                          context,
+                        ).deleteButtonTooltip,
+                        icon: const Icon(Lucide.Trash2, size: 18),
+                        onPressed: widget.onRemove == null
+                            ? null
+                            : () {
+                                widget.onRemove!(index);
+                                setState(() => _inputs.removeAt(index));
+                                if (_inputs.isEmpty) {
+                                  Navigator.of(context).pop();
+                                }
+                              },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3707,6 +3899,49 @@ class _InlineVoiceServiceChip extends StatelessWidget {
                         ? AppFontWeights.semibold
                         : AppFontWeights.medium,
                   ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactActionPill extends StatelessWidget {
+  const _CompactActionPill({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.secondaryContainer,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: cs.onSecondaryContainer),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: cs.onSecondaryContainer,
+                  fontSize: 12,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ],

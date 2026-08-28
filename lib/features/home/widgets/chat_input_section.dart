@@ -51,10 +51,15 @@ class ChatInputSection extends StatelessWidget {
     this.onReasoningBudgetChanged,
     this.onComposerModelChanged,
     this.onSend,
+    this.onGuide,
     this.onStop,
     this.hasQueuedInput = false,
     this.queuedPreviewText,
+    this.queuedInputs = const <QueuedChatInput>[],
     this.onCancelQueuedInput,
+    this.onRemoveQueuedInput,
+    this.onClearQueuedInputs,
+    this.onReorderQueuedInput,
     this.onQuickPhrase,
     this.onLongPressQuickPhrase,
     this.onToggleOcr,
@@ -94,10 +99,15 @@ class ChatInputSection extends StatelessWidget {
   final Future<void> Function(String providerKey, String modelId)?
   onComposerModelChanged;
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
+  final Future<ChatInputSubmissionResult> Function(ChatInputData)? onGuide;
   final VoidCallback? onStop;
   final bool hasQueuedInput;
   final String? queuedPreviewText;
+  final List<QueuedChatInput> queuedInputs;
   final VoidCallback? onCancelQueuedInput;
+  final ValueChanged<int>? onRemoveQueuedInput;
+  final VoidCallback? onClearQueuedInputs;
+  final void Function(int oldIndex, int newIndex)? onReorderQueuedInput;
   final VoidCallback? onQuickPhrase;
   final VoidCallback? onLongPressQuickPhrase;
   final VoidCallback? onToggleOcr;
@@ -187,11 +197,16 @@ class ChatInputSection extends StatelessWidget {
               : false,
           onOpenSearch: onOpenSearch,
           onSend: onSend,
+          onGuide: onGuide,
           loading: isLoading,
           sendButtonTooltip: sendButtonTooltip,
           hasQueuedInput: hasQueuedInput,
           queuedPreviewText: queuedPreviewText,
+          queuedInputs: queuedInputs,
           onCancelQueuedInput: onCancelQueuedInput,
+          onRemoveQueuedInput: onRemoveQueuedInput,
+          onClearQueuedInputs: onClearQueuedInputs,
+          onReorderQueuedInput: onReorderQueuedInput,
           showMcpButton: _shouldShowMcpButton(context, settings, a, pk, mid),
           mcpActive: _isMcpActive(context, a),
           showQuickPhraseButton: _hasQuickPhrases(context, a),

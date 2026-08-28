@@ -341,6 +341,8 @@ class HomePageController extends ChangeNotifier {
       _viewModel.isCurrentConversationLoading;
 
   QueuedChatInput? get currentQueuedInput => _viewModel.currentQueuedInput;
+  List<QueuedChatInput> get currentQueuedInputs =>
+      _viewModel.currentQueuedInputs;
 
   ValueNotifier<String?> get processingFilesMessageId =>
       _viewModel.processingFilesMessageId;
@@ -928,6 +930,12 @@ class HomePageController extends ChangeNotifier {
     return result;
   }
 
+  Future<ChatInputSubmissionResult> guideMessage(ChatInputData input) async {
+    final result = await _viewModel.guideMessage(input);
+    if (result != ChatInputSubmissionResult.rejected) notifyListeners();
+    return result;
+  }
+
   Future<void> sendSuggestion(String suggestion) async {
     final text = suggestion.trim();
     if (text.isEmpty) return;
@@ -967,18 +975,40 @@ class HomePageController extends ChangeNotifier {
     final restored = _viewModel.cancelCurrentQueuedInput();
     if (restored == null) return;
 
+    final current = _mediaController.snapshotInput(_inputController.text);
+    final restoredText = restored.text.trim();
+    final currentText = current.text.trim();
+    final merged = ChatInputData(
+      text: [
+        if (restoredText.isNotEmpty) restoredText,
+        if (currentText.isNotEmpty) currentText,
+      ].join('\n'),
+      imagePaths: [...restored.imagePaths, ...current.imagePaths],
+      documents: [...restored.documents, ...current.documents],
+      allowImagesApiRouting:
+          restored.allowImagesApiRouting && current.allowImagesApiRouting,
+    );
+
     _inputController.value = TextEditingValue(
-      text: restored.text,
-      selection: TextSelection.collapsed(offset: restored.text.length),
+      text: merged.text,
+      selection: TextSelection.collapsed(offset: merged.text.length),
       composing: TextRange.empty,
     );
-    _mediaController.restoreInput(restored);
+    _mediaController.restoreInput(merged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_context.mounted) return;
       _inputFocus.requestFocus();
     });
     notifyListeners();
   }
+
+  void removeQueuedMessageAt(int index) =>
+      _viewModel.removeCurrentQueuedInputAt(index);
+
+  void clearQueuedMessages() => _viewModel.clearCurrentQueuedInputs();
+
+  void reorderQueuedMessage(int oldIndex, int newIndex) =>
+      _viewModel.reorderCurrentQueuedInput(oldIndex, newIndex);
 
   Future<void> regenerateAtMessage(
     ChatMessage message, {

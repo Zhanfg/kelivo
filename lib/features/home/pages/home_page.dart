@@ -1528,10 +1528,15 @@ class _HomePageState extends State<HomePage>
         }
         return result;
       },
+      onGuide: _controller.guideMessage,
       onStop: _controller.cancelStreaming,
       hasQueuedInput: _controller.currentQueuedInput != null,
       queuedPreviewText: _controller.currentQueuedInput?.input.text,
+      queuedInputs: _controller.currentQueuedInputs,
       onCancelQueuedInput: _controller.cancelQueuedMessage,
+      onRemoveQueuedInput: _controller.removeQueuedMessageAt,
+      onClearQueuedInputs: _controller.clearQueuedMessages,
+      onReorderQueuedInput: _controller.reorderQueuedMessage,
       onQuickPhrase: _showQuickPhraseMenu,
       onLongPressQuickPhrase: () {
         Navigator.of(

@@ -16,7 +16,7 @@ Future<SettingsProvider> _settings({required bool fitContent}) async {
   final harness = await createBusinessTestHarness(
     initial: {
       'display_chat_message_background_style_v1': 'solid',
-      if (fitContent) 'display_assistant_bubble_fit_content_v1': true,
+      'display_assistant_bubble_fit_content_v1': fitContent,
     },
   );
   final settings = SettingsProvider(harness.preferences);
@@ -74,12 +74,17 @@ Future<double> _bubbleWidth(
         .width;
   }
   await tester.pumpAndSettle();
-  return tester
-      .getSize(find.byKey(ValueKey('assistant_${message.id}')))
-      .width;
+  return tester.getSize(find.byKey(ValueKey('assistant_${message.id}'))).width;
 }
 
 void main() {
+  test('assistant bubbles default to fit-content', () async {
+    final harness = await createBusinessTestHarness();
+    final settings = SettingsProvider(harness.preferences);
+    await settings.loaded;
+    expect(settings.assistantBubbleFitContent, isTrue);
+  });
+
   testWidgets('fit-content option shrinks the assistant bubble to its text', (
     tester,
   ) async {
@@ -94,11 +99,7 @@ void main() {
       fitContent: false,
       waiting: true,
     );
-    final hugging = await _bubbleWidth(
-      tester,
-      fitContent: true,
-      waiting: true,
-    );
+    final hugging = await _bubbleWidth(tester, fitContent: true, waiting: true);
     expect(hugging, lessThan(spanning));
   });
 }

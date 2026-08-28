@@ -2600,6 +2600,7 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     await _preferences.setBool(_displayAssistantBubbleFitContentKey, v);
   }
+
   void _loadCustomThemes(BusinessPreferences prefs) {
     final raw = prefs.getStringList(_customThemesKey) ?? const <String>[];
     final themes = <CustomTheme>[];

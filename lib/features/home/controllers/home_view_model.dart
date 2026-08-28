@@ -148,8 +148,9 @@ class HomeViewModel extends ChangeNotifier {
 
   @visibleForTesting
   ChatActions get debugChatActions => _chatActions;
-  QueuedChatInput? _queuedInput;
+  final List<QueuedChatInput> _queuedInputs = <QueuedChatInput>[];
   bool _isDrainingQueuedInput = false;
+  bool _isGuidingInput = false;
 
   /// Function to get localized title
   final String Function(BuildContext context) getTitleForLocale;
@@ -223,11 +224,19 @@ class HomeViewModel extends ChangeNotifier {
 
   QueuedChatInput? get currentQueuedInput {
     final cid = currentConversation?.id;
-    final queued = _queuedInput;
-    if (cid == null || queued == null || queued.conversationId != cid) {
-      return null;
+    if (cid == null) return null;
+    for (final queued in _queuedInputs) {
+      if (queued.conversationId == cid) return queued;
     }
-    return queued;
+    return null;
+  }
+
+  List<QueuedChatInput> get currentQueuedInputs {
+    final cid = currentConversation?.id;
+    if (cid == null) return const <QueuedChatInput>[];
+    return List<QueuedChatInput>.unmodifiable(
+      _queuedInputs.where((queued) => queued.conversationId == cid),
+    );
   }
 
   final FileProcessingIndicatorController _fileProcessingIndicator =
@@ -249,7 +258,7 @@ class HomeViewModel extends ChangeNotifier {
 
   void _onLoadingChanged(String conversationId, bool loading) {
     notifyListeners();
-    if (!loading) {
+    if (!loading && !_isGuidingInput) {
       unawaited(_drainQueuedInputIfReady(conversationId));
     }
   }
@@ -379,12 +388,11 @@ class HomeViewModel extends ChangeNotifier {
 
     final activeConversation = currentConversation!;
     if (_chatController.isConversationLoading(activeConversation.id)) {
-      if (_queuedInput != null) {
-        return ChatInputSubmissionResult.rejected;
-      }
-      _queuedInput = QueuedChatInput(
-        conversationId: activeConversation.id,
-        input: _cloneInput(input),
+      _queuedInputs.add(
+        QueuedChatInput(
+          conversationId: activeConversation.id,
+          input: _cloneInput(input),
+        ),
       );
       notifyListeners();
       return ChatInputSubmissionResult.queued;
@@ -399,9 +407,72 @@ class HomeViewModel extends ChangeNotifier {
   ChatInputData? cancelCurrentQueuedInput() {
     final queued = currentQueuedInput;
     if (queued == null || _isDrainingQueuedInput) return null;
-    _queuedInput = null;
+    _queuedInputs.remove(queued);
     notifyListeners();
     return _cloneInput(queued.input);
+  }
+
+  void removeCurrentQueuedInputAt(int index) {
+    final queued = currentQueuedInputs;
+    if (_isDrainingQueuedInput || index < 0 || index >= queued.length) return;
+    _queuedInputs.remove(queued[index]);
+    notifyListeners();
+  }
+
+  void clearCurrentQueuedInputs() {
+    final cid = currentConversation?.id;
+    if (cid == null || _isDrainingQueuedInput) return;
+    _queuedInputs.removeWhere((queued) => queued.conversationId == cid);
+    notifyListeners();
+  }
+
+  void reorderCurrentQueuedInput(int oldIndex, int newIndex) {
+    final queued = currentQueuedInputs;
+    if (_isDrainingQueuedInput ||
+        oldIndex < 0 ||
+        oldIndex >= queued.length ||
+        newIndex < 0 ||
+        newIndex >= queued.length ||
+        oldIndex == newIndex) {
+      return;
+    }
+    final moved = queued[oldIndex];
+    _queuedInputs.remove(moved);
+    final target = queued[newIndex];
+    final targetIndex = _queuedInputs.indexOf(target);
+    _queuedInputs.insert(
+      oldIndex < newIndex ? targetIndex + 1 : targetIndex,
+      moved,
+    );
+    notifyListeners();
+  }
+
+  /// Stop the active reply and immediately send this input as a new user turn.
+  Future<ChatInputSubmissionResult> guideMessage(ChatInputData input) async {
+    if (input.text.trim().isEmpty &&
+        input.imagePaths.isEmpty &&
+        input.documents.isEmpty) {
+      return ChatInputSubmissionResult.rejected;
+    }
+    final conversation = currentConversation;
+    if (conversation == null) return ChatInputSubmissionResult.rejected;
+    if (!_chatController.isConversationLoading(conversation.id)) {
+      return sendMessage(input);
+    }
+
+    _isGuidingInput = true;
+    try {
+      await _chatActions.cancelStreaming(conversation);
+      final success = await _sendMessageToConversation(input, conversation);
+      return success
+          ? ChatInputSubmissionResult.sent
+          : ChatInputSubmissionResult.rejected;
+    } finally {
+      _isGuidingInput = false;
+      if (!_chatController.isConversationLoading(conversation.id)) {
+        unawaited(_drainQueuedInputIfReady(conversation.id));
+      }
+    }
   }
 
   Future<bool> _sendMessageToConversation(
@@ -453,28 +524,30 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   Future<void> _drainQueuedInputIfReady(String conversationId) async {
-    if (_isDrainingQueuedInput) return;
-    final queued = _queuedInput;
+    if (_isDrainingQueuedInput || _isGuidingInput) return;
+    final queuedIndex = _queuedInputs.indexWhere(
+      (queued) => queued.conversationId == conversationId,
+    );
     final conversation = currentConversation;
-    if (queued == null || conversation == null) return;
-    if (queued.conversationId != conversationId ||
-        conversation.id != conversationId) {
-      return;
-    }
+    if (queuedIndex < 0 || conversation == null) return;
+    final queued = _queuedInputs[queuedIndex];
+    if (conversation.id != conversationId) return;
     if (_chatController.isConversationLoading(conversationId)) return;
 
     _isDrainingQueuedInput = true;
-    _queuedInput = null;
+    _queuedInputs.removeAt(queuedIndex);
     notifyListeners();
 
-    final input = queued.input;
-    final success = await _sendMessageToConversation(input, conversation);
-    if (!success) {
-      _queuedInput = queued;
+    var success = false;
+    try {
+      success = await _sendMessageToConversation(queued.input, conversation);
+    } finally {
+      if (!success && !_queuedInputs.contains(queued)) {
+        _queuedInputs.insert(queuedIndex, queued);
+      }
+      _isDrainingQueuedInput = false;
+      notifyListeners();
     }
-
-    _isDrainingQueuedInput = false;
-    notifyListeners();
   }
 
   /// Regenerate response at a specific message.

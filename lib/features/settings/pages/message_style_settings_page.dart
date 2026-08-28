@@ -174,7 +174,7 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
       ],
     );
 
-    final layoutCard = SectionCard(
+    final layoutCard = _iosSectionCard(
       children: [
         _SwitchRow(
           label: l10n.messageStyleSettingsPageAssistantFitContent,
