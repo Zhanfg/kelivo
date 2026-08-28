@@ -13,7 +13,7 @@ env:
 
 jobs:
   shard:
-    name: Full tests / shard ${{ matrix.shard }}
+    name: Non-baseline tests / shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -42,7 +42,11 @@ jobs:
           SHARD_COUNT: '6'
         run: |
           set -euo pipefail
-          mapfile -t all_files < <(find test -type f -name '*_test.dart' | sort)
+          mapfile -t all_files < <(
+            find test -type f -name '*_test.dart' | sort \
+              | grep -v '^test/core/services/backup/backup_progress_kernel_test.dart$' \
+              | grep -v '^test/core/services/backup/restore_bundle_staging_test.dart$'
+          )
           selected=()
           for i in "${!all_files[@]}"; do
             if (( i % SHARD_COUNT == SHARD )); then
@@ -50,7 +54,7 @@ jobs:
             fi
           done
 
-          echo "Shard ${SHARD}/${SHARD_COUNT}: ${#selected[@]} test files"
+          echo "Shard ${SHARD}/${SHARD_COUNT}: ${#selected[@]} non-baseline test files"
           printf '%s\n' "${selected[@]}"
 
           set +e
