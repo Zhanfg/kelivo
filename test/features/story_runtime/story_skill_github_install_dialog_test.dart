@@ -3,55 +3,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets(
-    'GitHub Skill install dialog keeps controllers alive through route pop',
-    (tester) async {
-      StorySkillGitHubInstallRequest? result;
+  testWidgets('GitHub Skill install uses one-field bottom sheet', (tester) async {
+    StorySkillGitHubInstallRequest? result;
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (context) => Scaffold(
-              body: Center(
-                child: FilledButton(
-                  onPressed: () async {
-                    result = await showStorySkillGitHubInstallDialog(context);
-                  },
-                  child: const Text('Open'),
-                ),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () async {
+                  result = await showStorySkillGitHubInstallDialog(context);
+                },
+                child: const Text('Open'),
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
 
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
 
-      final fields = find.byType(TextField);
-      expect(fields, findsNWidgets(3));
+    expect(find.text('从 GitHub 安装 Skill'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.textContaining('Branch / Tag / Ref'), findsNothing);
+    expect(find.textContaining('Skill 子目录'), findsNothing);
 
-      await tester.enterText(fields.at(0), 'owner/story-skill');
-      await tester.enterText(fields.at(1), 'main');
-      await tester.enterText(fields.at(2), 'skills/example');
-      await tester.pump();
+    await tester.enterText(find.byType(TextField), 'owner/story-skill');
+    await tester.pump();
+    await tester.tap(find.text('自动查找并安装'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('安装'));
-
-      // showDialog completes as soon as the route is popped, while its reverse
-      // transition can still keep the TextFields mounted. Their controllers
-      // must therefore remain alive until the dialog State itself is disposed.
-      await tester.pump();
-      expect(tester.takeException(), isNull);
-      await tester.pump(const Duration(milliseconds: 50));
-      expect(tester.takeException(), isNull);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-
-      expect(result, isNotNull);
-      expect(result!.repositoryUrl, 'owner/story-skill');
-      expect(result!.ref, 'main');
-      expect(result!.subdirectory, 'skills/example');
-    },
-  );
+    expect(tester.takeException(), isNull);
+    expect(result, isNotNull);
+    expect(result!.repositoryUrl, 'owner/story-skill');
+    expect(result!.ref, isNull);
+    expect(result!.subdirectory, isNull);
+  });
 }
