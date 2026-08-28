@@ -190,9 +190,10 @@ class StoryConversationModeAction extends StatelessWidget {
 }
 
 /// Kept for focused layout tests and callers that already use this public
-/// helper. The product AppBar no longer depends on this title-slot centering;
-/// [StoryConversationModeTitle] uses an OverlayPortal instead.
-class StoryConversationModeCenteredSlot extends StatelessWidget {
+/// helper. It centers [child] against the physical screen while keeping the
+/// child inside the title slot's real layout bounds, so paint and hit testing
+/// share the same coordinates even when AppBar leading/actions are asymmetric.
+class StoryConversationModeCenteredSlot extends StatefulWidget {
   const StoryConversationModeCenteredSlot({
     super.key,
     required this.controlWidth,
@@ -203,13 +204,79 @@ class StoryConversationModeCenteredSlot extends StatelessWidget {
   final Widget child;
 
   @override
+  State<StoryConversationModeCenteredSlot> createState() =>
+      _StoryConversationModeCenteredSlotState();
+}
+
+class _StoryConversationModeCenteredSlotState
+    extends State<StoryConversationModeCenteredSlot> {
+  final GlobalKey _slotKey = GlobalKey();
+  double? _left;
+  bool _measureScheduled = false;
+
+  void _scheduleMeasurement() {
+    if (_measureScheduled) return;
+    _measureScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureScheduled = false;
+      if (!mounted) return;
+      final renderObject = _slotKey.currentContext?.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) return;
+
+      final slotWidth = renderObject.size.width;
+      final globalLeft = renderObject.localToGlobal(Offset.zero).dx;
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      final maxLeft = (slotWidth - widget.controlWidth)
+          .clamp(0.0, double.infinity)
+          .toDouble();
+      final nextLeft = (screenWidth / 2 -
+              globalLeft -
+              widget.controlWidth / 2)
+          .clamp(0.0, maxLeft)
+          .toDouble();
+      final currentLeft = _left;
+      if (currentLeft == null || (currentLeft - nextLeft).abs() >= 0.5) {
+        setState(() => _left = nextLeft);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant StoryConversationModeCenteredSlot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controlWidth != widget.controlWidth) {
+      _left = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 36,
-      child: Center(
-        child: SizedBox(width: controlWidth, height: 36, child: child),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final slotWidth = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : widget.controlWidth;
+        final fallbackLeft = ((slotWidth - widget.controlWidth) / 2)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+        _scheduleMeasurement();
+        return SizedBox(
+          key: _slotKey,
+          width: double.infinity,
+          height: 36,
+          child: Stack(
+            children: [
+              Positioned(
+                left: _left ?? fallbackLeft,
+                top: 0,
+                width: widget.controlWidth,
+                height: 36,
+                child: widget.child,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
