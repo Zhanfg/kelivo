@@ -3,26 +3,26 @@ import 'package:provider/provider.dart';
 
 import '../../../core/database/business_preferences.dart';
 import '../../../core/models/conversation.dart';
-import '../../../core/providers/assistant_provider.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../../settings/pages/memory_settings_page.dart';
+import '../../settings/pages/tts_services_page.dart';
+import '../../world_book/pages/world_book_page.dart';
 import '../agency/story_agency_policy.dart';
 import '../orchestration/story_break_armor_mode.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
-import '../voice/story_voice_routing.dart';
-import '../voice/story_voice_store.dart';
-import '../world_tree/story_world_tree_store.dart';
+import 'story_character_manager_page.dart';
+import 'story_conversation_mode_control.dart';
 import 'story_native_settings_widgets.dart';
+import 'story_reference_library_page.dart';
+import 'story_skill_manager_page.dart';
+import 'story_voice_manager_page.dart';
 
-/// Lifecycle-safe Story Mode control surface.
+/// Product-facing Story settings.
 ///
-/// This page intentionally avoids `context.watch` subscriptions. Story Mode is
-/// a settings/control surface, so provider snapshots are read after the first
-/// frame and copied into local state. This keeps route deactivation independent
-/// from Provider/InheritedWidget dependency teardown and avoids the
-/// `_dependents.isEmpty` assertion observed in Android debug builds.
+/// Internal runtime ids, engine readiness, provider state, cache state and
+/// other diagnostics deliberately do not belong on this surface.
 class StoryModeRuntimePage extends StatefulWidget {
   const StoryModeRuntimePage({super.key});
 
@@ -38,24 +38,10 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
 
   late StoryRuntimeStore _runtimeStore;
   late StoryBreakArmorMode _breakArmorMode;
-  late StoryWorldTreeStore _worldTreeStore;
-  late StoryVoiceRoutingStore _voiceStore;
 
   List<Conversation> _conversations = const <Conversation>[];
   String? _selectedConversationId;
   StoryRuntimeSessionState? _session;
-  String? _assistantName;
-  String? _storyWorldTreeId;
-  StoryVoiceAssignment? _narrator;
-  String? _narratorServiceId;
-  bool _narratorWorldlineScoped = false;
-  List<String> _ttsServiceIds = const <String>[];
-  Map<String, String> _ttsServiceLabels = const <String, String>{};
-
-  final TextEditingController _narratorVoiceController =
-      TextEditingController();
-  final TextEditingController _narratorPersonaController =
-      TextEditingController();
 
   @override
   void initState() {
@@ -70,8 +56,6 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
     final preferences = context.read<BusinessPreferences>();
     _runtimeStore = StoryRuntimeStore(preferences);
     _breakArmorMode = StoryBreakArmorMode(preferences);
-    _worldTreeStore = StoryWorldTreeStore(preferences);
-    _voiceStore = StoryVoiceRoutingStore(preferences);
     _ready = true;
     await _reload(selectNewestIfNeeded: true);
   }
@@ -80,11 +64,10 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
     if (!_ready) return;
     if (mounted) setState(() => _loading = true);
     try {
-      final chatService = context.read<ChatService>();
-      final assistantProvider = context.read<AssistantProvider>();
-      final settingsProvider = context.read<SettingsProvider>();
-
-      final conversations = chatService.getAllConversations().toList()
+      final conversations = context
+          .read<ChatService>()
+          .getAllConversations()
+          .toList()
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       var selectedId = _selectedConversationId;
       if (selectNewestIfNeeded ||
@@ -92,66 +75,21 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
           !conversations.any((item) => item.id == selectedId)) {
         selectedId = conversations.isEmpty ? null : conversations.first.id;
       }
-
-      Conversation? selected;
-      if (selectedId != null) {
-        for (final item in conversations) {
-          if (item.id == selectedId) {
-            selected = item;
-            break;
-          }
-        }
-      }
-
       final session = selectedId == null
           ? null
           : await _runtimeStore.readOrDefault(selectedId);
-      final tree = selectedId == null
-          ? null
-          : await _worldTreeStore.readForConversation(selectedId);
-      final voiceRouting = tree == null
-          ? null
-          : await _voiceStore.readOrDefault(tree.worldTreeId);
-      final narrator = voiceRouting?.narrator;
-
-      String? assistantName;
-      if (selected != null) {
-        final assistant = selected.assistantId == null
-            ? assistantProvider.currentAssistant
-            : assistantProvider.getById(selected.assistantId!);
-        assistantName = assistant?.name;
-      }
-
-      final serviceIds = <String>[];
-      final serviceLabels = <String, String>{};
-      for (final service in settingsProvider.ttsServices) {
-        if (!service.enabled) continue;
-        serviceIds.add(service.id);
-        final name = service.name.trim();
-        serviceLabels[service.id] = name.isEmpty ? service.kind.name : name;
-      }
-
       if (!mounted) return;
       setState(() {
         _conversations = List.unmodifiable(conversations);
         _selectedConversationId = selectedId;
         _session = session;
-        _assistantName = assistantName;
-        _storyWorldTreeId = tree?.worldTreeId;
-        _narrator = narrator;
-        _narratorServiceId = narrator?.ttsServiceId;
-        _narratorWorldlineScoped = narrator?.worldlineId != null;
-        _narratorVoiceController.text = narrator?.voiceId ?? '';
-        _narratorPersonaController.text = narrator?.personaDescription ?? '';
-        _ttsServiceIds = List.unmodifiable(serviceIds);
-        _ttsServiceLabels = Map.unmodifiable(serviceLabels);
         _breakArmorEnabled = _breakArmorMode.enabled;
         _loading = false;
       });
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
-      _showError(error);
+      _showMessage('故事设置暂时无法加载。');
     }
   }
 
@@ -170,8 +108,8 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
     try {
       await action();
       if (reload) await _reload();
-    } catch (error) {
-      if (mounted) _showError(error);
+    } catch (_) {
+      _showMessage('操作失败，请稍后重试。');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -180,7 +118,10 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
   Future<void> _setStoryEnabled(bool enabled) async {
     final id = _selectedConversationId;
     if (id == null) return;
-    await _runBusy(() => _runtimeStore.setEnabled(id, enabled));
+    await _runBusy(() async {
+      await _runtimeStore.setEnabled(id, enabled);
+      storyConversationModeRevision.value++;
+    });
   }
 
   Future<void> _setBreakArmorEnabled(bool enabled) async {
@@ -198,82 +139,35 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
     );
   }
 
-  Future<void> _saveNarratorVoice() async {
-    final treeId = _storyWorldTreeId;
-    final serviceId = _narratorServiceId?.trim() ?? '';
-    final voiceId = _narratorVoiceController.text.trim();
-    if (treeId == null) {
-      _showMessage('请先启用故事模式并完成至少一个故事回合。');
-      return;
-    }
-    if (serviceId.isEmpty || voiceId.isEmpty) {
-      _showMessage('请选择 TTS 服务并填写 Voice ID。');
-      return;
-    }
-    await _runBusy(() async {
-      final current = await _voiceStore.readOrDefault(treeId);
-      final assignment = StoryVoiceAssignment(
-        characterId: '__narrator__',
-        ttsServiceId: serviceId,
-        voiceId: voiceId,
-        personaDescription: _narratorPersonaController.text.trim(),
-        worldlineId: _narratorWorldlineScoped ? _session?.worldlineId : null,
-        revision: (_narrator?.revision ?? 0) + 1,
-      );
-      await _voiceStore.upsertState(
-        StoryVoiceRoutingState(
-          worldTreeId: current.worldTreeId,
-          narrator: assignment,
-          assignments: current.assignments,
-        ),
-      );
-    });
-  }
-
-  Future<void> _clearNarratorVoice() async {
-    final treeId = _storyWorldTreeId;
-    if (treeId == null) return;
-    await _runBusy(() async {
-      final current = await _voiceStore.readOrDefault(treeId);
-      await _voiceStore.upsertState(
-        StoryVoiceRoutingState(
-          worldTreeId: current.worldTreeId,
-          assignments: current.assignments,
-        ),
-      );
-    });
-  }
-
   String _conversationLabel(String id, bool zh) {
     for (final conversation in _conversations) {
-      if (conversation.id == id) {
-        final title = conversation.title.trim();
-        return title.isEmpty ? (zh ? '未命名会话' : 'Untitled') : title;
-      }
+      if (conversation.id != id) continue;
+      final title = conversation.title.trim();
+      return title.isEmpty ? (zh ? '未命名会话' : 'Untitled') : title;
     }
     return zh ? '未命名会话' : 'Untitled';
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  void _open(Widget page) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
   }
 
-  void _showError(Object error) => _showMessage('操作失败：$error');
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context) {
     final zh = Localizations.localeOf(context).languageCode == 'zh';
     String tr(String zhText, String enText) => zh ? zhText : enText;
-    final session = _session;
     final selectedId = _selectedConversationId;
-    final narratorServiceId = _ttsServiceIds.contains(_narratorServiceId)
-        ? _narratorServiceId
-        : null;
+    final session = _session;
 
     return Scaffold(
       appBar: AppBar(
         leading: StoryNativeBackButton(tooltip: tr('返回', 'Back')),
-        title: Text(tr('故事模式', 'Story Mode')),
+        title: Text(tr('故事设置', 'Story settings')),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -281,17 +175,11 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
                 StoryNativeSection(
-                  key: const ValueKey('story-runtime-section'),
-                  title: tr('故事运行时', 'Story Runtime'),
+                  title: tr('当前故事', 'Current story'),
                   first: true,
-                  footer: tr(
-                    'Skills 与参考文本是独立能力；这里只控制当前会话的故事运行时。',
-                    'Skills and reference texts are independent capabilities; this page controls Story Runtime for the current conversation.',
-                  ),
                   children: [
                     if (_conversations.isNotEmpty)
                       StoryNativeSelectRow<String>(
-                        key: const ValueKey('story-conversation-row'),
                         label: tr('会话', 'Conversation'),
                         icon: Lucide.MessageCircle,
                         value: selectedId ?? _conversations.first.id,
@@ -301,24 +189,19 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                       )
                     else
                       StoryNativeRow(
-                        key: const ValueKey('story-no-conversation-row'),
                         title: tr('没有可用会话', 'No conversations'),
-                        subtitle: tr('先创建一个聊天会话。', 'Create a chat first.'),
+                        subtitle: tr(
+                          '先创建一个会话。',
+                          'Create a conversation first.',
+                        ),
                         icon: Lucide.MessageCircle,
                         enabled: false,
                       ),
-                    StoryNativeRow(
-                      key: const ValueKey('story-assistant-row'),
-                      title: 'Assistant',
-                      subtitle: _assistantName ?? tr('默认 Assistant', 'Default'),
-                      icon: Lucide.Bot,
-                    ),
                     StoryNativeSwitchRow(
-                      key: const ValueKey('story-enable-row'),
-                      title: tr('启用故事模式', 'Enable Story Mode'),
+                      title: tr('故事模式', 'Story mode'),
                       subtitle: tr(
-                        '开启 World Tree、世界线记忆、Story Runtime 与故事能力编排。',
-                        'Enables World Tree, worldline memory, Story Runtime and story capability orchestration.',
+                        '只影响当前会话；切回聊天不会删除故事进度。',
+                        'Affects only this conversation. Switching back to Chat keeps story progress.',
                       ),
                       icon: Lucide.Compass,
                       value: session?.enabled ?? false,
@@ -327,11 +210,10 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                           : _setStoryEnabled,
                     ),
                     StoryNativeSwitchRow(
-                      key: const ValueKey('story-break-armor-row'),
                       title: tr('叙事约束增强', 'Narrative guardrails'),
                       subtitle: tr(
-                        '只在故事模式开启时生效，不影响普通聊天。',
-                        'Only affects Story Mode; normal chat is unchanged.',
+                        '加强角色一致性与用户自主权，不影响普通聊天。',
+                        'Strengthens character consistency and user agency without affecting normal Chat.',
                       ),
                       icon: Lucide.Shield,
                       value: _breakArmorEnabled,
@@ -339,15 +221,14 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                     ),
                     if (session != null)
                       StoryNativeSelectRow<StoryAgencyMode>(
-                        key: const ValueKey('story-agency-row'),
-                        label: tr('用户自主权', 'User agency'),
+                        label: tr('叙事主动程度', 'Narrative initiative'),
                         icon: Lucide.User,
                         value: session.agencyMode,
                         options: StoryAgencyMode.values,
                         labelFor: (mode) => switch (mode) {
-                          StoryAgencyMode.manual => 'Manual',
-                          StoryAgencyMode.balanced => 'Balanced',
-                          StoryAgencyMode.cinematic => 'Cinematic',
+                          StoryAgencyMode.manual => tr('手动', 'Manual'),
+                          StoryAgencyMode.balanced => tr('平衡', 'Balanced'),
+                          StoryAgencyMode.cinematic => tr('电影感', 'Cinematic'),
                         },
                         onSelected: _busy ? null : _setAgencyMode,
                       ),
@@ -355,98 +236,66 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                 ),
                 const SizedBox(height: 18),
                 StoryNativeSection(
-                  key: const ValueKey('story-status-section'),
-                  title: tr('运行状态', 'Runtime status'),
+                  title: tr('故事内容', 'Story content'),
                   children: [
                     StoryNativeRow(
-                      key: const ValueKey('story-worldline-status'),
-                      title: 'Worldline',
-                      subtitle: session?.worldlineId ?? tr('尚未建立', 'Not created'),
-                      icon: Lucide.GitFork,
-                      enabled: false,
+                      title: tr('世界书', 'World Book'),
+                      icon: Lucide.BookOpen,
+                      onTap: () => _open(const WorldBookPage()),
                     ),
                     StoryNativeRow(
-                      key: const ValueKey('story-scene-status'),
-                      title: tr('场景修订', 'Scene revision'),
-                      subtitle: '${session?.sceneRevision ?? 0}',
-                      icon: Lucide.History,
-                      enabled: false,
+                      title: tr('记忆', 'Memory'),
+                      icon: Lucide.Brain,
+                      onTap: () => _open(const MemorySettingsPage()),
+                    ),
+                    StoryNativeRow(
+                      title: tr('角色', 'Characters'),
+                      icon: Lucide.User,
+                      enabled: selectedId != null,
+                      onTap: selectedId == null
+                          ? null
+                          : () => _open(
+                                StoryCharacterManagerPage(
+                                  conversationId: selectedId,
+                                ),
+                              ),
+                    ),
+                    StoryNativeRow(
+                      title: tr('声音', 'Voices'),
+                      icon: Lucide.Volume2,
+                      enabled: selectedId != null,
+                      onTap: selectedId == null
+                          ? null
+                          : () => _open(
+                                StoryVoiceManagerPage(
+                                  conversationId: selectedId,
+                                ),
+                              ),
+                    ),
+                    StoryNativeRow(
+                      title: tr('技能', 'Skills'),
+                      icon: Lucide.Shapes,
+                      onTap: () => _open(const StorySkillManagerPage()),
+                    ),
+                    StoryNativeRow(
+                      title: tr('参考文本', 'Reference texts'),
+                      icon: Lucide.BookOpenText,
+                      onTap: () => _open(const StoryReferenceLibraryPage()),
                     ),
                   ],
                 ),
                 const SizedBox(height: 18),
                 StoryNativeSection(
-                  key: const ValueKey('story-voice-section'),
-                  title: tr('故事语音', 'Story Voice'),
-                  footer: tr(
-                    '复用 Kelivo 已启用的网络 TTS；这里只保存服务、Voice ID 与表达描述。',
-                    'Reuses enabled Kelivo network TTS; only service, Voice ID and performance direction are stored here.',
-                  ),
+                  title: tr('高级设置', 'Advanced settings'),
                   children: [
-                    StoryNativeSelectRow<String>(
-                      key: const ValueKey('story-tts-service-row'),
-                      label: tr('旁白 TTS 服务', 'Narrator TTS service'),
-                      icon: Lucide.Volume2,
-                      value: narratorServiceId ?? '',
-                      options: <String>['', ..._ttsServiceIds],
-                      labelFor: (id) => id.isEmpty
-                          ? tr('未选择', 'Not selected')
-                          : (_ttsServiceLabels[id] ?? id),
-                      onSelected: _busy
-                          ? null
-                          : (value) => setState(
-                              () => _narratorServiceId = value.isEmpty ? null : value,
-                            ),
-                    ),
-                    StoryNativeTextFieldRow(
-                      key: const ValueKey('story-voice-id-row'),
-                      label: tr('Voice ID / 音色名', 'Voice ID'),
-                      controller: _narratorVoiceController,
-                      enabled: !_busy,
-                    ),
-                    StoryNativeTextFieldRow(
-                      key: const ValueKey('story-voice-persona-row'),
-                      label: tr('表达描述', 'Performance direction'),
-                      controller: _narratorPersonaController,
-                      enabled: !_busy,
-                      minLines: 2,
-                      maxLines: 4,
-                    ),
-                    StoryNativeSwitchRow(
-                      key: const ValueKey('story-voice-scope-row'),
-                      title: tr('仅当前 Worldline 使用', 'Current worldline only'),
-                      icon: Lucide.GitFork,
-                      value: _narratorWorldlineScoped && session?.worldlineId != null,
-                      onChanged: _busy || session?.worldlineId == null
-                          ? null
-                          : (value) => setState(
-                              () => _narratorWorldlineScoped = value,
-                            ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: StoryNativeButton(
-                              label: tr('保存旁白音色', 'Save narrator voice'),
-                              icon: Lucide.Check,
-                              primary: true,
-                              enabled: !_busy && _storyWorldTreeId != null,
-                              onTap: _saveNarratorVoice,
-                            ),
-                          ),
-                          if (_narrator != null) ...[
-                            const SizedBox(width: 8),
-                            StoryNativeButton(
-                              label: tr('清除', 'Clear'),
-                              icon: Lucide.Trash2,
-                              enabled: !_busy,
-                              onTap: _clearNarratorVoice,
-                            ),
-                          ],
-                        ],
+                    StoryNativeRow(
+                      title: tr('声音服务', 'Voice services'),
+                      subtitle: tr(
+                        '配置本地模型或网络声音来源。',
+                        'Configure local models or network voice sources.',
                       ),
+                      icon: Lucide.Settings,
+                      onTap: () => _open(const TtsServicesPage()),
                     ),
                   ],
                 ),
@@ -457,12 +306,5 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
               ],
             ),
     );
-  }
-
-  @override
-  void dispose() {
-    _narratorVoiceController.dispose();
-    _narratorPersonaController.dispose();
-    super.dispose();
   }
 }

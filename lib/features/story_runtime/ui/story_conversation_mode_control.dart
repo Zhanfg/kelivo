@@ -4,21 +4,27 @@ import 'package:provider/provider.dart';
 import '../../../core/database/business_preferences.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
-import '../../../icons/lucide_adapter.dart';
-import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
 
-/// ChatGPT-like initial Chat / Story choice rendered inside Kelivo's native
-/// chat header. Once the user commits a choice, or the conversation has real
-/// messages, the original Kelivo title is restored.
+/// Lightweight revision signal for Story UI surfaces that are siblings of the
+/// AppBar title. Story mode remains persisted by [StoryRuntimeStore]; this only
+/// asks visible UI to refresh after an in-place mode switch.
+final ValueNotifier<int> storyConversationModeRevision = ValueNotifier<int>(0);
+
+/// Persistent Chat / Story mode switch for the active conversation.
+///
+/// The control stays visible after a conversation starts. Its visual position
+/// is corrected after layout so its center tracks the physical screen center,
+/// independent of AppBar leading/actions width.
 class StoryConversationModeTitle extends StatefulWidget {
   const StoryConversationModeTitle({
     super.key,
     required this.fallback,
   });
 
+  /// Kept for Home layout compatibility and used while no conversation exists.
   final Widget fallback;
 
   @override
@@ -45,8 +51,14 @@ class _StoryConversationModeTitleState
     return _sessionFuture!;
   }
 
-  Future<void> _selectMode(String conversationId, bool story) async {
-    if (_busy) return;
+  Future<void> _selectMode(
+    String conversationId,
+    StoryRuntimeSessionState session,
+    bool story,
+  ) async {
+    if (_busy || (session.modeSelectionCommitted && session.enabled == story)) {
+      return;
+    }
     setState(() => _busy = true);
     try {
       final store = StoryRuntimeStore(context.read<BusinessPreferences>());
@@ -56,6 +68,7 @@ class _StoryConversationModeTitleState
         _loadedConversationId = conversationId;
         _sessionFuture = store.readOrDefault(conversationId);
       });
+      storyConversationModeRevision.value++;
       Haptics.light();
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -66,230 +79,88 @@ class _StoryConversationModeTitleState
   Widget build(BuildContext context) {
     final chatService = context.watch<ChatService>();
     final conversationId = chatService.currentConversationId;
-    if (conversationId == null) return widget.fallback;
-    final conversation = chatService.getConversation(conversationId);
-    if (conversation == null || conversation.messageIds.isNotEmpty) {
+    if (conversationId == null ||
+        chatService.getConversation(conversationId) == null) {
       return widget.fallback;
     }
 
     return FutureBuilder<StoryRuntimeSessionState>(
       future: _futureFor(context, conversationId),
       builder: (context, snapshot) {
-        final session = snapshot.data;
-        if (session == null || session.modeSelectionCommitted) {
-          return widget.fallback;
-        }
-        return _InitialModeSelector(
-          storySelected: session.enabled,
-          busy: _busy,
-          onSelectChat: () => _selectMode(conversationId, false),
-          onSelectStory: () => _selectMode(conversationId, true),
+        final session = snapshot.data ??
+            StoryRuntimeSessionState(conversationId: conversationId);
+        return _ScreenCenteredModeSwitch(
+          child: _ModeSelector(
+            storySelected: session.enabled,
+            busy: _busy || snapshot.connectionState == ConnectionState.waiting,
+            onSelectChat: () => _selectMode(conversationId, session, false),
+            onSelectStory: () => _selectMode(conversationId, session, true),
+          ),
         );
       },
     );
   }
 }
 
-/// Compact bidirectional conversion tool shown after the initial selector is
-/// gone. It converts the current conversation in-place and never deletes its
-/// chat history or Story sidecar state.
-class StoryConversationModeAction extends StatefulWidget {
+/// Compatibility shim for Home layouts that previously exposed a separate
+/// conversion action. The persistent centered switch now owns mode conversion.
+class StoryConversationModeAction extends StatelessWidget {
   const StoryConversationModeAction({super.key});
 
   @override
-  State<StoryConversationModeAction> createState() =>
-      _StoryConversationModeActionState();
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-class _StoryConversationModeActionState
-    extends State<StoryConversationModeAction> {
-  String? _loadedConversationId;
-  Future<StoryRuntimeSessionState>? _sessionFuture;
-  bool _busy = false;
+class _ScreenCenteredModeSwitch extends StatefulWidget {
+  const _ScreenCenteredModeSwitch({required this.child});
 
-  Future<StoryRuntimeSessionState> _futureFor(
-    BuildContext context,
-    String conversationId,
-  ) {
-    if (_loadedConversationId != conversationId || _sessionFuture == null) {
-      _loadedConversationId = conversationId;
-      _sessionFuture = StoryRuntimeStore(
-        context.read<BusinessPreferences>(),
-      ).readOrDefault(conversationId);
-    }
-    return _sessionFuture!;
-  }
+  final Widget child;
 
-  Future<void> _convert(
-    String conversationId,
-    bool story,
-  ) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final store = StoryRuntimeStore(context.read<BusinessPreferences>());
-      await store.setEnabled(conversationId, story);
+  @override
+  State<_ScreenCenteredModeSwitch> createState() =>
+      _ScreenCenteredModeSwitchState();
+}
+
+class _ScreenCenteredModeSwitchState extends State<_ScreenCenteredModeSwitch> {
+  final GlobalKey _measureKey = GlobalKey();
+  double _paintOffsetX = 0;
+  bool _measureScheduled = false;
+
+  void _scheduleMeasure() {
+    if (_measureScheduled) return;
+    _measureScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureScheduled = false;
       if (!mounted) return;
-      setState(() {
-        _loadedConversationId = conversationId;
-        _sessionFuture = store.readOrDefault(conversationId);
-      });
-      Haptics.light();
-      final zh = Localizations.localeOf(context).languageCode == 'zh';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            story
-                ? (zh ? '已转换为故事；原聊天记录已保留。' : 'Converted to Story; chat history was preserved.')
-                : (zh ? '已转换为普通聊天；Story 状态已保留，可随时恢复。' : 'Converted to Chat; Story state was preserved for later.'),
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
+      final renderObject = _measureKey.currentContext?.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) return;
 
-  Future<void> _showConversionSheet(
-    String conversationId,
-    StoryRuntimeSessionState session,
-  ) async {
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
-    final cs = Theme.of(context).colorScheme;
-    final targetStory = !session.enabled;
-    final actionLabel = targetStory
-        ? (zh ? '转换为故事' : 'Convert to Story')
-        : (zh ? '转换为普通聊天' : 'Convert to Chat');
-    final description = targetStory
-        ? (zh
-              ? '保留当前聊天历史，并从下一条消息开始启用 Story Runtime、World Tree 与世界线记忆。'
-              : 'Keep the current history and enable Story Runtime, World Tree and worldline memory from the next message.')
-        : (zh
-              ? '停止后续 Story Runtime 注入，但保留 World Tree、世界线记忆和语音绑定；以后转回故事可继续使用。'
-              : 'Stop Story Runtime injection while preserving World Tree, worldline memory and voice bindings for later resume.');
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      final actualLeft = renderObject.localToGlobal(Offset.zero).dx;
+      final desiredLeft = (screenWidth - renderObject.size.width) / 2;
+      final correction = desiredLeft - actualLeft;
+      if (correction.abs() < 0.5) return;
 
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                zh ? '会话模式' : 'Conversation mode',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: AppFontWeights.semibold,
-                  color: cs.onSurface.withValues(alpha: 0.58),
-                ),
-              ),
-              const SizedBox(height: 8),
-              IosCardPress(
-                borderRadius: BorderRadius.circular(14),
-                baseColor: cs.surfaceContainerHighest.withValues(alpha: 0.42),
-                padding: EdgeInsets.zero,
-                onTap: _busy
-                    ? null
-                    : () async {
-                        Navigator.of(sheetContext).pop();
-                        await _convert(conversationId, targetStory);
-                      },
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-                  child: Row(
-                    children: [
-                      Icon(
-                        targetStory ? Lucide.Compass : Lucide.MessageCircle,
-                        size: 20,
-                        color: cs.onSurface.withValues(alpha: 0.88),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              actionLabel,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: AppFontWeights.medium,
-                                color: cs.onSurface.withValues(alpha: 0.92),
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              description,
-                              style: TextStyle(
-                                fontSize: 12,
-                                height: 1.3,
-                                color: cs.onSurface.withValues(alpha: 0.58),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        Lucide.ChevronRight,
-                        size: 16,
-                        color: cs.onSurface.withValues(alpha: 0.62),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+      final nextOffset = (_paintOffsetX + correction)
+          .clamp(-screenWidth, screenWidth)
+          .toDouble();
+      if ((nextOffset - _paintOffsetX).abs() < 0.5) return;
+      setState(() => _paintOffsetX = nextOffset);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final chatService = context.watch<ChatService>();
-    final conversationId = chatService.currentConversationId;
-    if (conversationId == null) return const SizedBox.shrink();
-    final conversation = chatService.getConversation(conversationId);
-    if (conversation == null) return const SizedBox.shrink();
-
-    return FutureBuilder<StoryRuntimeSessionState>(
-      future: _futureFor(context, conversationId),
-      builder: (context, snapshot) {
-        final session = snapshot.data;
-        if (session == null) return const SizedBox.shrink();
-        final started = conversation.messageIds.isNotEmpty;
-        if (!started && !session.modeSelectionCommitted) {
-          return const SizedBox.shrink();
-        }
-        final zh = Localizations.localeOf(context).languageCode == 'zh';
-        final semantic = session.enabled
-            ? (zh ? '转换为普通聊天' : 'Convert to Chat')
-            : (zh ? '转换为故事' : 'Convert to Story');
-        return IosIconButton(
-          size: 19,
-          minSize: 40,
-          padding: const EdgeInsets.all(8),
-          icon: Lucide.RefreshCw,
-          semanticLabel: semantic,
-          onTap: _busy
-              ? null
-              : () => _showConversionSheet(conversationId, session),
-        );
-      },
+    _scheduleMeasure();
+    return Transform.translate(
+      offset: Offset(_paintOffsetX, 0),
+      child: KeyedSubtree(key: _measureKey, child: widget.child),
     );
   }
 }
 
-class _InitialModeSelector extends StatelessWidget {
-  const _InitialModeSelector({
+class _ModeSelector extends StatelessWidget {
+  const _ModeSelector({
     required this.storySelected,
     required this.busy,
     required this.onSelectChat,
@@ -306,44 +177,89 @@ class _InitialModeSelector extends StatelessWidget {
     final zh = Localizations.localeOf(context).languageCode == 'zh';
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
+    final compact = MediaQuery.sizeOf(context).width < 360;
+    final width = compact ? 112.0 : 124.0;
+    const height = 36.0;
+
+    return Semantics(
+      container: true,
+      label: zh ? '应用模式' : 'App mode',
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: Material(
           color: cs.surfaceContainerHighest.withValues(
-            alpha: isDark ? 0.42 : 0.66,
+            alpha: isDark ? 0.54 : 0.72,
           ),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: 0.16),
-            width: 0.6,
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: AnimatedAlign(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    alignment: storySelected
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: 0.5,
+                      heightFactor: 1,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOutCubic,
+                        decoration: BoxDecoration(
+                          color: cs.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: cs.outlineVariant.withValues(alpha: 0.14),
+                            width: 0.6,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: cs.shadow.withValues(alpha: 0.06),
+                              blurRadius: 5,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ModeTapTarget(
+                      label: zh ? '聊天' : 'Chat',
+                      selected: !storySelected,
+                      enabled: !busy,
+                      onTap: onSelectChat,
+                    ),
+                  ),
+                  Expanded(
+                    child: _ModeTapTarget(
+                      label: zh ? '故事' : 'Story',
+                      selected: storySelected,
+                      enabled: !busy,
+                      onTap: onSelectStory,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ModeSegment(
-              label: zh ? '聊天' : 'Chat',
-              selected: !storySelected,
-              enabled: !busy,
-              onTap: onSelectChat,
-            ),
-            _ModeSegment(
-              label: zh ? '故事' : 'Story',
-              selected: storySelected,
-              enabled: !busy,
-              onTap: onSelectStory,
-            ),
-          ],
         ),
       ),
     );
   }
 }
 
-class _ModeSegment extends StatelessWidget {
-  const _ModeSegment({
+class _ModeTapTarget extends StatelessWidget {
+  const _ModeTapTarget({
     required this.label,
     required this.selected,
     required this.enabled,
@@ -358,37 +274,25 @@ class _ModeSegment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return IosCardPress(
-      borderRadius: BorderRadius.circular(12),
-      baseColor: selected ? cs.surface : Colors.transparent,
-      padding: EdgeInsets.zero,
-      haptics: false,
-      onTap: enabled ? onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: cs.shadow.withValues(alpha: 0.06),
-                    blurRadius: 5,
-                    offset: const Offset(0, 1),
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            height: 1.05,
-            fontWeight: selected
-                ? AppFontWeights.semibold
-                : AppFontWeights.medium,
-            color: cs.onSurface.withValues(alpha: selected ? 0.94 : 0.58),
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        child: Center(
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.05,
+              fontWeight: selected
+                  ? AppFontWeights.semibold
+                  : AppFontWeights.medium,
+              color: cs.onSurface.withValues(alpha: selected ? 0.94 : 0.58),
+            ),
+            child: Text(label),
           ),
         ),
       ),
