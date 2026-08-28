@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/patches/composer-phase3b-voice-settings.py'
       - '.github/patches/composer-phase3b-voice-settings-import.py'
+      - '.github/patches/composer-phase3b-voice-longpress.py'
       - '.github/workflows/composer-native-phase3b-voice-settings-apply.yml'
 
 permissions:
@@ -29,6 +30,7 @@ jobs:
           set -euo pipefail
           python3 .github/patches/composer-phase3b-voice-settings.py
           python3 .github/patches/composer-phase3b-voice-settings-import.py
+          python3 .github/patches/composer-phase3b-voice-longpress.py
           git diff --check
 
       - name: Setup Flutter
@@ -71,6 +73,7 @@ jobs:
           set -euo pipefail
           rm -f .github/patches/composer-phase3b-voice-settings.py
           rm -f .github/patches/composer-phase3b-voice-settings-import.py
+          rm -f .github/patches/composer-phase3b-voice-longpress.py
           rm -f .github/workflows/composer-native-phase3b-voice-settings-apply.yml
           git add -A
           if git diff --cached --quiet; then
