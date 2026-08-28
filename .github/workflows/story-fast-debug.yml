@@ -1,4 +1,4 @@
-# rebuild after complete native Story UI integration
+# rebuild after local-first TTS integration
 name: Story Fast Debug
 
 on:
@@ -90,7 +90,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$(git rev-parse HEAD)" \
             --title "Kelivo Story Runtime TEST ${VERSION} (${SHORT_SHA})" \
-            --notes "Installable Android debug-signed test build after complete native Story UI integration. Story controls are integrated into Kelivo Settings and Story Studio/Skills reuse Kelivo-native visual controls. Static analysis and APK signature verification passed before publishing." \
+            --notes "Installable Android debug-signed test build after local-first TTS integration. Story controls are integrated into Kelivo Settings and Story Studio/Skills reuse Kelivo-native visual controls. Static analysis and APK signature verification passed before publishing." \
             --prerelease
 
       - name: Upload artifact
