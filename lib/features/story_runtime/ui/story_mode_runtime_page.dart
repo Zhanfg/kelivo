@@ -5,24 +5,19 @@ import '../../../core/database/business_preferences.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../settings/pages/memory_settings_page.dart';
-import '../../settings/pages/tts_services_page.dart';
-import '../../world_book/pages/world_book_page.dart';
 import '../agency/story_agency_policy.dart';
 import '../orchestration/story_break_armor_mode.dart';
+import '../orchestration/story_mode_transition_service.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
-import 'story_character_manager_page.dart';
 import 'story_conversation_mode_control.dart';
 import 'story_native_settings_widgets.dart';
-import 'story_reference_library_page.dart';
-import 'story_skill_manager_page.dart';
-import 'story_voice_manager_page.dart';
 
-/// Product-facing Story settings.
+/// Product-facing Story behavior settings.
 ///
-/// Internal runtime ids, engine readiness, provider state, cache state and
-/// other diagnostics deliberately do not belong on this surface.
+/// World Book, Memory, Characters, Voices, References and Skills live only in
+/// the global Story tool bar on Home. This page intentionally does not duplicate
+/// those first-level destinations as a second navigation hierarchy.
 class StoryModeRuntimePage extends StatefulWidget {
   const StoryModeRuntimePage({super.key});
 
@@ -106,8 +101,8 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
     try {
       await action();
       if (reload) await _reload();
-    } catch (_) {
-      _showMessage('操作失败，请稍后重试。');
+    } catch (error) {
+      _showMessage('操作失败：$error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -116,8 +111,14 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
   Future<void> _setStoryEnabled(bool enabled) async {
     final id = _selectedConversationId;
     if (id == null) return;
+    final preferences = context.read<BusinessPreferences>();
+    final chatService = context.read<ChatService>();
     await _runBusy(() async {
-      await _runtimeStore.setEnabled(id, enabled);
+      final transition = StoryModeTransitionService(
+        preferences: preferences,
+        chatService: chatService,
+      );
+      await transition.setMode(conversationId: id, storyEnabled: enabled);
       storyConversationModeRevision.value++;
     });
   }
@@ -144,10 +145,6 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
       return title.isEmpty ? (zh ? '未命名会话' : 'Untitled') : title;
     }
     return zh ? '未命名会话' : 'Untitled';
-  }
-
-  void _open(Widget page) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
   }
 
   void _showMessage(String message) {
@@ -177,6 +174,10 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                 StoryNativeSection(
                   title: tr('当前故事', 'Current story'),
                   first: true,
+                  footer: tr(
+                    '故事内容工具统一放在主页的全局故事工具栏；此页只配置故事运行行为。',
+                    'Story content tools live in the global Story toolbar on Home; this page only configures Story runtime behavior.',
+                  ),
                   children: [
                     if (_conversations.isNotEmpty)
                       StoryNativeSelectRow<String>(
@@ -200,8 +201,8 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                     StoryNativeSwitchRow(
                       title: tr('故事模式', 'Story mode'),
                       subtitle: tr(
-                        '只影响当前会话；切回聊天不会删除故事进度。',
-                        'Affects only this conversation. Switching back to Chat keeps story progress.',
+                        '进入故事时会建立或恢复 World Tree 与 Scene；切回聊天不会删除故事进度。',
+                        'Entering Story bootstraps or resumes the World Tree and Scene. Switching back to Chat keeps Story progress.',
                       ),
                       icon: Lucide.Compass,
                       value: session?.enabled ?? false,
@@ -232,69 +233,6 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                         },
                         onSelected: _busy ? null : _setAgencyMode,
                       ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                StoryNativeSection(
-                  title: tr('故事内容', 'Story content'),
-                  children: [
-                    StoryNativeRow(
-                      title: tr('世界书', 'World Book'),
-                      icon: Lucide.BookOpen,
-                      onTap: () => _open(const WorldBookPage()),
-                    ),
-                    StoryNativeRow(
-                      title: tr('记忆', 'Memory'),
-                      icon: Lucide.Brain,
-                      onTap: () => _open(const MemorySettingsPage()),
-                    ),
-                    StoryNativeRow(
-                      title: tr('角色', 'Characters'),
-                      icon: Lucide.User,
-                      enabled: selectedId != null,
-                      onTap: selectedId == null
-                          ? null
-                          : () => _open(
-                              StoryCharacterManagerPage(
-                                conversationId: selectedId,
-                              ),
-                            ),
-                    ),
-                    StoryNativeRow(
-                      title: tr('声音', 'Voices'),
-                      icon: Lucide.Volume2,
-                      enabled: selectedId != null,
-                      onTap: selectedId == null
-                          ? null
-                          : () => _open(
-                              StoryVoiceManagerPage(conversationId: selectedId),
-                            ),
-                    ),
-                    StoryNativeRow(
-                      title: tr('技能', 'Skills'),
-                      icon: Lucide.Shapes,
-                      onTap: () => _open(const StorySkillManagerPage()),
-                    ),
-                    StoryNativeRow(
-                      title: tr('参考文本', 'Reference texts'),
-                      icon: Lucide.BookOpenText,
-                      onTap: () => _open(const StoryReferenceLibraryPage()),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                StoryNativeSection(
-                  title: tr('高级设置', 'Advanced settings'),
-                  children: [
-                    StoryNativeRow(
-                      title: tr('声音服务', 'Voice services'),
-                      subtitle: tr(
-                        '配置本地模型或网络声音来源。',
-                        'Configure local models or network voice sources.',
-                      ),
-                      icon: Lucide.Settings,
-                      onTap: () => _open(const TtsServicesPage()),
-                    ),
                   ],
                 ),
                 if (_busy) ...[
