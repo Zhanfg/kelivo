@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('GitHub Skill install uses one-field bottom sheet', (tester) async {
+  testWidgets('GitHub Skill install uses one-field bottom sheet', (
+    tester,
+  ) async {
     StorySkillGitHubInstallRequest? result;
 
     await tester.pumpWidget(

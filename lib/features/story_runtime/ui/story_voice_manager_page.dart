@@ -322,7 +322,9 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
     if (assignment.ttsServiceId == storySystemTtsServiceId) return '系统 TTS';
     for (final service in _services) {
       if (service.id == assignment.ttsServiceId) {
-        final name = service.name.trim().isEmpty ? service.kind.name : service.name;
+        final name = service.name.trim().isEmpty
+            ? service.kind.name
+            : service.name;
         return '$name · ${assignment.voiceId}';
       }
     }
@@ -363,7 +365,8 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
     String tr(String zhText, String enText) => zh ? zhText : enText;
     final characterIds = _characterIds();
     final allSelected =
-        characterIds.isNotEmpty && _selectedCharacters.length == characterIds.length;
+        characterIds.isNotEmpty &&
+        _selectedCharacters.length == characterIds.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -420,7 +423,9 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
                                 index,
                               ),
                         trailing: Checkbox(
-                          value: _selectedCharacters.contains(characterIds[index]),
+                          value: _selectedCharacters.contains(
+                            characterIds[index],
+                          ),
                           onChanged: _busy
                               ? null
                               : (value) => _toggleSelected(
@@ -467,7 +472,10 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
                   children: [
                     StoryNativeRow(
                       title: tr('系统 TTS', 'System TTS'),
-                      subtitle: tr('使用设备系统语音引擎。', 'Use the device system voice engine.'),
+                      subtitle: tr(
+                        '使用设备系统语音引擎。',
+                        'Use the device system voice engine.',
+                      ),
                       icon: Lucide.Smartphone,
                       enabled: false,
                     ),
@@ -477,7 +485,10 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
                           ? tr('未安装本地模型。', 'Local model is not installed.')
                           : _localReady
                           ? tr('本地运行时可用。', 'Local runtime is ready.')
-                          : tr('模型已安装，但本地运行时未就绪。', 'Model installed, runtime not ready.'),
+                          : tr(
+                              '模型已安装，但本地运行时未就绪。',
+                              'Model installed, runtime not ready.',
+                            ),
                       icon: Lucide.Cpu,
                       enabled: false,
                     ),
@@ -563,7 +574,9 @@ class _VoiceEditorSheetState extends State<_VoiceEditorSheet> {
   void initState() {
     super.initState();
     final currentService = widget.current?.ttsServiceId;
-    final enabledSources = widget.sources.where((source) => source.enabled).toList();
+    final enabledSources = widget.sources
+        .where((source) => source.enabled)
+        .toList();
     _serviceId = enabledSources.any((item) => item.id == currentService)
         ? currentService!
         : enabledSources.first.id;
@@ -624,9 +637,9 @@ class _VoiceEditorSheetState extends State<_VoiceEditorSheet> {
       );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('预览失败：$error')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('预览失败：$error')));
       }
     } finally {
       if (mounted) setState(() => _previewing = false);
@@ -657,7 +670,9 @@ class _VoiceEditorSheetState extends State<_VoiceEditorSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -683,7 +698,10 @@ class _VoiceEditorSheetState extends State<_VoiceEditorSheet> {
                       controller: _voiceController,
                       hintText: _serviceId == storyLocalMossTtsServiceId
                           ? 'Junhao'
-                          : tr('填写服务支持的音色名', 'Voice id supported by the service'),
+                          : tr(
+                              '填写服务支持的音色名',
+                              'Voice id supported by the service',
+                            ),
                     ),
                   StoryNativeTextFieldRow(
                     label: tr('表达方式', 'Performance'),
@@ -702,7 +720,9 @@ class _VoiceEditorSheetState extends State<_VoiceEditorSheet> {
                 children: [
                   Expanded(
                     child: StoryNativeButton(
-                      label: _previewing ? tr('预览中', 'Previewing') : tr('试听', 'Preview'),
+                      label: _previewing
+                          ? tr('预览中', 'Previewing')
+                          : tr('试听', 'Preview'),
                       icon: Lucide.Play,
                       enabled: !_previewing,
                       onTap: _preview,

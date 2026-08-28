@@ -102,8 +102,7 @@ final class StoryModeTransitionService {
 
     // Re-read by conversation to ensure the coordinator write is visible and
     // to protect against future coordinator implementations returning a copy.
-    final persistedTree =
-        await _worldTreeStore.readForConversation(id) ?? tree;
+    final persistedTree = await _worldTreeStore.readForConversation(id) ?? tree;
     final persistedLine = persistedTree.worldlineForConversation(id);
     if (persistedLine == null) {
       throw StateError('Story worldline binding was not persisted.');

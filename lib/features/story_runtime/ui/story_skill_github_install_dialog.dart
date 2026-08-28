@@ -94,7 +94,11 @@ class _StorySkillGitHubInstallSheetState
                   baseColor: Colors.transparent,
                   onTap: () => Navigator.of(context).maybePop(),
                   child: Center(
-                    child: Icon(Lucide.ArrowLeft, size: 20, color: cs.onSurface),
+                    child: Icon(
+                      Lucide.ArrowLeft,
+                      size: 20,
+                      color: cs.onSurface,
+                    ),
                   ),
                 ),
               ),

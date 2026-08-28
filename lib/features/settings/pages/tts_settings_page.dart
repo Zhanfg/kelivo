@@ -218,9 +218,15 @@ class _TtsSettingsContentState extends State<TtsSettingsContent> {
                 final subtitle = waiting
                     ? tr('正在检查…', 'Checking…')
                     : ready
-                    ? tr('已安装，可在 Android 上离线使用。', 'Installed and ready for offline use on Android.')
+                    ? tr(
+                        '已安装，可在 Android 上离线使用。',
+                        'Installed and ready for offline use on Android.',
+                      )
                     : installed
-                    ? tr('模型已安装，但当前设备上的本地运行时不可用。', 'Model installed, but the local runtime is unavailable on this device.')
+                    ? tr(
+                        '模型已安装，但当前设备上的本地运行时不可用。',
+                        'Model installed, but the local runtime is unavailable on this device.',
+                      )
                     : tr('未安装本地模型。', 'No local model installed.');
                 return _SettingsRow(
                   title: tr('MOSS-TTS-Nano', 'MOSS-TTS-Nano'),
@@ -239,7 +245,10 @@ class _TtsSettingsContentState extends State<TtsSettingsContent> {
             ),
             _ActionSettingsRow(
               title: tr('导入 / 替换本地模型', 'Import / replace local model'),
-              subtitle: tr('支持一次选择完整模型目录，不需要逐个选文件。', 'Choose the complete model directory once; no per-file picking.'),
+              subtitle: tr(
+                '支持一次选择完整模型目录，不需要逐个选文件。',
+                'Choose the complete model directory once; no per-file picking.',
+              ),
               icon: Lucide.FolderInput,
               enabled: !_localBusy,
               onTap: _installLocalModel,
@@ -250,7 +259,10 @@ class _TtsSettingsContentState extends State<TtsSettingsContent> {
                 final ready = snapshot.data?.ready == true;
                 return _ActionSettingsRow(
                   title: tr('测试本地语音', 'Test local voice'),
-                  subtitle: tr('强制走本地 MOSS，不调用网络 TTS。', 'Forces local MOSS without calling network TTS.'),
+                  subtitle: tr(
+                    '强制走本地 MOSS，不调用网络 TTS。',
+                    'Forces local MOSS without calling network TTS.',
+                  ),
                   icon: Lucide.Play,
                   enabled: !_localBusy && ready,
                   onTap: _testLocalTts,
@@ -261,10 +273,13 @@ class _TtsSettingsContentState extends State<TtsSettingsContent> {
               future: _localStatusFuture,
               builder: (context, snapshot) => _ActionSettingsRow(
                 title: tr('删除本地模型', 'Remove local model'),
-                subtitle: tr('释放模型占用的存储空间。', 'Free storage used by model files.'),
+                subtitle: tr(
+                  '释放模型占用的存储空间。',
+                  'Free storage used by model files.',
+                ),
                 icon: Lucide.Trash2,
-                enabled: !_localBusy &&
-                    snapshot.data?.validation.isValid == true,
+                enabled:
+                    !_localBusy && snapshot.data?.validation.isValid == true,
                 onTap: _removeLocalModel,
               ),
             ),
@@ -347,18 +362,20 @@ class _BackendModeRow extends StatelessWidget {
       TtsBackendMode.systemOnly => zh ? '系统 TTS' : 'System TTS',
     };
     final subtitle = switch (mode) {
-      TtsBackendMode.automatic => zh
-          ? '安装本地模型后不把文本静默回退到云端。'
-          : 'Once local is installed, text never silently falls back to cloud.',
-      TtsBackendMode.localOnly => zh
-          ? '只允许 MOSS 本地模型；不可用时直接报错。'
-          : 'Only the local MOSS model; fails rather than using the network.',
-      TtsBackendMode.cloudOnly => zh
-          ? '只使用当前启用的网络语音服务。'
-          : 'Only the currently enabled network voice service.',
-      TtsBackendMode.systemOnly => zh
-          ? '只使用 Android / 系统自带 TTS。'
-          : 'Only Android / OS-provided TTS.',
+      TtsBackendMode.automatic =>
+        zh
+            ? '安装本地模型后不把文本静默回退到云端。'
+            : 'Once local is installed, text never silently falls back to cloud.',
+      TtsBackendMode.localOnly =>
+        zh
+            ? '只允许 MOSS 本地模型；不可用时直接报错。'
+            : 'Only the local MOSS model; fails rather than using the network.',
+      TtsBackendMode.cloudOnly =>
+        zh
+            ? '只使用当前启用的网络语音服务。'
+            : 'Only the currently enabled network voice service.',
+      TtsBackendMode.systemOnly =>
+        zh ? '只使用 Android / 系统自带 TTS。' : 'Only Android / OS-provided TTS.',
     };
     return IosCardPress(
       onTap: onTap,
@@ -369,7 +386,9 @@ class _BackendModeRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
         child: Row(
           children: [
-            Expanded(child: _RowText(title: title, subtitle: subtitle)),
+            Expanded(
+              child: _RowText(title: title, subtitle: subtitle),
+            ),
             const SizedBox(width: 12),
             AnimatedOpacity(
               opacity: selected ? 1 : 0,
@@ -470,7 +489,9 @@ class _SettingsRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
       child: Row(
         children: [
-          Expanded(child: _RowText(title: title, subtitle: subtitle)),
+          Expanded(
+            child: _RowText(title: title, subtitle: subtitle),
+          ),
           const SizedBox(width: 12),
           trailing,
         ],
@@ -508,7 +529,9 @@ class _ActionSettingsRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
           child: Row(
             children: [
-              Expanded(child: _RowText(title: title, subtitle: subtitle)),
+              Expanded(
+                child: _RowText(title: title, subtitle: subtitle),
+              ),
               const SizedBox(width: 12),
               Icon(icon, size: 19, color: cs.onSurfaceVariant),
             ],

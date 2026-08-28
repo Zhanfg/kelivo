@@ -69,9 +69,14 @@ class _StoryConversationModeTitleState
       if (_portalWanted) {
         final renderObject = _anchorKey.currentContext?.findRenderObject();
         if (renderObject is RenderBox && renderObject.hasSize) {
-          final nextY = renderObject.localToGlobal(
-            Offset(renderObject.size.width / 2, renderObject.size.height / 2),
-          ).dy;
+          final nextY = renderObject
+              .localToGlobal(
+                Offset(
+                  renderObject.size.width / 2,
+                  renderObject.size.height / 2,
+                ),
+              )
+              .dy;
           final currentY = _toolbarCenterY;
           if (currentY == null || (currentY - nextY).abs() >= 0.5) {
             setState(() => _toolbarCenterY = nextY);
@@ -113,9 +118,9 @@ class _StoryConversationModeTitleState
       Haptics.light();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('模式转换失败：$error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('模式转换失败：$error')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -162,19 +167,13 @@ class _StoryConversationModeTitleState
             height: 36,
             child: _ModeSelector(
               storySelected: session.enabled,
-              busy: _busy ||
-                  snapshot.connectionState == ConnectionState.waiting,
-              onSelectChat: () =>
-                  _selectMode(conversationId, session, false),
-              onSelectStory: () =>
-                  _selectMode(conversationId, session, true),
+              busy:
+                  _busy || snapshot.connectionState == ConnectionState.waiting,
+              onSelectChat: () => _selectMode(conversationId, session, false),
+              onSelectStory: () => _selectMode(conversationId, session, true),
             ),
           ),
-          child: SizedBox(
-            key: _anchorKey,
-            width: 1,
-            height: 36,
-          ),
+          child: SizedBox(key: _anchorKey, width: 1, height: 36),
         );
       },
     );

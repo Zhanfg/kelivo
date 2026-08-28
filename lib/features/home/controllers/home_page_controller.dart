@@ -51,6 +51,7 @@ import '../utils/chat_layout_constants.dart';
 import '../widgets/chat_input_bar.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../story_runtime/orchestration/story_native_lifecycle_bridge.dart';
+import '../../story_runtime/voice/story_voice_playback_service.dart';
 
 enum ChatSelectionMode { share, delete }
 
@@ -1808,18 +1809,29 @@ class HomePageController extends ChangeNotifier {
     );
     if (text.trim().isEmpty) return;
 
+    try {
+      final preferences = _context.read<BusinessPreferences>();
+      final bridge = StoryNativeLifecycleBridge(preferences);
+      final narrator = await bridge.resolveNarratorAssignment(message);
+      if (narrator != null) {
+        final voiceContext = await bridge.resolveNarratorContext(message);
+        await StoryVoicePlaybackService(
+          preferences: preferences,
+          ttsProvider: tts,
+        ).speakAssignment(
+          assignment: narrator,
+          text: text,
+          context: voiceContext,
+        );
+        return;
+      }
+    } catch (error) {
+      debugPrint('Story narrator playback failed: $error');
+    }
+
     final selectedService = sp.selectedTtsService;
     if (selectedService != null && selectedService.enabled) {
-      var routedService = selectedService;
-      try {
-        final preferences = _context.read<BusinessPreferences>();
-        routedService = await StoryNativeLifecycleBridge(
-          preferences,
-        ).routeNarrator(message: message, selectedService: selectedService);
-      } catch (error) {
-        debugPrint('Story narrator routing failed: $error');
-      }
-      await tts.speakWithNetworkService(routedService, text);
+      await tts.speakWithNetworkService(selectedService, text);
       return;
     }
 

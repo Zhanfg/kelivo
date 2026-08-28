@@ -369,7 +369,11 @@ final class StorySkillGitHubService {
       relative[entry.key.substring(root.length + 1)] = entry.value;
     }
 
-    final skillRoot = _selectSkillRoot(relative, source.subdirectory);
+    final skillRoot = _selectSkillRoot(
+      relative,
+      source.subdirectory,
+      repository: source.repository,
+    );
     final skillEntry =
         relative[skillRoot.isEmpty ? 'SKILL.md' : '$skillRoot/SKILL.md'];
     if (skillEntry == null || !skillEntry.isFile) {

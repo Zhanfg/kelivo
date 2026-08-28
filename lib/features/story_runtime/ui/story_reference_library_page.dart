@@ -115,7 +115,8 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
   Future<void> _pickAnalysisModel() async {
     if (_busy) return;
     final settings = context.read<SettingsProvider>();
-    final initialProvider = _analysisProviderKey ?? settings.currentModelProvider;
+    final initialProvider =
+        _analysisProviderKey ?? settings.currentModelProvider;
     final initialModel = _analysisModelId ?? settings.currentModelId;
     final selected = await showModelSelector(
       context,
@@ -132,7 +133,10 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
   String _analysisModelLabel(SettingsProvider settings) {
     final provider = _analysisProviderKey?.trim();
     final model = _analysisModelId?.trim();
-    if (provider == null || provider.isEmpty || model == null || model.isEmpty) {
+    if (provider == null ||
+        provider.isEmpty ||
+        model == null ||
+        model.isEmpty) {
       return '未选择';
     }
     final config = settings.getProviderConfig(provider);
@@ -143,7 +147,9 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
         return '$overrideName · ${config.name}';
       }
     }
-    final providerName = config.name.trim().isEmpty ? provider : config.name.trim();
+    final providerName = config.name.trim().isEmpty
+        ? provider
+        : config.name.trim();
     return '$model · $providerName';
   }
 
@@ -154,7 +160,8 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
       allowedExtensions: const ['txt', 'md', 'markdown', 'pdf', 'docx', 'epub'],
       allowMultiple: true,
     );
-    final paths = result?.files
+    final paths =
+        result?.files
             .map((file) => file.path?.trim())
             .whereType<String>()
             .where((path) => path.isNotEmpty)
@@ -196,9 +203,7 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
     await _analyzeDocuments(selected);
   }
 
-  Future<void> _analyzeDocuments(
-    List<StoryReferenceDocument> documents,
-  ) async {
+  Future<void> _analyzeDocuments(List<StoryReferenceDocument> documents) async {
     if (_busy || documents.isEmpty) return;
     final settings = context.read<SettingsProvider>();
     final provider = _analysisProviderKey?.trim();
@@ -218,11 +223,15 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
     );
     const service = StoryReferenceAnalysisService();
     await _runBusy(() async {
-      for (var documentIndex = 0;
-          documentIndex < documents.length;
-          documentIndex++) {
+      for (
+        var documentIndex = 0;
+        documentIndex < documents.length;
+        documentIndex++
+      ) {
         final document = documents[documentIndex];
-        final source = await _referenceImportService.readNormalizedText(document);
+        final source = await _referenceImportService.readNormalizedText(
+          document,
+        );
         await service.analyzeAndSave(
           document: document,
           sourceText: source,
@@ -435,7 +444,8 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
 
   void _toggleAllProfiles() {
     setState(() {
-      if (_profiles.isNotEmpty && _selectedProfileIds.length == _profiles.length) {
+      if (_profiles.isNotEmpty &&
+          _selectedProfileIds.length == _profiles.length) {
         _selectedProfileIds.clear();
       } else {
         _selectedProfileIds
@@ -473,7 +483,8 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
       return tr('未命名会话', 'Untitled conversation');
     }
 
-    final allDocumentsSelected = _documents.isNotEmpty &&
+    final allDocumentsSelected =
+        _documents.isNotEmpty &&
         _selectedDocumentIds.length == _documents.length;
     final allProfilesSelected =
         _profiles.isNotEmpty && _selectedProfileIds.length == _profiles.length;
@@ -575,13 +586,15 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
                               ),
                               icon: Lucide.Search,
                               primary: true,
-                              enabled: !_busy && _selectedDocumentIds.isNotEmpty,
+                              enabled:
+                                  !_busy && _selectedDocumentIds.isNotEmpty,
                               onTap: _analyzeSelectedDocuments,
                             ),
                             StoryNativeButton(
                               label: tr('删除所选', 'Delete selected'),
                               icon: Lucide.Trash2,
-                              enabled: !_busy && _selectedDocumentIds.isNotEmpty,
+                              enabled:
+                                  !_busy && _selectedDocumentIds.isNotEmpty,
                               onTap: _deleteSelectedDocuments,
                             ),
                           ],
@@ -627,7 +640,8 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
                               label: tr('批量启用', 'Enable selected'),
                               icon: Lucide.Check,
                               primary: true,
-                              enabled: !_busy &&
+                              enabled:
+                                  !_busy &&
                                   _selectedConversationId != null &&
                                   _selectedProfileIds.isNotEmpty,
                               onTap: () => _setSelectedProfilesEnabled(true),
@@ -635,7 +649,8 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
                             StoryNativeButton(
                               label: tr('批量停用', 'Disable selected'),
                               icon: Lucide.CircleOff,
-                              enabled: !_busy &&
+                              enabled:
+                                  !_busy &&
                                   _selectedConversationId != null &&
                                   _selectedProfileIds.isNotEmpty,
                               onTap: () => _setSelectedProfilesEnabled(false),
@@ -691,14 +706,17 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
                     value: selected,
                     onChanged: _busy
                         ? null
-                        : (value) =>
-                            _toggleProfileSelection(profile.id, value == true),
+                        : (value) => _toggleProfileSelection(
+                            profile.id,
+                            value == true,
+                          ),
                   ),
                   Expanded(
                     child: InkWell(
                       onTap: _busy
                           ? null
-                          : () => _toggleProfileSelection(profile.id, !selected),
+                          : () =>
+                                _toggleProfileSelection(profile.id, !selected),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Column(
@@ -707,9 +725,7 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
                             Text(profile.name),
                             const SizedBox(height: 2),
                             Text(
-                              aspects.isEmpty
-                                  ? '抽象写作风格'
-                                  : aspects.join(' · '),
+                              aspects.isEmpty ? '抽象写作风格' : aspects.join(' · '),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: cs.onSurfaceVariant,
@@ -759,7 +775,7 @@ class _StoryReferenceLibraryPageState extends State<StoryReferenceLibraryPage> {
                           onChangeEnd: _busy
                               ? null
                               : (value) =>
-                                  _setReferenceStrength(profile, value),
+                                    _setReferenceStrength(profile, value),
                         ),
                       ),
                       SizedBox(
@@ -806,7 +822,9 @@ class _SelectableDocumentRow extends StatelessWidget {
             children: [
               Checkbox(
                 value: selected,
-                onChanged: enabled ? (value) => onSelected(value == true) : null,
+                onChanged: enabled
+                    ? (value) => onSelected(value == true)
+                    : null,
               ),
               Icon(Lucide.NotebookTabs, size: 20, color: cs.onSurfaceVariant),
               const SizedBox(width: 10),
