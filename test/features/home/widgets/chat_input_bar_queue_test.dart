@@ -250,6 +250,13 @@ void main() {
     final textField = tester.widget<TextField>(find.byType(TextField));
     expect(textField.readOnly, isFalse);
     expect(find.text('Queued to send'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('Queued to send'),
+        matching: find.byType(ClipRRect),
+      ),
+      findsWidgets,
+    );
     expect(find.text('Cancel Queue'), findsOneWidget);
     expect(find.text(preview), findsOneWidget);
 

@@ -10,7 +10,6 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
-import '../../story_runtime/ui/story_mode_chat_chip.dart';
 import '../utils/model_display_helper.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
@@ -145,7 +144,6 @@ class ChatInputSection extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        StoryModeChatChip(conversationId: conversationId),
         ChatInputBar(
           key: inputBarKey,
           onMore: onMore,

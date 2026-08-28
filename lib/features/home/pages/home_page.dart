@@ -859,6 +859,11 @@ class _HomePageState extends State<HomePage>
     });
   }
 
+  void _startDrawingPrompt() {
+    final isZh = Localizations.localeOf(context).languageCode == 'zh';
+    _handleProcessText(isZh ? '请绘制：' : 'Draw: ');
+  }
+
   // ============================================================================
   // Build Methods
   // ============================================================================
@@ -1858,6 +1863,10 @@ class _HomePageState extends State<HomePage>
             onUpload: () {
               Navigator.of(ctx).maybePop();
               _controller.onPickFiles();
+            },
+            onDrawing: () {
+              Navigator.of(ctx).maybePop();
+              _startDrawingPrompt();
             },
             onSearch: () async {
               await Navigator.of(ctx).maybePop();

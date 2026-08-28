@@ -85,12 +85,12 @@ void main() {
     expect(settings.assistantBubbleFitContent, isTrue);
   });
 
-  testWidgets('fit-content option shrinks the assistant bubble to its text', (
+  testWidgets('assistant bubble stays fit-content when legacy setting is off', (
     tester,
   ) async {
     final spanning = await _bubbleWidth(tester, fitContent: false);
     final hugging = await _bubbleWidth(tester, fitContent: true);
-    expect(hugging, lessThan(spanning));
+    expect(hugging, spanning);
   });
 
   testWidgets('waiting bubble hugs the indicator too', (tester) async {
@@ -100,6 +100,6 @@ void main() {
       waiting: true,
     );
     final hugging = await _bubbleWidth(tester, fitContent: true, waiting: true);
-    expect(hugging, lessThan(spanning));
+    expect(hugging, spanning);
   });
 }

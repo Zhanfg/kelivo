@@ -2929,22 +2929,6 @@ class _ChatInputBarState extends State<ChatInputBar>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (widget.hasQueuedInput) ...[
-              _QueuedInputBanner(
-                label: widget.queuedInputs.length > 1
-                    ? '${AppLocalizations.of(context)!.chatInputBarQueuedPending} · ${widget.queuedInputs.length}'
-                    : AppLocalizations.of(context)!.chatInputBarQueuedPending,
-                previewText: widget.queuedPreviewText,
-                cancelLabel: AppLocalizations.of(
-                  context,
-                )!.chatInputBarQueuedCancel,
-                onCancel: widget.onCancelQueuedInput,
-                onManage: widget.queuedInputs.isEmpty
-                    ? null
-                    : () => unawaited(_showQueueManager()),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-            ],
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -2972,6 +2956,24 @@ class _ChatInputBarState extends State<ChatInputBar>
                       ),
                       child: Column(
                         children: [
+                          if (widget.hasQueuedInput) ...[
+                            _QueuedInputBanner(
+                              label: widget.queuedInputs.length > 1
+                                  ? '${AppLocalizations.of(context)!.chatInputBarQueuedPending} · ${widget.queuedInputs.length}'
+                                  : AppLocalizations.of(
+                                      context,
+                                    )!.chatInputBarQueuedPending,
+                              previewText: widget.queuedPreviewText,
+                              cancelLabel: AppLocalizations.of(
+                                context,
+                              )!.chatInputBarQueuedCancel,
+                              onCancel: widget.onCancelQueuedInput,
+                              onManage: widget.queuedInputs.isEmpty
+                                  ? null
+                                  : () => unawaited(_showQueueManager()),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                          ],
                           if (hasDocs || hasImages)
                             _buildInlineAttachmentPreviews(context, isDark),
                           // Input field with expand/collapse button

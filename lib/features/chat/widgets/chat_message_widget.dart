@@ -2415,14 +2415,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
   }
 
-  /// Assistant blocks span the row by default. With the fit-content option
-  /// on, [Align] hands the bubble loose constraints so it hugs its text;
-  /// long text still wraps at the same max width.
+  /// Assistant bubbles always hug their content; long text still wraps at the
+  /// same maximum width.
   Widget _assistantBlockWidth(BuildContext context, {required Widget child}) {
-    final fitContent = context.select<SettingsProvider, bool>(
-      (s) => s.assistantBubbleFitContent,
-    );
-    if (!fitContent) return SizedBox(width: double.infinity, child: child);
     return Align(alignment: Alignment.centerLeft, child: child);
   }
 

@@ -21,6 +21,7 @@ class BottomToolsSheet extends StatelessWidget {
     this.onCamera,
     this.onPhotos,
     this.onUpload,
+    this.onDrawing,
     this.onSearch,
     this.onMcp,
     this.onQuickPhrase,
@@ -33,6 +34,7 @@ class BottomToolsSheet extends StatelessWidget {
   final VoidCallback? onCamera;
   final VoidCallback? onPhotos;
   final VoidCallback? onUpload;
+  final VoidCallback? onDrawing;
   final VoidCallback? onSearch;
   final VoidCallback? onMcp;
   final VoidCallback? onQuickPhrase;
@@ -168,21 +170,35 @@ class BottomToolsSheet extends StatelessWidget {
                     Row(
                       children: [
                         roundedAction(
-                          icon: Lucide.Camera,
-                          label: l10n.bottomToolsSheetCamera,
-                          onTap: onCamera,
-                        ),
-                        const SizedBox(width: 12),
-                        roundedAction(
                           icon: Lucide.Image,
                           label: l10n.bottomToolsSheetPhotos,
                           onTap: onPhotos,
                         ),
                         const SizedBox(width: 12),
                         roundedAction(
+                          icon: Lucide.Camera,
+                          label: l10n.bottomToolsSheetCamera,
+                          onTap: onCamera,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        roundedAction(
                           icon: Lucide.Paperclip,
                           label: l10n.bottomToolsSheetUpload,
                           onTap: onUpload,
+                        ),
+                        const SizedBox(width: 12),
+                        roundedAction(
+                          icon: Lucide.Brush,
+                          label:
+                              Localizations.localeOf(context).languageCode ==
+                                  'zh'
+                              ? '绘画'
+                              : 'Draw',
+                          onTap: onDrawing,
                         ),
                       ],
                     ),
