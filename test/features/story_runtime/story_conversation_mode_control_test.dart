@@ -1,4 +1,5 @@
 import 'package:Kelivo/features/story_runtime/ui/story_conversation_mode_control.dart';
+import 'package:Kelivo/shared/widgets/interactive_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -60,5 +61,39 @@ void main() {
     await tester.tap(find.byKey(storyTargetKey));
     await tester.pump();
     expect(storyTapped, isTrue);
+  });
+
+  testWidgets('mode slot moves with content when the drawer opens', (
+    tester,
+  ) async {
+    const controlKey = ValueKey<String>('story-mode-control');
+    final drawerController = InteractiveDrawerController(initialValue: 1);
+    addTearDown(drawerController.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: InteractiveDrawer(
+          controller: drawerController,
+          drawerWidth: 300,
+          drawer: const ColoredBox(color: Colors.white),
+          child: Scaffold(
+            appBar: AppBar(
+              title: const StoryConversationModeCenteredSlot(
+                controlWidth: 124,
+                child: SizedBox(key: controlKey, width: 124, height: 36),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final screenWidth =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(
+      tester.getRect(find.byKey(controlKey)).center.dx,
+      moreOrLessEquals(screenWidth / 2 + 300, epsilon: 0.5),
+    );
   });
 }
