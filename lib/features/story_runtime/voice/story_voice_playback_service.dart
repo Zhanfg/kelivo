@@ -4,6 +4,7 @@ import '../../../core/database/business_preferences.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/tts/local_tts.dart';
 import '../../../core/services/tts/network_tts.dart';
+import 'story_voice_context.dart';
 import 'story_voice_models.dart';
 import 'story_voice_routing.dart';
 
@@ -34,6 +35,7 @@ final class StoryVoicePlaybackService {
   Future<StoryResolvedVoiceRequest> resolve({
     required StoryVoiceAssignment assignment,
     StorySpeechIntent intent = const StorySpeechIntent(),
+    StoryVoiceContextWindow? context,
   }) async {
     if (isStoryNativeTtsServiceId(assignment.ttsServiceId)) {
       throw StateError('story_voice_native_backend_has_no_network_request');
@@ -53,6 +55,7 @@ final class StoryVoicePlaybackService {
       service: service,
       assignment: assignment,
       intent: intent,
+      context: context,
     );
   }
 
@@ -60,9 +63,14 @@ final class StoryVoicePlaybackService {
     required StoryVoiceAssignment assignment,
     required String text,
     StorySpeechIntent intent = const StorySpeechIntent(),
+    StoryVoiceContextWindow? context,
     bool flush = true,
   }) async {
-    final request = await resolve(assignment: assignment, intent: intent);
+    final request = await resolve(
+      assignment: assignment,
+      intent: intent,
+      context: context,
+    );
     await ttsProvider.speakWithNetworkService(
       request.service,
       text,
@@ -75,11 +83,13 @@ final class StoryVoicePlaybackService {
   ///
   /// [speak] remains network-only for compatibility with existing callers that
   /// need the resolved network request. New Story playback paths should use
-  /// this method when the assignment can point at local or system TTS.
+  /// this method so a per-story source can differ from Kelivo's global TTS
+  /// selection while still sharing the native playback stack.
   Future<void> speakAssignment({
     required StoryVoiceAssignment assignment,
     required String text,
     StorySpeechIntent intent = const StorySpeechIntent(),
+    StoryVoiceContextWindow? context,
     bool flush = true,
   }) async {
     switch (assignment.ttsServiceId) {
@@ -107,6 +117,7 @@ final class StoryVoicePlaybackService {
           assignment: assignment,
           text: text,
           intent: intent,
+          context: context,
           flush: flush,
         );
     }
