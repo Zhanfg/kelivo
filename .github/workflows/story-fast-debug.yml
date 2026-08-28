@@ -1,4 +1,4 @@
-# fast rebuild for GitHub Skill dialog lifecycle fix
+# fast rebuild for GitHub Skill dialog lifecycle fix; use hosted JDK directly
 name: Story Fast Debug
 
 on:
@@ -26,12 +26,13 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: zulu
-          java-version: '17'
-          cache: gradle
+      - name: Use hosted JDK 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+          "$JAVA_HOME_17_X64/bin/java" -version
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
