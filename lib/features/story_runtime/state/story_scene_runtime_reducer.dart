@@ -3,9 +3,9 @@ import 'story_scene_runtime_state.dart';
 
 /// Applies one parsed Story turn to persisted scene state.
 ///
-/// The reducer is pure so Story response parsing can be tested without Hive or
-/// SharedPreferences. Unknown/ill-typed metadata is ignored rather than
-/// poisoning a completed assistant turn.
+/// The reducer is pure so Story response parsing can be tested without relying
+/// on legacy preference storage. Unknown/ill-typed metadata is ignored rather
+/// than poisoning a completed assistant turn.
 StorySceneRuntimeState reduceStoryTurnIntoScene({
   required StorySceneRuntimeState current,
   required StoryTurn turn,
