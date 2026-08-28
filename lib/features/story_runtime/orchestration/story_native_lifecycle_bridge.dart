@@ -16,9 +16,9 @@ import 'story_runtime_commit_service.dart';
 ///
 /// Native chat remains authoritative for message persistence. Story state is a
 /// sidecar transaction committed only after Kelivo reports a successful final
-/// assistant revision. Native TTS also remains authoritative: Story may route
-/// the already-selected network service through a narrator assignment, but it
-/// never creates a parallel playback stack or copies provider credentials.
+/// assistant revision. Native TTS also remains authoritative: Story only
+/// resolves semantic voice assignments and lets Kelivo's existing TTS provider
+/// perform local, system or network playback.
 final class StoryNativeLifecycleBridge {
   StoryNativeLifecycleBridge(BusinessPreferences preferences)
     : _commitService = StoryRuntimeCommitService(preferences),
@@ -53,37 +53,48 @@ final class StoryNativeLifecycleBridge {
     return result;
   }
 
+  /// Returns the active narrator assignment for a Story assistant message.
+  ///
+  /// Unlike [routeNarrator], this is backend-agnostic and can therefore return
+  /// native local/system assignments as well as network assignments. Worldline
+  /// scoping is enforced here so all playback entry points share one rule.
+  Future<StoryVoiceAssignment?> resolveNarratorAssignment(
+    ChatMessage message,
+  ) async {
+    if (message.role != 'assistant') return null;
+
+    final session = await _sessionStore.readOrDefault(message.conversationId);
+    if (!session.enabled) return null;
+
+    final tree = await _worldTreeStore.readForConversation(
+      message.conversationId,
+    );
+    if (tree == null) return null;
+
+    final routing = await _voiceStore.readOrDefault(tree.worldTreeId);
+    final narrator = routing.narrator;
+    if (narrator == null) return null;
+    if (narrator.worldlineId != null &&
+        narrator.worldlineId != session.worldlineId) {
+      return null;
+    }
+    return narrator;
+  }
+
   /// Applies Story narrator semantics to Kelivo's currently selected network
   /// TTS service. Playback remains a single native TtsProvider request, so the
-  /// provider's chunking, three-chunk prefetch, seek and replay cache continue
-  /// to work unchanged.
+  /// provider's chunking, prefetch, seek and replay cache continue to work.
+  ///
+  /// Native local/system assignments deliberately return [selectedService]
+  /// unchanged here; callers that support all backends should first use
+  /// [resolveNarratorAssignment] and StoryVoicePlaybackService.speakAssignment.
   Future<TtsServiceOptions> routeNarrator({
     required ChatMessage message,
     required TtsServiceOptions selectedService,
     StorySpeechIntent intent = const StorySpeechIntent(),
   }) async {
-    if (message.role != 'assistant') return selectedService;
-
-    final session = await _sessionStore.readOrDefault(message.conversationId);
-    if (!session.enabled) return selectedService;
-
-    final tree = await _worldTreeStore.readForConversation(
-      message.conversationId,
-    );
-    if (tree == null) return selectedService;
-
-    final routing = await _voiceStore.readOrDefault(tree.worldTreeId);
-    final narrator = routing.narrator;
-    if (narrator == null) return selectedService;
-
-    // A narrator can optionally be scoped to one branch. Never leak a branch
-    // voice assignment into a sibling worldline.
-    if (narrator.worldlineId != null &&
-        narrator.worldlineId != session.worldlineId) {
-      return selectedService;
-    }
-
-    if (narrator.ttsServiceId != selectedService.id) {
+    final narrator = await resolveNarratorAssignment(message);
+    if (narrator == null || narrator.ttsServiceId != selectedService.id) {
       return selectedService;
     }
 
