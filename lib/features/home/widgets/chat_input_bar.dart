@@ -221,6 +221,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   static const int _maxVoiceLevels = 400;
   Timer? _voiceLevelTimer;
   TextEditingValue? _voiceBaseValue;
+  String _voiceLastObservedTranscript = '';
+  bool _voiceTranscriptEditing = false;
   bool _ownsVoiceSession = false;
   bool _finishingVoice = false;
   String? _lastReportedVoiceError;
@@ -333,8 +335,34 @@ class _ChatInputBarState extends State<ChatInputBar>
       _pendingImagePasteIds.isNotEmpty ||
       _pendingTextPasteIds.isNotEmpty;
 
-  // Instance method for onChanged to avoid recreating the callback on every build
-  void _onTextChanged(String _) => setState(() {});
+  // Instance method for onChanged to avoid recreating the callback on every build.
+  // Programmatic controller writes do not invoke TextField.onChanged, so this
+  // is also the boundary where a live ASR transcript becomes user-owned text.
+  void _onTextChanged(String _) {
+    final asr = widget.asrProvider;
+    if (_ownsVoiceSession &&
+        !_finishingVoice &&
+        asr?.supportsLiveTranscript == true) {
+      _voiceTranscriptEditing = true;
+      final composing = _controller.value.composing;
+      if (!composing.isValid || composing.isCollapsed) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted ||
+              !_ownsVoiceSession ||
+              !_voiceTranscriptEditing ||
+              _finishingVoice) {
+            return;
+          }
+          final activeAsr = widget.asrProvider;
+          if (activeAsr?.supportsLiveTranscript == true) {
+            _applyVoiceTranscript(activeAsr!.transcript);
+            if (mounted) setState(() {});
+          }
+        });
+      }
+    }
+    setState(() {});
+  }
 
   void _addImages(List<String> paths) {
     if (paths.isEmpty) return;
@@ -752,6 +780,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
 
     _voiceBaseValue = _controller.value;
+    _voiceLastObservedTranscript = '';
+    _voiceTranscriptEditing = false;
     _ownsVoiceSession = true;
     _finishingVoice = false;
     _lastReportedVoiceError = null;
@@ -795,6 +825,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       _ownsVoiceSession = false;
       _finishingVoice = false;
       _voiceLevels.clear();
+      _resetVoiceTranscriptTracking();
       _reportVoiceFailure(error);
       scheduleMicrotask(asr.clearError);
     } else if (!asr.isActive && !_finishingVoice) {
@@ -804,10 +835,16 @@ class _ChatInputBarState extends State<ChatInputBar>
       _voiceBaseValue = null;
       _ownsVoiceSession = false;
       _voiceLevels.clear();
+      _resetVoiceTranscriptTracking();
       if (!detectedSpeech) _reportNoSpeech();
     }
     setState(() {});
-    _ensureCaretVisible();
+    if (!_voiceTranscriptEditing) _ensureCaretVisible();
+  }
+
+  void _resetVoiceTranscriptTracking() {
+    _voiceLastObservedTranscript = '';
+    _voiceTranscriptEditing = false;
   }
 
   void _startVoiceLevelSampling() {
@@ -832,7 +869,52 @@ class _ChatInputBarState extends State<ChatInputBar>
   void _applyVoiceTranscript(String transcript) {
     final baseValue = _voiceBaseValue;
     if (baseValue == null) return;
-    final text = _joinVoiceText(baseValue.text, transcript);
+    final spoken = transcript.trim();
+
+    if (_voiceTranscriptEditing) {
+      final composing = _controller.value.composing;
+      // Never mutate the controller while an IME composition is active. The
+      // latest provider transcript remains available and will be reconciled on
+      // the next provider/user event or when recording finishes.
+      if (composing.isValid && !composing.isCollapsed) return;
+
+      final previous = _voiceLastObservedTranscript;
+      if (spoken == previous) return;
+      if (spoken.isNotEmpty &&
+          spoken.startsWith(previous) &&
+          spoken.length > previous.length) {
+        final delta = spoken.substring(previous.length).trimLeft();
+        if (delta.isNotEmpty) {
+          final current = _controller.value;
+          final oldLength = current.text.length;
+          final text = _joinVoiceText(current.text, delta);
+          final selection = current.selection;
+          final nextSelection = selection.isValid
+              ? selection.copyWith(
+                  baseOffset: selection.baseOffset == oldLength
+                      ? text.length
+                      : selection.baseOffset,
+                  extentOffset: selection.extentOffset == oldLength
+                      ? text.length
+                      : selection.extentOffset,
+                )
+              : TextSelection.collapsed(offset: text.length);
+          _controller.value = current.copyWith(
+            text: text,
+            selection: nextSelection,
+            composing: TextRange.empty,
+          );
+        }
+      }
+      // If the recognizer revises already-seen words after the user has edited
+      // them, prefer the user's correction. Advance the shadow transcript so
+      // future genuinely-new suffixes can still stream into the draft.
+      _voiceLastObservedTranscript = spoken;
+      return;
+    }
+
+    _voiceLastObservedTranscript = spoken;
+    final text = _joinVoiceText(baseValue.text, spoken);
     if (_controller.text == text) return;
     _controller.value = TextEditingValue(
       text: text,
@@ -866,6 +948,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     _ownsVoiceSession = false;
     _finishingVoice = false;
     _voiceLevels.clear();
+    _resetVoiceTranscriptTracking();
     if (original != null) _controller.value = original;
     if (mounted) setState(() {});
     try {
@@ -875,7 +958,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
   }
 
-  Future<void> _finishVoiceInput({required bool sendAfter}) async {
+  Future<void> _finishVoiceInput() async {
     final asr = widget.asrProvider;
     if (!_ownsVoiceSession || _finishingVoice || asr == null) return;
     _stopVoiceLevelSampling();
@@ -889,21 +972,18 @@ class _ChatInputBarState extends State<ChatInputBar>
       final detectedSpeech = transcript.trim().isNotEmpty;
       _voiceBaseValue = null;
       _ownsVoiceSession = false;
-      _finishingVoice = false;
       _voiceLevels.clear();
+      _resetVoiceTranscriptTracking();
       setState(() {});
       _ensureCaretVisible();
-      if (!detectedSpeech) {
-        _reportNoSpeech();
-      } else if (sendAfter && _controller.text.trim().isNotEmpty) {
-        await _handleSend();
-      }
+      if (!detectedSpeech) _reportNoSpeech();
     } catch (error) {
       if (!mounted) return;
       if (_ownsVoiceSession) {
         _voiceBaseValue = null;
         _ownsVoiceSession = false;
         _voiceLevels.clear();
+        _resetVoiceTranscriptTracking();
         setState(() {});
       }
       if (_lastReportedVoiceError == null) _reportVoiceFailure(error);
@@ -949,7 +1029,9 @@ class _ChatInputBarState extends State<ChatInputBar>
     });
   }
 
-  /// Bottom row shown while recording: cancel (X) — waveform — stop — send.
+  /// Recording row stays intentionally compact: cancel, one continuous
+  /// waveform/transcribing surface, and Stop. Sending is only available after
+  /// transcription returns to the normal Composer action row.
   Widget _buildVoiceRecordingRow(BuildContext context, ThemeData theme) {
     final l10n = AppLocalizations.of(context)!;
     final canFinish =
@@ -964,9 +1046,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         ),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.only(left: 8, right: 2),
-            // Match the normal action row height (32) so the input bar
-            // doesn't jump when switching in/out of recording state
+            padding: const EdgeInsets.only(left: 8, right: 8),
             child: SizedBox(
               height: 32,
               child: AnimatedSwitcher(
@@ -1001,13 +1081,10 @@ class _ChatInputBarState extends State<ChatInputBar>
             ),
           ),
         ),
-        // Stop: finish recording and transcribe into the input field
         _CompactIconButton(
           tooltip: l10n.chatInputBarVoiceStopTooltip,
           icon: Lucide.Square,
-          onTap: canFinish
-              ? () => unawaited(_finishVoiceInput(sendAfter: false))
-              : null,
+          onTap: canFinish ? () => unawaited(_finishVoiceInput()) : null,
           childBuilder: (c) => Center(
             child: Container(
               width: 12,
@@ -1018,15 +1095,6 @@ class _ChatInputBarState extends State<ChatInputBar>
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        // Send: transcribe and send the message right away
-        _CompactSendButton(
-          enabled: canFinish,
-          onSend: () => unawaited(_finishVoiceInput(sendAfter: true)),
-          color: theme.colorScheme.primary,
-          icon: Lucide.Check,
-          tooltip: l10n.chatInputBarVoiceSendTooltip,
         ),
       ],
     );
@@ -2647,6 +2715,10 @@ class _ChatInputBarState extends State<ChatInputBar>
         selectedAsrService != null &&
         asr.canUse(selectedAsrService) &&
         !asr.isActive;
+    final voiceTranscriptEditable =
+        _ownsVoiceSession &&
+        !_finishingVoice &&
+        asr?.supportsLiveTranscript == true;
     final isDark = theme.brightness == Brightness.dark;
     final inputFillColor = _inputFillColor(
       theme: theme,
@@ -2854,7 +2926,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                 ),
                                             readOnly:
                                                 _composerLocked ||
-                                                _ownsVoiceSession,
+                                                (_ownsVoiceSession &&
+                                                    !voiceTranscriptEditable),
                                             minLines: 1,
                                             maxLines: 6,
                                             // On mobile, optionally show "Send" on the return key and submit on tap.
@@ -2907,8 +2980,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                                   ),
                                 ),
                               ),
-                              // Expand/Collapse icon button (only shown when 3+ lines)
-                              if (showExpandButton)
+                              // Fullscreen editing is a separate global surface. Keep
+                              // live voice edits in-place directly above the IME.
+                              if (showExpandButton && !_ownsVoiceSession)
                                 Positioned(
                                   top: 10,
                                   right: 12,

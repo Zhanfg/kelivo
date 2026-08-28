@@ -22,6 +22,7 @@ void main() {
     required SettingsProvider settings,
     required AsrProvider asr,
     required TextEditingController controller,
+    Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend,
   }) {
     return MultiProvider(
       providers: [
@@ -39,7 +40,7 @@ void main() {
           body: ChatInputBar(
             controller: controller,
             asrProvider: asr,
-            onSend: (_) async => ChatInputSubmissionResult.rejected,
+            onSend: onSend ?? (_) async => ChatInputSubmissionResult.rejected,
           ),
         ),
       ),
@@ -93,6 +94,53 @@ void main() {
     await tester.tap(find.byTooltip('Stop and transcribe to input'));
     await tester.pumpAndSettle();
     expect(controller.text, 'draft hello world');
+    expect(find.byTooltip('Voice input'), findsOneWidget);
+  });
+
+  testWidgets('live ASR remains editable and Stop never auto-sends', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    final option = SystemAsrOptions(id: 'system-edit-test');
+    await settings.setAsrServices(<AsrServiceOptions>[option]);
+    final backend = _FakeSystemBackend();
+    final asr = AsrProvider(systemService: SystemAsrService(backend: backend));
+    final controller = TextEditingController(text: 'draft');
+    var sendCalls = 0;
+    addTearDown(asr.dispose);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      harness(
+        settings: settings,
+        asr: asr,
+        controller: controller,
+        onSend: (_) async {
+          sendCalls++;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+    await tester.tap(find.byTooltip('Voice input'));
+    await tester.pump();
+
+    backend.emitTranscript('hello world', false);
+    await tester.pump();
+    expect(controller.text, 'draft hello world');
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isFalse);
+
+    await tester.enterText(find.byType(TextField), 'draft hello brave world');
+    await tester.pump();
+    backend.emitTranscript('hello world again', false);
+    await tester.pump();
+    expect(controller.text, 'draft hello brave world again');
+
+    await tester.tap(find.byTooltip('Stop and transcribe to input'));
+    await tester.pumpAndSettle();
+
+    expect(sendCalls, 0);
+    expect(controller.text, 'draft hello brave world again');
     expect(find.byTooltip('Voice input'), findsOneWidget);
   });
 
@@ -200,6 +248,7 @@ void main() {
     );
     await tester.tap(find.byTooltip('Voice input'));
     await tester.pump();
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
     capture.add(_pcm16(6000));
     await tester.pump(const Duration(milliseconds: 65));
 
