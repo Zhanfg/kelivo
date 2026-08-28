@@ -1,0 +1,85 @@
+name: Composer Native Phase 2 Reasoning Apply
+
+on:
+  push:
+    branches: [feat/story-runtime-foundation]
+    paths:
+      - '.github/patches/composer-phase2-reasoning.py'
+      - '.github/workflows/composer-native-phase2-reasoning-apply.yml'
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+        with:
+          ref: feat/story-runtime-foundation
+          fetch-depth: 0
+
+      - name: Apply guarded reasoning integration
+        run: |
+          set -euo pipefail
+          python3 .github/patches/composer-phase2-reasoning.py
+          git diff --check
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Format affected Dart files
+        run: |
+          dart format \
+            lib/features/home/composer/composer_reasoning_popover.dart \
+            lib/features/home/widgets/chat_input_bar.dart \
+            lib/features/home/widgets/chat_input_section.dart \
+            lib/features/home/pages/home_page.dart \
+            test/features/home/composer/composer_reasoning_popover_test.dart \
+            test/features/home/widgets/chat_input_bar_mobile_composer_test.dart
+
+      - name: Analyze reasoning interaction surface
+        run: |
+          dart analyze --fatal-infos \
+            lib/features/home/composer \
+            lib/features/home/widgets/chat_input_bar.dart \
+            lib/features/home/widgets/chat_input_section.dart \
+            lib/features/home/pages/home_page.dart \
+            test/features/home/composer \
+            test/features/home/widgets/chat_input_bar_mobile_composer_test.dart
+
+      - name: Run Composer reasoning and input regressions
+        run: |
+          flutter test --concurrency=1 --reporter expanded \
+            test/features/home/composer/composer_reasoning_level_test.dart \
+            test/features/home/composer/composer_reasoning_popover_test.dart \
+            test/features/home/widgets/chat_input_bar_mobile_composer_test.dart \
+            test/features/home/widgets/chat_input_bar_asr_test.dart \
+            test/features/home/widgets/chat_input_bar_queue_test.dart \
+            test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart
+
+      - name: Commit verified local reasoning integration
+        run: |
+          set -euo pipefail
+          rm -f .github/patches/composer-phase2-reasoning.py
+          rm -f .github/workflows/composer-native-phase2-reasoning-apply.yml
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No verified changes to commit.'
+            exit 0
+          fi
+          git config user.name 'Axymorrsen'
+          git config user.email 'Axymosen@outlook.com'
+          git commit -m 'feat(composer): integrate local reasoning controls'
+          git push origin HEAD:feat/story-runtime-foundation
