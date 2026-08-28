@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import '../../../core/database/business_preferences.dart';
 import '../../../core/models/chat_message.dart';
 import '../models/story_runtime_models.dart';
