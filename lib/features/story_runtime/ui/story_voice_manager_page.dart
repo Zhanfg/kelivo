@@ -13,10 +13,7 @@ import '../world_tree/story_world_tree_store.dart';
 import 'story_native_settings_widgets.dart';
 
 class StoryVoiceManagerPage extends StatefulWidget {
-  const StoryVoiceManagerPage({
-    super.key,
-    required this.conversationId,
-  });
+  const StoryVoiceManagerPage({super.key, required this.conversationId});
 
   final String conversationId;
 
@@ -114,9 +111,7 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
     }
     if (_services.isEmpty) {
       _message(
-        zh
-            ? '请先在声音服务中启用至少一个声音来源。'
-            : 'Enable at least one voice source first.',
+        zh ? '请先在声音服务中启用至少一个声音来源。' : 'Enable at least one voice source first.',
       );
       return;
     }
@@ -164,9 +159,7 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
       }
       await _reload();
     } catch (_) {
-      _message(
-        zh ? '保存声音失败。' : 'Could not save the voice.',
-      );
+      _message(zh ? '保存声音失败。' : 'Could not save the voice.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -228,9 +221,9 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
   }
 
   void _openVoiceServices() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const TtsServicesPage()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const TtsServicesPage()));
   }
 
   @override
@@ -270,16 +263,17 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
                           _assignmentFor(characterIds[index]),
                           index,
                         ),
-                        subtitle: _assignmentFor(characterIds[index])?.voiceId ??
+                        subtitle:
+                            _assignmentFor(characterIds[index])?.voiceId ??
                             tr('自动', 'Auto'),
                         icon: Lucide.User,
                         onTap: _busy
                             ? null
                             : () => _editCharacter(
-                                  characterIds[index],
-                                  _assignmentFor(characterIds[index]),
-                                  index,
-                                ),
+                                characterIds[index],
+                                _assignmentFor(characterIds[index]),
+                                index,
+                              ),
                       ),
                     if (characterIds.isEmpty)
                       StoryNativeRow(
@@ -348,7 +342,9 @@ class _VoiceEditorSheetState extends State<_VoiceEditorSheet> {
     _serviceId = widget.services.any((item) => item.id == currentService)
         ? currentService!
         : widget.services.first.id;
-    _voiceController = TextEditingController(text: widget.current?.voiceId ?? '');
+    _voiceController = TextEditingController(
+      text: widget.current?.voiceId ?? '',
+    );
     _performanceController = TextEditingController(
       text: widget.current?.personaDescription ?? '',
     );

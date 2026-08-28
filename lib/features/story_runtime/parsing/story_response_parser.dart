@@ -41,9 +41,7 @@ final class StoryResponseParser {
   /// host removes it from ChatMessage.content and stores [turn] in a sidecar.
   StoryParsedResponse parseEmbedded(String raw, {required String turnId}) {
     final end = raw.lastIndexOf(storyEventsCommentEnd);
-    final start = end < 0
-        ? -1
-        : raw.lastIndexOf(storyEventsCommentStart, end);
+    final start = end < 0 ? -1 : raw.lastIndexOf(storyEventsCommentStart, end);
     if (start < 0 || end < 0 || end < start) {
       throw const StoryResponseParseException('embedded_events_missing');
     }

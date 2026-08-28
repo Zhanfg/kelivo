@@ -119,10 +119,8 @@ class TtsProvider extends ChangeNotifier {
   bool get canSaveNetworkAudio =>
       _lastReplayNetworkService != null && _chunks.isNotEmpty;
 
-  TtsProvider({
-    required this.preferences,
-    LocalTtsBackend? localBackend,
-  }) : _localBackend = localBackend ?? MossLocalTtsBackend() {
+  TtsProvider({required this.preferences, LocalTtsBackend? localBackend})
+    : _localBackend = localBackend ?? MossLocalTtsBackend() {
     _init();
   }
 
@@ -752,7 +750,9 @@ class TtsProvider extends ChangeNotifier {
   }) async {
     final file = io.File(result.filePath);
     if (!await file.isFile()) {
-      throw StateError('Local TTS output file does not exist: ${result.filePath}');
+      throw StateError(
+        'Local TTS output file does not exist: ${result.filePath}',
+      );
     }
     await _player.stop();
     await Future<void>.delayed(const Duration(milliseconds: 20));

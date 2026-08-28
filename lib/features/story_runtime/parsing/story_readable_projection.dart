@@ -2,10 +2,7 @@ import '../models/story_runtime_models.dart';
 import 'story_response_parser.dart';
 
 final class StoryReadableProjection {
-  const StoryReadableProjection({
-    required this.turn,
-    required this.markdown,
-  });
+  const StoryReadableProjection({required this.turn, required this.markdown});
 
   final StoryTurn turn;
   final String markdown;

@@ -155,7 +155,10 @@ class ChatInputSection extends StatelessWidget {
           asrProvider: asr,
           onConfigureReasoning: onConfigureReasoning,
           reasoningActive: isReasoningEnabled(
-            (context.watch<AssistantProvider>().currentAssistant?.thinkingBudget) ??
+            (context
+                    .watch<AssistantProvider>()
+                    .currentAssistant
+                    ?.thinkingBudget) ??
                 settings.thinkingBudget,
           ),
           reasoningBudget:
@@ -180,7 +183,8 @@ class ChatInputSection extends StatelessWidget {
           onQuickPhrase: onQuickPhrase,
           onLongPressQuickPhrase: onLongPressQuickPhrase,
           showOcrButton: isTablet
-              ? (settings.ocrModelProvider != null && settings.ocrModelId != null)
+              ? (settings.ocrModelProvider != null &&
+                    settings.ocrModelId != null)
               : (isDesktop &&
                     settings.ocrModelProvider != null &&
                     settings.ocrModelId != null),

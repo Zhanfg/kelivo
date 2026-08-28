@@ -179,7 +179,9 @@ final class StoryRuntimeCommitService {
         throw StateError('story_worldline_missing_on_finalize');
       }
 
-      final coordinator = StoryWorldTreeCoordinator(repository: _worldTreeStore);
+      final coordinator = StoryWorldTreeCoordinator(
+        repository: _worldTreeStore,
+      );
       final committedTree = await coordinator.syncSelection(
         worldTreeId: tree.worldTreeId,
         worldlineId: worldline.id,
@@ -206,7 +208,10 @@ final class StoryRuntimeCommitService {
         }
       }
 
-      await _recordVoiceContext(message, parsed?.visibleText ?? message.content);
+      await _recordVoiceContext(
+        message,
+        parsed?.visibleText ?? message.content,
+      );
 
       await _sessionStore.upsert(
         session.copyWith(

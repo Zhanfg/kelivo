@@ -48,10 +48,7 @@ void main() {
 
   test('plain assistant prose remains unchanged', () {
     const text = 'Ordinary assistant response.';
-    expect(
-      projectStoryReadableOrOriginal(text, turnId: 'turn-2'),
-      text,
-    );
+    expect(projectStoryReadableOrOriginal(text, turnId: 'turn-2'), text);
   });
 
   test('partial streaming Story envelope is hidden until it is renderable', () {
@@ -66,11 +63,14 @@ void main() {
     );
   });
 
-  test('invalid finalized Story-like JSON remains available as fallback text', () {
-    const invalid = '{"version":1,"events":[';
-    expect(
-      projectStoryReadableOrOriginal(invalid, turnId: 'turn-4'),
-      invalid,
-    );
-  });
+  test(
+    'invalid finalized Story-like JSON remains available as fallback text',
+    () {
+      const invalid = '{"version":1,"events":[';
+      expect(
+        projectStoryReadableOrOriginal(invalid, turnId: 'turn-4'),
+        invalid,
+      );
+    },
+  );
 }

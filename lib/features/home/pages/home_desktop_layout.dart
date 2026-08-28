@@ -298,9 +298,7 @@ class HomeDesktopScaffold extends StatelessWidget {
         onTap: onToggleSidebar,
       ),
       titleSpacing: 2,
-      title: StoryConversationModeTitle(
-        fallback: _buildTitle(context, cs),
-      ),
+      title: StoryConversationModeTitle(fallback: _buildTitle(context, cs)),
       actions: _buildActions(context, topicsOnRight),
     );
   }
@@ -326,7 +324,9 @@ class HomeDesktopScaffold extends StatelessWidget {
       final showProv = context
           .watch<SettingsProvider>()
           .showProviderInModelCapsule;
-      capsuleLabel = showProv ? '$modelDisplay | $providerName' : '$modelDisplay';
+      capsuleLabel = showProv
+          ? '$modelDisplay | $providerName'
+          : '$modelDisplay';
 
       final Widget brandIcon = AnimatedSwitcher(
         duration: const Duration(milliseconds: 200),

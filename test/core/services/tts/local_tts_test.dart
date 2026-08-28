@@ -19,17 +19,20 @@ void main() {
       );
     });
 
-    test('automatic does not leak to cloud when installed local runtime fails', () {
-      expect(
-        resolveTtsBackend(
-          mode: TtsBackendMode.automatic,
-          localInstalled: true,
-          localReady: false,
-          cloudAvailable: true,
-        ),
-        TtsBackendChoice.unavailable,
-      );
-    });
+    test(
+      'automatic does not leak to cloud when installed local runtime fails',
+      () {
+        expect(
+          resolveTtsBackend(
+            mode: TtsBackendMode.automatic,
+            localInstalled: true,
+            localReady: false,
+            cloudAvailable: true,
+          ),
+          TtsBackendChoice.unavailable,
+        );
+      },
+    );
 
     test('automatic uses cloud only when no local model is installed', () {
       expect(
@@ -99,17 +102,20 @@ void main() {
       }
     });
 
-    test('validates a complete local ONNX layout without network access', () async {
-      await _writeCompleteModel(root);
-      final store = MossLocalModelStore(rootDirectory: root);
+    test(
+      'validates a complete local ONNX layout without network access',
+      () async {
+        await _writeCompleteModel(root);
+        final store = MossLocalModelStore(rootDirectory: root);
 
-      final validation = await store.validate();
+        final validation = await store.validate();
 
-      expect(validation.isValid, isTrue);
-      expect(validation.missingPaths, isEmpty);
-      expect(validation.tokenizerPath, isNotNull);
-      expect(await store.isInstalled(), isTrue);
-    });
+        expect(validation.isValid, isTrue);
+        expect(validation.missingPaths, isEmpty);
+        expect(validation.tokenizerPath, isNotNull);
+        expect(await store.isInstalled(), isTrue);
+      },
+    );
 
     test('reports a missing ONNX file as not installed', () async {
       await _writeCompleteModel(root);
@@ -133,9 +139,7 @@ void main() {
 }
 
 Future<void> _writeCompleteModel(Directory root) async {
-  final ttsDir = Directory(
-    p.join(root.path, 'MOSS-TTS-Nano-100M-ONNX'),
-  );
+  final ttsDir = Directory(p.join(root.path, 'MOSS-TTS-Nano-100M-ONNX'));
   final codecDir = Directory(
     p.join(root.path, 'MOSS-Audio-Tokenizer-Nano-ONNX'),
   );

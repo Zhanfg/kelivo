@@ -134,7 +134,9 @@ final class StoryRuntimePromptService {
         messages: messages,
       );
       var tree = await _worldTreeStore.readForConversation(conversation.id);
-      final coordinator = StoryWorldTreeCoordinator(repository: _worldTreeStore);
+      final coordinator = StoryWorldTreeCoordinator(
+        repository: _worldTreeStore,
+      );
       tree ??= await coordinator.bootstrap(
         conversationId: conversation.id,
         name: conversation.title,

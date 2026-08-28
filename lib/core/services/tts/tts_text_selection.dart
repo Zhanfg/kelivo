@@ -43,10 +43,8 @@ class TtsTextSelection {
     return original;
   }
 
-  static String _stripHtmlComments(String input) => input.replaceAll(
-    RegExp(r'<!--[\s\S]*?-->'),
-    '',
-  );
+  static String _stripHtmlComments(String input) =>
+      input.replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
 
   static String _quotedText(String input) {
     final ranges = <_TextRange>[];

@@ -116,7 +116,9 @@ void main() {
     final resolved = resolver.resolve(
       tree: tree(),
       currentWorldlineId: 'child',
-      baseMemories: <MemoryEntry>[memory('sibling-fact', 'secret sibling fact')],
+      baseMemories: <MemoryEntry>[
+        memory('sibling-fact', 'secret sibling fact'),
+      ],
       links: <StoryWorldlineMemoryLink>[
         StoryWorldlineMemoryLink(
           memoryId: 'sibling-fact',

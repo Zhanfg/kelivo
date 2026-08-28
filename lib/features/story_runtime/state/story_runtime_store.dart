@@ -95,10 +95,7 @@ final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState>
         }
         if (!replaced) {
           next.add(
-            item.copyWith(
-              enabled: enabled,
-              modeSelectionCommitted: true,
-            ),
+            item.copyWith(enabled: enabled, modeSelectionCommitted: true),
           );
           replaced = true;
         }

@@ -52,9 +52,7 @@ TtsBackendChoice resolveTtsBackend({
       if (cloudAvailable) return TtsBackendChoice.cloud;
       return TtsBackendChoice.system;
     case TtsBackendMode.localOnly:
-      return localReady
-          ? TtsBackendChoice.local
-          : TtsBackendChoice.unavailable;
+      return localReady ? TtsBackendChoice.local : TtsBackendChoice.unavailable;
     case TtsBackendMode.cloudOnly:
       return cloudAvailable
           ? TtsBackendChoice.cloud

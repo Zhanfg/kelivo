@@ -4,8 +4,10 @@ import 'package:Kelivo/features/story_runtime/state/story_scene_runtime_state.da
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('scene transition and continuity patches update persisted scene state', () {
-    const raw = '''
+  test(
+    'scene transition and continuity patches update persisted scene state',
+    () {
+      const raw = '''
 {
   "version": 1,
   "events": [
@@ -37,37 +39,40 @@ void main() {
   ]
 }
 ''';
-    final turn = const StoryResponseParser().parse(raw, turnId: 'turn-1');
-    const current = StorySceneRuntimeState(
-      conversationId: 'conversation',
-      openLoops: <String>['Old loop'],
-      continuityState: <String, Object?>{'old': 'remove-me'},
-      revision: 4,
-    );
+      final turn = const StoryResponseParser().parse(raw, turnId: 'turn-1');
+      const current = StorySceneRuntimeState(
+        conversationId: 'conversation',
+        openLoops: <String>['Old loop'],
+        continuityState: <String, Object?>{'old': 'remove-me'},
+        revision: 4,
+      );
 
-    final next = reduceStoryTurnIntoScene(
-      current: current,
-      turn: turn,
-      worldTreeId: 'tree',
-      worldlineId: 'line',
-    );
+      final next = reduceStoryTurnIntoScene(
+        current: current,
+        turn: turn,
+        worldTreeId: 'tree',
+        worldlineId: 'line',
+      );
 
-    expect(next.worldTreeId, 'tree');
-    expect(next.worldlineId, 'line');
-    expect(next.sceneId, 'tower-12');
-    expect(next.location, 'North Tower / Floor 12');
-    expect(next.timeLabel, '23:40');
-    expect(next.participantCharacterIds, <String>['guard', 'mira']);
-    expect(next.openLoops, <String>['Old loop', 'Convince the guard']);
-    expect(next.continuityState['weather'], 'storm');
-    expect(next.continuityState['door_locked'], true);
-    expect(next.continuityState.containsKey('old'), isFalse);
-    expect(next.serialState['chapter'], 7);
-    expect(next.revision, 5);
-  });
+      expect(next.worldTreeId, 'tree');
+      expect(next.worldlineId, 'line');
+      expect(next.sceneId, 'tower-12');
+      expect(next.location, 'North Tower / Floor 12');
+      expect(next.timeLabel, '23:40');
+      expect(next.participantCharacterIds, <String>['guard', 'mira']);
+      expect(next.openLoops, <String>['Old loop', 'Convince the guard']);
+      expect(next.continuityState['weather'], 'storm');
+      expect(next.continuityState['door_locked'], true);
+      expect(next.continuityState.containsKey('old'), isFalse);
+      expect(next.serialState['chapter'], 7);
+      expect(next.revision, 5);
+    },
+  );
 
-  test('malformed metadata is ignored and unchanged state does not churn revision', () {
-    const raw = '''
+  test(
+    'malformed metadata is ignored and unchanged state does not churn revision',
+    () {
+      const raw = '''
 {
   "version": 1,
   "events": [
@@ -83,23 +88,24 @@ void main() {
   ]
 }
 ''';
-    final turn = const StoryResponseParser().parse(raw, turnId: 'turn-2');
-    const current = StorySceneRuntimeState(
-      conversationId: 'conversation',
-      worldTreeId: 'tree',
-      worldlineId: 'line',
-      revision: 2,
-    );
+      final turn = const StoryResponseParser().parse(raw, turnId: 'turn-2');
+      const current = StorySceneRuntimeState(
+        conversationId: 'conversation',
+        worldTreeId: 'tree',
+        worldlineId: 'line',
+        revision: 2,
+      );
 
-    final next = reduceStoryTurnIntoScene(
-      current: current,
-      turn: turn,
-      worldTreeId: 'tree',
-      worldlineId: 'line',
-    );
+      final next = reduceStoryTurnIntoScene(
+        current: current,
+        turn: turn,
+        worldTreeId: 'tree',
+        worldlineId: 'line',
+      );
 
-    expect(next.revision, 2);
-    expect(next.openLoops, isEmpty);
-    expect(next.continuityState, isEmpty);
-  });
+      expect(next.revision, 2);
+      expect(next.openLoops, isEmpty);
+      expect(next.continuityState, isEmpty);
+    },
+  );
 }

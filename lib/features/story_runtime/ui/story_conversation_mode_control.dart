@@ -19,10 +19,7 @@ final ValueNotifier<int> storyConversationModeRevision = ValueNotifier<int>(0);
 /// is corrected after layout so its center tracks the physical screen center,
 /// independent of AppBar leading/actions width.
 class StoryConversationModeTitle extends StatefulWidget {
-  const StoryConversationModeTitle({
-    super.key,
-    required this.fallback,
-  });
+  const StoryConversationModeTitle({super.key, required this.fallback});
 
   /// Kept for Home layout compatibility and used while no conversation exists.
   final Widget fallback;
@@ -87,7 +84,8 @@ class _StoryConversationModeTitleState
     return FutureBuilder<StoryRuntimeSessionState>(
       future: _futureFor(context, conversationId),
       builder: (context, snapshot) {
-        final session = snapshot.data ??
+        final session =
+            snapshot.data ??
             StoryRuntimeSessionState(conversationId: conversationId);
         return _ScreenCenteredModeSwitch(
           child: _ModeSelector(

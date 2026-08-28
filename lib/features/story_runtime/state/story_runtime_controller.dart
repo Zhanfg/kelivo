@@ -70,10 +70,7 @@ final class StoryRuntimeController extends ChangeNotifier {
       if (current.enabled == enabled && current.modeSelectionCommitted) {
         return current;
       }
-      return current.copyWith(
-        enabled: enabled,
-        modeSelectionCommitted: true,
-      );
+      return current.copyWith(enabled: enabled, modeSelectionCommitted: true);
     });
   }
 

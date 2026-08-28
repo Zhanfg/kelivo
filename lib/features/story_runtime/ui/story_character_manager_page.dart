@@ -11,10 +11,7 @@ import 'story_native_settings_widgets.dart';
 import 'story_voice_manager_page.dart';
 
 class StoryCharacterManagerPage extends StatefulWidget {
-  const StoryCharacterManagerPage({
-    super.key,
-    required this.conversationId,
-  });
+  const StoryCharacterManagerPage({super.key, required this.conversationId});
 
   final String conversationId;
 
@@ -23,8 +20,7 @@ class StoryCharacterManagerPage extends StatefulWidget {
       _StoryCharacterManagerPageState();
 }
 
-class _StoryCharacterManagerPageState
-    extends State<StoryCharacterManagerPage> {
+class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
   late Future<_CharacterPageData> _future;
 
   @override
@@ -43,9 +39,9 @@ class _StoryCharacterManagerPageState
     ).readForConversation(widget.conversationId);
     final routing = tree == null
         ? null
-        : await StoryVoiceRoutingStore(preferences).readOrDefault(
-            tree.worldTreeId,
-          );
+        : await StoryVoiceRoutingStore(
+            preferences,
+          ).readOrDefault(tree.worldTreeId);
 
     final ids = <String>{
       ...scene.participantCharacterIds,
@@ -119,9 +115,8 @@ class _StoryCharacterManagerPageState
   void _openVoices() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => StoryVoiceManagerPage(
-          conversationId: widget.conversationId,
-        ),
+        builder: (_) =>
+            StoryVoiceManagerPage(conversationId: widget.conversationId),
       ),
     );
   }
@@ -146,10 +141,7 @@ class _StoryCharacterManagerPageState
             return _CharacterEmptyState(
               icon: Lucide.User,
               title: tr('角色暂时无法加载', 'Characters are unavailable'),
-              subtitle: tr(
-                '稍后返回故事再试。',
-                'Return to the story and try again.',
-              ),
+              subtitle: tr('稍后返回故事再试。', 'Return to the story and try again.'),
             );
           }
           final characters =
@@ -219,10 +211,7 @@ class _CharacterPageData {
 }
 
 class _CharacterView {
-  const _CharacterView({
-    required this.displayName,
-    this.voiceName,
-  });
+  const _CharacterView({required this.displayName, this.voiceName});
 
   final String displayName;
   final String? voiceName;
@@ -261,9 +250,9 @@ class _CharacterEmptyState extends StatelessWidget {
               Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
               ),
             ],
           ),

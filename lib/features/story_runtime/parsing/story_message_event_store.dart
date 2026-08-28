@@ -35,7 +35,8 @@ final class StoryMessageEventRecord {
       );
 }
 
-final class StoryMessageEventStore extends JsonBlobStore<StoryMessageEventRecord> {
+final class StoryMessageEventStore
+    extends JsonBlobStore<StoryMessageEventRecord> {
   StoryMessageEventStore(super.preferences);
 
   static const String key = 'story_message_events_v1';
@@ -48,7 +49,8 @@ final class StoryMessageEventStore extends JsonBlobStore<StoryMessageEventRecord
       StoryMessageEventRecord.fromJson(json);
 
   @override
-  Map<String, dynamic> encodeItem(StoryMessageEventRecord item) => item.toJson();
+  Map<String, dynamic> encodeItem(StoryMessageEventRecord item) =>
+      item.toJson();
 
   Future<StoryMessageEventRecord?> readForMessage(String messageId) async {
     final id = messageId.trim();
@@ -141,8 +143,9 @@ StoryEvent _eventFromJson(Map<String, dynamic> json) {
   final actor = switch (actorType) {
     StoryActorType.self => const StoryActorRef.self(),
     StoryActorType.world => const StoryActorRef.world(),
-    StoryActorType.character =>
-      StoryActorRef.character(actorJson['characterId'] as String),
+    StoryActorType.character => StoryActorRef.character(
+      actorJson['characterId'] as String,
+    ),
   };
   return StoryEvent(
     id: json['id'] as String,

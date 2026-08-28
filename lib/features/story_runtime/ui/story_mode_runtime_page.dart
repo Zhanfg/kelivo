@@ -64,11 +64,9 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
     if (!_ready) return;
     if (mounted) setState(() => _loading = true);
     try {
-      final conversations = context
-          .read<ChatService>()
-          .getAllConversations()
-          .toList()
-        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      final conversations =
+          context.read<ChatService>().getAllConversations().toList()
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       var selectedId = _selectedConversationId;
       if (selectNewestIfNeeded ||
           selectedId == null ||
@@ -154,7 +152,9 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -255,10 +255,10 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                       onTap: selectedId == null
                           ? null
                           : () => _open(
-                                StoryCharacterManagerPage(
-                                  conversationId: selectedId,
-                                ),
+                              StoryCharacterManagerPage(
+                                conversationId: selectedId,
                               ),
+                            ),
                     ),
                     StoryNativeRow(
                       title: tr('声音', 'Voices'),
@@ -267,10 +267,8 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                       onTap: selectedId == null
                           ? null
                           : () => _open(
-                                StoryVoiceManagerPage(
-                                  conversationId: selectedId,
-                                ),
-                              ),
+                              StoryVoiceManagerPage(conversationId: selectedId),
+                            ),
                     ),
                     StoryNativeRow(
                       title: tr('技能', 'Skills'),

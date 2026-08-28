@@ -20,8 +20,8 @@ StorySceneRuntimeState reduceStoryTurnIntoScene({
   final openLoops = <String>[...current.openLoops];
   final continuity = <String, Object?>{...current.continuityState};
   final serial = <String, Object?>{...current.serialState};
-  var changed = current.worldTreeId != worldTreeId ||
-      current.worldlineId != worldlineId;
+  var changed =
+      current.worldTreeId != worldTreeId || current.worldlineId != worldlineId;
 
   for (final event in turn.events) {
     final metadata = event.metadata;
@@ -31,7 +31,9 @@ StorySceneRuntimeState reduceStoryTurnIntoScene({
       final nextLocation = _string(metadata['location']);
       final nextTime = _string(metadata['time_label']);
       final nextPov = _string(metadata['pov']);
-      final suppliedParticipants = _stringList(metadata['participant_character_ids']);
+      final suppliedParticipants = _stringList(
+        metadata['participant_character_ids'],
+      );
 
       if (nextSceneId != null && nextSceneId != sceneId) {
         sceneId = nextSceneId;
@@ -68,14 +70,15 @@ StorySceneRuntimeState reduceStoryTurnIntoScene({
       changed = true;
     }
 
-    for (final item in _stringList(metadata['open_loops_add']) ?? const <String>[]) {
+    for (final item
+        in _stringList(metadata['open_loops_add']) ?? const <String>[]) {
       if (!openLoops.contains(item)) {
         openLoops.add(item);
         changed = true;
       }
     }
-    final closed = (_stringList(metadata['open_loops_close']) ?? const <String>[])
-        .toSet();
+    final closed =
+        (_stringList(metadata['open_loops_close']) ?? const <String>[]).toSet();
     if (closed.isNotEmpty) {
       final before = openLoops.length;
       openLoops.removeWhere(closed.contains);

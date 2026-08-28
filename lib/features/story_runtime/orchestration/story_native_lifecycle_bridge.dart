@@ -47,9 +47,7 @@ final class StoryNativeLifecycleBridge {
   }) async {
     final result = await _commitService.commitAssistantMessage(message);
     final visible = result?.visibleText;
-    if (visible != null &&
-        visible != message.content &&
-        chatService != null) {
+    if (visible != null && visible != message.content && chatService != null) {
       await chatService.updateMessage(message.id, content: visible);
     }
     return result;
