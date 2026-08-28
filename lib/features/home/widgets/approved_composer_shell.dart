@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,12 +12,11 @@ import '../../../core/services/asr/asr_service_options.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'chat_input_bar.dart';
 
-/// Presentation layer for the approved Kelivo composer interaction model.
+/// Visible composer that mirrors the approved HTML interaction model.
 ///
-/// [ChatInputBar] remains the source of truth for attachments, paste/import,
-/// submission recovery and desktop keyboard behavior. This shell owns only the
-/// compact four-action surface, six-line fullscreen affordance and the voice
-/// recording/transcript presentation.
+/// The legacy [ChatInputBar] stays mounted offstage so its mature attachment,
+/// clipboard/import, recovery and media-controller paths remain alive. This
+/// widget is the only painted composer surface.
 class ApprovedComposerShell extends StatefulWidget {
   const ApprovedComposerShell({
     super.key,
@@ -26,6 +27,9 @@ class ApprovedComposerShell extends StatefulWidget {
     required this.loading,
     required this.reasoningBudget,
     required this.supportsReasoning,
+    this.hasQueuedInput = false,
+    this.queuedPreviewText,
+    this.onCancelQueuedInput,
     this.onMore,
     this.onSelectModel,
     this.onConfigureReasoning,
@@ -40,6 +44,9 @@ class ApprovedComposerShell extends StatefulWidget {
   final bool loading;
   final int? reasoningBudget;
   final bool supportsReasoning;
+  final bool hasQueuedInput;
+  final String? queuedPreviewText;
+  final VoidCallback? onCancelQueuedInput;
   final VoidCallback? onMore;
   final VoidCallback? onSelectModel;
   final VoidCallback? onConfigureReasoning;
@@ -51,6 +58,10 @@ class ApprovedComposerShell extends StatefulWidget {
 }
 
 class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
+  Timer? _mediaPoll;
+  String _mediaFingerprint = '';
+  ChatInputData _mediaSnapshot = const ChatInputData(text: '');
+
   bool _voiceOwned = false;
   bool _voiceLocked = false;
   bool _voiceSettingsExpanded = false;
@@ -66,6 +77,11 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
     _voiceEditor = TextEditingController();
     widget.inputController.addListener(_handleDraftChanged);
     widget.asrProvider.addListener(_handleAsrChanged);
+    _mediaPoll = Timer.periodic(
+      const Duration(milliseconds: 180),
+      (_) => _refreshMediaSnapshot(),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshMediaSnapshot());
   }
 
   @override
@@ -83,17 +99,29 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
 
   @override
   void dispose() {
+    _mediaPoll?.cancel();
     widget.inputController.removeListener(_handleDraftChanged);
     widget.asrProvider.removeListener(_handleAsrChanged);
-    if (_voiceOwned) {
-      unawaited(widget.asrProvider.cancel());
-    }
+    if (_voiceOwned) unawaited(widget.asrProvider.cancel());
     _voiceEditor.dispose();
     super.dispose();
   }
 
   void _handleDraftChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _refreshMediaSnapshot() {
+    if (!mounted) return;
+    final snapshot = widget.mediaController.snapshotInput(widget.inputController.text);
+    final fingerprint = [
+      ...snapshot.imagePaths,
+      ...snapshot.documents.map((e) => '${e.path}|${e.fileName}|${e.mime}'),
+    ].join('\u0000');
+    if (fingerprint == _mediaFingerprint) return;
+    _mediaFingerprint = fingerprint;
+    _mediaSnapshot = snapshot;
+    setState(() {});
   }
 
   void _handleAsrChanged() {
@@ -112,21 +140,12 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
 
   bool get _selectedAsrStreams {
     final selected = context.read<SettingsProvider>().selectedAsrService;
-    // Sherpa local ASR returns a complete transcript after capture. System and
-    // cloud services already publish partial transcripts through AsrProvider.
     return selected is! SherpaOnnxAsrOptions;
-  }
-
-  int get _lineCount {
-    final value = widget.inputController.text;
-    if (value.isEmpty) return 1;
-    return '\n'.allMatches(value).length + 1;
   }
 
   Future<void> _startVoice({bool locked = false}) async {
     if (_voiceActive || widget.loading) return;
-    final settings = context.read<SettingsProvider>();
-    final selected = settings.selectedAsrService;
+    final selected = context.read<SettingsProvider>().selectedAsrService;
     if (selected == null || !widget.asrProvider.canUse(selected)) return;
 
     _voiceBaseText = widget.inputController.text.trimRight();
@@ -143,8 +162,7 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
     try {
       await widget.asrProvider.start(selected);
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _voiceOwned = false);
+      if (mounted) setState(() => _voiceOwned = false);
     }
   }
 
@@ -154,8 +172,8 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
     setState(() {
       _voiceOwned = false;
       _voiceLocked = false;
-      _voiceEditing = false;
       _voiceSettingsExpanded = false;
+      _voiceEditing = false;
       _voiceFinishing = false;
       _voiceReadyText = null;
       _voiceEditor.clear();
@@ -203,53 +221,48 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
   }
 
   Future<void> _sendDraft() async {
-    final draft = widget.mediaController.snapshotInput(
-      widget.inputController.text,
-    );
-    if (draft.text.isEmpty && !widget.mediaController.hasDraftMedia) return;
+    final draft = widget.mediaController.snapshotInput(widget.inputController.text);
+    if (draft.text.isEmpty && draft.imagePaths.isEmpty && draft.documents.isEmpty) {
+      return;
+    }
     final result = await widget.onSend?.call(draft);
     if (!mounted) return;
     if (result == ChatInputSubmissionResult.sent ||
         result == ChatInputSubmissionResult.queued) {
       widget.inputController.clear();
       widget.mediaController.clearDraft();
+      _refreshMediaSnapshot();
     }
   }
 
   Future<void> _openFullscreenEditor() async {
     final editor = TextEditingController(text: widget.inputController.text);
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 10,
-          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + 12,
-        ),
-        child: SizedBox(
-          height: MediaQuery.sizeOf(sheetContext).height * .72,
+      useSafeArea: false,
+      builder: (dialogContext) => Dialog.fullscreen(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        child: SafeArea(
           child: Column(
             children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      '编辑消息',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+              SizedBox(
+                height: 58,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 18),
+                    const Expanded(
+                      child: Text(
+                        '编辑消息',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Lucide.FoldVertical),
-                    onPressed: () => Navigator.of(sheetContext).pop(),
-                  ),
-                ],
+                    IconButton(
+                      icon: const Icon(Lucide.Minimize2),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
               ),
               Expanded(
                 child: TextField(
@@ -259,7 +272,10 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
                   minLines: null,
                   maxLines: null,
                   textAlignVertical: TextAlignVertical.top,
-                  decoration: const InputDecoration(border: InputBorder.none),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.all(18),
+                  ),
                 ),
               ),
             ],
@@ -273,223 +289,314 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
 
   Future<void> _openVoiceFullscreenEditor() async {
     setState(() => _voiceEditing = true);
-    final focusNode = FocusNode();
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 12,
-          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + 12,
-        ),
-        child: SizedBox(
-          height: MediaQuery.sizeOf(sheetContext).height * .72,
-          child: TextField(
-            controller: _voiceEditor,
-            focusNode: focusNode,
-            autofocus: true,
-            expands: true,
-            minLines: null,
-            maxLines: null,
-            textAlignVertical: TextAlignVertical.top,
-            decoration: const InputDecoration(
-              hintText: '编辑语音转写',
-              border: InputBorder.none,
-            ),
+      useSafeArea: false,
+      builder: (dialogContext) => Dialog.fullscreen(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        child: SafeArea(
+          child: Column(
+            children: [
+              SizedBox(
+                height: 58,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 18),
+                    const Expanded(
+                      child: Text(
+                        '语音转写',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Lucide.Minimize2),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _voiceEditor,
+                  autofocus: true,
+                  expands: true,
+                  minLines: null,
+                  maxLines: null,
+                  textAlignVertical: TextAlignVertical.top,
+                  decoration: const InputDecoration(
+                    hintText: '编辑语音转写',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.all(18),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
-    focusNode.dispose();
   }
 
-  Widget _actionButton({
+  Widget _iconButton({
     required IconData icon,
     required VoidCallback? onPressed,
-    VoidCallback? onLongPress,
     bool primary = false,
+    bool stop = false,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final button = IconButton(
+    final enabled = onPressed != null;
+    return IconButton(
       onPressed: onPressed,
       icon: Icon(icon, size: 20),
       style: IconButton.styleFrom(
         minimumSize: const Size(40, 40),
         maximumSize: const Size(40, 40),
-        backgroundColor: primary ? cs.primary : Colors.transparent,
-        foregroundColor: primary ? cs.onPrimary : cs.onSurface,
-      ),
-    );
-    if (onLongPress == null) return button;
-    return GestureDetector(onLongPress: onLongPress, child: button);
-  }
-
-  Widget _buildCompactActions() {
-    final hasDraft = widget.inputController.text.trim().isNotEmpty ||
-        widget.mediaController.hasDraftMedia;
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(999),
-      child: SizedBox(
-        height: 44,
-        child: Row(
-          children: [
-            _actionButton(icon: Lucide.Plus, onPressed: widget.onMore),
-            const Spacer(),
-            Tooltip(
-              message: widget.reasoningBudget == -1
-                  ? '模型与思考 · 自动'
-                  : '模型与思考',
-              child: _actionButton(
-                icon: Lucide.Brain,
-                onPressed: widget.supportsReasoning
-                    ? widget.onConfigureReasoning
-                    : widget.onSelectModel,
-                onLongPress: widget.onSelectModel,
-              ),
-            ),
-            GestureDetector(
-              onLongPressStart: (_) => unawaited(_startVoice()),
-              onLongPressMoveUpdate: (details) {
-                if (!_voiceOwned) return;
-                final delta = details.localOffsetFromOrigin;
-                if (delta.dy < -44 && !_voiceLocked) {
-                  setState(() => _voiceLocked = true);
-                } else if (delta.dx < -56) {
-                  unawaited(_cancelVoice());
-                }
-              },
-              onLongPressEnd: (_) {
-                if (_voiceOwned && !_voiceLocked) {
-                  unawaited(_finishVoice());
-                }
-              },
-              child: _actionButton(
-                icon: Lucide.Mic,
-                onPressed: () => unawaited(_startVoice()),
-              ),
-            ),
-            if (widget.loading)
-              _actionButton(
-                icon: Lucide.Square,
-                onPressed: widget.onStop,
-                primary: true,
-              )
-            else
-              _actionButton(
-                icon: Lucide.ArrowUp,
-                onPressed: hasDraft ? () => unawaited(_sendDraft()) : null,
-                primary: hasDraft,
-              ),
-          ],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(stop ? 13 : 999),
         ),
+        backgroundColor: primary
+            ? (enabled ? cs.primary : cs.surfaceContainerHighest)
+            : Colors.transparent,
+        foregroundColor: primary
+            ? (enabled ? cs.onPrimary : cs.onSurfaceVariant)
+            : cs.onSurface,
       ),
     );
   }
 
-  Widget _buildVoiceSurface() {
-    final cs = Theme.of(context).colorScheme;
-    final live = _voiceOwned
-        ? widget.asrProvider.transcript
-        : (_voiceReadyText ?? '');
-    if (!_voiceEditing && live.isNotEmpty && _voiceEditor.text != live) {
-      _voiceEditor.value = TextEditingValue(
-        text: live,
-        selection: TextSelection.collapsed(offset: live.length),
-      );
-    }
+  int _visualLines(BuildContext context, double maxWidth) {
+    final text = widget.inputController.text;
+    if (text.isEmpty) return 1;
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: Theme.of(context).textTheme.bodyLarge,
+      ),
+      textDirection: Directionality.of(context),
+    )..layout(maxWidth: math.max(48, maxWidth - 56));
+    return painter.computeLineMetrics().length;
+  }
 
-    return Material(
-      color: cs.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(28),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_voiceEditing || live.isNotEmpty || !_selectedAsrStreams)
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 150),
-                child: TextField(
-                  controller: _voiceEditor,
-                  readOnly: !_voiceEditing,
-                  onTap: () => setState(() => _voiceEditing = true),
-                  maxLines: null,
-                  decoration: InputDecoration(
-                    hintText: _selectedAsrStreams
-                        ? '正在流式转写…'
-                        : (_voiceOwned ? '结束录音后显示完整转写' : '转写完成'),
-                    border: InputBorder.none,
-                    suffixIcon: IconButton(
-                      icon: const Icon(Lucide.Maximize2, size: 18),
-                      onPressed: _openVoiceFullscreenEditor,
-                    ),
-                  ),
+  Widget _buildAttachments() {
+    final images = _mediaSnapshot.imagePaths;
+    final docs = _mediaSnapshot.documents;
+    if (images.isEmpty && docs.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 62,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          for (final path in images)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 58,
+                  height: 58,
+                  child: path.startsWith('http') || path.startsWith('data:')
+                      ? Container(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          child: const Icon(Lucide.Image, size: 20),
+                        )
+                      : Image.file(
+                          File(path),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                            child: const Icon(Lucide.ImageOff, size: 20),
+                          ),
+                        ),
                 ),
               ),
-            if (_voiceSettingsExpanded) _buildVoiceSettings(),
+            ),
+          for (final doc in docs)
             Container(
-              height: 56,
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              constraints: const BoxConstraints(maxWidth: 150),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(999),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _actionButton(
-                    icon: Lucide.X,
-                    onPressed: () => unawaited(_cancelVoice()),
-                  ),
-                  _actionButton(
-                    icon: Lucide.Settings,
-                    onPressed: () => setState(
-                      () => _voiceSettingsExpanded = !_voiceSettingsExpanded,
+                  const Icon(Lucide.FileText, size: 18),
+                  const SizedBox(width: 7),
+                  Flexible(
+                    child: Text(
+                      doc.fileName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11),
                     ),
                   ),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        _voiceLocked
-                            ? '已锁定'
-                            : _voiceOwned
-                                ? (_selectedAsrStreams
-                                    ? '流式录音中'
-                                    : '录音中 · 非流式')
-                                : '转写完成 · 待发送',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ),
-                  if (_voiceOwned)
-                    _actionButton(
-                      icon: Lucide.Square,
-                      onPressed: _voiceFinishing
-                          ? null
-                          : () => unawaited(_finishVoice()),
-                      primary: true,
-                    )
-                  else
-                    _actionButton(
-                      icon: Lucide.ArrowUp,
-                      onPressed: (_voiceReadyText?.trim().isNotEmpty ?? false)
-                          ? () => unawaited(_sendVoice())
-                          : null,
-                      primary: _voiceReadyText?.trim().isNotEmpty ?? false,
-                    ),
                 ],
               ),
             ),
-          ],
-        ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildQueueBanner() {
+    if (!widget.hasQueuedInput) return const SizedBox.shrink();
+    final preview = widget.queuedPreviewText?.trim();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          const Icon(Lucide.ListPlus, size: 17),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              (preview == null || preview.isEmpty) ? '队列中有待发送内容' : preview,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11),
+            ),
+          ),
+          if (widget.onCancelQueuedInput != null)
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Lucide.X, size: 16),
+              onPressed: widget.onCancelQueuedInput,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNormalComposer() {
+    final cs = Theme.of(context).colorScheme;
+    final snapshot = widget.mediaController.snapshotInput(widget.inputController.text);
+    final hasDraft = snapshot.text.isNotEmpty ||
+        snapshot.imagePaths.isNotEmpty ||
+        snapshot.documents.isNotEmpty;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showExpand = _visualLines(context, constraints.maxWidth) >= 6;
+        return Material(
+          color: cs.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(28),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildQueueBanner(),
+                _buildAttachments(),
+                if (_mediaSnapshot.imagePaths.isNotEmpty ||
+                    _mediaSnapshot.documents.isNotEmpty)
+                  const SizedBox(height: 6),
+                Stack(
+                  children: [
+                    TextField(
+                      controller: widget.inputController,
+                      minLines: 1,
+                      maxLines: 6,
+                      readOnly: widget.hasQueuedInput,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        hintText: '输入消息…',
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.fromLTRB(
+                          8,
+                          5,
+                          showExpand ? 42 : 8,
+                          10,
+                        ),
+                      ),
+                    ),
+                    if (showExpand)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: IconButton(
+                          tooltip: '全屏编辑',
+                          icon: const Icon(Lucide.Maximize2, size: 18),
+                          onPressed: _openFullscreenEditor,
+                        ),
+                      ),
+                  ],
+                ),
+                if (widget.loading && hasDraft) ...[
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.tonalIcon(
+                      onPressed: () => unawaited(_sendDraft()),
+                      icon: const Icon(Lucide.ListPlus, size: 17),
+                      label: const Text('加入队列'),
+                    ),
+                  ),
+                ],
+                Row(
+                  children: [
+                    _iconButton(icon: Lucide.Plus, onPressed: widget.onMore),
+                    const Spacer(),
+                    GestureDetector(
+                      onLongPress: widget.onSelectModel,
+                      child: _iconButton(
+                        icon: Lucide.Brain,
+                        onPressed: widget.supportsReasoning
+                            ? widget.onConfigureReasoning
+                            : widget.onSelectModel,
+                      ),
+                    ),
+                    GestureDetector(
+                      onLongPressStart: (_) => unawaited(_startVoice()),
+                      onLongPressMoveUpdate: (details) {
+                        if (!_voiceOwned) return;
+                        final delta = details.localOffsetFromOrigin;
+                        if (delta.dy < -44 && !_voiceLocked) {
+                          setState(() => _voiceLocked = true);
+                        } else if (delta.dx < -56) {
+                          unawaited(_cancelVoice());
+                        }
+                      },
+                      onLongPressEnd: (_) {
+                        if (_voiceOwned && !_voiceLocked) {
+                          unawaited(_finishVoice());
+                        }
+                      },
+                      child: _iconButton(
+                        icon: Lucide.Mic,
+                        onPressed: widget.loading
+                            ? null
+                            : () => unawaited(_startVoice()),
+                      ),
+                    ),
+                    if (widget.loading)
+                      _iconButton(
+                        icon: Lucide.Pause,
+                        onPressed: widget.onStop,
+                        primary: true,
+                        stop: true,
+                      )
+                    else
+                      _iconButton(
+                        icon: Lucide.ArrowUp,
+                        onPressed: hasDraft ? () => unawaited(_sendDraft()) : null,
+                        primary: true,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -497,7 +604,7 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
     final selected = context.watch<SettingsProvider>().selectedAsrService;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
@@ -525,30 +632,120 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
     );
   }
 
+  Widget _buildVoiceSurface() {
+    final cs = Theme.of(context).colorScheme;
+    final live = _voiceOwned ? widget.asrProvider.transcript : (_voiceReadyText ?? '');
+    if (!_voiceEditing && live.isNotEmpty && _voiceEditor.text != live) {
+      _voiceEditor.value = TextEditingValue(
+        text: live,
+        selection: TextSelection.collapsed(offset: live.length),
+      );
+    }
+
+    return Material(
+      color: cs.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(28),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_voiceEditing || live.isNotEmpty || !_selectedAsrStreams)
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 150),
+                child: TextField(
+                  controller: _voiceEditor,
+                  readOnly: !_voiceEditing,
+                  onTap: () => setState(() => _voiceEditing = true),
+                  maxLines: null,
+                  decoration: InputDecoration(
+                    hintText: _selectedAsrStreams
+                        ? '正在流式转写…'
+                        : (_voiceOwned ? '结束录音后显示完整转写' : '转写完成'),
+                    border: InputBorder.none,
+                    suffixIcon: IconButton(
+                      icon: const Icon(Lucide.Maximize2, size: 18),
+                      onPressed: _openVoiceFullscreenEditor,
+                    ),
+                  ),
+                ),
+              ),
+            if (_voiceSettingsExpanded) _buildVoiceSettings(),
+            Container(
+              height: 58,
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                children: [
+                  _iconButton(
+                    icon: Lucide.X,
+                    onPressed: () => unawaited(_cancelVoice()),
+                  ),
+                  _iconButton(
+                    icon: Lucide.Settings,
+                    onPressed: () => setState(
+                      () => _voiceSettingsExpanded = !_voiceSettingsExpanded,
+                    ),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: _voiceLocked
+                          ? const Text('↑ 已锁定', style: TextStyle(fontSize: 11))
+                          : _voiceOwned
+                              ? Text(
+                                  _selectedAsrStreams
+                                      ? '流式录音中 · ↑锁定  ←取消'
+                                      : '录音中 · 非流式 · ↑锁定  ←取消',
+                                  style: const TextStyle(fontSize: 10),
+                                )
+                              : const Text(
+                                  '转写完成 · 待发送',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                    ),
+                  ),
+                  if (_voiceOwned)
+                    _iconButton(
+                      icon: Lucide.Square,
+                      onPressed: _voiceFinishing
+                          ? null
+                          : () => unawaited(_finishVoice()),
+                      primary: true,
+                    )
+                  else
+                    _iconButton(
+                      icon: Lucide.ArrowUp,
+                      onPressed: (_voiceReadyText?.trim().isNotEmpty ?? false)
+                          ? () => unawaited(_sendVoice())
+                          : null,
+                      primary: true,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
-      clipBehavior: Clip.none,
       children: [
-        widget.child,
-        Positioned(
-          left: 12,
-          right: 12,
-          bottom: 4,
-          child: _voiceActive
-              ? _buildVoiceSurface()
-              : _buildCompactActions(),
-        ),
-        if (!_voiceActive && _lineCount >= 6)
-          Positioned(
-            right: 18,
-            bottom: 54,
-            child: IconButton.filledTonal(
-              tooltip: '全屏编辑',
-              icon: const Icon(Lucide.Maximize2, size: 18),
-              onPressed: _openFullscreenEditor,
-            ),
+        Offstage(offstage: true, child: widget.child),
+        SafeArea(
+          top: false,
+          left: false,
+          right: false,
+          bottom: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
+            child: _voiceActive ? _buildVoiceSurface() : _buildNormalComposer(),
           ),
+        ),
       ],
     );
   }
