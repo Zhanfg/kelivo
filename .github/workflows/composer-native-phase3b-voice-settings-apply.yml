@@ -1,0 +1,80 @@
+name: Composer Native Phase 3B Voice Settings Apply
+
+on:
+  push:
+    branches: [feat/story-runtime-foundation]
+    paths:
+      - '.github/patches/composer-phase3b-voice-settings.py'
+      - '.github/workflows/composer-native-phase3b-voice-settings-apply.yml'
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+        with:
+          ref: feat/story-runtime-foundation
+          fetch-depth: 0
+
+      - name: Apply guarded inline voice settings integration
+        run: |
+          set -euo pipefail
+          python3 .github/patches/composer-phase3b-voice-settings.py
+          git diff --check
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Format affected Dart files
+        run: |
+          dart format \
+            lib/features/home/widgets/chat_input_bar.dart \
+            test/features/home/widgets/chat_input_bar_asr_test.dart
+
+      - name: Analyze inline voice settings surface
+        run: |
+          dart analyze --fatal-infos \
+            lib/features/home/widgets/chat_input_bar.dart \
+            lib/features/settings/pages/tts_services_page.dart \
+            lib/features/settings/widgets/asr_services_section.dart \
+            test/features/home/widgets/chat_input_bar_asr_test.dart
+
+      - name: Run voice and Composer regressions
+        run: |
+          flutter test --concurrency=1 --reporter expanded \
+            test/core/providers/asr_provider_test.dart \
+            test/features/home/widgets/chat_input_bar_asr_test.dart \
+            test/features/home/widgets/chat_input_bar_mobile_composer_test.dart \
+            test/features/home/composer/composer_reasoning_level_test.dart \
+            test/features/home/composer/composer_reasoning_popover_test.dart \
+            test/features/home/widgets/chat_input_bar_queue_test.dart \
+            test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart
+
+      - name: Commit verified inline voice settings integration
+        run: |
+          set -euo pipefail
+          rm -f .github/patches/composer-phase3b-voice-settings.py
+          rm -f .github/workflows/composer-native-phase3b-voice-settings-apply.yml
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No verified changes to commit.'
+            exit 0
+          fi
+          git config user.name 'Axymorrsen'
+          git config user.email 'Axymosen@outlook.com'
+          git commit -m 'feat(composer): add inline voice service controls'
+          git push origin HEAD:feat/story-runtime-foundation
