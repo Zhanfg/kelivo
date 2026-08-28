@@ -2,16 +2,24 @@ import 'dart:convert';
 
 import '../../../core/database/business_preferences.dart';
 import '../../../core/providers/tts_provider.dart';
+import '../../../core/services/tts/local_tts.dart';
 import '../../../core/services/tts/network_tts.dart';
 import 'story_voice_models.dart';
 import 'story_voice_routing.dart';
 
+/// Stable pseudo service ids used by Story voice assignments for Kelivo's
+/// native, non-network TTS backends.
+const String storyLocalMossTtsServiceId = '__story_local_moss__';
+const String storySystemTtsServiceId = '__story_system_tts__';
+
+bool isStoryNativeTtsServiceId(String value) =>
+    value == storyLocalMossTtsServiceId || value == storySystemTtsServiceId;
+
 /// Adapter from Story semantic voice routing to Kelivo's existing TtsProvider.
 ///
-/// It never owns network credentials, HTTP, audio queues or playback. Those all
-/// remain in the native TTS subsystem. The adapter resolves a configured service
-/// by id, derives a per-line voice/instruction view and hands it back to
-/// TtsProvider.speakWithNetworkService().
+/// It never owns network credentials, HTTP, audio queues or playback. Network,
+/// Android-local MOSS and system TTS are all played through Kelivo's native TTS
+/// provider so seek/pause/replay behavior stays in one stack.
 final class StoryVoicePlaybackService {
   const StoryVoicePlaybackService({
     required this.preferences,
@@ -27,6 +35,9 @@ final class StoryVoicePlaybackService {
     required StoryVoiceAssignment assignment,
     StorySpeechIntent intent = const StorySpeechIntent(),
   }) async {
+    if (isStoryNativeTtsServiceId(assignment.ttsServiceId)) {
+      throw StateError('story_voice_native_backend_has_no_network_request');
+    }
     final service = await _readServiceById(assignment.ttsServiceId);
     if (service == null) {
       throw StateError(
@@ -58,6 +69,47 @@ final class StoryVoicePlaybackService {
       flush: flush,
     );
     return request;
+  }
+
+  /// Plays any Story assignment, including native local/system backends.
+  ///
+  /// [speak] remains network-only for compatibility with existing callers that
+  /// need the resolved network request. New Story playback paths should use
+  /// this method when the assignment can point at local or system TTS.
+  Future<void> speakAssignment({
+    required StoryVoiceAssignment assignment,
+    required String text,
+    StorySpeechIntent intent = const StorySpeechIntent(),
+    bool flush = true,
+  }) async {
+    switch (assignment.ttsServiceId) {
+      case storyLocalMossTtsServiceId:
+        if (!await ttsProvider.isLocalTtsReady()) {
+          throw StateError('story_voice_local_moss_not_ready');
+        }
+        final previous = ttsProvider.backendMode;
+        try {
+          if (previous != TtsBackendMode.localOnly) {
+            await ttsProvider.setBackendMode(TtsBackendMode.localOnly);
+          }
+          await ttsProvider.speak(text, flush: flush);
+        } finally {
+          if (ttsProvider.backendMode != previous) {
+            await ttsProvider.setBackendMode(previous);
+          }
+        }
+        return;
+      case storySystemTtsServiceId:
+        await ttsProvider.speakSystem(text, flush: flush);
+        return;
+      default:
+        await speak(
+          assignment: assignment,
+          text: text,
+          intent: intent,
+          flush: flush,
+        );
+    }
   }
 
   Future<TtsServiceOptions?> _readServiceById(String serviceId) async {
