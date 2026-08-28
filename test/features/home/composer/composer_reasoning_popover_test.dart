@@ -56,10 +56,10 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const ValueKey('anchor')));
+    await tester.tap(find.byIcon(Icons.psychology));
     await tester.pumpAndSettle();
 
-    final l10n = AppLocalizations.of(tester.element(find.byType(_Harness)))!;
+    final l10n = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
     expect(find.byKey(const ValueKey('composer-reasoning-slider')), findsOneWidget);
     expect(find.text(l10n.reasoningBudgetSheetAuto), findsOneWidget);
     expect(find.text(l10n.modelDetailSheetAdvancedTab), findsOneWidget);
@@ -79,12 +79,12 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const ValueKey('anchor')));
+    await tester.tap(find.byIcon(Icons.psychology));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('composer-reasoning-advanced')));
     await tester.pumpAndSettle();
 
-    final l10n = AppLocalizations.of(tester.element(find.byType(_Harness)))!;
+    final l10n = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
     expect(find.text(l10n.chatInputBarSelectModelTooltip), findsOneWidget);
     expect(find.text(l10n.chatInputBarReasoningStrengthTooltip), findsOneWidget);
     expect(find.textContaining('Speed'), findsNothing);
@@ -115,12 +115,12 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const ValueKey('anchor')));
+    await tester.tap(find.byIcon(Icons.psychology));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('composer-reasoning-advanced')));
     await tester.pumpAndSettle();
 
-    final l10n = AppLocalizations.of(tester.element(find.byType(_Harness)))!;
+    final l10n = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
     await tester.tap(find.text(l10n.chatInputBarSelectModelTooltip));
     await tester.pumpAndSettle();
     expect(find.text('Provider A'), findsOneWidget);
@@ -154,25 +154,27 @@ class _Harness extends StatelessWidget {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(
-        body: Align(
-          alignment: Alignment.bottomCenter,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 24),
-            child: IconButton(
-              key: anchorKey,
-              icon: const Icon(Icons.psychology),
-              onPressed: () => showComposerReasoningPopover(
-                context,
-                anchorKey: anchorKey,
-                currentBudget: -1,
-                supportsXhigh: supportsXhigh,
-                supportsMax: supportsMax,
-                currentProviderKey: 'ProviderA',
-                currentModelId: 'model-a',
-                modelOptions: modelOptions,
-                onBudgetChanged: onBudgetChanged,
-                onModelChanged: onModelChanged,
+      home: Builder(
+        builder: (pageContext) => Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: IconButton(
+                key: anchorKey,
+                icon: const Icon(Icons.psychology),
+                onPressed: () => showComposerReasoningPopover(
+                  pageContext,
+                  anchorKey: anchorKey,
+                  currentBudget: -1,
+                  supportsXhigh: supportsXhigh,
+                  supportsMax: supportsMax,
+                  currentProviderKey: 'ProviderA',
+                  currentModelId: 'model-a',
+                  modelOptions: modelOptions,
+                  onBudgetChanged: onBudgetChanged,
+                  onModelChanged: onModelChanged,
+                ),
               ),
             ),
           ),
