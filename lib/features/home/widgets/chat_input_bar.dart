@@ -2825,11 +2825,15 @@ class _ChatInputBarState extends State<ChatInputBar>
     final settings = context.watch<SettingsProvider>();
     final selectedAsrService = settings.selectedAsrService;
     final asr = widget.asrProvider;
-    final showVoiceInput =
+    final selectedVoiceServiceUsable =
         asr != null &&
         selectedAsrService != null &&
-        asr.canUse(selectedAsrService) &&
-        !asr.isActive;
+        asr.canUse(selectedAsrService);
+    // Voice input is opt-in, but a broken/unavailable selected service must not
+    // hide the recovery entrance. Keep the mic whenever at least one service
+    // exists; tapping an unusable selection opens the inline service switcher.
+    final showVoiceInput =
+        asr != null && settings.asrServices.isNotEmpty && !asr.isActive;
     final voiceTranscriptEditable =
         _ownsVoiceSession &&
         !_finishingVoice &&
@@ -3303,9 +3307,11 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     _composerLocked ||
                                                         widget.loading
                                                     ? null
-                                                    : () => unawaited(
+                                                    : selectedVoiceServiceUsable
+                                                    ? () => unawaited(
                                                         _startVoiceInput(),
-                                                      ),
+                                                      )
+                                                    : _toggleInlineVoiceSettings,
                                                 onLongPress:
                                                     _composerLocked ||
                                                         widget.loading

@@ -66,6 +66,58 @@ void main() {
   });
 
   testWidgets(
+    'unavailable selected ASR keeps mic and tap opens recovery switcher',
+    (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+      final unavailable = SherpaOnnxAsrOptions(
+        id: 'offline-missing',
+        name: 'Missing Offline',
+        modelId: 'missing-model',
+      );
+      final fallback = SystemAsrOptions(id: 'system-fallback', name: 'System');
+      await settings.setAsrServices(<AsrServiceOptions>[unavailable, fallback]);
+      await settings.setSelectedAsrServiceId(unavailable.id);
+      final backend = _FakeSystemBackend();
+      final asr = AsrProvider(
+        systemService: SystemAsrService(backend: backend),
+        localModelInstalledChecker: (_) async => false,
+      );
+      final controller = TextEditingController();
+      addTearDown(asr.dispose);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        harness(settings: settings, asr: asr, controller: controller),
+      );
+      await tester.pump();
+
+      expect(asr.canUse(unavailable), isFalse);
+      expect(find.byTooltip('Voice input'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Voice input'));
+      await tester.pumpAndSettle();
+
+      expect(asr.isActive, isFalse);
+      expect(
+        find.byKey(const ValueKey('voice-settings-inline')),
+        findsOneWidget,
+      );
+      expect(find.text('Missing Offline'), findsOneWidget);
+      expect(find.text('System'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('voice-service-chip:system-fallback')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(settings.selectedAsrServiceId, fallback.id);
+      expect(find.byKey(const ValueKey('voice-settings-inline')), findsNothing);
+      expect(find.byTooltip('Voice input'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'long-press mic opens inline service switcher and selection collapses it',
     (tester) async {
       final settings = SettingsProvider(createBusinessTestPreferences());
