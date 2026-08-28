@@ -97,7 +97,15 @@ def patch_skill_discovery() -> None:
     if call_old in text:
         text = text.replace(call_old, call_new, 1)
 
-    if 'required String repository' not in text:
+    old_signature = "\n".join(
+        [
+            'String _selectSkillRoot(',
+            '  Map<String, ArchiveFile> entries,',
+            '  String? requestedSubdirectory,',
+            ') {',
+        ]
+    )
+    if old_signature in text:
         pattern = re.compile(
             r'String _selectSkillRoot\(\n.*?\n\}\n\n'
             r'Map<String, String> _parseFrontmatter',
@@ -170,6 +178,8 @@ def patch_skill_discovery() -> None:
         text, count = pattern.subn(lambda _: replacement, text, count=1)
         if count != 1:
             raise RuntimeError('Skill root function replacement anchor missing')
+    elif 'repository: source.repository' in text and 'required String repository,' not in text:
+        raise RuntimeError('Skill root signature is inconsistent')
 
     path.write_text(text)
 
