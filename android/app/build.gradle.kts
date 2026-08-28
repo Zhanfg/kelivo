@@ -17,7 +17,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/publish/versioning).
         applicationId = "com.psyche.kelivo"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -25,6 +25,14 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    packaging {
+        jniLibs {
+            // MOSS and sherpa Android are pinned to the same ONNX Runtime version.
+            // Package a single shared runtime to avoid duplicate native-library merge failures.
+            pickFirsts += setOf("**/libonnxruntime.so")
+        }
     }
 
     val keystorePropertiesFile = rootProject.file("key.properties")
