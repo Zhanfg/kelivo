@@ -5,6 +5,7 @@ on:
     branches: [feat/story-runtime-foundation]
     paths:
       - '.github/patches/composer-phase2-reasoning.py'
+      - '.github/patches/composer-phase2-reasoning-anchor-fix.py'
       - '.github/workflows/composer-native-phase2-reasoning-apply.yml'
 
 permissions:
@@ -27,6 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 .github/patches/composer-phase2-reasoning.py
+          python3 .github/patches/composer-phase2-reasoning-anchor-fix.py
           git diff --check
 
       - name: Setup Flutter
@@ -73,6 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .github/patches/composer-phase2-reasoning.py
+          rm -f .github/patches/composer-phase2-reasoning-anchor-fix.py
           rm -f .github/workflows/composer-native-phase2-reasoning-apply.yml
           git add -A
           if git diff --cached --quiet; then
