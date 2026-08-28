@@ -5,6 +5,7 @@ import '../../../core/database/business_preferences.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
+import '../orchestration/story_mode_transition_service.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
 
@@ -15,14 +16,14 @@ final ValueNotifier<int> storyConversationModeRevision = ValueNotifier<int>(0);
 
 /// Persistent Chat / Story mode switch for the active conversation.
 ///
-/// The control stays visible after a conversation starts. The active selector
-/// expands its title slot to the full width the AppBar actually gives it, then
-/// places the selector at the physical screen center inside those real layout
-/// bounds. This keeps painting and hit testing in the same coordinate space.
+/// The selector is rendered through an [OverlayPortal]. Its X coordinate is
+/// therefore resolved against the route Overlay (the physical screen), not the
+/// AppBar title slot whose width changes with leading/actions/navigation state.
+/// The portal is still owned by the Home route, so a pushed Settings route paints
+/// above it and the selector never leaks onto the next page.
 class StoryConversationModeTitle extends StatefulWidget {
   const StoryConversationModeTitle({super.key, required this.fallback});
 
-  /// Kept for Home layout compatibility and used while no conversation exists.
   final Widget fallback;
 
   @override
@@ -32,9 +33,17 @@ class StoryConversationModeTitle extends StatefulWidget {
 
 class _StoryConversationModeTitleState
     extends State<StoryConversationModeTitle> {
+  final OverlayPortalController _portalController = OverlayPortalController(
+    debugLabel: 'story-conversation-mode',
+  );
+  final GlobalKey _anchorKey = GlobalKey();
+
   String? _loadedConversationId;
   Future<StoryRuntimeSessionState>? _sessionFuture;
   bool _busy = false;
+  bool _postFrameScheduled = false;
+  bool _portalWanted = false;
+  double? _toolbarCenterY;
 
   Future<StoryRuntimeSessionState> _futureFor(
     BuildContext context,
@@ -49,6 +58,32 @@ class _StoryConversationModeTitleState
     return _sessionFuture!;
   }
 
+  void _schedulePortalState(bool visible) {
+    _portalWanted = visible;
+    if (_postFrameScheduled) return;
+    _postFrameScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _postFrameScheduled = false;
+      if (!mounted) return;
+
+      if (_portalWanted) {
+        final renderObject = _anchorKey.currentContext?.findRenderObject();
+        if (renderObject is RenderBox && renderObject.hasSize) {
+          final nextY = renderObject.localToGlobal(
+            Offset(renderObject.size.width / 2, renderObject.size.height / 2),
+          ).dy;
+          final currentY = _toolbarCenterY;
+          if (currentY == null || (currentY - nextY).abs() >= 0.5) {
+            setState(() => _toolbarCenterY = nextY);
+          }
+        }
+        if (!_portalController.isShowing) _portalController.show();
+      } else if (_portalController.isShowing) {
+        _portalController.hide();
+      }
+    });
+  }
+
   Future<void> _selectMode(
     String conversationId,
     StoryRuntimeSessionState session,
@@ -59,18 +94,37 @@ class _StoryConversationModeTitleState
     }
     setState(() => _busy = true);
     try {
-      final store = StoryRuntimeStore(context.read<BusinessPreferences>());
-      await store.setEnabled(conversationId, story);
+      final preferences = context.read<BusinessPreferences>();
+      final chatService = context.read<ChatService>();
+      final transition = StoryModeTransitionService(
+        preferences: preferences,
+        chatService: chatService,
+      );
+      final next = await transition.setMode(
+        conversationId: conversationId,
+        storyEnabled: story,
+      );
       if (!mounted) return;
       setState(() {
         _loadedConversationId = conversationId;
-        _sessionFuture = store.readOrDefault(conversationId);
+        _sessionFuture = Future<StoryRuntimeSessionState>.value(next);
       });
       storyConversationModeRevision.value++;
       Haptics.light();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('模式转换失败：$error')),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  @override
+  void dispose() {
+    if (_portalController.isShowing) _portalController.hide();
+    super.dispose();
   }
 
   @override
@@ -79,6 +133,7 @@ class _StoryConversationModeTitleState
     final conversationId = chatService.currentConversationId;
     if (conversationId == null ||
         chatService.getConversation(conversationId) == null) {
+      _schedulePortalState(false);
       return widget.fallback;
     }
 
@@ -88,14 +143,37 @@ class _StoryConversationModeTitleState
         final session =
             snapshot.data ??
             StoryRuntimeSessionState(conversationId: conversationId);
+        _schedulePortalState(true);
         final controlWidth = _modeSelectorWidth(context);
-        return StoryConversationModeCenteredSlot(
-          controlWidth: controlWidth,
-          child: _ModeSelector(
-            storySelected: session.enabled,
-            busy: _busy || snapshot.connectionState == ConnectionState.waiting,
-            onSelectChat: () => _selectMode(conversationId, session, false),
-            onSelectStory: () => _selectMode(conversationId, session, true),
+        final media = MediaQuery.of(context);
+        final defaultCenterY = media.padding.top + (kToolbarHeight / 2);
+        final centerY = _toolbarCenterY ?? defaultCenterY;
+        final left = ((media.size.width - controlWidth) / 2)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+        final top = (centerY - 18).clamp(0.0, double.infinity).toDouble();
+
+        return OverlayPortal(
+          controller: _portalController,
+          overlayChildBuilder: (overlayContext) => Positioned(
+            left: left,
+            top: top,
+            width: controlWidth,
+            height: 36,
+            child: _ModeSelector(
+              storySelected: session.enabled,
+              busy: _busy ||
+                  snapshot.connectionState == ConnectionState.waiting,
+              onSelectChat: () =>
+                  _selectMode(conversationId, session, false),
+              onSelectStory: () =>
+                  _selectMode(conversationId, session, true),
+            ),
+          ),
+          child: SizedBox(
+            key: _anchorKey,
+            width: 1,
+            height: 36,
           ),
         );
       },
@@ -112,14 +190,10 @@ class StoryConversationModeAction extends StatelessWidget {
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-/// Gives the centered Story mode control real layout space instead of moving a
-/// narrow title with a paint-only transform.
-///
-/// Keeping the control inside this widget's actual bounds is important because
-/// ancestors reject pointer events outside a RenderBox before transformed
-/// descendants get a chance to hit-test. This widget is public so the AppBar
-/// hit-test regression can be covered by a focused widget test.
-class StoryConversationModeCenteredSlot extends StatefulWidget {
+/// Kept for focused layout tests and callers that already use this public
+/// helper. The product AppBar no longer depends on this title-slot centering;
+/// [StoryConversationModeTitle] uses an OverlayPortal instead.
+class StoryConversationModeCenteredSlot extends StatelessWidget {
   const StoryConversationModeCenteredSlot({
     super.key,
     required this.controlWidth,
@@ -130,91 +204,13 @@ class StoryConversationModeCenteredSlot extends StatefulWidget {
   final Widget child;
 
   @override
-  State<StoryConversationModeCenteredSlot> createState() =>
-      _StoryConversationModeCenteredSlotState();
-}
-
-class _StoryConversationModeCenteredSlotState
-    extends State<StoryConversationModeCenteredSlot> {
-  final GlobalKey _slotKey = GlobalKey();
-  double? _localLeft;
-  bool _measureScheduled = false;
-
-  @override
-  void didUpdateWidget(covariant StoryConversationModeCenteredSlot oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.controlWidth != widget.controlWidth) {
-      _localLeft = null;
-    }
-  }
-
-  void _scheduleMeasure() {
-    if (_measureScheduled) return;
-    _measureScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _measureScheduled = false;
-      if (!mounted) return;
-      final renderObject = _slotKey.currentContext?.findRenderObject();
-      if (renderObject is! RenderBox || !renderObject.hasSize) return;
-
-      final screenWidth = MediaQuery.sizeOf(context).width;
-      final slotLeft = renderObject.localToGlobal(Offset.zero).dx;
-      final desiredGlobalLeft = (screenWidth - widget.controlWidth) / 2;
-      final maxLeft = (renderObject.size.width - widget.controlWidth)
-          .clamp(0.0, double.infinity)
-          .toDouble();
-      final nextLeft = (desiredGlobalLeft - slotLeft)
-          .clamp(0.0, maxLeft)
-          .toDouble();
-      final currentLeft = _localLeft;
-      if (currentLeft != null && (nextLeft - currentLeft).abs() < 0.5) {
-        return;
-      }
-      setState(() => _localLeft = nextLeft);
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (!constraints.hasBoundedWidth) {
-          return SizedBox(
-            width: widget.controlWidth,
-            height: 36,
-            child: widget.child,
-          );
-        }
-
-        final maxLeft = (constraints.maxWidth - widget.controlWidth)
-            .clamp(0.0, double.infinity)
-            .toDouble();
-        final fallbackLeft = ((constraints.maxWidth - widget.controlWidth) / 2)
-            .clamp(0.0, maxLeft)
-            .toDouble();
-        final left = (_localLeft ?? fallbackLeft)
-            .clamp(0.0, maxLeft)
-            .toDouble();
-        _scheduleMeasure();
-
-        return SizedBox(
-          key: _slotKey,
-          width: double.infinity,
-          height: 36,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: left,
-                top: 0,
-                width: widget.controlWidth,
-                height: 36,
-                child: widget.child,
-              ),
-            ],
-          ),
-        );
-      },
+    return SizedBox(
+      width: double.infinity,
+      height: 36,
+      child: Center(
+        child: SizedBox(width: controlWidth, height: 36, child: child),
+      ),
     );
   }
 }
