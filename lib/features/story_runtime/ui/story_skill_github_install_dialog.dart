@@ -92,6 +92,7 @@ class _StorySkillGitHubInstallSheetState
                 child: IosCardPress(
                   borderRadius: BorderRadius.circular(12),
                   baseColor: Colors.transparent,
+                  haptics: false,
                   onTap: () => Navigator.of(context).maybePop(),
                   child: Center(
                     child: Icon(
@@ -145,6 +146,7 @@ class _StorySkillGitHubInstallSheetState
               baseColor: _valid
                   ? cs.primary
                   : cs.onSurface.withValues(alpha: 0.08),
+              haptics: false,
               onTap: _valid ? _submit : null,
               child: Center(
                 child: Row(
