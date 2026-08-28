@@ -1,4 +1,4 @@
-# fast rebuild for GitHub Skill dialog lifecycle fix; arm64-only hotfix lane
+# Fast Android debug build for focused Story regressions.
 name: Story Fast Debug
 
 on:
@@ -62,16 +62,18 @@ jobs:
             test/features/story_runtime/built_in_story_skill_assets_test.dart \
             test/features/story_runtime/story_conversation_mode_control_test.dart
 
-      - name: Build arm64 Android debug APK
-        run: flutter build apk --debug --target-platform android-arm64
+      - name: Build Android debug APKs
+        run: flutter build apk --debug --split-per-abi
 
-      - name: Verify debug APK signature
+      - name: Verify debug APK signatures
         shell: bash
         run: |
           set -euo pipefail
           apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -n "$apksigner"
-          "$apksigner" verify --verbose build/app/outputs/flutter-apk/app-debug.apk
+          for apk in build/app/outputs/flutter-apk/app-*-debug.apk; do
+            "$apksigner" verify --verbose "$apk"
+          done
 
       - name: Package
         shell: bash
@@ -80,12 +82,16 @@ jobs:
           VERSION="$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | tr -d ' ')"
           SHORT_SHA="$(git rev-parse --short=8 HEAD)"
           mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-debug.apk "dist/Kelivo_${VERSION}_Story_TEST_${SHORT_SHA}_arm64-v8a-debug.apk"
+          for file in build/app/outputs/flutter-apk/app-*-debug.apk; do
+            abi="$(basename "$file" | sed -E 's/app-(.*)-debug\.apk/\1/')"
+            cp "$file" "dist/Kelivo_${VERSION}_Story_TEST_${SHORT_SHA}_${abi}-debug.apk"
+          done
           sha256sum dist/*.apk > dist/SHA256SUMS.txt
-          printf 'commit=%s\nversion=%s\nabi=arm64-v8a\nsigning=android-debug\nvalidation=static-analysis+focused-skill-regression+apk-signature\n' \
+          printf 'commit=%s\nversion=%s\nabi=split-per-abi\nsigning=android-debug\nvalidation=static-analysis+focused-skill-regression+apk-signature\n' \
             "$(git rev-parse HEAD)" "$VERSION" > dist/BUILD_INFO.txt
 
       - name: Publish prerelease
+        continue-on-error: true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -105,7 +111,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: story-fast-debug-arm64
+          name: story-fast-debug-apks
           path: dist/
           if-no-files-found: error
           retention-days: 14
