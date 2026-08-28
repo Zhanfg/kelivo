@@ -229,9 +229,7 @@ class _StoryConversationModeCenteredSlotState
       final maxLeft = (slotWidth - widget.controlWidth)
           .clamp(0.0, double.infinity)
           .toDouble();
-      final nextLeft = (screenWidth / 2 -
-              globalLeft -
-              widget.controlWidth / 2)
+      final nextLeft = (screenWidth / 2 - globalLeft - widget.controlWidth / 2)
           .clamp(0.0, maxLeft)
           .toDouble();
       final currentLeft = _left;
