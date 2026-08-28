@@ -122,8 +122,7 @@ dependencies:
   math_expressions: ^2.6.2
 
   # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class font, you can use the icons in
-  # the material Icons class.
+  # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   restart_app: ^1.8.3
   drift: ^2.34.0
@@ -211,7 +210,8 @@ flutter:
   #       - asset: fonts/TrajanPro-Bold.ttf
   #         weight: 700
   #
-  # For details regarding fonts from package dependencies, see https://flutter.dev/to/font-from-package
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
 
 #  fonts:
 #    - family: JetBrainsMono
