@@ -1,4 +1,4 @@
-# rebuild after local-first TTS integration
+# fast rebuild for GitHub Skill dialog lifecycle fix
 name: Story Fast Debug
 
 on:
@@ -7,6 +7,7 @@ on:
       - feat/story-runtime-foundation
     paths:
       - .github/workflows/story-fast-debug.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -19,10 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Checkout
+      - name: Checkout exact triggering commit
         uses: actions/checkout@v4
         with:
-          ref: feat/story-runtime-foundation
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Setup Java
@@ -53,6 +54,13 @@ jobs:
       - name: Static analysis
         run: dart analyze --fatal-infos lib test
 
+      - name: Focused Skill lifecycle regression
+        run: |
+          flutter test --concurrency=1 \
+            test/features/story_runtime/story_skill_github_install_dialog_test.dart \
+            test/features/story_runtime/built_in_story_skill_assets_test.dart \
+            test/features/story_runtime/story_conversation_mode_control_test.dart
+
       - name: Build universal Android debug APK
         run: flutter build apk --debug
 
@@ -73,7 +81,7 @@ jobs:
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-debug.apk "dist/Kelivo_${VERSION}_Story_TEST_${SHORT_SHA}_universal-debug.apk"
           sha256sum dist/*.apk > dist/SHA256SUMS.txt
-          printf 'commit=%s\nversion=%s\nsigning=android-debug\nvalidation=static-analysis+apk-signature\n' \
+          printf 'commit=%s\nversion=%s\nsigning=android-debug\nvalidation=static-analysis+focused-skill-regression+apk-signature\n' \
             "$(git rev-parse HEAD)" "$VERSION" > dist/BUILD_INFO.txt
 
       - name: Publish prerelease
@@ -90,7 +98,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$(git rev-parse HEAD)" \
             --title "Kelivo Story Runtime TEST ${VERSION} (${SHORT_SHA})" \
-            --notes "Installable Android debug-signed test build after local-first TTS integration. Story controls are integrated into Kelivo Settings and Story Studio/Skills reuse Kelivo-native visual controls. Static analysis and APK signature verification passed before publishing." \
+            --notes "Installable Android debug-signed test build for the GitHub Skill dialog lifecycle fix. Static analysis, focused Story regressions and APK signature verification passed before publishing. Full non-baseline validation continues independently." \
             --prerelease
 
       - name: Upload artifact
