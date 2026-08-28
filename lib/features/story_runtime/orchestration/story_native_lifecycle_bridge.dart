@@ -4,6 +4,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/tts/network_tts.dart';
 import '../state/story_runtime_store.dart';
 import '../state/story_scene_runtime_state.dart';
+import '../voice/story_voice_context.dart';
 import '../voice/story_voice_context_store.dart';
 import '../voice/story_voice_models.dart';
 import '../voice/story_voice_routing.dart';
@@ -81,6 +82,23 @@ final class StoryNativeLifecycleBridge {
     return narrator;
   }
 
+  /// Reconstructs the same compact Story voice context used by network
+  /// narrator routing. Callers can pass it to a backend-agnostic playback
+  /// service so a Story-specific network source still receives scene context.
+  Future<StoryVoiceContextWindow> resolveNarratorContext(
+    ChatMessage message,
+  ) async {
+    final history = await _voiceContextStore.readForConversation(
+      message.conversationId,
+    );
+    final scene = await _sceneStore.readOrDefault(message.conversationId);
+    return history.windowFor(
+      message.id,
+      currentFallback: _stripHiddenComments(message.content),
+      sceneHint: _sceneHint(scene),
+    );
+  }
+
   /// Applies Story narrator semantics to Kelivo's currently selected network
   /// TTS service. Playback remains a single native TtsProvider request, so the
   /// provider's chunking, prefetch, seek and replay cache continue to work.
@@ -98,16 +116,7 @@ final class StoryNativeLifecycleBridge {
       return selectedService;
     }
 
-    final history = await _voiceContextStore.readForConversation(
-      message.conversationId,
-    );
-    final scene = await _sceneStore.readOrDefault(message.conversationId);
-    final context = history.windowFor(
-      message.id,
-      currentFallback: _stripHiddenComments(message.content),
-      sceneHint: _sceneHint(scene),
-    );
-
+    final context = await resolveNarratorContext(message);
     return _voiceResolver
         .resolve(
           service: selectedService,
