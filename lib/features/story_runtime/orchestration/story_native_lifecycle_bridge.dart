@@ -85,7 +85,7 @@ final class StoryNativeLifecycleBridge {
   /// Reconstructs the same compact Story voice context used by network
   /// narrator routing. Callers can pass it to a backend-agnostic playback
   /// service so a Story-specific network source still receives scene context.
-  Future<StoryVoiceContextWindow> resolveNarratorContext(
+  Future<StoryVoiceContextWindow?> resolveNarratorContext(
     ChatMessage message,
   ) async {
     final history = await _voiceContextStore.readForConversation(

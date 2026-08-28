@@ -172,6 +172,7 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
   Future<void> _editSelectedCharacters() async {
     if (_selectedCharacters.isEmpty || _busy) return;
     final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final preferences = context.read<BusinessPreferences>();
     final selected = await _showEditor(
       title: zh
           ? '批量设置 ${_selectedCharacters.length} 个角色'
@@ -182,7 +183,7 @@ class _StoryVoiceManagerPageState extends State<StoryVoiceManagerPage> {
     if (treeId == null) return;
     setState(() => _busy = true);
     try {
-      final store = StoryVoiceRoutingStore(context.read<BusinessPreferences>());
+      final store = StoryVoiceRoutingStore(preferences);
       for (final characterId in _selectedCharacters) {
         final current = _assignmentFor(characterId);
         await store.upsertCharacterAssignment(
