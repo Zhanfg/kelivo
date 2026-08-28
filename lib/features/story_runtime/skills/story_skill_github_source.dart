@@ -522,33 +522,63 @@ void _rejectPrivilegedManifest(Map<String, dynamic> manifest) {
 
 String _selectSkillRoot(
   Map<String, ArchiveFile> entries,
-  String? requestedSubdirectory,
-) {
+  String? requestedSubdirectory, {
+  required String repository,
+}) {
   final requested = _normalizeSubdirectory(requestedSubdirectory);
   if (requested != null) {
-    if (entries.containsKey('$requested/SKILL.md')) return requested;
+    final path = '$requested/SKILL.md';
+    final entry = entries[path];
+    if (entry != null && entry.isFile) return requested;
     throw StorySkillGitHubException(
       'skill_subdirectory_missing',
       detail: requested,
     );
   }
   if (entries.containsKey('SKILL.md')) return '';
-  final candidates =
-      entries.keys
-          .where((path) => path.endsWith('/SKILL.md'))
-          .map((path) => path.substring(0, path.length - '/SKILL.md'.length))
-          .toList(growable: false)
-        ..sort((a, b) {
-          final depth = a.split('/').length.compareTo(b.split('/').length);
-          return depth != 0 ? depth : a.compareTo(b);
-        });
+
+  final candidates = entries.keys
+      .where((path) => path.endsWith('/SKILL.md'))
+      .map((path) => path.substring(0, path.length - '/SKILL.md'.length))
+      .toList(growable: false);
   if (candidates.isEmpty) {
     throw const StorySkillGitHubException('skill_markdown_missing');
   }
-  final depth = candidates.first.split('/').length;
-  if (candidates.length > 1 && candidates[1].split('/').length == depth) {
-    throw const StorySkillGitHubException('skill_path_ambiguous');
+
+  String slug(String value) => value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+  final repositorySlug = slug(repository);
+
+  int score(String candidate) {
+    final normalized = candidate.replaceAll('\\', '/');
+    final segments = normalized
+        .split('/')
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+    final leaf = segments.isEmpty ? normalized : segments.last;
+    var value = segments.length * 20;
+    if (slug(leaf) == repositorySlug) value -= 1000;
+    if (entries.containsKey('$candidate/manifest.json')) value -= 250;
+    final lower = normalized.toLowerCase();
+    if (lower.startsWith('skills/') ||
+        lower.startsWith('.agents/skills/') ||
+        lower.startsWith('.claude/skills/') ||
+        lower.startsWith('.github/skills/')) {
+      value -= 120;
+    }
+    if (lower.contains('/skills/')) value -= 60;
+    return value;
   }
+
+  candidates.sort((a, b) {
+    final scoreCompare = score(a).compareTo(score(b));
+    if (scoreCompare != 0) return scoreCompare;
+    final depthCompare = a.split('/').length.compareTo(b.split('/').length);
+    if (depthCompare != 0) return depthCompare;
+    return a.compareTo(b);
+  });
   return candidates.first;
 }
 
