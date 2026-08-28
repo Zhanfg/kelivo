@@ -99,7 +99,6 @@ class BottomToolsSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag handle
             Container(
               width: 40,
               height: 4,
@@ -285,8 +284,8 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
               Future.microtask(() {
                 rootNav.push(
                   MaterialPageRoute(builder: (_) => const WorldBookPage()),
-                ),
-              );
+                );
+              });
             },
             trailing: Icon(
               Lucide.ChevronRight,
