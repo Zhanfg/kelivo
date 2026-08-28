@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/database/business_preferences.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
+import '../../../shared/responsive/breakpoints.dart';
 import '../../../theme/app_font_weights.dart';
 import '../orchestration/story_mode_transition_service.dart';
 import '../state/story_runtime_state.dart';
@@ -14,13 +15,16 @@ import '../state/story_runtime_store.dart';
 /// asks visible UI to refresh after an in-place mode switch.
 final ValueNotifier<int> storyConversationModeRevision = ValueNotifier<int>(0);
 
-/// Persistent Chat / Story mode switch for the active conversation.
+/// Conversation mode affordance for the native Home AppBar.
 ///
-/// The selector is rendered through an [OverlayPortal]. Its X coordinate is
-/// therefore resolved against the route Overlay (the physical screen), not the
-/// AppBar title slot whose width changes with leading/actions/navigation state.
-/// The portal is still owned by the Home route, so a pushed Settings route paints
-/// above it and the selector never leaks onto the next page.
+/// Mobile deliberately keeps the normal conversation title. Entering Story
+/// Mode and choosing Story resources belongs to the composer's `+` menu, where
+/// users already expect conversation-level actions. Wider layouts keep a
+/// compact Chat / Story selector because they have enough permanent toolbar
+/// space and do not rely on the mobile composer overflow menu.
+///
+/// The selector is part of the AppBar layout instead of a route-level overlay,
+/// so it moves and clips with drawers/sidebars rather than floating above them.
 class StoryConversationModeTitle extends StatefulWidget {
   const StoryConversationModeTitle({super.key, required this.fallback});
 
@@ -33,17 +37,9 @@ class StoryConversationModeTitle extends StatefulWidget {
 
 class _StoryConversationModeTitleState
     extends State<StoryConversationModeTitle> {
-  final OverlayPortalController _portalController = OverlayPortalController(
-    debugLabel: 'story-conversation-mode',
-  );
-  final GlobalKey _anchorKey = GlobalKey();
-
   String? _loadedConversationId;
   Future<StoryRuntimeSessionState>? _sessionFuture;
   bool _busy = false;
-  bool _postFrameScheduled = false;
-  bool _portalWanted = false;
-  double? _toolbarCenterY;
 
   Future<StoryRuntimeSessionState> _futureFor(
     BuildContext context,
@@ -58,37 +54,6 @@ class _StoryConversationModeTitleState
     return _sessionFuture!;
   }
 
-  void _schedulePortalState(bool visible) {
-    _portalWanted = visible;
-    if (_postFrameScheduled) return;
-    _postFrameScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _postFrameScheduled = false;
-      if (!mounted) return;
-
-      if (_portalWanted) {
-        final renderObject = _anchorKey.currentContext?.findRenderObject();
-        if (renderObject is RenderBox && renderObject.hasSize) {
-          final nextY = renderObject
-              .localToGlobal(
-                Offset(
-                  renderObject.size.width / 2,
-                  renderObject.size.height / 2,
-                ),
-              )
-              .dy;
-          final currentY = _toolbarCenterY;
-          if (currentY == null || (currentY - nextY).abs() >= 0.5) {
-            setState(() => _toolbarCenterY = nextY);
-          }
-        }
-        if (!_portalController.isShowing) _portalController.show();
-      } else if (_portalController.isShowing) {
-        _portalController.hide();
-      }
-    });
-  }
-
   Future<void> _selectMode(
     String conversationId,
     StoryRuntimeSessionState session,
@@ -99,11 +64,9 @@ class _StoryConversationModeTitleState
     }
     setState(() => _busy = true);
     try {
-      final preferences = context.read<BusinessPreferences>();
-      final chatService = context.read<ChatService>();
       final transition = StoryModeTransitionService(
-        preferences: preferences,
-        chatService: chatService,
+        preferences: context.read<BusinessPreferences>(),
+        chatService: context.read<ChatService>(),
       );
       final next = await transition.setMode(
         conversationId: conversationId,
@@ -127,18 +90,15 @@ class _StoryConversationModeTitleState
   }
 
   @override
-  void dispose() {
-    if (_portalController.isShowing) _portalController.hide();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.tablet) {
+      return widget.fallback;
+    }
+
     final chatService = context.watch<ChatService>();
     final conversationId = chatService.currentConversationId;
     if (conversationId == null ||
         chatService.getConversation(conversationId) == null) {
-      _schedulePortalState(false);
       return widget.fallback;
     }
 
@@ -148,40 +108,23 @@ class _StoryConversationModeTitleState
         final session =
             snapshot.data ??
             StoryRuntimeSessionState(conversationId: conversationId);
-        _schedulePortalState(true);
         final controlWidth = _modeSelectorWidth(context);
-        final media = MediaQuery.of(context);
-        final defaultCenterY = media.padding.top + (kToolbarHeight / 2);
-        final centerY = _toolbarCenterY ?? defaultCenterY;
-        final left = ((media.size.width - controlWidth) / 2)
-            .clamp(0.0, double.infinity)
-            .toDouble();
-        final top = (centerY - 18).clamp(0.0, double.infinity).toDouble();
-
-        return OverlayPortal(
-          controller: _portalController,
-          overlayChildBuilder: (overlayContext) => Positioned(
-            left: left,
-            top: top,
-            width: controlWidth,
-            height: 36,
-            child: _ModeSelector(
-              storySelected: session.enabled,
-              busy:
-                  _busy || snapshot.connectionState == ConnectionState.waiting,
-              onSelectChat: () => _selectMode(conversationId, session, false),
-              onSelectStory: () => _selectMode(conversationId, session, true),
-            ),
+        return StoryConversationModeCenteredSlot(
+          controlWidth: controlWidth,
+          child: _ModeSelector(
+            storySelected: session.enabled,
+            busy: _busy || snapshot.connectionState == ConnectionState.waiting,
+            onSelectChat: () => _selectMode(conversationId, session, false),
+            onSelectStory: () => _selectMode(conversationId, session, true),
           ),
-          child: SizedBox(key: _anchorKey, width: 1, height: 36),
         );
       },
     );
   }
 }
 
-/// Compatibility shim for Home layouts that previously exposed a separate
-/// conversion action. The persistent centered switch now owns mode conversion.
+/// Mobile conversion now lives in the composer `+` menu. The Home layouts keep
+/// this compatibility slot so older call sites do not need a parallel action.
 class StoryConversationModeAction extends StatelessWidget {
   const StoryConversationModeAction({super.key});
 
@@ -189,10 +132,9 @@ class StoryConversationModeAction extends StatelessWidget {
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-/// Kept for focused layout tests and callers that already use this public
-/// helper. It centers [child] against the physical screen while keeping the
-/// child inside the title slot's real layout bounds, so paint and hit testing
-/// share the same coordinates even when AppBar leading/actions are asymmetric.
+/// Centers [child] against the physical screen while keeping the child inside
+/// the AppBar title slot's real layout bounds. Paint and hit testing therefore
+/// share the same coordinates and the control participates in drawer motion.
 class StoryConversationModeCenteredSlot extends StatefulWidget {
   const StoryConversationModeCenteredSlot({
     super.key,
