@@ -15,9 +15,10 @@ final ValueNotifier<int> storyConversationModeRevision = ValueNotifier<int>(0);
 
 /// Persistent Chat / Story mode switch for the active conversation.
 ///
-/// The control stays visible after a conversation starts. Its visual position
-/// is corrected after layout so its center tracks the physical screen center,
-/// independent of AppBar leading/actions width.
+/// The control stays visible after a conversation starts. The active selector
+/// expands its title slot to the full width the AppBar actually gives it, then
+/// places the selector at the physical screen center inside those real layout
+/// bounds. This keeps painting and hit testing in the same coordinate space.
 class StoryConversationModeTitle extends StatefulWidget {
   const StoryConversationModeTitle({super.key, required this.fallback});
 
@@ -87,7 +88,9 @@ class _StoryConversationModeTitleState
         final session =
             snapshot.data ??
             StoryRuntimeSessionState(conversationId: conversationId);
-        return _ScreenCenteredModeSwitch(
+        final controlWidth = _modeSelectorWidth(context);
+        return StoryConversationModeCenteredSlot(
+          controlWidth: controlWidth,
           child: _ModeSelector(
             storySelected: session.enabled,
             busy: _busy || snapshot.connectionState == ConnectionState.waiting,
@@ -109,20 +112,41 @@ class StoryConversationModeAction extends StatelessWidget {
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-class _ScreenCenteredModeSwitch extends StatefulWidget {
-  const _ScreenCenteredModeSwitch({required this.child});
+/// Gives the centered Story mode control real layout space instead of moving a
+/// narrow title with a paint-only transform.
+///
+/// Keeping the control inside this widget's actual bounds is important because
+/// ancestors reject pointer events outside a RenderBox before transformed
+/// descendants get a chance to hit-test. This widget is public so the AppBar
+/// hit-test regression can be covered by a focused widget test.
+class StoryConversationModeCenteredSlot extends StatefulWidget {
+  const StoryConversationModeCenteredSlot({
+    super.key,
+    required this.controlWidth,
+    required this.child,
+  });
 
+  final double controlWidth;
   final Widget child;
 
   @override
-  State<_ScreenCenteredModeSwitch> createState() =>
-      _ScreenCenteredModeSwitchState();
+  State<StoryConversationModeCenteredSlot> createState() =>
+      _StoryConversationModeCenteredSlotState();
 }
 
-class _ScreenCenteredModeSwitchState extends State<_ScreenCenteredModeSwitch> {
-  final GlobalKey _measureKey = GlobalKey();
-  double _paintOffsetX = 0;
+class _StoryConversationModeCenteredSlotState
+    extends State<StoryConversationModeCenteredSlot> {
+  final GlobalKey _slotKey = GlobalKey();
+  double? _localLeft;
   bool _measureScheduled = false;
+
+  @override
+  void didUpdateWidget(covariant StoryConversationModeCenteredSlot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controlWidth != widget.controlWidth) {
+      _localLeft = null;
+    }
+  }
 
   void _scheduleMeasure() {
     if (_measureScheduled) return;
@@ -130,32 +154,73 @@ class _ScreenCenteredModeSwitchState extends State<_ScreenCenteredModeSwitch> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _measureScheduled = false;
       if (!mounted) return;
-      final renderObject = _measureKey.currentContext?.findRenderObject();
+      final renderObject = _slotKey.currentContext?.findRenderObject();
       if (renderObject is! RenderBox || !renderObject.hasSize) return;
 
       final screenWidth = MediaQuery.sizeOf(context).width;
-      final actualLeft = renderObject.localToGlobal(Offset.zero).dx;
-      final desiredLeft = (screenWidth - renderObject.size.width) / 2;
-      final correction = desiredLeft - actualLeft;
-      if (correction.abs() < 0.5) return;
-
-      final nextOffset = (_paintOffsetX + correction)
-          .clamp(-screenWidth, screenWidth)
+      final slotLeft = renderObject.localToGlobal(Offset.zero).dx;
+      final desiredGlobalLeft = (screenWidth - widget.controlWidth) / 2;
+      final maxLeft = (renderObject.size.width - widget.controlWidth)
+          .clamp(0.0, double.infinity)
           .toDouble();
-      if ((nextOffset - _paintOffsetX).abs() < 0.5) return;
-      setState(() => _paintOffsetX = nextOffset);
+      final nextLeft = (desiredGlobalLeft - slotLeft)
+          .clamp(0.0, maxLeft)
+          .toDouble();
+      final currentLeft = _localLeft;
+      if (currentLeft != null && (nextLeft - currentLeft).abs() < 0.5) {
+        return;
+      }
+      setState(() => _localLeft = nextLeft);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    _scheduleMeasure();
-    return Transform.translate(
-      offset: Offset(_paintOffsetX, 0),
-      child: KeyedSubtree(key: _measureKey, child: widget.child),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.hasBoundedWidth) {
+          return SizedBox(
+            width: widget.controlWidth,
+            height: 36,
+            child: widget.child,
+          );
+        }
+
+        final maxLeft = (constraints.maxWidth - widget.controlWidth)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+        final fallbackLeft = ((constraints.maxWidth - widget.controlWidth) / 2)
+            .clamp(0.0, maxLeft)
+            .toDouble();
+        final left = (_localLeft ?? fallbackLeft)
+            .clamp(0.0, maxLeft)
+            .toDouble();
+        _scheduleMeasure();
+
+        return SizedBox(
+          key: _slotKey,
+          width: double.infinity,
+          height: 36,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: left,
+                top: 0,
+                width: widget.controlWidth,
+                height: 36,
+                child: widget.child,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
+
+double _modeSelectorWidth(BuildContext context) =>
+    MediaQuery.sizeOf(context).width < 360 ? 112.0 : 124.0;
 
 class _ModeSelector extends StatelessWidget {
   const _ModeSelector({
@@ -175,8 +240,7 @@ class _ModeSelector extends StatelessWidget {
     final zh = Localizations.localeOf(context).languageCode == 'zh';
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final compact = MediaQuery.sizeOf(context).width < 360;
-    final width = compact ? 112.0 : 124.0;
+    final width = _modeSelectorWidth(context);
     const height = 36.0;
 
     return Semantics(
