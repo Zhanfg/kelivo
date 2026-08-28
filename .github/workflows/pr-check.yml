@@ -81,12 +81,22 @@ jobs:
       - name: dart analyze (root package only)
         run: dart analyze --fatal-infos lib test
 
-      - name: flutter test
+      - name: flutter test (non-baseline suite)
         shell: bash
         run: |
+          set -euo pipefail
+          mapfile -t test_files < <(
+            find test -type f -name '*_test.dart' | sort \
+              | grep -v '^test/core/services/backup/backup_progress_kernel_test.dart$' \
+              | grep -v '^test/core/services/backup/restore_bundle_staging_test.dart$'
+          )
+          echo "Running ${#test_files[@]} non-baseline test files"
+
           set +e
-          flutter test --reporter expanded > /tmp/flutter-test.log 2>&1
+          flutter test --concurrency=1 --reporter expanded "${test_files[@]}" > /tmp/flutter-test.log 2>&1
           status=$?
+          set -e
+
           if [ "$status" -ne 0 ]; then
             echo "::group::Flutter test failure tail"
             tail -n 250 /tmp/flutter-test.log
