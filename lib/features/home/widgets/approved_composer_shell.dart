@@ -8,15 +8,14 @@ import '../../../core/providers/asr_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/asr/asr_service_options.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../../icons/reasoning_icons.dart';
 import 'chat_input_bar.dart';
 
-/// Interaction shell for the approved Kelivo composer design.
+/// Presentation layer for the approved Kelivo composer interaction model.
 ///
-/// The existing [ChatInputBar] remains the source of truth for attachments,
-/// paste/import handling and desktop keyboard behavior. This layer owns the
-/// compact four-action surface and the voice presentation so the UX can evolve
-/// without duplicating those mature data paths.
+/// [ChatInputBar] remains the source of truth for attachments, paste/import,
+/// submission recovery and desktop keyboard behavior. This shell owns only the
+/// compact four-action surface, six-line fullscreen affordance and the voice
+/// recording/transcript presentation.
 class ApprovedComposerShell extends StatefulWidget {
   const ApprovedComposerShell({
     super.key,
@@ -59,7 +58,6 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
   bool _voiceFinishing = false;
   String _voiceBaseText = '';
   String? _voiceReadyText;
-  Offset? _voiceGestureOrigin;
   late final TextEditingController _voiceEditor;
 
   @override
@@ -87,6 +85,9 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
   void dispose() {
     widget.inputController.removeListener(_handleDraftChanged);
     widget.asrProvider.removeListener(_handleAsrChanged);
+    if (_voiceOwned) {
+      unawaited(widget.asrProvider.cancel());
+    }
     _voiceEditor.dispose();
     super.dispose();
   }
@@ -111,9 +112,15 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
 
   bool get _selectedAsrStreams {
     final selected = context.read<SettingsProvider>().selectedAsrService;
-    // Sherpa local recognition produces its result after capture. System and
-    // cloud recognizers publish partial transcripts while recording.
+    // Sherpa local ASR returns a complete transcript after capture. System and
+    // cloud services already publish partial transcripts through AsrProvider.
     return selected is! SherpaOnnxAsrOptions;
+  }
+
+  int get _lineCount {
+    final value = widget.inputController.text;
+    if (value.isEmpty) return 1;
+    return '\n'.allMatches(value).length + 1;
   }
 
   Future<void> _startVoice({bool locked = false}) async {
@@ -121,20 +128,23 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
     final settings = context.read<SettingsProvider>();
     final selected = settings.selectedAsrService;
     if (selected == null || !widget.asrProvider.canUse(selected)) return;
+
     _voiceBaseText = widget.inputController.text.trimRight();
-    _voiceOwned = true;
-    _voiceLocked = locked;
-    _voiceSettingsExpanded = false;
-    _voiceEditing = false;
-    _voiceReadyText = null;
-    _voiceEditor.clear();
-    setState(() {});
+    setState(() {
+      _voiceOwned = true;
+      _voiceLocked = locked;
+      _voiceSettingsExpanded = false;
+      _voiceEditing = false;
+      _voiceFinishing = false;
+      _voiceReadyText = null;
+      _voiceEditor.clear();
+    });
+
     try {
       await widget.asrProvider.start(selected);
     } catch (_) {
       if (!mounted) return;
-      _voiceOwned = false;
-      setState(() {});
+      setState(() => _voiceOwned = false);
     }
   }
 
@@ -146,6 +156,7 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
       _voiceLocked = false;
       _voiceEditing = false;
       _voiceSettingsExpanded = false;
+      _voiceFinishing = false;
       _voiceReadyText = null;
       _voiceEditor.clear();
     });
@@ -164,7 +175,10 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
         _voiceLocked = false;
         _voiceFinishing = false;
         _voiceReadyText = transcript;
-        _voiceEditor.text = transcript;
+        _voiceEditor.value = TextEditingValue(
+          text: transcript,
+          selection: TextSelection.collapsed(offset: transcript.length),
+        );
       });
     } catch (_) {
       if (mounted) setState(() => _voiceFinishing = false);
@@ -189,7 +203,9 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
   }
 
   Future<void> _sendDraft() async {
-    final draft = widget.mediaController.snapshotInput(widget.inputController.text);
+    final draft = widget.mediaController.snapshotInput(
+      widget.inputController.text,
+    );
     if (draft.text.isEmpty && !widget.mediaController.hasDraftMedia) return;
     final result = await widget.onSend?.call(draft);
     if (!mounted) return;
@@ -200,14 +216,8 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
     }
   }
 
-  int get _lineCount {
-    final value = widget.inputController.text;
-    if (value.isEmpty) return 1;
-    return '\n'.allMatches(value).length + 1;
-  }
-
   Future<void> _openFullscreenEditor() async {
-    final edit = TextEditingController(text: widget.inputController.text);
+    final editor = TextEditingController(text: widget.inputController.text);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -216,49 +226,88 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 10,
-            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + 12,
-          ),
-          child: SizedBox(
-            height: MediaQuery.sizeOf(sheetContext).height * .72,
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text('编辑消息', style: TextStyle(fontWeight: FontWeight.w600)),
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 10,
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + 12,
+        ),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .72,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      '编辑消息',
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    IconButton(
-                      icon: const Icon(Lucide.FoldVertical),
-                      onPressed: () => Navigator.of(sheetContext).pop(),
-                    ),
-                  ],
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: edit,
-                    autofocus: true,
-                    expands: true,
-                    maxLines: null,
-                    minLines: null,
-                    textAlignVertical: TextAlignVertical.top,
-                    decoration: const InputDecoration(border: InputBorder.none),
                   ),
+                  IconButton(
+                    icon: const Icon(Lucide.FoldVertical),
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: TextField(
+                  controller: editor,
+                  autofocus: true,
+                  expands: true,
+                  minLines: null,
+                  maxLines: null,
+                  textAlignVertical: TextAlignVertical.top,
+                  decoration: const InputDecoration(border: InputBorder.none),
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (mounted) widget.inputController.value = editor.value;
+    editor.dispose();
+  }
+
+  Future<void> _openVoiceFullscreenEditor() async {
+    setState(() => _voiceEditing = true);
+    final focusNode = FocusNode();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 12,
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + 12,
+        ),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .72,
+          child: TextField(
+            controller: _voiceEditor,
+            focusNode: focusNode,
+            autofocus: true,
+            expands: true,
+            minLines: null,
+            maxLines: null,
+            textAlignVertical: TextAlignVertical.top,
+            decoration: const InputDecoration(
+              hintText: '编辑语音转写',
+              border: InputBorder.none,
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
-    if (!mounted) return;
-    widget.inputController.value = edit.value;
-    edit.dispose();
+    focusNode.dispose();
   }
 
   Widget _actionButton({
@@ -268,25 +317,9 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
     bool primary = false,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final child = Icon(icon, size: 20);
-    if (onLongPress != null) {
-      return GestureDetector(
-        onLongPress: onLongPress,
-        child: IconButton.filledTonal(
-          onPressed: onPressed,
-          icon: child,
-          style: IconButton.styleFrom(
-            minimumSize: const Size(40, 40),
-            maximumSize: const Size(40, 40),
-            backgroundColor: primary ? cs.primary : Colors.transparent,
-            foregroundColor: primary ? cs.onPrimary : cs.onSurface,
-          ),
-        ),
-      );
-    }
-    return IconButton(
+    final button = IconButton(
       onPressed: onPressed,
-      icon: child,
+      icon: Icon(icon, size: 20),
       style: IconButton.styleFrom(
         minimumSize: const Size(40, 40),
         maximumSize: const Size(40, 40),
@@ -294,13 +327,16 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
         foregroundColor: primary ? cs.onPrimary : cs.onSurface,
       ),
     );
+    if (onLongPress == null) return button;
+    return GestureDetector(onLongPress: onLongPress, child: button);
   }
 
   Widget _buildCompactActions() {
     final hasDraft = widget.inputController.text.trim().isNotEmpty ||
         widget.mediaController.hasDraftMedia;
+    final theme = Theme.of(context);
     return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      color: theme.colorScheme.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(999),
       child: SizedBox(
         height: 44,
@@ -308,31 +344,45 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
           children: [
             _actionButton(icon: Lucide.Plus, onPressed: widget.onMore),
             const Spacer(),
-            _actionButton(
-              icon: Lucide.Brain,
-              onPressed: widget.supportsReasoning
-                  ? widget.onConfigureReasoning
-                  : widget.onSelectModel,
-              onLongPress: widget.onSelectModel,
+            Tooltip(
+              message: widget.reasoningBudget == -1
+                  ? '模型与思考 · 自动'
+                  : '模型与思考',
+              child: _actionButton(
+                icon: Lucide.Brain,
+                onPressed: widget.supportsReasoning
+                    ? widget.onConfigureReasoning
+                    : widget.onSelectModel,
+                onLongPress: widget.onSelectModel,
+              ),
             ),
             GestureDetector(
               onLongPressStart: (_) => unawaited(_startVoice()),
               onLongPressMoveUpdate: (details) {
                 if (!_voiceOwned) return;
                 final delta = details.localOffsetFromOrigin;
-                if (delta.dy < -44) {
+                if (delta.dy < -44 && !_voiceLocked) {
                   setState(() => _voiceLocked = true);
                 } else if (delta.dx < -56) {
                   unawaited(_cancelVoice());
                 }
               },
               onLongPressEnd: (_) {
-                if (_voiceOwned && !_voiceLocked) unawaited(_finishVoice());
+                if (_voiceOwned && !_voiceLocked) {
+                  unawaited(_finishVoice());
+                }
               },
-              child: _actionButton(icon: Lucide.Mic, onPressed: () => unawaited(_startVoice())),
+              child: _actionButton(
+                icon: Lucide.Mic,
+                onPressed: () => unawaited(_startVoice()),
+              ),
             ),
             if (widget.loading)
-              _actionButton(icon: Lucide.Square, onPressed: widget.onStop, primary: true)
+              _actionButton(
+                icon: Lucide.Square,
+                onPressed: widget.onStop,
+                primary: true,
+              )
             else
               _actionButton(
                 icon: Lucide.ArrowUp,
@@ -347,13 +397,16 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
 
   Widget _buildVoiceSurface() {
     final cs = Theme.of(context).colorScheme;
-    final live = _voiceOwned ? widget.asrProvider.transcript : (_voiceReadyText ?? '');
+    final live = _voiceOwned
+        ? widget.asrProvider.transcript
+        : (_voiceReadyText ?? '');
     if (!_voiceEditing && live.isNotEmpty && _voiceEditor.text != live) {
       _voiceEditor.value = TextEditingValue(
         text: live,
         selection: TextSelection.collapsed(offset: live.length),
       );
     }
+
     return Material(
       color: cs.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(28),
@@ -391,27 +444,36 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
               ),
               child: Row(
                 children: [
-                  _actionButton(icon: Lucide.X, onPressed: () => unawaited(_cancelVoice())),
+                  _actionButton(
+                    icon: Lucide.X,
+                    onPressed: () => unawaited(_cancelVoice()),
+                  ),
                   _actionButton(
                     icon: Lucide.Settings,
-                    onPressed: () => setState(() => _voiceSettingsExpanded = !_voiceSettingsExpanded),
+                    onPressed: () => setState(
+                      () => _voiceSettingsExpanded = !_voiceSettingsExpanded,
+                    ),
                   ),
                   Expanded(
-                    child: _voiceLocked
-                        ? const Center(child: Text('已锁定', style: TextStyle(fontSize: 11)))
-                        : Center(
-                            child: Text(
-                              _voiceOwned
-                                  ? (_selectedAsrStreams ? '流式录音中' : '录音中 · 非流式')
-                                  : '转写完成 · 待发送',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                          ),
+                    child: Center(
+                      child: Text(
+                        _voiceLocked
+                            ? '已锁定'
+                            : _voiceOwned
+                                ? (_selectedAsrStreams
+                                    ? '流式录音中'
+                                    : '录音中 · 非流式')
+                                : '转写完成 · 待发送',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    ),
                   ),
                   if (_voiceOwned)
                     _actionButton(
                       icon: Lucide.Square,
-                      onPressed: _voiceFinishing ? null : () => unawaited(_finishVoice()),
+                      onPressed: _voiceFinishing
+                          ? null
+                          : () => unawaited(_finishVoice()),
                       primary: true,
                     )
                   else
@@ -450,50 +512,17 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
     );
   }
 
-  Widget _settingsRow(String label, String value) => SizedBox(
-        height: 34,
-        child: Row(
-          children: [
-            Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
-            Text(value, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ],
-        ),
-      );
-
-  Future<void> _openVoiceFullscreenEditor() async {
-    setState(() => _voiceEditing = true);
-    final focus = FocusNode();
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 12,
-          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + 12,
-        ),
-        child: SizedBox(
-          height: MediaQuery.sizeOf(sheetContext).height * .72,
-          child: TextField(
-            controller: _voiceEditor,
-            focusNode: focus,
-            autofocus: true,
-            expands: true,
-            maxLines: null,
-            minLines: null,
-            textAlignVertical: TextAlignVertical.top,
-            decoration: const InputDecoration(
-              hintText: '编辑语音转写',
-              border: InputBorder.none,
-            ),
-          ),
-        ),
+  Widget _settingsRow(String label, String value) {
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
+    return SizedBox(
+      height: 34,
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
+          Text(value, style: TextStyle(fontSize: 11, color: color)),
+        ],
       ),
     );
-    focus.dispose();
   }
 
   @override
@@ -506,7 +535,9 @@ class _ApprovedComposerShellState extends State<ApprovedComposerShell> {
           left: 12,
           right: 12,
           bottom: 4,
-          child: _voiceActive ? _buildVoiceSurface() : _buildCompactActions(),
+          child: _voiceActive
+              ? _buildVoiceSurface()
+              : _buildCompactActions(),
         ),
         if (!_voiceActive && _lineCount >= 6)
           Positioned(
