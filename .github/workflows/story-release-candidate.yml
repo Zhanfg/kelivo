@@ -1,4 +1,4 @@
-# Build trigger: 2026-08-28T10:01Z
+# Build trigger: 2026-08-28T10:10Z
 name: Story Test Build
 
 on:
@@ -29,9 +29,6 @@ jobs:
         with:
           ref: feat/story-runtime-foundation
           fetch-depth: 0
-
-      - name: Finalize Story native integration
-        run: python3 .github/scripts/story_finalize_patch.py
 
       - name: Setup Java
         uses: actions/setup-java@v4
