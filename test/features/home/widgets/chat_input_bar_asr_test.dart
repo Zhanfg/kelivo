@@ -65,6 +65,49 @@ void main() {
     expect(find.byTooltip('Voice input'), findsNothing);
   });
 
+  testWidgets(
+    'long-press mic opens inline service switcher and selection collapses it',
+    (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+      final first = SystemAsrOptions(id: 'system-a', name: 'System A');
+      final second = SystemAsrOptions(id: 'system-b', name: 'System B');
+      await settings.setAsrServices(<AsrServiceOptions>[first, second]);
+      await settings.setSelectedAsrServiceId(first.id);
+      final backend = _FakeSystemBackend();
+      final asr = AsrProvider(
+        systemService: SystemAsrService(backend: backend),
+      );
+      final controller = TextEditingController();
+      addTearDown(asr.dispose);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        harness(settings: settings, asr: asr, controller: controller),
+      );
+      await tester.longPress(find.byTooltip('Voice input'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('voice-settings-inline')),
+        findsOneWidget,
+      );
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.text('System A'), findsOneWidget);
+      expect(find.text('System B'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('voice-service-chip:system-b')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(settings.selectedAsrServiceId, second.id);
+      expect(find.byKey(const ValueKey('voice-settings-inline')), findsNothing);
+      expect(find.byTooltip('Voice input'), findsOneWidget);
+    },
+  );
+
   testWidgets('system ASR replaces partials from a stable draft base', (
     tester,
   ) async {

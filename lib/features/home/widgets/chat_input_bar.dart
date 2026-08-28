@@ -20,6 +20,7 @@ import 'dart:io';
 import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../core/providers/asr_provider.dart';
+import '../../../core/services/asr/asr_service_options.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
@@ -36,6 +37,7 @@ import '../../../desktop/desktop_context_menu.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../composer/composer_fullscreen_editor.dart';
 import '../composer/composer_reasoning_popover.dart';
+import '../../settings/pages/tts_services_page.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -223,6 +225,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   TextEditingValue? _voiceBaseValue;
   String _voiceLastObservedTranscript = '';
   bool _voiceTranscriptEditing = false;
+  bool _voiceSettingsExpanded = false;
   bool _ownsVoiceSession = false;
   bool _finishingVoice = false;
   String? _lastReportedVoiceError;
@@ -766,6 +769,42 @@ class _ChatInputBarState extends State<ChatInputBar>
   // Voice input
   // ---------------------------------------------------------------------------
 
+  void _toggleInlineVoiceSettings() {
+    final settings = context.read<SettingsProvider>();
+    if (_composerLocked ||
+        widget.loading ||
+        _ownsVoiceSession ||
+        _finishingVoice ||
+        settings.asrServices.isEmpty) {
+      return;
+    }
+    setState(() => _voiceSettingsExpanded = !_voiceSettingsExpanded);
+  }
+
+  Future<void> _selectInlineVoiceService(AsrServiceOptions service) async {
+    if (_composerLocked ||
+        widget.loading ||
+        _ownsVoiceSession ||
+        _finishingVoice) {
+      return;
+    }
+    final settings = context.read<SettingsProvider>();
+    await settings.setSelectedAsrServiceId(service.id);
+    if (service is SherpaOnnxAsrOptions) {
+      await widget.asrProvider?.refreshAvailability(service);
+    }
+    if (!mounted) return;
+    setState(() => _voiceSettingsExpanded = false);
+  }
+
+  Future<void> _openVoiceServicesSettings() async {
+    if (_ownsVoiceSession || _finishingVoice) return;
+    setState(() => _voiceSettingsExpanded = false);
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const TtsServicesPage()));
+  }
+
   Future<void> _startVoiceInput() async {
     final asr = widget.asrProvider;
     final selected = context.read<SettingsProvider>().selectedAsrService;
@@ -782,6 +821,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     _voiceBaseValue = _controller.value;
     _voiceLastObservedTranscript = '';
     _voiceTranscriptEditing = false;
+    _voiceSettingsExpanded = false;
     _ownsVoiceSession = true;
     _finishingVoice = false;
     _lastReportedVoiceError = null;
@@ -2704,6 +2744,81 @@ class _ChatInputBarState extends State<ChatInputBar>
     );
   }
 
+  Widget _buildInlineVoiceSettings(
+    BuildContext context,
+    SettingsProvider settings,
+  ) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final selectedId = settings.selectedAsrServiceId;
+    final services = settings.asrServices;
+
+    return Padding(
+      key: const ValueKey('voice-settings-inline'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        0,
+        AppSpacing.sm,
+        AppSpacing.xs,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHigh.withValues(alpha: 0.74),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.32)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+          child: Row(
+            children: [
+              Icon(
+                Lucide.Mic,
+                size: 16,
+                color: cs.onSurface.withValues(alpha: 0.64),
+              ),
+              const SizedBox(width: 7),
+              Flexible(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (var index = 0; index < services.length; index++) ...[
+                        _InlineVoiceServiceChip(
+                          key: ValueKey(
+                            'voice-service-chip:${services[index].id}',
+                          ),
+                          label: services[index].name,
+                          selected: selectedId == services[index].id,
+                          onTap: () => unawaited(
+                            _selectInlineVoiceService(services[index]),
+                          ),
+                        ),
+                        if (index != services.length - 1)
+                          const SizedBox(width: 6),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              _CompactIconButton(
+                tooltip: l10n.ttsServicesPageTitle,
+                icon: Lucide.Settings2,
+                onTap: () => unawaited(_openVoiceServicesSettings()),
+              ),
+              _CompactIconButton(
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                icon: Lucide.X,
+                onTap: () => setState(() => _voiceSettingsExpanded = false),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -2999,6 +3114,19 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 ),
                             ],
                           ),
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOutCubic,
+                            alignment: Alignment.topCenter,
+                            child:
+                                _voiceSettingsExpanded &&
+                                    !_ownsVoiceSession &&
+                                    settings.asrServices.isNotEmpty
+                                ? _buildInlineVoiceSettings(context, settings)
+                                : const SizedBox.shrink(
+                                    key: ValueKey('voice-settings-collapsed'),
+                                  ),
+                          ),
                           // Bottom buttons row (no divider)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(
@@ -3170,6 +3298,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                   context,
                                                 )!.chatInputBarVoiceInputTooltip,
                                                 icon: Lucide.Mic,
+                                                active: _voiceSettingsExpanded,
                                                 onTap:
                                                     _composerLocked ||
                                                         widget.loading
@@ -3177,6 +3306,13 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     : () => unawaited(
                                                         _startVoiceInput(),
                                                       ),
+                                                onLongPress:
+                                                    _composerLocked ||
+                                                        widget.loading
+                                                    ? null
+                                                    : _toggleInlineVoiceSettings,
+                                                allowLongPressOnDesktop:
+                                                    isMobileLayout,
                                               ),
                                               const SizedBox(width: 8),
                                             ],
@@ -3441,6 +3577,7 @@ class _CompactIconButton extends StatelessWidget {
     required this.icon,
     this.onTap,
     this.onLongPress,
+    this.allowLongPressOnDesktop = false,
     this.tooltip,
     this.active = false,
     this.child,
@@ -3451,6 +3588,7 @@ class _CompactIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final bool allowLongPressOnDesktop;
   final String? tooltip;
   final bool active;
   final Widget? child;
@@ -3482,8 +3620,10 @@ class _CompactIconButton extends StatelessWidget {
       size: isModelChild ? childSize : 20,
       padding: EdgeInsets.all(padding),
       onTap: onTap,
-      // Disable long press on desktop platforms
-      onLongPress: isDesktop ? null : onLongPress,
+      // Model/reasoning long-press stays disabled on desktop, while
+      // controls that explicitly opt in can use long-press in a mobile-width
+      // Composer even when widget tests run on a desktop host.
+      onLongPress: isDesktop && !allowLongPressOnDesktop ? null : onLongPress,
       color: fgColor,
       builder: childBuilder != null
           ? (c) => SizedBox(
@@ -3509,6 +3649,64 @@ class _CompactIconButton extends StatelessWidget {
       message: tooltip!,
       waitDuration: const Duration(milliseconds: 350),
       child: Semantics(tooltip: tooltip!, child: button),
+    );
+  }
+}
+
+class _InlineVoiceServiceChip extends StatelessWidget {
+  const _InlineVoiceServiceChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final background = selected
+        ? cs.secondaryContainer
+        : cs.surfaceContainerHighest.withValues(alpha: 0.54);
+    final foreground = selected ? cs.onSecondaryContainer : cs.onSurface;
+
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                Icon(Lucide.Check, size: 14, color: foreground),
+                const SizedBox(width: 4),
+              ],
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 132),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 12,
+                    fontWeight: selected
+                        ? AppFontWeights.semibold
+                        : AppFontWeights.medium,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
