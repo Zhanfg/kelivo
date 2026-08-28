@@ -10,8 +10,8 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
-import '../../story_runtime/ui/story_mode_chat_chip.dart';
 import '../utils/model_display_helper.dart';
+import 'approved_composer_shell.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
 
@@ -126,98 +126,101 @@ class ChatInputSection extends StatelessWidget {
     final isDesktop = _isDesktopPlatform(context);
     final hasWorldBooks =
         isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
+    final reasoningBudget =
+        context.watch<AssistantProvider>().currentAssistant?.thinkingBudget ??
+        settings.thinkingBudget;
+    final supportsReasoning =
+        (pk != null && mid != null) ? isReasoningModel(pk, mid) : false;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        StoryModeChatChip(conversationId: conversationId),
-        ChatInputBar(
-          key: inputBarKey,
-          onMore: onMore,
-          onSelectModel: onSelectModel,
-          onLongPressSelectModel: onLongPressSelectModel,
-          conversationId: conversationId,
-          onOpenMcp: onOpenMcp,
-          onLongPressMcp: onLongPressMcp,
-          onStop: onStop,
-          modelIcon: (pk != null && mid != null)
-              ? CurrentModelIcon(
-                  providerKey: pk,
-                  modelId: mid,
-                  size: 40,
-                  withBackground: true,
-                  backgroundColor: Colors.transparent,
-                )
-              : null,
-          focusNode: inputFocus,
-          controller: inputController,
-          mediaController: mediaController,
-          asrProvider: asr,
-          onConfigureReasoning: onConfigureReasoning,
-          reasoningActive: isReasoningEnabled(
-            (context
-                    .watch<AssistantProvider>()
-                    .currentAssistant
-                    ?.thinkingBudget) ??
-                settings.thinkingBudget,
-          ),
-          reasoningBudget:
-              (context
-                  .watch<AssistantProvider>()
-                  .currentAssistant
-                  ?.thinkingBudget) ??
-              settings.thinkingBudget,
-          supportsReasoning: (pk != null && mid != null)
-              ? isReasoningModel(pk, mid)
-              : false,
-          onOpenSearch: onOpenSearch,
-          onSend: onSend,
-          loading: isLoading,
-          sendButtonTooltip: sendButtonTooltip,
-          hasQueuedInput: hasQueuedInput,
-          queuedPreviewText: queuedPreviewText,
-          onCancelQueuedInput: onCancelQueuedInput,
-          showMcpButton: _shouldShowMcpButton(context, settings, a, pk, mid),
-          mcpActive: _isMcpActive(context, a),
-          showQuickPhraseButton: _hasQuickPhrases(context, a),
-          onQuickPhrase: onQuickPhrase,
-          onLongPressQuickPhrase: onLongPressQuickPhrase,
-          showOcrButton: isTablet
-              ? (settings.ocrModelProvider != null &&
-                    settings.ocrModelId != null)
-              : (isDesktop &&
-                    settings.ocrModelProvider != null &&
-                    settings.ocrModelId != null),
-          ocrActive: settings.ocrEnabled,
-          onToggleOcr: onToggleOcr,
-          showMiniMapButton: isTablet,
-          onOpenMiniMap: isTablet ? onOpenMiniMap : null,
-          onPickCamera: isTablet ? (isDesktop ? null : onPickCamera) : null,
-          onPickPhotos: isTablet ? (isDesktop ? null : onPickPhotos) : null,
-          onUploadFiles: isTablet ? onUploadFiles : null,
-          onToggleLearningMode: isTablet ? onToggleLearningMode : null,
-          onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
-          onLongPressLearning: isTablet ? onLongPressLearning : null,
-          learningModeActive: isTablet
-              ? context
-                    .watch<InstructionInjectionProvider>()
-                    .activeIdsFor(assistantId)
-                    .isNotEmpty
-              : false,
-          worldBookActive: isTablet
-              ? context
-                    .watch<WorldBookProvider>()
-                    .activeBookIdsFor(assistantId)
-                    .isNotEmpty
-              : false,
-          showMoreButton: !isTablet,
-          onClearContext: isTablet ? onClearContext : null,
-          onCompressContext: isTablet ? onCompressContext : null,
-          backgroundImageActive: backgroundImageActive,
-          inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
-          inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
-        ),
-      ],
+    final nativeBar = ChatInputBar(
+      key: inputBarKey,
+      onMore: onMore,
+      onSelectModel: onSelectModel,
+      onLongPressSelectModel: onLongPressSelectModel,
+      conversationId: conversationId,
+      onOpenMcp: onOpenMcp,
+      onLongPressMcp: onLongPressMcp,
+      onStop: onStop,
+      modelIcon: (pk != null && mid != null)
+          ? CurrentModelIcon(
+              providerKey: pk,
+              modelId: mid,
+              size: 40,
+              withBackground: true,
+              backgroundColor: Colors.transparent,
+            )
+          : null,
+      focusNode: inputFocus,
+      controller: inputController,
+      mediaController: mediaController,
+      asrProvider: asr,
+      onConfigureReasoning: onConfigureReasoning,
+      reasoningActive: isReasoningEnabled(reasoningBudget),
+      reasoningBudget: reasoningBudget,
+      supportsReasoning: supportsReasoning,
+      onOpenSearch: onOpenSearch,
+      onSend: onSend,
+      loading: isLoading,
+      sendButtonTooltip: sendButtonTooltip,
+      hasQueuedInput: hasQueuedInput,
+      queuedPreviewText: queuedPreviewText,
+      onCancelQueuedInput: onCancelQueuedInput,
+      showMcpButton: _shouldShowMcpButton(context, settings, a, pk, mid),
+      mcpActive: _isMcpActive(context, a),
+      showQuickPhraseButton: _hasQuickPhrases(context, a),
+      onQuickPhrase: onQuickPhrase,
+      onLongPressQuickPhrase: onLongPressQuickPhrase,
+      showOcrButton: isTablet
+          ? (settings.ocrModelProvider != null && settings.ocrModelId != null)
+          : (isDesktop &&
+              settings.ocrModelProvider != null &&
+              settings.ocrModelId != null),
+      ocrActive: settings.ocrEnabled,
+      onToggleOcr: onToggleOcr,
+      showMiniMapButton: isTablet,
+      onOpenMiniMap: isTablet ? onOpenMiniMap : null,
+      onPickCamera: isTablet ? (isDesktop ? null : onPickCamera) : null,
+      onPickPhotos: isTablet ? (isDesktop ? null : onPickPhotos) : null,
+      onUploadFiles: isTablet ? onUploadFiles : null,
+      onToggleLearningMode: isTablet ? onToggleLearningMode : null,
+      onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
+      onLongPressLearning: isTablet ? onLongPressLearning : null,
+      learningModeActive: isTablet
+          ? context
+              .watch<InstructionInjectionProvider>()
+              .activeIdsFor(assistantId)
+              .isNotEmpty
+          : false,
+      worldBookActive: isTablet
+          ? context
+              .watch<WorldBookProvider>()
+              .activeBookIdsFor(assistantId)
+              .isNotEmpty
+          : false,
+      showMoreButton: !isTablet,
+      onClearContext: isTablet ? onClearContext : null,
+      onCompressContext: isTablet ? onCompressContext : null,
+      backgroundImageActive: backgroundImageActive,
+      inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
+      inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
+    );
+
+    // Story and Chat keep the same composer muscle memory. Story-specific
+    // resources remain contextual, rather than occupying a permanent toolbar
+    // above the input field.
+    return ApprovedComposerShell(
+      inputController: inputController,
+      mediaController: mediaController,
+      asrProvider: asr,
+      loading: isLoading,
+      reasoningBudget: reasoningBudget,
+      supportsReasoning: supportsReasoning,
+      onMore: onMore,
+      onSelectModel: onSelectModel,
+      onConfigureReasoning: onConfigureReasoning,
+      onStop: onStop,
+      onSend: onSend,
+      child: nativeBar,
     );
   }
 
