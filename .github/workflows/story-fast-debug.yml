@@ -1,4 +1,4 @@
-# fast rebuild for GitHub Skill dialog lifecycle fix; use hosted JDK directly
+# fast rebuild for GitHub Skill dialog lifecycle fix; arm64-only hotfix lane
 name: Story Fast Debug
 
 on:
@@ -62,8 +62,8 @@ jobs:
             test/features/story_runtime/built_in_story_skill_assets_test.dart \
             test/features/story_runtime/story_conversation_mode_control_test.dart
 
-      - name: Build universal Android debug APK
-        run: flutter build apk --debug
+      - name: Build arm64 Android debug APK
+        run: flutter build apk --debug --target-platform android-arm64
 
       - name: Verify debug APK signature
         shell: bash
@@ -80,9 +80,9 @@ jobs:
           VERSION="$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | tr -d ' ')"
           SHORT_SHA="$(git rev-parse --short=8 HEAD)"
           mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-debug.apk "dist/Kelivo_${VERSION}_Story_TEST_${SHORT_SHA}_universal-debug.apk"
+          cp build/app/outputs/flutter-apk/app-debug.apk "dist/Kelivo_${VERSION}_Story_TEST_${SHORT_SHA}_arm64-v8a-debug.apk"
           sha256sum dist/*.apk > dist/SHA256SUMS.txt
-          printf 'commit=%s\nversion=%s\nsigning=android-debug\nvalidation=static-analysis+focused-skill-regression+apk-signature\n' \
+          printf 'commit=%s\nversion=%s\nabi=arm64-v8a\nsigning=android-debug\nvalidation=static-analysis+focused-skill-regression+apk-signature\n' \
             "$(git rev-parse HEAD)" "$VERSION" > dist/BUILD_INFO.txt
 
       - name: Publish prerelease
@@ -99,13 +99,13 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$(git rev-parse HEAD)" \
             --title "Kelivo Story Runtime TEST ${VERSION} (${SHORT_SHA})" \
-            --notes "Installable Android debug-signed test build for the GitHub Skill dialog lifecycle fix. Static analysis, focused Story regressions and APK signature verification passed before publishing. Full non-baseline validation continues independently." \
+            --notes "arm64-v8a Android debug-signed hotfix build for the GitHub Skill dialog lifecycle issue. Static analysis, focused Story regressions and APK signature verification passed before publishing. Full non-baseline validation continues independently." \
             --prerelease
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: story-fast-debug
+          name: story-fast-debug-arm64
           path: dist/
           if-no-files-found: error
           retention-days: 14
