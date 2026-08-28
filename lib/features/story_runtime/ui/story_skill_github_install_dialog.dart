@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/haptics.dart';
+import '../../../icons/lucide_adapter.dart';
+import '../../../shared/widgets/ios_form_text_field.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../theme/app_font_weights.dart';
+
 final class StorySkillGitHubInstallRequest {
   const StorySkillGitHubInstallRequest({
     required this.repositoryUrl,
@@ -14,112 +20,154 @@ final class StorySkillGitHubInstallRequest {
 
 Future<StorySkillGitHubInstallRequest?> showStorySkillGitHubInstallDialog(
   BuildContext context,
-) {
-  return showDialog<StorySkillGitHubInstallRequest>(
+) async {
+  final cs = Theme.of(context).colorScheme;
+  return showModalBottomSheet<StorySkillGitHubInstallRequest>(
     context: context,
-    builder: (_) => const _StorySkillGitHubInstallDialog(),
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => const _StorySkillGitHubInstallSheet(),
   );
 }
 
-class _StorySkillGitHubInstallDialog extends StatefulWidget {
-  const _StorySkillGitHubInstallDialog();
+class _StorySkillGitHubInstallSheet extends StatefulWidget {
+  const _StorySkillGitHubInstallSheet();
 
   @override
-  State<_StorySkillGitHubInstallDialog> createState() =>
-      _StorySkillGitHubInstallDialogState();
+  State<_StorySkillGitHubInstallSheet> createState() =>
+      _StorySkillGitHubInstallSheetState();
 }
 
-class _StorySkillGitHubInstallDialogState
-    extends State<_StorySkillGitHubInstallDialog> {
+class _StorySkillGitHubInstallSheetState
+    extends State<_StorySkillGitHubInstallSheet> {
   final TextEditingController _repository = TextEditingController();
-  final TextEditingController _ref = TextEditingController();
-  final TextEditingController _subdirectory = TextEditingController();
 
   bool get _valid => _repository.text.trim().isNotEmpty;
 
   @override
   void dispose() {
     _repository.dispose();
-    _ref.dispose();
-    _subdirectory.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (!_valid) return;
+    Haptics.light();
     Navigator.of(context).pop(
-      StorySkillGitHubInstallRequest(
-        repositoryUrl: _repository.text.trim(),
-        ref: _optional(_ref.text),
-        subdirectory: _optional(_subdirectory.text),
-      ),
+      StorySkillGitHubInstallRequest(repositoryUrl: _repository.text.trim()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('从 GitHub 安装 Skill'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '支持公开 GitHub 仓库和包含 SKILL.md 的子目录。GitHub 直装采用安全模式：不会执行脚本，也不会静默授予 MCP、工具或内存权限。',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _repository,
-              autofocus: true,
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.next,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                labelText: 'GitHub 仓库',
-                hintText: 'owner/repo 或 https://github.com/owner/repo',
-                border: OutlineInputBorder(),
+    final cs = Theme.of(context).colorScheme;
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(999),
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _ref,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Branch / Tag / Ref（可选）',
-                hintText: '留空使用默认分支',
-                border: OutlineInputBorder(),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: IosCardPress(
+                  borderRadius: BorderRadius.circular(12),
+                  baseColor: Colors.transparent,
+                  onTap: () => Navigator.of(context).maybePop(),
+                  child: Center(
+                    child: Icon(Lucide.ArrowLeft, size: 20, color: cs.onSurface),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  '从 GitHub 安装 Skill',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: AppFontWeights.emphasis,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 40),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '只需要仓库地址。Kelivo 会自动读取默认分支、扫描 SKILL.md、选择 Skill 入口并固定到具体 commit；不会执行仓库脚本，也不会静默授予 MCP、工具或内存权限。',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: cs.onSurface.withValues(alpha: 0.62),
+            ),
+          ),
+          const SizedBox(height: 8),
+          IosFormTextField(
+            label: 'GitHub 仓库',
+            controller: _repository,
+            hintText: 'owner/repo 或 https://github.com/owner/repo',
+            keyboardType: TextInputType.url,
+            textInputAction: TextInputAction.done,
+            autofocus: true,
+            inlineLabel: false,
+            outerPadding: const EdgeInsets.symmetric(vertical: 8),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 48,
+            child: IosCardPress(
+              borderRadius: BorderRadius.circular(14),
+              baseColor: _valid
+                  ? cs.primary
+                  : cs.onSurface.withValues(alpha: 0.08),
+              onTap: _valid ? _submit : null,
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Lucide.Download,
+                      size: 18,
+                      color: _valid ? cs.onPrimary : cs.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '自动查找并安装',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: AppFontWeights.semibold,
+                        color: _valid ? cs.onPrimary : cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _subdirectory,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
-              decoration: const InputDecoration(
-                labelText: 'Skill 子目录（可选）',
-                hintText: '例如 skills/humanizer',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: _valid ? _submit : null,
-          child: const Text('安装'),
-        ),
-      ],
     );
   }
-}
-
-String? _optional(String value) {
-  final normalized = value.trim();
-  return normalized.isEmpty ? null : normalized;
 }
