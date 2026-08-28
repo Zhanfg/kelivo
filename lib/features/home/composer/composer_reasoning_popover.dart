@@ -238,10 +238,12 @@ class _ComposerReasoningPopoverState
       180.0,
       math.min(430.0, widget.anchorRect.top - 20),
     );
-    final left = (widget.anchorRect.center.dx - totalWidth / 2).clamp(
-      12.0,
-      math.max(12.0, size.width - totalWidth - 12),
-    );
+    final left = (widget.anchorRect.center.dx - totalWidth / 2)
+        .clamp(
+          12.0,
+          math.max(12.0, size.width - totalWidth - 12),
+        )
+        .toDouble();
     final bottom = math.max(12.0, size.height - widget.anchorRect.top + 8);
 
     return Material(
@@ -367,7 +369,7 @@ class _ComposerReasoningPopoverState
             TextButton.icon(
               key: const ValueKey('composer-reasoning-advanced'),
               onPressed: _busy ? null : () => setState(() => _advanced = true),
-              icon: const Icon(Lucide.SlidersHorizontal, size: 18),
+              icon: const Icon(Lucide.Settings2, size: 18),
               label: Text(l10n.modelDetailSheetAdvancedTab),
               style: TextButton.styleFrom(
                 alignment: Alignment.centerLeft,
