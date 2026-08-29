@@ -11,6 +11,11 @@ import '../../home/widgets/instruction_injection_sheet.dart';
 import '../../home/widgets/world_book_sheet.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
+import '../../settings/pages/memory_settings_page.dart';
+import '../../story_runtime/ui/story_character_manager_page.dart';
+import '../../story_runtime/ui/story_reference_library_page.dart';
+import '../../story_runtime/ui/story_skill_manager_page.dart';
+import '../../story_runtime/ui/story_voice_manager_page.dart';
 import '../../model/widgets/ocr_prompt_sheet.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -29,6 +34,7 @@ class BottomToolsSheet extends StatelessWidget {
     this.onClear,
     this.clearLabel,
     this.assistantId,
+    this.storyConversationId,
   });
 
   final VoidCallback? onCamera;
@@ -42,12 +48,22 @@ class BottomToolsSheet extends StatelessWidget {
   final VoidCallback? onClear;
   final String? clearLabel;
   final String? assistantId;
+  final String? storyConversationId;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final bg = Theme.of(context).colorScheme.surface;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
+    final storyConversationId = this.storyConversationId;
+
+    void openStoryPage(Widget page) {
+      final navigator = Navigator.of(context, rootNavigator: true);
+      Navigator.of(context).maybePop();
+      Future.microtask(
+        () => navigator.push(MaterialPageRoute(builder: (_) => page)),
+      );
+    }
 
     Widget secondaryAction({
       required IconData icon,
@@ -202,7 +218,67 @@ class BottomToolsSheet extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (onSearch != null ||
+                    if (storyConversationId != null) ...[
+                      const SizedBox(height: 8),
+                      secondaryAction(
+                        icon: Lucide.BookOpen,
+                        label:
+                            Localizations.localeOf(context).languageCode == 'zh'
+                            ? '世界书'
+                            : 'World Book',
+                        onTap: () => openStoryPage(const WorldBookPage()),
+                      ),
+                      secondaryAction(
+                        icon: Lucide.Brain,
+                        label:
+                            Localizations.localeOf(context).languageCode == 'zh'
+                            ? '记忆'
+                            : 'Memory',
+                        onTap: () => openStoryPage(const MemorySettingsPage()),
+                      ),
+                      secondaryAction(
+                        icon: Lucide.User,
+                        label:
+                            Localizations.localeOf(context).languageCode == 'zh'
+                            ? '角色'
+                            : 'Characters',
+                        onTap: () => openStoryPage(
+                          StoryCharacterManagerPage(
+                            conversationId: storyConversationId,
+                          ),
+                        ),
+                      ),
+                      secondaryAction(
+                        icon: Lucide.Volume2,
+                        label:
+                            Localizations.localeOf(context).languageCode == 'zh'
+                            ? '声音'
+                            : 'Voices',
+                        onTap: () => openStoryPage(
+                          StoryVoiceManagerPage(
+                            conversationId: storyConversationId,
+                          ),
+                        ),
+                      ),
+                      secondaryAction(
+                        icon: Lucide.BookOpenText,
+                        label:
+                            Localizations.localeOf(context).languageCode == 'zh'
+                            ? '参考资料'
+                            : 'References',
+                        onTap: () =>
+                            openStoryPage(const StoryReferenceLibraryPage()),
+                      ),
+                      secondaryAction(
+                        icon: Lucide.Shapes,
+                        label:
+                            Localizations.localeOf(context).languageCode == 'zh'
+                            ? '技能'
+                            : 'Skills',
+                        onTap: () =>
+                            openStoryPage(const StorySkillManagerPage()),
+                      ),
+                    ] else if (onSearch != null ||
                         onMcp != null ||
                         onQuickPhrase != null) ...[
                       const SizedBox(height: 8),
@@ -226,12 +302,14 @@ class BottomToolsSheet extends StatelessWidget {
                           onLongPress: onManageQuickPhrases,
                         ),
                     ],
-                    const SizedBox(height: 12),
-                    _LearningAndClearSection(
-                      clearLabel: clearLabel,
-                      onClear: onClear,
-                      assistantId: assistantId,
-                    ),
+                    if (storyConversationId == null) ...[
+                      const SizedBox(height: 12),
+                      _LearningAndClearSection(
+                        clearLabel: clearLabel,
+                        onClear: onClear,
+                        assistantId: assistantId,
+                      ),
+                    ],
                   ],
                 ),
               ),

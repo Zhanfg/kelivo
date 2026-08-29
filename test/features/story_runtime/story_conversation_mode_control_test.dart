@@ -1,9 +1,25 @@
+import '../../support/business_test_harness.dart';
+
+import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/features/story_runtime/ui/story_conversation_mode_control.dart';
 import 'package:Kelivo/shared/widgets/interactive_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'workspace selection persists independently of a conversation',
+    () async {
+      final harness = await createBusinessTestHarness();
+      await harness.preferences.setBool(storyWorkspaceSelectedKey, true);
+
+      final reloaded = BusinessPreferences(harness.repository);
+      await reloaded.load();
+
+      expect(isStoryWorkspaceSelected(reloaded), isTrue);
+    },
+  );
+
   testWidgets('centered mode slot stays physically centered and tappable', (
     tester,
   ) async {

@@ -28,6 +28,7 @@ void main() {
     required AsrProvider asr,
     required TextEditingController controller,
     Future<void> Function(int budget)? onReasoningBudgetChanged,
+    bool storyMode = false,
   }) {
     return MultiProvider(
       providers: [
@@ -56,6 +57,7 @@ void main() {
             supportsXhighReasoning: true,
             supportsMaxReasoning: false,
             onSend: (_) async => ChatInputSubmissionResult.rejected,
+            storyMode: storyMode,
           ),
         ),
       ),
@@ -93,6 +95,40 @@ void main() {
 
     // Secondary capabilities stay out of the persistent mobile row.
     expect(find.byIcon(Lucide.Globe), findsNothing);
+  });
+
+  testWidgets('story composer keeps only story primary entrances', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final p = await providers();
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    addTearDown(p.asr.dispose);
+
+    await tester.pumpWidget(
+      harness(
+        settings: p.settings,
+        asr: p.asr,
+        controller: controller,
+        storyMode: true,
+      ),
+    );
+    await tester.pump();
+
+    final context = tester.element(find.byType(ChatInputBar));
+    final l10n = AppLocalizations.of(context)!;
+    expect(find.byIcon(Lucide.Plus), findsOneWidget);
+    expect(find.byTooltip('Voice input'), findsOneWidget);
+    expect(find.byIcon(Lucide.ArrowUp), findsOneWidget);
+    expect(
+      find.byTooltip(l10n.chatInputBarReasoningStrengthTooltip),
+      findsNothing,
+    );
   });
 
   testWidgets('mobile reasoning button opens the anchored local popover', (

@@ -15,6 +15,13 @@ import '../state/story_runtime_store.dart';
 /// asks visible UI to refresh after an in-place mode switch.
 final ValueNotifier<int> storyConversationModeRevision = ValueNotifier<int>(0);
 
+const storyWorkspaceSelectedKey = 'story_workspace_selected_v1';
+
+bool isStoryWorkspaceSelected(
+  BusinessPreferences preferences, {
+  bool fallback = false,
+}) => preferences.getBool(storyWorkspaceSelectedKey) ?? fallback;
+
 /// Persistent Chat / Story mode switch for the active conversation.
 class StoryConversationModeTitle extends StatefulWidget {
   const StoryConversationModeTitle({super.key, required this.fallback});
@@ -50,21 +57,29 @@ class _StoryConversationModeTitleState
     StoryRuntimeSessionState session,
     bool story,
   ) async {
-    if (_busy || (session.modeSelectionCommitted && session.enabled == story)) {
+    final preferences = context.read<BusinessPreferences>();
+    final workspaceSelected = isStoryWorkspaceSelected(
+      preferences,
+      fallback: session.enabled,
+    );
+    if (_busy || (workspaceSelected == story && (!story || session.enabled))) {
       return;
     }
     setState(() => _busy = true);
     try {
-      final preferences = context.read<BusinessPreferences>();
       final chatService = context.read<ChatService>();
-      final transition = StoryModeTransitionService(
-        preferences: preferences,
-        chatService: chatService,
-      );
-      final next = await transition.setMode(
-        conversationId: conversationId,
-        storyEnabled: story,
-      );
+      var next = session;
+      if (story && !session.enabled) {
+        final transition = StoryModeTransitionService(
+          preferences: preferences,
+          chatService: chatService,
+        );
+        next = await transition.setMode(
+          conversationId: conversationId,
+          storyEnabled: true,
+        );
+      }
+      await preferences.setBool(storyWorkspaceSelectedKey, story);
       if (!mounted) return;
       setState(() {
         _loadedConversationId = conversationId;
@@ -97,11 +112,15 @@ class _StoryConversationModeTitleState
         final session =
             snapshot.data ??
             StoryRuntimeSessionState(conversationId: conversationId);
+        final storySelected = isStoryWorkspaceSelected(
+          context.read<BusinessPreferences>(),
+          fallback: session.enabled,
+        );
         final controlWidth = _modeSelectorWidth(context);
         return StoryConversationModeCenteredSlot(
           controlWidth: controlWidth,
           child: _ModeSelector(
-            storySelected: session.enabled,
+            storySelected: storySelected,
             busy: _busy || snapshot.connectionState == ConnectionState.waiting,
             onSelectChat: () => _selectMode(conversationId, session, false),
             onSelectStory: () => _selectMode(conversationId, session, true),

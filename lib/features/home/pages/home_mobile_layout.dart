@@ -14,12 +14,16 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/database/business_preferences.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../../story_runtime/ui/story_conversation_mode_control.dart';
+import '../../story_runtime/orchestration/story_mode_transition_service.dart';
+import '../../story_runtime/ui/story_workspace_drawer.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -95,28 +99,52 @@ class HomeMobileScaffold extends StatelessWidget {
       scrimColor: cs.onSurface,
       maxScrimOpacity: 0.12,
       barrierDismissible: true,
-      drawer: SideDrawer(
-        userName: context.watch<UserProvider>().name,
-        assistantName: _getAssistantName(context),
-        closePickerTicker: assistantPickerCloseTick,
-        loadingConversationIds: loadingConversationIds,
-        globalSearchMode: globalSearchMode,
-        globalSearchQuery: globalSearchQuery,
-        onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
-        onEnterGlobalSearch: onEnterGlobalSearch,
-        onExitGlobalSearch: onExitGlobalSearch,
-        onOpenGlobalSearchResult: (conversationId, messageId) async {
-          await onOpenGlobalSearchResult(conversationId, messageId);
-          drawerController.close();
-        },
-        onSelectConversation: (id, {closeDrawer = true}) {
-          onSelectConversation(id);
-          if (closeDrawer) drawerController.close();
-        },
-        onNewConversation: ({closeDrawer = true}) async {
-          await onCreateNewConversation();
-          if (closeDrawer) drawerController.close();
-        },
+      drawer: ValueListenableBuilder<int>(
+        valueListenable: storyConversationModeRevision,
+        builder: (context, _, _) =>
+            isStoryWorkspaceSelected(context.read<BusinessPreferences>())
+            ? StoryWorkspaceDrawer(
+                onSelectStory: (id) {
+                  onSelectConversation(id);
+                  drawerController.close();
+                },
+                onNewStory: () async {
+                  await onCreateNewConversation();
+                  if (!context.mounted) return;
+                  final id = context.read<ChatService>().currentConversationId;
+                  if (id != null) {
+                    await StoryModeTransitionService(
+                      preferences: context.read<BusinessPreferences>(),
+                      chatService: context.read<ChatService>(),
+                    ).setMode(conversationId: id, storyEnabled: true);
+                    storyConversationModeRevision.value++;
+                  }
+                  drawerController.close();
+                },
+              )
+            : SideDrawer(
+                userName: context.watch<UserProvider>().name,
+                assistantName: _getAssistantName(context),
+                closePickerTicker: assistantPickerCloseTick,
+                loadingConversationIds: loadingConversationIds,
+                globalSearchMode: globalSearchMode,
+                globalSearchQuery: globalSearchQuery,
+                onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
+                onEnterGlobalSearch: onEnterGlobalSearch,
+                onExitGlobalSearch: onExitGlobalSearch,
+                onOpenGlobalSearchResult: (conversationId, messageId) async {
+                  await onOpenGlobalSearchResult(conversationId, messageId);
+                  drawerController.close();
+                },
+                onSelectConversation: (id, {closeDrawer = true}) {
+                  onSelectConversation(id);
+                  if (closeDrawer) drawerController.close();
+                },
+                onNewConversation: ({closeDrawer = true}) async {
+                  await onCreateNewConversation();
+                  if (closeDrawer) drawerController.close();
+                },
+              ),
       ),
       child: ChatFrostedBackdrop(
         backdrop: const MobileBackgroundLayer(),

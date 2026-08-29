@@ -76,6 +76,7 @@ class ChatInputSection extends StatelessWidget {
     this.conversationId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
+    this.storyMode = false,
   });
 
   final GlobalKey inputBarKey;
@@ -126,6 +127,7 @@ class ChatInputSection extends StatelessWidget {
   final String? conversationId;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
+  final bool storyMode;
 
   @override
   Widget build(BuildContext context) {
@@ -250,6 +252,7 @@ class ChatInputSection extends StatelessWidget {
           backgroundImageActive: backgroundImageActive,
           inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
           inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
+          storyMode: storyMode,
         ),
       ],
     );

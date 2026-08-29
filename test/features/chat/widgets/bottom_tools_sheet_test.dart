@@ -44,4 +44,37 @@ void main() {
     expect(find.text('Upload'), findsOneWidget);
     expect(find.text('Draw'), findsOneWidget);
   });
+
+  testWidgets('story tools replace chat-only secondary actions', (
+    tester,
+  ) async {
+    final harness = await createBusinessTestHarness();
+    final settings = SettingsProvider(harness.preferences);
+    await settings.loaded;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: settings),
+          ChangeNotifierProvider(
+            create: (_) => WorldBookProvider(preferences: harness.preferences),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(
+            body: BottomToolsSheet(storyConversationId: 'story-1'),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('World Book'), findsOneWidget);
+    expect(find.text('Memory'), findsOneWidget);
+    expect(find.text('Characters'), findsOneWidget);
+    expect(find.text('Voices'), findsOneWidget);
+    expect(find.text('References'), findsOneWidget);
+    expect(find.text('Skills'), findsOneWidget);
+    expect(find.text('Online Search'), findsNothing);
+  });
 }

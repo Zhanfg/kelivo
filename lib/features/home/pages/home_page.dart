@@ -18,6 +18,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
@@ -43,6 +44,7 @@ import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../provider/pages/providers_page.dart';
 import '../../assistant/widgets/mcp_assistant_sheet.dart';
+import '../../story_runtime/ui/story_conversation_mode_control.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
 import '../widgets/chat_input_bar.dart';
@@ -1465,105 +1467,111 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildChatInputBar(BuildContext context, {required bool isTablet}) {
-    return ChatInputSection(
-      inputBarKey: _inputBarKey,
-      inputFocus: _inputFocus,
-      inputController: _inputController,
-      mediaController: _mediaController,
-      isTablet: isTablet,
-      isLoading: _controller.isCurrentConversationGenerating,
-      isGenerationPaused: _controller.isCurrentGenerationPaused,
-      onToggleGenerationPaused: _controller.toggleGenerationPaused,
-      isToolModel: _controller.isToolModel,
-      isReasoningModel: _controller.isReasoningModel,
-      isReasoningEnabled: _controller.isReasoningEnabled,
-      conversationId: _controller.currentConversation?.id,
-      sendButtonTooltip: _controller.isUserMessageEditActive
-          ? AppLocalizations.of(context)!.messageEditPageSaveAndSend
-          : null,
-      onMore: _toggleTools,
-      onSelectModel: () => showModelSelectSheet(context),
-      onLongPressSelectModel: () {
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const ProvidersPage()));
-      },
-      onOpenMcp: () {
-        final a = context.read<AssistantProvider>().currentAssistant;
-        if (a != null) {
-          if (PlatformUtils.isDesktop) {
-            showDesktopMcpServersPopover(
-              context,
-              anchorKey: _inputBarKey,
-              assistantId: a.id,
+    return ValueListenableBuilder<int>(
+      valueListenable: storyConversationModeRevision,
+      builder: (context, _, _) => ChatInputSection(
+        inputBarKey: _inputBarKey,
+        inputFocus: _inputFocus,
+        inputController: _inputController,
+        mediaController: _mediaController,
+        isTablet: isTablet,
+        isLoading: _controller.isCurrentConversationGenerating,
+        isGenerationPaused: _controller.isCurrentGenerationPaused,
+        onToggleGenerationPaused: _controller.toggleGenerationPaused,
+        isToolModel: _controller.isToolModel,
+        isReasoningModel: _controller.isReasoningModel,
+        isReasoningEnabled: _controller.isReasoningEnabled,
+        conversationId: _controller.currentConversation?.id,
+        sendButtonTooltip: _controller.isUserMessageEditActive
+            ? AppLocalizations.of(context)!.messageEditPageSaveAndSend
+            : null,
+        onMore: _toggleTools,
+        onSelectModel: () => showModelSelectSheet(context),
+        onLongPressSelectModel: () {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const ProvidersPage()));
+        },
+        onOpenMcp: () {
+          final a = context.read<AssistantProvider>().currentAssistant;
+          if (a != null) {
+            if (PlatformUtils.isDesktop) {
+              showDesktopMcpServersPopover(
+                context,
+                anchorKey: _inputBarKey,
+                assistantId: a.id,
+              );
+            } else {
+              showAssistantMcpSheet(context, assistantId: a.id);
+            }
+          }
+        },
+        onLongPressMcp: () {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const McpPage()));
+        },
+        onOpenSearch: _openSearchSettings,
+        onConfigureReasoning: () async {
+          final assistantProvider = context.read<AssistantProvider>();
+          final settingsProvider = context.read<SettingsProvider>();
+          final assistant = assistantProvider.currentAssistant;
+          if (assistant != null) {
+            if (assistant.thinkingBudget != null) {
+              settingsProvider.setThinkingBudget(assistant.thinkingBudget);
+            }
+            await _openReasoningSettings();
+            if (!mounted) return;
+            final chosen = settingsProvider.thinkingBudget;
+            await assistantProvider.updateAssistant(
+              assistant.copyWith(thinkingBudget: chosen),
             );
-          } else {
-            showAssistantMcpSheet(context, assistantId: a.id);
           }
-        }
-      },
-      onLongPressMcp: () {
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const McpPage()));
-      },
-      onOpenSearch: _openSearchSettings,
-      onConfigureReasoning: () async {
-        final assistantProvider = context.read<AssistantProvider>();
-        final settingsProvider = context.read<SettingsProvider>();
-        final assistant = assistantProvider.currentAssistant;
-        if (assistant != null) {
-          if (assistant.thinkingBudget != null) {
-            settingsProvider.setThinkingBudget(assistant.thinkingBudget);
+        },
+        onReasoningBudgetChanged: _setComposerReasoningBudget,
+        onComposerModelChanged: _setComposerModel,
+        onSend: (text) async {
+          final result = await _controller.sendMessage(text);
+          if (!mounted) return result;
+          if (PlatformUtils.isMobile &&
+              result == ChatInputSubmissionResult.sent) {
+            _controller.dismissKeyboard();
           }
-          await _openReasoningSettings();
-          if (!mounted) return;
-          final chosen = settingsProvider.thinkingBudget;
-          await assistantProvider.updateAssistant(
-            assistant.copyWith(thinkingBudget: chosen),
-          );
-        }
-      },
-      onReasoningBudgetChanged: _setComposerReasoningBudget,
-      onComposerModelChanged: _setComposerModel,
-      onSend: (text) async {
-        final result = await _controller.sendMessage(text);
-        if (!mounted) return result;
-        if (PlatformUtils.isMobile &&
-            result == ChatInputSubmissionResult.sent) {
-          _controller.dismissKeyboard();
-        }
-        return result;
-      },
-      onGuide: _controller.guideMessage,
-      onStop: _controller.cancelStreaming,
-      hasQueuedInput: _controller.currentQueuedInput != null,
-      queuedPreviewText: _controller.currentQueuedInput?.input.text,
-      queuedInputs: _controller.currentQueuedInputs,
-      onCancelQueuedInput: _controller.cancelQueuedMessage,
-      onRemoveQueuedInput: _controller.removeQueuedMessageAt,
-      onClearQueuedInputs: _controller.clearQueuedMessages,
-      onReorderQueuedInput: _controller.reorderQueuedMessage,
-      onQuickPhrase: _showQuickPhraseMenu,
-      onLongPressQuickPhrase: () {
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const QuickPhrasesPage()));
-      },
-      onToggleOcr: () async {
-        final sp = context.read<SettingsProvider>();
-        await sp.setOcrEnabled(!sp.ocrEnabled);
-      },
-      onOpenMiniMap: _openMiniMap,
-      onPickCamera: _controller.onPickCamera,
-      onPickPhotos: _controller.onPickPhotos,
-      onUploadFiles: _controller.onPickFiles,
-      onToggleLearningMode: _openInstructionInjectionPopover,
-      onOpenWorldBook: _openWorldBookPopover,
-      onLongPressLearning: _showLearningPromptSheet,
-      onClearContext: _controller.clearContext,
-      onCompressContext: _handleDesktopCompressContext,
-      backgroundImageActive: _assistantBackgroundActive(context),
+          return result;
+        },
+        onGuide: _controller.guideMessage,
+        onStop: _controller.cancelStreaming,
+        hasQueuedInput: _controller.currentQueuedInput != null,
+        queuedPreviewText: _controller.currentQueuedInput?.input.text,
+        queuedInputs: _controller.currentQueuedInputs,
+        onCancelQueuedInput: _controller.cancelQueuedMessage,
+        onRemoveQueuedInput: _controller.removeQueuedMessageAt,
+        onClearQueuedInputs: _controller.clearQueuedMessages,
+        onReorderQueuedInput: _controller.reorderQueuedMessage,
+        onQuickPhrase: _showQuickPhraseMenu,
+        onLongPressQuickPhrase: () {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const QuickPhrasesPage()));
+        },
+        onToggleOcr: () async {
+          final sp = context.read<SettingsProvider>();
+          await sp.setOcrEnabled(!sp.ocrEnabled);
+        },
+        onOpenMiniMap: _openMiniMap,
+        onPickCamera: _controller.onPickCamera,
+        onPickPhotos: _controller.onPickPhotos,
+        onUploadFiles: _controller.onPickFiles,
+        onToggleLearningMode: _openInstructionInjectionPopover,
+        onOpenWorldBook: _openWorldBookPopover,
+        onLongPressLearning: _showLearningPromptSheet,
+        onClearContext: _controller.clearContext,
+        onCompressContext: _handleDesktopCompressContext,
+        backgroundImageActive: _assistantBackgroundActive(context),
+        storyMode: isStoryWorkspaceSelected(
+          context.read<BusinessPreferences>(),
+        ),
+      ),
     );
   }
 
@@ -1843,6 +1851,9 @@ class _HomePageState extends State<HomePage>
     _controller.dismissKeyboard();
     final cs = Theme.of(context).colorScheme;
     final assistantId = context.read<AssistantProvider>().currentAssistantId;
+    final storyMode = isStoryWorkspaceSelected(
+      context.read<BusinessPreferences>(),
+    );
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1904,6 +1915,9 @@ class _HomePageState extends State<HomePage>
               _showContextManagementSheet();
             },
             assistantId: assistantId,
+            storyConversationId: storyMode
+                ? _controller.currentConversation?.id
+                : null,
           ),
         );
       },

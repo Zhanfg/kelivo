@@ -159,6 +159,7 @@ class ChatInputBar extends StatefulWidget {
         SettingsProvider.defaultChatInputBackgroundOpacityLight,
     this.inputBackgroundOpacityDark =
         SettingsProvider.defaultChatInputBackgroundOpacityDark,
+    this.storyMode = false,
   });
 
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
@@ -222,6 +223,7 @@ class ChatInputBar extends StatefulWidget {
   final bool backgroundImageActive;
   final double inputBackgroundOpacityLight;
   final double inputBackgroundOpacityDark;
+  final bool storyMode;
 
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
@@ -3311,7 +3313,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                               ),
                                               const SizedBox(width: 8),
                                             ],
-                                            if (isMobileLayout) ...[
+                                            if (isMobileLayout &&
+                                                !widget.storyMode) ...[
                                               Builder(
                                                 builder: (_) {
                                                   final anchorKey = GlobalKey(
