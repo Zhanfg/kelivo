@@ -1,4 +1,4 @@
-# Fast Android debug build for focused Story regressions.
+# Fast Android debug build for focused Story regressions and verified Composer v8 integration.
 name: Story Fast Debug
 
 on:
@@ -105,7 +105,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$(git rev-parse HEAD)" \
             --title "Kelivo Story Runtime TEST ${VERSION} (${SHORT_SHA})" \
-            --notes "arm64-v8a Android debug-signed hotfix build for the GitHub Skill dialog lifecycle issue. Static analysis, focused Story regressions and APK signature verification passed before publishing. Full non-baseline validation continues independently." \
+            --notes "Android debug-signed validation build for the verified Composer v8 and Story Runtime integration. Static analysis, focused Story regressions and APK signature verification passed before publishing. Full non-baseline validation continues independently." \
             --prerelease
 
       - name: Upload artifact
