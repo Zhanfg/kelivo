@@ -45,6 +45,7 @@ import '../../mcp/pages/mcp_page.dart';
 import '../../provider/pages/providers_page.dart';
 import '../../assistant/widgets/mcp_assistant_sheet.dart';
 import '../../story_runtime/ui/story_conversation_mode_control.dart';
+import '../../story_runtime/ui/story_narrative_view.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
 import '../widgets/chat_input_bar.dart';
@@ -988,19 +989,34 @@ class _HomePageState extends State<HomePage>
       backgroundImageActive: backgroundImageActive,
       content: Builder(
         builder: (context) {
-          final content = KeyedSubtree(
-            key: ValueKey<String>(
-              _controller.currentConversation?.id ?? 'none',
-            ),
-            child: _buildMessageListView(
-              context,
-              topContentPadding: topContentPadding,
-              bottomContentPadding: bottomContentPadding,
-              dividerPadding: const EdgeInsets.symmetric(
-                vertical: 10,
-                horizontal: AppSpacing.md,
-              ),
-            ),
+          final content = ValueListenableBuilder<int>(
+            valueListenable: storyConversationModeRevision,
+            builder: (context, _, _) {
+              final storySelected = isStoryWorkspaceSelected(
+                context.read<BusinessPreferences>(),
+              );
+              return KeyedSubtree(
+                key: ValueKey<String>(
+                  _controller.currentConversation?.id ?? 'none',
+                ),
+                child: storySelected
+                    ? StoryNarrativeView(
+                        messages: _controller.chatController.collapsedMessages,
+                        topPadding: topContentPadding,
+                        bottomPadding: bottomContentPadding,
+                        title: _controller.currentConversation?.title,
+                      )
+                    : _buildMessageListView(
+                        context,
+                        topContentPadding: topContentPadding,
+                        bottomContentPadding: bottomContentPadding,
+                        dividerPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: AppSpacing.md,
+                        ),
+                      ),
+              );
+            },
           );
           return FadeTransition(
             opacity: _controller.convoFade,
