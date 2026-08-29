@@ -5,6 +5,7 @@ on:
     branches: [feat/story-runtime-foundation]
     paths:
       - '.github/patches/composer-v8-voice-shell.py'
+      - '.github/patches/composer-v8-voice-shell-compat.py'
       - '.github/patches/composer-v8-voice-shell-analyzer-fix.py'
       - '.github/workflows/composer-v8-voice-shell-apply.yml'
 
@@ -27,6 +28,7 @@ jobs:
       - name: Apply guarded v8 voice shell patch
         run: |
           set -euo pipefail
+          python3 .github/patches/composer-v8-voice-shell-compat.py
           python3 .github/patches/composer-v8-voice-shell.py
           python3 .github/patches/composer-v8-voice-shell-analyzer-fix.py
           git diff --check
@@ -73,6 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .github/patches/composer-v8-voice-shell.py
+          rm -f .github/patches/composer-v8-voice-shell-compat.py
           rm -f .github/patches/composer-v8-voice-shell-analyzer-fix.py
           rm -f .github/workflows/composer-v8-voice-shell-apply.yml
           git add -A
