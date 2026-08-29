@@ -29,25 +29,51 @@ if text.count(old_language) != 1:
     raise SystemExit(f'voice-language-switch: expected 1 match, found {text.count(old_language)}')
 text = text.replace(old_language, new_language, 1)
 
-old_reasoning = """                                                        onLongPress:
-                                                            _composerLocked
-                                                            ? null
-                                                            : widget
-                                                                  .onSelectModel,
-                                                        childBuilder:
+old_reasoning = """                                                      onLongPress:
+                                                          _composerLocked
+                                                          ? null
+                                                          : widget
+                                                                .onSelectModel,
+                                                      childBuilder:
 """
-new_reasoning = """                                                        onLongPress:
-                                                            _composerLocked
-                                                            ? null
-                                                            : widget
-                                                                  .onSelectModel,
-                                                        allowLongPressOnDesktop:
-                                                            isMobileLayout,
-                                                        childBuilder:
+new_reasoning = """                                                      onLongPress:
+                                                          _composerLocked
+                                                          ? null
+                                                          : widget
+                                                                .onSelectModel,
+                                                      allowLongPressOnDesktop:
+                                                          isMobileLayout,
+                                                      childBuilder:
 """
 if text.count(old_reasoning) != 1:
     raise SystemExit(f'reasoning-longpress-usage: expected 1 match, found {text.count(old_reasoning)}')
 text = text.replace(old_reasoning, new_reasoning, 1)
 
+old_tap = """                                                onTap:
+                                                    _composerLocked || widget.loading
+                                                    ? null
+                                                    : selectedVoiceServiceUsable
+                                                    ? () => unawaited(
+                                                        _startVoiceInput(),
+                                                      )
+                                                    : _toggleInlineVoiceSettings,
+"""
+new_tap = """                                                onTap:
+                                                    _composerLocked || widget.loading
+                                                    ? null
+                                                    : settings.asrServices.isEmpty
+                                                    ? () => unawaited(
+                                                        _openVoiceServicesSettings(),
+                                                      )
+                                                    : selectedVoiceServiceUsable
+                                                    ? () => unawaited(
+                                                        _startVoiceInput(),
+                                                      )
+                                                    : _toggleInlineVoiceSettings,
+"""
+if text.count(old_tap) != 1:
+    raise SystemExit(f'voice-story-recovery: expected 1 match, found {text.count(old_tap)}')
+text = text.replace(old_tap, new_tap, 1)
+
 path.write_text(text, encoding='utf-8')
-print('Voice shell analyzer fix applied')
+print('Voice shell analyzer and story recovery fix applied')
