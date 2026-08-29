@@ -66,7 +66,6 @@ List<ComposerModelOption> buildComposerModelOptions(SettingsProvider settings) {
 
 Future<void> showComposerReasoningPopover(
   BuildContext context, {
-  required LayerLink anchorLink,
   required Rect anchorRect,
   required int? currentBudget,
   required bool supportsXhigh,
@@ -84,7 +83,6 @@ Future<void> showComposerReasoningPopover(
     barrierColor: Colors.transparent,
     transitionDuration: const Duration(milliseconds: 160),
     pageBuilder: (dialogContext, _, __) => _ComposerReasoningPopover(
-      anchorLink: anchorLink,
       anchorRect: anchorRect,
       currentBudget: currentBudget,
       supportsXhigh: supportsXhigh,
@@ -110,7 +108,6 @@ enum _AdvancedPane { reasoning, model }
 
 class _ComposerReasoningPopover extends StatefulWidget {
   const _ComposerReasoningPopover({
-    required this.anchorLink,
     required this.anchorRect,
     required this.currentBudget,
     required this.supportsXhigh,
@@ -122,7 +119,6 @@ class _ComposerReasoningPopover extends StatefulWidget {
     required this.onModelChanged,
   });
 
-  final LayerLink anchorLink;
   final Rect anchorRect;
   final int? currentBudget;
   final bool supportsXhigh;
@@ -228,7 +224,7 @@ class _ComposerReasoningPopoverState extends State<_ComposerReasoningPopover> {
       180.0,
       math.min(430.0, widget.anchorRect.top - 20),
     );
-    final horizontalOffset = size.width - 12 - widget.anchorRect.right;
+    final bottom = math.max(12.0, size.height - widget.anchorRect.top + 8);
 
     return Material(
       type: MaterialType.transparency,
@@ -240,12 +236,9 @@ class _ComposerReasoningPopoverState extends State<_ComposerReasoningPopover> {
               onTap: () => Navigator.of(context).pop(),
             ),
           ),
-          CompositedTransformFollower(
-            link: widget.anchorLink,
-            showWhenUnlinked: false,
-            targetAnchor: Alignment.topRight,
-            followerAnchor: Alignment.bottomRight,
-            offset: Offset(horizontalOffset, -8),
+          Positioned(
+            right: 12,
+            bottom: bottom,
             child: SizedBox(
               width: totalWidth,
               child: ConstrainedBox(

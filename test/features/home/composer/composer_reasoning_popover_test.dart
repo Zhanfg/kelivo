@@ -67,6 +67,12 @@ void main() {
         find.byKey(const ValueKey('composer-reasoning-slider')),
         findsOneWidget,
       );
+      expect(
+        tester
+            .getRect(find.byKey(const ValueKey('composer-reasoning-slider')))
+            .bottom,
+        lessThan(tester.getRect(find.byIcon(Icons.psychology)).top),
+      );
       expect(find.text(l10n.reasoningBudgetSheetAuto), findsOneWidget);
       expect(find.text(l10n.modelDetailSheetAdvancedTab), findsOneWidget);
       expect(find.textContaining('Speed'), findsNothing);
@@ -163,7 +169,6 @@ class _Harness extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final anchorKey = GlobalKey();
-    final anchorLink = LayerLink();
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -173,35 +178,31 @@ class _Harness extends StatelessWidget {
             alignment: Alignment.bottomCenter,
             child: Padding(
               padding: const EdgeInsets.only(bottom: 24),
-              child: CompositedTransformTarget(
-                link: anchorLink,
-                child: IconButton(
-                  key: anchorKey,
-                  icon: const Icon(Icons.psychology),
-                  onPressed: () {
-                    final renderObject = anchorKey.currentContext
-                        ?.findRenderObject();
-                    if (renderObject is! RenderBox || !renderObject.hasSize) {
-                      return;
-                    }
-                    final anchorRect =
-                        renderObject.localToGlobal(Offset.zero) &
-                        renderObject.size;
-                    showComposerReasoningPopover(
-                      pageContext,
-                      anchorLink: anchorLink,
-                      anchorRect: anchorRect,
-                      currentBudget: -1,
-                      supportsXhigh: supportsXhigh,
-                      supportsMax: supportsMax,
-                      currentProviderKey: 'ProviderA',
-                      currentModelId: 'model-a',
-                      modelOptions: modelOptions,
-                      onBudgetChanged: onBudgetChanged,
-                      onModelChanged: onModelChanged,
-                    );
-                  },
-                ),
+              child: IconButton(
+                key: anchorKey,
+                icon: const Icon(Icons.psychology),
+                onPressed: () {
+                  final renderObject = anchorKey.currentContext
+                      ?.findRenderObject();
+                  if (renderObject is! RenderBox || !renderObject.hasSize) {
+                    return;
+                  }
+                  final anchorRect =
+                      renderObject.localToGlobal(Offset.zero) &
+                      renderObject.size;
+                  showComposerReasoningPopover(
+                    pageContext,
+                    anchorRect: anchorRect,
+                    currentBudget: -1,
+                    supportsXhigh: supportsXhigh,
+                    supportsMax: supportsMax,
+                    currentProviderKey: 'ProviderA',
+                    currentModelId: 'model-a',
+                    modelOptions: modelOptions,
+                    onBudgetChanged: onBudgetChanged,
+                    onModelChanged: onModelChanged,
+                  );
+                },
               ),
             ),
           ),

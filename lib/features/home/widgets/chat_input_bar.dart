@@ -692,10 +692,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     return math.max(1, painter.computeLineMetrics().length);
   }
 
-  Future<void> _openComposerReasoning({
-    required GlobalKey anchorKey,
-    required LayerLink anchorLink,
-  }) async {
+  Future<void> _openComposerReasoning({required GlobalKey anchorKey}) async {
     if (_composerLocked || _ownsVoiceSession || widget.loading) return;
     if (!widget.supportsReasoning) {
       widget.onSelectModel?.call();
@@ -716,7 +713,6 @@ class _ChatInputBarState extends State<ChatInputBar>
     final settings = context.read<SettingsProvider>();
     await showComposerReasoningPopover(
       context,
-      anchorLink: anchorLink,
       anchorRect: anchorRect,
       currentBudget: widget.reasoningBudget,
       supportsXhigh: widget.supportsXhighReasoning,
@@ -3322,63 +3318,56 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     debugLabel:
                                                         'composer-reasoning-anchor',
                                                   );
-                                                  final anchorLink =
-                                                      LayerLink();
-                                                  return CompositedTransformTarget(
-                                                    link: anchorLink,
-                                                    child: Container(
-                                                      key: anchorKey,
-                                                      child: _CompactIconButton(
-                                                        key: const ValueKey(
-                                                          'composer-reasoning-button',
-                                                        ),
-                                                        tooltip:
-                                                            widget
-                                                                .supportsReasoning
-                                                            ? AppLocalizations.of(
-                                                                context,
-                                                              )!.chatInputBarReasoningStrengthTooltip
-                                                            : AppLocalizations.of(
-                                                                context,
-                                                              )!.chatInputBarSelectModelTooltip,
-                                                        icon:
-                                                            widget
-                                                                .supportsReasoning
-                                                            ? Lucide.Brain
-                                                            : Lucide.Boxes,
-                                                        active:
-                                                            widget
-                                                                .supportsReasoning &&
-                                                            widget
-                                                                .reasoningActive,
-                                                        onTap: _composerLocked
-                                                            ? null
-                                                            : () => unawaited(
-                                                                _openComposerReasoning(
-                                                                  anchorKey:
-                                                                      anchorKey,
-                                                                  anchorLink:
-                                                                      anchorLink,
-                                                                ),
-                                                              ),
-                                                        onLongPress:
-                                                            _composerLocked
-                                                            ? null
-                                                            : widget
-                                                                  .onSelectModel,
-                                                        childBuilder:
-                                                            widget
-                                                                .supportsReasoning
-                                                            ? (
-                                                                color,
-                                                              ) => ReasoningIcons.budgetIcon(
-                                                                widget
-                                                                    .reasoningBudget,
-                                                                size: 20,
-                                                                color: color,
-                                                              )
-                                                            : null,
+                                                  return Container(
+                                                    key: anchorKey,
+                                                    child: _CompactIconButton(
+                                                      key: const ValueKey(
+                                                        'composer-reasoning-button',
                                                       ),
+                                                      tooltip:
+                                                          widget
+                                                              .supportsReasoning
+                                                          ? AppLocalizations.of(
+                                                              context,
+                                                            )!.chatInputBarReasoningStrengthTooltip
+                                                          : AppLocalizations.of(
+                                                              context,
+                                                            )!.chatInputBarSelectModelTooltip,
+                                                      icon:
+                                                          widget
+                                                              .supportsReasoning
+                                                          ? Lucide.Brain
+                                                          : Lucide.Boxes,
+                                                      active:
+                                                          widget
+                                                              .supportsReasoning &&
+                                                          widget
+                                                              .reasoningActive,
+                                                      onTap: _composerLocked
+                                                          ? null
+                                                          : () => unawaited(
+                                                              _openComposerReasoning(
+                                                                anchorKey:
+                                                                    anchorKey,
+                                                              ),
+                                                            ),
+                                                      onLongPress:
+                                                          _composerLocked
+                                                          ? null
+                                                          : widget
+                                                                .onSelectModel,
+                                                      childBuilder:
+                                                          widget
+                                                              .supportsReasoning
+                                                          ? (
+                                                              color,
+                                                            ) => ReasoningIcons.budgetIcon(
+                                                              widget
+                                                                  .reasoningBudget,
+                                                              size: 20,
+                                                              color: color,
+                                                            )
+                                                          : null,
                                                     ),
                                                   );
                                                 },
