@@ -2343,8 +2343,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           ? (isDark
                 ? cs.primary.withValues(alpha: 0.15)
                 : cs.primary.withValues(alpha: 0.08))
-          : null,
-      bareOnDefault: !isUser,
+          : cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.06),
       isUser: isUser,
       child: child,
     );

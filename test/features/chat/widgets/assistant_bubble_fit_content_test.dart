@@ -93,6 +93,49 @@ void main() {
     expect(hugging, spanning);
   });
 
+  testWidgets('assistant default style paints a short left bubble', (
+    tester,
+  ) async {
+    final harness = await createBusinessTestHarness();
+    final settings = SettingsProvider(harness.preferences);
+    await settings.loaded;
+    final message = ChatMessage(
+      role: 'assistant',
+      content: 'OK',
+      conversationId: 'conversation-default-bubble',
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider(
+            create: (_) =>
+                TtsProvider(preferences: createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider<ToolApprovalService>.value(
+            value: ToolApprovalService(),
+          ),
+          ChangeNotifierProvider<AskUserInteractionService>.value(
+            value: AskUserInteractionService(),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ChatMessageWidget(message: message, showModelIcon: false),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final text = find.byKey(ValueKey('assistant_${message.id}'));
+    final bubble = find.ancestor(of: text, matching: find.byType(DecoratedBox));
+    expect(bubble, findsWidgets);
+    expect(tester.getSize(text).width, lessThan(120));
+  });
+
   testWidgets('waiting bubble hugs the indicator too', (tester) async {
     final spanning = await _bubbleWidth(
       tester,
