@@ -272,7 +272,8 @@ class HomeMobileScaffold extends StatelessWidget {
       scrolledUnderElevation: 0,
       leading: Builder(
         builder: (context) {
-          return IosIconButton(
+          final drawerController = InteractiveDrawer.maybeControllerOf(context);
+          final button = IosIconButton(
             size: 20,
             padding: const EdgeInsets.all(8),
             minSize: 40,
@@ -285,6 +286,17 @@ class HomeMobileScaffold extends StatelessWidget {
             onTap: () {
               onDismissKeyboard();
               onToggleDrawer();
+            },
+          );
+          if (drawerController == null) return button;
+          return AnimatedBuilder(
+            animation: drawerController,
+            builder: (context, _) {
+              final drawerOpen = drawerController.value > 0.01;
+              return IgnorePointer(
+                ignoring: drawerOpen,
+                child: Opacity(opacity: drawerOpen ? 0 : 1, child: button),
+              );
             },
           );
         },

@@ -204,14 +204,22 @@ class _StoryConversationModeCenteredSlotState
     if (drawerController != null) {
       return AnimatedBuilder(
         animation: drawerController,
-        builder: (context, _) =>
-            _buildSlot(context, followParent: drawerController.value > 0),
+        builder: (context, _) {
+          final drawerOpen = drawerController.value > 0.01;
+          return IgnorePointer(
+            ignoring: drawerOpen,
+            child: Opacity(
+              opacity: drawerOpen ? 0 : 1,
+              child: _buildSlot(context),
+            ),
+          );
+        },
       );
     }
     return _buildSlot(context);
   }
 
-  Widget _buildSlot(BuildContext context, {bool followParent = false}) {
+  Widget _buildSlot(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final slotWidth = constraints.hasBoundedWidth
@@ -220,19 +228,6 @@ class _StoryConversationModeCenteredSlotState
         final fallbackLeft = ((slotWidth - widget.controlWidth) / 2)
             .clamp(0.0, double.infinity)
             .toDouble();
-        if (followParent) {
-          return SizedBox(
-            width: double.infinity,
-            height: 36,
-            child: Center(
-              child: SizedBox(
-                width: widget.controlWidth,
-                height: 36,
-                child: widget.child,
-              ),
-            ),
-          );
-        }
         _scheduleMeasurement();
         return SizedBox(
           key: _slotKey,

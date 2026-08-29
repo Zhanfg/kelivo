@@ -79,9 +79,7 @@ void main() {
     expect(storyTapped, isTrue);
   });
 
-  testWidgets('mode slot moves with content when the drawer opens', (
-    tester,
-  ) async {
+  testWidgets('mode slot hides while the drawer is open', (tester) async {
     const controlKey = ValueKey<String>('story-mode-control');
     final drawerController = InteractiveDrawerController(initialValue: 1);
     addTearDown(drawerController.dispose);
@@ -105,11 +103,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final screenWidth =
-        tester.view.physicalSize.width / tester.view.devicePixelRatio;
-    expect(
-      tester.getRect(find.byKey(controlKey)).center.dx,
-      moreOrLessEquals(screenWidth / 2 + 300, epsilon: 0.5),
+    final opacity = tester.widget<Opacity>(
+      find.ancestor(of: find.byKey(controlKey), matching: find.byType(Opacity)),
     );
+    expect(opacity.opacity, 0);
   });
 }
