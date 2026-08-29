@@ -7,6 +7,7 @@ on:
       - '.github/patches/composer-v8-voice-shell.py'
       - '.github/patches/composer-v8-voice-shell-compat.py'
       - '.github/patches/composer-v8-voice-shell-analyzer-fix.py'
+      - '.github/patches/composer-v8-voice-shell-regression-fix.py'
       - '.github/workflows/composer-v8-voice-shell-apply.yml'
 
 permissions:
@@ -31,9 +32,11 @@ jobs:
           python3 .github/patches/composer-v8-voice-shell-compat.py
           python3 .github/patches/composer-v8-voice-shell.py
           python3 .github/patches/composer-v8-voice-shell-analyzer-fix.py
+          python3 .github/patches/composer-v8-voice-shell-regression-fix.py
           git diff --check
           grep -q "composer-voice-shell" lib/features/home/composer/composer_voice_shell.dart
           grep -q "voice-ptt-hint" lib/features/home/composer/composer_voice_shell.dart
+          grep -q "voice-state-locked" lib/features/home/composer/composer_voice_shell.dart
           grep -q "_voiceReady" lib/features/home/widgets/chat_input_bar.dart
           grep -q "_beginVoicePtt" lib/features/home/widgets/chat_input_bar.dart
 
@@ -77,6 +80,7 @@ jobs:
           rm -f .github/patches/composer-v8-voice-shell.py
           rm -f .github/patches/composer-v8-voice-shell-compat.py
           rm -f .github/patches/composer-v8-voice-shell-analyzer-fix.py
+          rm -f .github/patches/composer-v8-voice-shell-regression-fix.py
           rm -f .github/workflows/composer-v8-voice-shell-apply.yml
           git add -A
           if git diff --cached --quiet; then
