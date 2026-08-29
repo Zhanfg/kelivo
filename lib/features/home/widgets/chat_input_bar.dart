@@ -37,6 +37,7 @@ import '../../../desktop/desktop_context_menu.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../composer/composer_fullscreen_editor.dart';
 import '../composer/composer_reasoning_popover.dart';
+import '../composer/composer_voice_shell.dart';
 import '../../settings/pages/tts_services_page.dart';
 
 class ChatInputBarController {
@@ -244,6 +245,13 @@ class _ChatInputBarState extends State<ChatInputBar>
   bool _voiceSettingsExpanded = false;
   bool _ownsVoiceSession = false;
   bool _finishingVoice = false;
+  bool _voiceReady = false;
+  bool _voicePttPending = false;
+  bool _voicePttActive = false;
+  bool _voicePttLocked = false;
+  bool _voicePttCancelArmed = false;
+  bool _voicePttReleasePending = false;
+  Offset? _voicePttOrigin;
   String? _lastReportedVoiceError;
   final List<_DraftImage> _images = <_DraftImage>[];
   final Queue<_ImageProcessingTask> _imageProcessingQueue =
@@ -817,7 +825,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     ).push(MaterialPageRoute<void>(builder: (_) => const TtsServicesPage()));
   }
 
-  Future<void> _startVoiceInput() async {
+  Future<void> _startVoiceInput({bool ptt = false}) async {
     final asr = widget.asrProvider;
     final selected = context.read<SettingsProvider>().selectedAsrService;
     if (_composerLocked ||
@@ -834,6 +842,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     _voiceLastObservedTranscript = '';
     _voiceTranscriptEditing = false;
     _voiceSettingsExpanded = false;
+    _voiceReady = false;
+    if (!ptt) _resetVoicePttState();
     _ownsVoiceSession = true;
     _finishingVoice = false;
     _lastReportedVoiceError = null;
@@ -876,7 +886,9 @@ class _ChatInputBarState extends State<ChatInputBar>
       _voiceBaseValue = null;
       _ownsVoiceSession = false;
       _finishingVoice = false;
+      _voiceReady = false;
       _voiceLevels.clear();
+      _resetVoicePttState();
       _resetVoiceTranscriptTracking();
       _reportVoiceFailure(error);
       scheduleMicrotask(asr.clearError);
@@ -884,9 +896,11 @@ class _ChatInputBarState extends State<ChatInputBar>
       // Some system recognizers publish a final result and stop on their own.
       _stopVoiceLevelSampling();
       final detectedSpeech = asr.transcript.trim().isNotEmpty;
-      _voiceBaseValue = null;
       _ownsVoiceSession = false;
+      _voiceReady = detectedSpeech;
+      if (!detectedSpeech) _voiceBaseValue = null;
       _voiceLevels.clear();
+      _resetVoicePttState();
       _resetVoiceTranscriptTracking();
       if (!detectedSpeech) _reportNoSpeech();
     }
@@ -992,17 +1006,22 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   Future<void> _cancelVoiceInput() async {
-    if (!_ownsVoiceSession) return;
+    if (!_ownsVoiceSession && !_voiceReady) return;
     _stopVoiceLevelSampling();
     final asr = widget.asrProvider;
     final original = _voiceBaseValue;
+    final wasActive = _ownsVoiceSession;
     _voiceBaseValue = null;
     _ownsVoiceSession = false;
     _finishingVoice = false;
+    _voiceReady = false;
+    _voiceSettingsExpanded = false;
     _voiceLevels.clear();
+    _resetVoicePttState();
     _resetVoiceTranscriptTracking();
     if (original != null) _controller.value = original;
     if (mounted) setState(() {});
+    if (!wasActive) return;
     try {
       await asr?.cancel();
     } catch (error) {
@@ -1022,9 +1041,11 @@ class _ChatInputBarState extends State<ChatInputBar>
       if (!mounted) return;
       _applyVoiceTranscript(transcript);
       final detectedSpeech = transcript.trim().isNotEmpty;
-      _voiceBaseValue = null;
       _ownsVoiceSession = false;
+      _voiceReady = detectedSpeech;
+      if (!detectedSpeech) _voiceBaseValue = null;
       _voiceLevels.clear();
+      _resetVoicePttState();
       _resetVoiceTranscriptTracking();
       setState(() {});
       _ensureCaretVisible();
@@ -1034,7 +1055,9 @@ class _ChatInputBarState extends State<ChatInputBar>
       if (_ownsVoiceSession) {
         _voiceBaseValue = null;
         _ownsVoiceSession = false;
+        _voiceReady = false;
         _voiceLevels.clear();
+        _resetVoicePttState();
         _resetVoiceTranscriptTracking();
         setState(() {});
       }
@@ -1079,6 +1102,270 @@ class _ChatInputBarState extends State<ChatInputBar>
       if (!mounted) return;
       showAppSnackBar(context, message: message, type: NotificationType.error);
     });
+  }
+
+  void _resetVoicePttState() {
+    _voicePttPending = false;
+    _voicePttActive = false;
+    _voicePttLocked = false;
+    _voicePttCancelArmed = false;
+    _voicePttReleasePending = false;
+    _voicePttOrigin = null;
+  }
+
+  Future<void> _submitVoiceReady() async {
+    if (!_voiceReady || _finishingVoice) return;
+    _voiceReady = false;
+    _voiceBaseValue = null;
+    _voiceSettingsExpanded = false;
+    if (mounted) setState(() {});
+    await _handleSend();
+  }
+
+  void _toggleVoiceShellSettings() {
+    if (!_ownsVoiceSession && !_voiceReady) return;
+    setState(() => _voiceSettingsExpanded = !_voiceSettingsExpanded);
+  }
+
+  void _beginVoicePtt(LongPressStartDetails details) {
+    final settings = context.read<SettingsProvider>();
+    final selected = settings.selectedAsrService;
+    final asr = widget.asrProvider;
+    if (_composerLocked ||
+        widget.loading ||
+        selected == null ||
+        asr == null ||
+        !asr.canUse(selected) ||
+        _ownsVoiceSession ||
+        _voiceReady ||
+        _voicePttPending) {
+      return;
+    }
+    _voicePttOrigin = details.globalPosition;
+    _voicePttPending = true;
+    _voicePttActive = false;
+    _voicePttLocked = false;
+    _voicePttCancelArmed = false;
+    _voicePttReleasePending = false;
+    setState(() {});
+    unawaited(
+      _startVoiceInput(ptt: true).then((_) async {
+        if (!mounted) return;
+        _voicePttPending = false;
+        if (!_ownsVoiceSession) {
+          _resetVoicePttState();
+          setState(() {});
+          return;
+        }
+        _voicePttActive = true;
+        setState(() {});
+        if (_voicePttCancelArmed) {
+          await _cancelVoiceInput();
+        } else if (_voicePttReleasePending && !_voicePttLocked) {
+          await _finishVoiceInput();
+        }
+      }),
+    );
+  }
+
+  void _applyVoicePttOffset(Offset offset) {
+    if (!_voicePttPending && !_voicePttActive) return;
+    final cancel = offset.dx <= -56;
+    final lock = !cancel && offset.dy <= -44;
+    if (cancel == _voicePttCancelArmed && (!lock || _voicePttLocked)) return;
+    setState(() {
+      _voicePttCancelArmed = cancel;
+      if (lock) _voicePttLocked = true;
+    });
+  }
+
+  void _updateVoicePtt(LongPressMoveUpdateDetails details) {
+    _applyVoicePttOffset(details.offsetFromOrigin);
+  }
+
+  void _handleVoicePttPointerMove(PointerMoveEvent event) {
+    final origin = _voicePttOrigin;
+    if (origin == null || (!_voicePttPending && !_voicePttActive)) return;
+    _applyVoicePttOffset(event.position - origin);
+  }
+
+  void _completeVoicePttGesture() {
+    if (_voicePttPending && !_voicePttActive) {
+      _voicePttReleasePending = true;
+      return;
+    }
+    if (!_voicePttActive) return;
+    if (_voicePttCancelArmed) {
+      _voicePttActive = false;
+      unawaited(_cancelVoiceInput());
+    } else if (!_voicePttLocked) {
+      _voicePttActive = false;
+      unawaited(_finishVoiceInput());
+    }
+  }
+
+  void _handleVoicePttPointerUp(PointerUpEvent _) {
+    _completeVoicePttGesture();
+  }
+
+  void _endVoicePtt(LongPressEndDetails _) {
+    _completeVoicePttGesture();
+  }
+
+  String _voiceModelLabel(AsrServiceOptions service) {
+    return switch (service) {
+      SherpaOnnxAsrOptions value =>
+        value.modelId.trim().isEmpty ? value.name : value.modelId,
+      SystemAsrOptions value => value.name,
+      OpenAiRealtimeAsrOptions value => value.model,
+      DashScopeAsrOptions value => value.model,
+      QwenAudioAsrOptions value => value.model,
+      VolcengineAsrOptions value => value.resourceId,
+      MimoAsrOptions value => value.model,
+      StepAsrOptions value => value.model,
+      _ => service.name,
+    };
+  }
+
+  String _voiceLanguageLabel(BuildContext context, AsrServiceOptions service) {
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final raw = switch (service) {
+      SherpaOnnxAsrOptions value => value.language,
+      SystemAsrOptions value => value.localeId,
+      OpenAiRealtimeAsrOptions value => value.language,
+      DashScopeAsrOptions value => value.language,
+      QwenAudioAsrOptions _ => '',
+      VolcengineAsrOptions value => value.language,
+      MimoAsrOptions value => value.language,
+      StepAsrOptions value => value.language,
+      _ => '',
+    };
+    if (raw.trim().isEmpty || raw.trim().toLowerCase() == 'auto') {
+      return zh ? '自动' : 'Auto';
+    }
+    return raw.trim();
+  }
+
+  Future<void> _openVoiceTranscriptEditor() async {
+    if (!_ownsVoiceSession && !_voiceReady) return;
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final editorFocus = FocusNode();
+    try {
+      await showDialog<void>(
+        context: context,
+        useSafeArea: false,
+        builder: (dialogContext) => Dialog.fullscreen(
+          child: SafeArea(
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 56,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        key: const ValueKey('voice-editor-close'),
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        icon: const Icon(Lucide.ArrowLeft),
+                      ),
+                      Expanded(
+                        child: Text(
+                          zh ? '编辑语音转写' : 'Edit voice transcript',
+                          style: TextStyle(fontWeight: AppFontWeights.semibold),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Text(
+                          _ownsVoiceSession
+                              ? (zh ? '录音继续' : 'Recording continues')
+                              : (zh ? '待发送' : 'Ready'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      key: const ValueKey('voice-fullscreen-field'),
+                      controller: _controller,
+                      focusNode: editorFocus,
+                      autofocus: true,
+                      onChanged: _onTextChanged,
+                      readOnly:
+                          _ownsVoiceSession &&
+                          widget.asrProvider?.supportsLiveTranscript != true,
+                      minLines: null,
+                      maxLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                      keyboardType: TextInputType.multiline,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } finally {
+      editorFocus.dispose();
+    }
+  }
+
+  Widget _buildComposerVoiceShell(
+    BuildContext context,
+    ThemeData theme,
+    AsrServiceOptions service,
+  ) {
+    final asr = widget.asrProvider;
+    final live = asr?.supportsLiveTranscript == true;
+    final editable =
+        _voiceReady || (_ownsVoiceSession && !_finishingVoice && live);
+    final l10n = AppLocalizations.of(context)!;
+    final activity = _finishingVoice
+        ? _VoiceTranscribingIndicator(
+            key: const ValueKey('voice-transcribing-indicator'),
+            label: l10n.chatInputBarVoiceTranscribing,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.72),
+          )
+        : ValueListenableBuilder<int>(
+            valueListenable: _voiceLevelsVersion,
+            builder: (context, _, _) => _VoiceWaveform(
+              key: const ValueKey('voice-waveform'),
+              levels: _voiceLevels,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
+            ),
+          );
+    return ComposerVoiceShell(
+      controller: _controller,
+      focusNode: widget.focusNode,
+      editable: editable,
+      transcribing: _finishingVoice,
+      ready: _voiceReady,
+      locked: _voicePttLocked,
+      pttActive: _voicePttActive,
+      cancelArmed: _voicePttCancelArmed,
+      settingsExpanded: _voiceSettingsExpanded,
+      supportsLiveTranscript: live,
+      serviceName: service.name,
+      modelLabel: _voiceModelLabel(service),
+      languageLabel: _voiceLanguageLabel(context, service),
+      activity: activity,
+      onChanged: _onTextChanged,
+      onCancel: () => unawaited(_cancelVoiceInput()),
+      onToggleSettings: _toggleVoiceShellSettings,
+      onStop: _finishingVoice ? null : () => unawaited(_finishVoiceInput()),
+      onSend: _voiceReady ? () => unawaited(_submitVoiceReady()) : null,
+      onFullscreen: () => unawaited(_openVoiceTranscriptEditor()),
+      cancelTooltip: l10n.chatInputBarVoiceCancelTooltip,
+      stopTooltip: l10n.chatInputBarVoiceStopTooltip,
+    );
   }
 
   /// Recording row stays intentionally compact: cancel, one continuous
@@ -2873,6 +3160,8 @@ class _ChatInputBarState extends State<ChatInputBar>
         _ownsVoiceSession &&
         !_finishingVoice &&
         asr?.supportsLiveTranscript == true;
+    final showVoiceShell =
+        selectedAsrService != null && (_ownsVoiceSession || _voiceReady);
     final isDark = theme.brightness == Brightness.dark;
     final inputFillColor = _inputFillColor(
       theme: theme,
@@ -2918,357 +3207,365 @@ class _ChatInputBarState extends State<ChatInputBar>
         ? BoxConstraints(maxHeight: maxInputHeight)
         : const BoxConstraints();
 
-    return SafeArea(
-      top: false,
-      left: false,
-      right: false,
-      bottom: true,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.sm,
-          AppSpacing.xxs,
-          AppSpacing.sm,
-          AppSpacing.xs,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Main input container with iOS-like frosted glass effect
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        // Translucent background over blurred content
-                        color: inputFillColor,
-                        borderRadius: BorderRadius.circular(20),
-                        // Use previous gray border for better contrast on white
-                        border: Border.all(
-                          color: isDark
-                              ? theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.10,
-                                )
-                              : theme.colorScheme.outline.withValues(
-                                  alpha: 0.20,
-                                ),
-                          width: 1,
+    return Listener(
+      onPointerMove: _handleVoicePttPointerMove,
+      onPointerUp: _handleVoicePttPointerUp,
+      child: SafeArea(
+        top: false,
+        left: false,
+        right: false,
+        bottom: true,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.sm,
+            AppSpacing.xxs,
+            AppSpacing.sm,
+            AppSpacing.xs,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Main input container with iOS-like frosted glass effect
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          // Translucent background over blurred content
+                          color: inputFillColor,
+                          borderRadius: BorderRadius.circular(20),
+                          // Use previous gray border for better contrast on white
+                          border: Border.all(
+                            color: isDark
+                                ? theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.10,
+                                  )
+                                : theme.colorScheme.outline.withValues(
+                                    alpha: 0.20,
+                                  ),
+                            width: 1,
+                          ),
                         ),
-                      ),
-                      child: Column(
-                        children: [
-                          if (widget.hasQueuedInput) ...[
-                            _QueuedInputBanner(
-                              label: widget.queuedInputs.length > 1
-                                  ? '${AppLocalizations.of(context)!.chatInputBarQueuedPending} · ${widget.queuedInputs.length}'
-                                  : AppLocalizations.of(
-                                      context,
-                                    )!.chatInputBarQueuedPending,
-                              previewText: widget.queuedPreviewText,
-                              cancelLabel: AppLocalizations.of(
+                        child: Column(
+                          children: [
+                            if (widget.hasQueuedInput && !showVoiceShell) ...[
+                              _QueuedInputBanner(
+                                label: widget.queuedInputs.length > 1
+                                    ? '${AppLocalizations.of(context)!.chatInputBarQueuedPending} · ${widget.queuedInputs.length}'
+                                    : AppLocalizations.of(
+                                        context,
+                                      )!.chatInputBarQueuedPending,
+                                previewText: widget.queuedPreviewText,
+                                cancelLabel: AppLocalizations.of(
+                                  context,
+                                )!.chatInputBarQueuedCancel,
+                                onCancel: widget.onCancelQueuedInput,
+                                onManage: widget.queuedInputs.isEmpty
+                                    ? null
+                                    : () => unawaited(_showQueueManager()),
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                            ],
+                            if (showVoiceShell)
+                              _buildComposerVoiceShell(
                                 context,
-                              )!.chatInputBarQueuedCancel,
-                              onCancel: widget.onCancelQueuedInput,
-                              onManage: widget.queuedInputs.isEmpty
-                                  ? null
-                                  : () => unawaited(_showQueueManager()),
-                            ),
-                            const SizedBox(height: AppSpacing.xs),
-                          ],
-                          if (showGenerationDraftActions)
-                            Padding(
-                              key: const ValueKey(
-                                'composer-generation-actions',
+                                theme,
+                                selectedAsrService,
                               ),
-                              padding: const EdgeInsets.fromLTRB(
-                                AppSpacing.xs,
-                                0,
-                                AppSpacing.xs,
-                                AppSpacing.xs,
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  _CompactActionPill(
-                                    label:
-                                        Localizations.localeOf(
-                                              context,
-                                            ).languageCode ==
-                                            'zh'
-                                        ? '加入队列'
-                                        : 'Queue',
-                                    icon: Lucide.ListOrdered,
-                                    onTap: _handleSend,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  _CompactActionPill(
-                                    label:
-                                        Localizations.localeOf(
-                                              context,
-                                            ).languageCode ==
-                                            'zh'
-                                        ? '立即引导'
-                                        : 'Guide',
-                                    icon: Lucide.MessageCirclePlus,
-                                    onTap: widget.onGuide == null
-                                        ? null
-                                        : _handleGuide,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (hasDocs || hasImages)
-                            _buildInlineAttachmentPreviews(context, isDark),
-                          // Input field with expand/collapse button
-                          Stack(
-                            children: [
+                            if (showGenerationDraftActions && !showVoiceShell)
                               Padding(
+                                key: const ValueKey(
+                                  'composer-generation-actions',
+                                ),
                                 padding: const EdgeInsets.fromLTRB(
-                                  AppSpacing.md,
-                                  AppSpacing.xxs,
-                                  AppSpacing.md,
+                                  AppSpacing.xs,
+                                  0,
+                                  AppSpacing.xs,
                                   AppSpacing.xs,
                                 ),
-                                child: ConstrainedBox(
-                                  constraints: textFieldConstraints,
-                                  child: Focus(
-                                    onKeyEvent: _handleKeyEvent,
-                                    child: Builder(
-                                      builder: (ctx) {
-                                        // Desktop: show a right-click context menu with paste/cut/copy/select all
-                                        // Future<void> _showDesktopContextMenu(Offset globalPos) async {
-                                        //   bool isDesktop = false;
-                                        //   try { isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux; } catch (_) {}
-                                        //   if (!isDesktop) return;
-                                        //   // Ensure input has focus so operations apply correctly
-                                        //   try { widget.focusNode?.requestFocus(); } catch (_) {}
-                                        //
-                                        //   final sel = _controller.selection;
-                                        //   final hasSelection = sel.isValid && !sel.isCollapsed;
-                                        //   final hasText = _controller.text.isNotEmpty;
-                                        //
-                                        //   final l10n = MaterialLocalizations.of(ctx);
-                                        //   await showDesktopContextMenuAt(
-                                        //     ctx,
-                                        //     globalPosition: globalPos,
-                                        //     items: [
-                                        //       DesktopContextMenuItem(
-                                        //         icon: Lucide.Clipboard,
-                                        //         label: l10n.pasteButtonLabel,
-                                        //         onTap: () async {
-                                        //           await _handlePasteFromClipboard();
-                                        //         },
-                                        //       ),
-                                        //       DesktopContextMenuItem(
-                                        //         icon: Lucide.Cut,
-                                        //         label: l10n.cutButtonLabel,
-                                        //         onTap: () async {
-                                        //           final s = _controller.selection;
-                                        //           if (s.isValid && !s.isCollapsed) {
-                                        //             final text = _controller.text.substring(s.start, s.end);
-                                        //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
-                                        //             final newText = _controller.text.replaceRange(s.start, s.end, '');
-                                        //             _controller.value = TextEditingValue(
-                                        //               text: newText,
-                                        //               selection: TextSelection.collapsed(offset: s.start),
-                                        //             );
-                                        //             setState(() {});
-                                        //           }
-                                        //         },
-                                        //       ),
-                                        //       DesktopContextMenuItem(
-                                        //         icon: Lucide.Copy,
-                                        //         label: l10n.copyButtonLabel,
-                                        //         onTap: () async {
-                                        //           final s2 = _controller.selection;
-                                        //           if (s2.isValid && !s2.isCollapsed) {
-                                        //             final text = _controller.text.substring(s2.start, s2.end);
-                                        //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
-                                        //           }
-                                        //         },
-                                        //       ),
-                                        //       // DesktopContextMenuItem(
-                                        //       //   // icon: Lucide.TextSelect,
-                                        //       //   label: l10n.selectAllButtonLabel,
-                                        //       //   onTap: () {
-                                        //       //     if (hasText) {
-                                        //       //       _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
-                                        //       //       setState(() {});
-                                        //       //     }
-                                        //       //   },
-                                        //       // ),
-                                        //     ],
-                                        //   );
-                                        // }
-
-                                        final enterToSend = context
-                                            .watch<SettingsProvider>()
-                                            .enterToSendOnMobile;
-                                        return GestureDetector(
-                                          behavior:
-                                              HitTestBehavior.deferToChild,
-                                          // onSecondaryTapDown: (details) {
-                                          //   // _showDesktopContextMenu(details.globalPosition);
-                                          // },
-                                          child: TextField(
-                                            controller: _controller,
-                                            focusNode: widget.focusNode,
-                                            onChanged: _onTextChanged,
-                                            contentInsertionConfiguration:
-                                                ContentInsertionConfiguration(
-                                                  onContentInserted:
-                                                      _handleInsertedContent,
-                                                  allowedMimeTypes: const [
-                                                    'image/png',
-                                                    'image/jpeg',
-                                                    'image/jpg',
-                                                    'image/gif',
-                                                    'image/webp',
-                                                  ],
-                                                ),
-                                            readOnly:
-                                                _composerLocked ||
-                                                (_ownsVoiceSession &&
-                                                    !voiceTranscriptEditable),
-                                            minLines: 1,
-                                            maxLines: 6,
-                                            // On mobile, optionally show "Send" on the return key and submit on tap.
-                                            // Still keep multiline so pasted text preserves line breaks.
-                                            keyboardType:
-                                                TextInputType.multiline,
-                                            textInputAction: enterToSend
-                                                ? TextInputAction.send
-                                                : TextInputAction.newline,
-                                            onSubmitted: enterToSend
-                                                ? (_) =>
-                                                      unawaited(_handleSend())
-                                                : null,
-                                            // Custom context menu: use instance method to avoid flickering
-                                            // caused by recreating the callback on every build.
-                                            // See: https://github.com/flutter/flutter/issues/150551
-                                            contextMenuBuilder:
-                                                _buildContextMenu,
-                                            autofocus: false,
-                                            decoration: InputDecoration(
-                                              hintText: _hint(context),
-                                              hintStyle: TextStyle(
-                                                color: theme
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withValues(alpha: 0.45),
-                                              ),
-                                              border: InputBorder.none,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 2,
-                                                  ),
-                                            ),
-                                            style: TextStyle(
-                                              color:
-                                                  theme.colorScheme.onSurface,
-                                              fontSize:
-                                                  (Platform.isWindows ||
-                                                      Platform.isLinux ||
-                                                      Platform.isMacOS)
-                                                  ? 14
-                                                  : 15,
-                                            ),
-                                            cursorColor:
-                                                theme.colorScheme.primary,
-                                          ),
-                                        );
-                                      },
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    _CompactActionPill(
+                                      label:
+                                          Localizations.localeOf(
+                                                context,
+                                              ).languageCode ==
+                                              'zh'
+                                          ? '加入队列'
+                                          : 'Queue',
+                                      icon: Lucide.ListOrdered,
+                                      onTap: _handleSend,
                                     ),
-                                  ),
+                                    const SizedBox(width: 6),
+                                    _CompactActionPill(
+                                      label:
+                                          Localizations.localeOf(
+                                                context,
+                                              ).languageCode ==
+                                              'zh'
+                                          ? '立即引导'
+                                          : 'Guide',
+                                      icon: Lucide.MessageCirclePlus,
+                                      onTap: widget.onGuide == null
+                                          ? null
+                                          : _handleGuide,
+                                    ),
+                                  ],
                                 ),
                               ),
-                              // Fullscreen editing is a separate global surface. Keep
-                              // live voice edits in-place directly above the IME.
-                              if (showExpandButton && !_ownsVoiceSession)
-                                Positioned(
-                                  top: 10,
-                                  right: 12,
-                                  child: GestureDetector(
-                                    onTap: () =>
-                                        unawaited(_openFullscreenEditor()),
-                                    child: Icon(
-                                      Lucide.Maximize2,
-                                      size: 16,
-                                      color: theme.colorScheme.onSurface
-                                          .withValues(alpha: 0.45),
+                            if ((hasDocs || hasImages) && !showVoiceShell)
+                              _buildInlineAttachmentPreviews(context, isDark),
+                            // Input field with expand/collapse button
+                            if (!showVoiceShell)
+                              Stack(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      AppSpacing.md,
+                                      AppSpacing.xxs,
+                                      AppSpacing.md,
+                                      AppSpacing.xs,
+                                    ),
+                                    child: ConstrainedBox(
+                                      constraints: textFieldConstraints,
+                                      child: Focus(
+                                        onKeyEvent: _handleKeyEvent,
+                                        child: Builder(
+                                          builder: (ctx) {
+                                            // Desktop: show a right-click context menu with paste/cut/copy/select all
+                                            // Future<void> _showDesktopContextMenu(Offset globalPos) async {
+                                            //   bool isDesktop = false;
+                                            //   try { isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux; } catch (_) {}
+                                            //   if (!isDesktop) return;
+                                            //   // Ensure input has focus so operations apply correctly
+                                            //   try { widget.focusNode?.requestFocus(); } catch (_) {}
+                                            //
+                                            //   final sel = _controller.selection;
+                                            //   final hasSelection = sel.isValid && !sel.isCollapsed;
+                                            //   final hasText = _controller.text.isNotEmpty;
+                                            //
+                                            //   final l10n = MaterialLocalizations.of(ctx);
+                                            //   await showDesktopContextMenuAt(
+                                            //     ctx,
+                                            //     globalPosition: globalPos,
+                                            //     items: [
+                                            //       DesktopContextMenuItem(
+                                            //         icon: Lucide.Clipboard,
+                                            //         label: l10n.pasteButtonLabel,
+                                            //         onTap: () async {
+                                            //           await _handlePasteFromClipboard();
+                                            //         },
+                                            //       ),
+                                            //       DesktopContextMenuItem(
+                                            //         icon: Lucide.Cut,
+                                            //         label: l10n.cutButtonLabel,
+                                            //         onTap: () async {
+                                            //           final s = _controller.selection;
+                                            //           if (s.isValid && !s.isCollapsed) {
+                                            //             final text = _controller.text.substring(s.start, s.end);
+                                            //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
+                                            //             final newText = _controller.text.replaceRange(s.start, s.end, '');
+                                            //             _controller.value = TextEditingValue(
+                                            //               text: newText,
+                                            //               selection: TextSelection.collapsed(offset: s.start),
+                                            //             );
+                                            //             setState(() {});
+                                            //           }
+                                            //         },
+                                            //       ),
+                                            //       DesktopContextMenuItem(
+                                            //         icon: Lucide.Copy,
+                                            //         label: l10n.copyButtonLabel,
+                                            //         onTap: () async {
+                                            //           final s2 = _controller.selection;
+                                            //           if (s2.isValid && !s2.isCollapsed) {
+                                            //             final text = _controller.text.substring(s2.start, s2.end);
+                                            //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
+                                            //           }
+                                            //         },
+                                            //       ),
+                                            //       // DesktopContextMenuItem(
+                                            //       //   // icon: Lucide.TextSelect,
+                                            //       //   label: l10n.selectAllButtonLabel,
+                                            //       //   onTap: () {
+                                            //       //     if (hasText) {
+                                            //       //       _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
+                                            //       //       setState(() {});
+                                            //       //     }
+                                            //       //   },
+                                            //       // ),
+                                            //     ],
+                                            //   );
+                                            // }
+
+                                            final enterToSend = context
+                                                .watch<SettingsProvider>()
+                                                .enterToSendOnMobile;
+                                            return GestureDetector(
+                                              behavior:
+                                                  HitTestBehavior.deferToChild,
+                                              // onSecondaryTapDown: (details) {
+                                              //   // _showDesktopContextMenu(details.globalPosition);
+                                              // },
+                                              child: TextField(
+                                                controller: _controller,
+                                                focusNode: widget.focusNode,
+                                                onChanged: _onTextChanged,
+                                                contentInsertionConfiguration:
+                                                    ContentInsertionConfiguration(
+                                                      onContentInserted:
+                                                          _handleInsertedContent,
+                                                      allowedMimeTypes: const [
+                                                        'image/png',
+                                                        'image/jpeg',
+                                                        'image/jpg',
+                                                        'image/gif',
+                                                        'image/webp',
+                                                      ],
+                                                    ),
+                                                readOnly:
+                                                    _composerLocked ||
+                                                    (_ownsVoiceSession &&
+                                                        !voiceTranscriptEditable),
+                                                minLines: 1,
+                                                maxLines: 6,
+                                                // On mobile, optionally show "Send" on the return key and submit on tap.
+                                                // Still keep multiline so pasted text preserves line breaks.
+                                                keyboardType:
+                                                    TextInputType.multiline,
+                                                textInputAction: enterToSend
+                                                    ? TextInputAction.send
+                                                    : TextInputAction.newline,
+                                                onSubmitted: enterToSend
+                                                    ? (_) => unawaited(
+                                                        _handleSend(),
+                                                      )
+                                                    : null,
+                                                // Custom context menu: use instance method to avoid flickering
+                                                // caused by recreating the callback on every build.
+                                                // See: https://github.com/flutter/flutter/issues/150551
+                                                contextMenuBuilder:
+                                                    _buildContextMenu,
+                                                autofocus: false,
+                                                decoration: InputDecoration(
+                                                  hintText: _hint(context),
+                                                  hintStyle: TextStyle(
+                                                    color: theme
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withValues(
+                                                          alpha: 0.45,
+                                                        ),
+                                                  ),
+                                                  border: InputBorder.none,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 2,
+                                                      ),
+                                                ),
+                                                style: TextStyle(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurface,
+                                                  fontSize:
+                                                      (Platform.isWindows ||
+                                                          Platform.isLinux ||
+                                                          Platform.isMacOS)
+                                                      ? 14
+                                                      : 15,
+                                                ),
+                                                cursorColor:
+                                                    theme.colorScheme.primary,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
                                     ),
                                   ),
+                                  // Fullscreen editing is a separate global surface. Keep
+                                  // live voice edits in-place directly above the IME.
+                                  if (showExpandButton && !_ownsVoiceSession)
+                                    Positioned(
+                                      top: 10,
+                                      right: 12,
+                                      child: GestureDetector(
+                                        onTap: () =>
+                                            unawaited(_openFullscreenEditor()),
+                                        child: Icon(
+                                          Lucide.Maximize2,
+                                          size: 16,
+                                          color: theme.colorScheme.onSurface
+                                              .withValues(alpha: 0.45),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            if (!showVoiceShell)
+                              AnimatedSize(
+                                duration: const Duration(milliseconds: 180),
+                                curve: Curves.easeOutCubic,
+                                alignment: Alignment.topCenter,
+                                child:
+                                    _voiceSettingsExpanded &&
+                                        !_ownsVoiceSession &&
+                                        settings.asrServices.isNotEmpty
+                                    ? _buildInlineVoiceSettings(
+                                        context,
+                                        settings,
+                                      )
+                                    : const SizedBox.shrink(
+                                        key: ValueKey(
+                                          'voice-settings-collapsed',
+                                        ),
+                                      ),
+                              ),
+                            // Bottom buttons row (no divider)
+                            if (!showVoiceShell)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  AppSpacing.xs,
+                                  0,
+                                  AppSpacing.xs,
+                                  AppSpacing.xs,
                                 ),
-                            ],
-                          ),
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 180),
-                            curve: Curves.easeOutCubic,
-                            alignment: Alignment.topCenter,
-                            child:
-                                _voiceSettingsExpanded &&
-                                    !_ownsVoiceSession &&
-                                    settings.asrServices.isNotEmpty
-                                ? _buildInlineVoiceSettings(context, settings)
-                                : const SizedBox.shrink(
-                                    key: ValueKey('voice-settings-collapsed'),
-                                  ),
-                          ),
-                          // Bottom buttons row (no divider)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.xs,
-                              0,
-                              AppSpacing.xs,
-                              AppSpacing.xs,
-                            ),
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 260),
-                              switchInCurve: Curves.easeOutCubic,
-                              switchOutCurve: Curves.easeInCubic,
-                              transitionBuilder: (child, anim) =>
-                                  FadeTransition(
-                                    opacity: anim,
-                                    child: SlideTransition(
-                                      position: Tween<Offset>(
-                                        begin: const Offset(0, 0.35),
-                                        end: Offset.zero,
-                                      ).animate(anim),
-                                      child: child,
-                                    ),
-                                  ),
-                              child: _ownsVoiceSession
-                                  ? _buildVoiceRecordingRow(context, theme)
-                                  : Row(
-                                      key: const ValueKey('actions'),
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        // Responsive left action bar that overflows into a + menu on desktop
-                                        if (!isMobileLayout)
-                                          Expanded(
-                                            child: _buildResponsiveLeftActions(
-                                              context,
-                                            ),
-                                          )
-                                        else if (widget.showMoreButton)
-                                          _CompactIconButton(
-                                            tooltip: AppLocalizations.of(
-                                              context,
-                                            )!.chatInputBarMoreTooltip,
-                                            icon: Lucide.Plus,
-                                            active: widget.moreOpen,
-                                            onTap: _composerLocked
-                                                ? null
-                                                : widget.onMore,
-                                          ),
-                                        Row(
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 260),
+                                  switchInCurve: Curves.easeOutCubic,
+                                  switchOutCurve: Curves.easeInCubic,
+                                  transitionBuilder: (child, anim) =>
+                                      FadeTransition(
+                                        opacity: anim,
+                                        child: SlideTransition(
+                                          position: Tween<Offset>(
+                                            begin: const Offset(0, 0.35),
+                                            end: Offset.zero,
+                                          ).animate(anim),
+                                          child: child,
+                                        ),
+                                      ),
+                                  child: _ownsVoiceSession
+                                      ? _buildVoiceRecordingRow(context, theme)
+                                      : Row(
+                                          key: const ValueKey('actions'),
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
-                                            if (widget.showMoreButton &&
-                                                !isMobileLayout) ...[
+                                            // Responsive left action bar that overflows into a + menu on desktop
+                                            if (!isMobileLayout)
+                                              Expanded(
+                                                child:
+                                                    _buildResponsiveLeftActions(
+                                                      context,
+                                                    ),
+                                              )
+                                            else if (widget.showMoreButton)
                                               _CompactIconButton(
                                                 tooltip: AppLocalizations.of(
                                                   context,
@@ -3278,8 +3575,21 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                 onTap: _composerLocked
                                                     ? null
                                                     : widget.onMore,
-                                                childBuilder: (c) =>
-                                                    AnimatedSwitcher(
+                                              ),
+                                            Row(
+                                              children: [
+                                                if (widget.showMoreButton &&
+                                                    !isMobileLayout) ...[
+                                                  _CompactIconButton(
+                                                    tooltip: AppLocalizations.of(
+                                                      context,
+                                                    )!.chatInputBarMoreTooltip,
+                                                    icon: Lucide.Plus,
+                                                    active: widget.moreOpen,
+                                                    onTap: _composerLocked
+                                                        ? null
+                                                        : widget.onMore,
+                                                    childBuilder: (c) => AnimatedSwitcher(
                                                       duration: const Duration(
                                                         milliseconds: 200,
                                                       ),
@@ -3312,163 +3622,168 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                         color: c,
                                                       ),
                                                     ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                            ],
-                                            if (isMobileLayout &&
-                                                !widget.storyMode) ...[
-                                              Builder(
-                                                builder: (_) {
-                                                  final anchorKey = GlobalKey(
-                                                    debugLabel:
-                                                        'composer-reasoning-anchor',
-                                                  );
-                                                  return Container(
-                                                    key: anchorKey,
-                                                    child: _CompactIconButton(
-                                                      key: const ValueKey(
-                                                        'composer-reasoning-button',
-                                                      ),
-                                                      tooltip:
-                                                          widget
-                                                              .supportsReasoning
-                                                          ? AppLocalizations.of(
-                                                              context,
-                                                            )!.chatInputBarReasoningStrengthTooltip
-                                                          : AppLocalizations.of(
-                                                              context,
-                                                            )!.chatInputBarSelectModelTooltip,
-                                                      icon:
-                                                          widget
-                                                              .supportsReasoning
-                                                          ? Lucide.Brain
-                                                          : Lucide.Boxes,
-                                                      active:
-                                                          widget
-                                                              .supportsReasoning &&
-                                                          widget
-                                                              .reasoningActive,
-                                                      onTap: _composerLocked
-                                                          ? null
-                                                          : () => unawaited(
-                                                              _openComposerReasoning(
-                                                                anchorKey:
-                                                                    anchorKey,
-                                                              ),
-                                                            ),
-                                                      onLongPress:
-                                                          _composerLocked
-                                                          ? null
-                                                          : widget
-                                                                .onSelectModel,
-                                                      childBuilder:
-                                                          widget
-                                                              .supportsReasoning
-                                                          ? (
-                                                              color,
-                                                            ) => ReasoningIcons.budgetIcon(
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                ],
+                                                if (isMobileLayout &&
+                                                    !widget.storyMode) ...[
+                                                  Builder(
+                                                    builder: (_) {
+                                                      final anchorKey = GlobalKey(
+                                                        debugLabel:
+                                                            'composer-reasoning-anchor',
+                                                      );
+                                                      return Container(
+                                                        key: anchorKey,
+                                                        child: _CompactIconButton(
+                                                          key: const ValueKey(
+                                                            'composer-reasoning-button',
+                                                          ),
+                                                          tooltip:
                                                               widget
-                                                                  .reasoningBudget,
-                                                              size: 20,
-                                                              color: color,
-                                                            )
-                                                          : null,
-                                                    ),
-                                                  );
-                                                },
-                                              ),
-                                              const SizedBox(width: 8),
-                                            ],
-                                            if (showVoiceInput) ...[
-                                              _CompactIconButton(
-                                                tooltip: AppLocalizations.of(
-                                                  context,
-                                                )!.chatInputBarVoiceInputTooltip,
-                                                icon: Lucide.Mic,
-                                                active: _voiceSettingsExpanded,
-                                                onTap:
-                                                    _composerLocked ||
-                                                        widget.loading
-                                                    ? null
-                                                    : settings
-                                                          .asrServices
-                                                          .isEmpty
-                                                    ? () => unawaited(
-                                                        _openVoiceServicesSettings(),
-                                                      )
-                                                    : selectedVoiceServiceUsable
-                                                    ? () => unawaited(
-                                                        _startVoiceInput(),
-                                                      )
-                                                    : _toggleInlineVoiceSettings,
-                                                onLongPress:
-                                                    _composerLocked ||
-                                                        widget.loading
-                                                    ? null
-                                                    : settings
-                                                          .asrServices
-                                                          .isEmpty
-                                                    ? () => unawaited(
-                                                        _openVoiceServicesSettings(),
-                                                      )
-                                                    : _toggleInlineVoiceSettings,
-                                                allowLongPressOnDesktop:
-                                                    isMobileLayout,
-                                              ),
-                                              const SizedBox(width: 8),
-                                            ],
-                                            _CompactSendButton(
-                                              enabled:
-                                                  (hasText ||
-                                                      hasImages ||
-                                                      hasDocs) &&
-                                                  !_hasUnreadyImages &&
-                                                  !widget.loading,
-                                              loading: widget.loading,
-                                              paused: widget.generationPaused,
-                                              onSend: _handleSend,
-                                              onTogglePaused: widget
-                                                  .onToggleGenerationPaused,
-                                              color: theme.colorScheme.primary,
-                                              icon: Lucide.ArrowUp,
-                                              tooltip: widget.sendButtonTooltip,
+                                                                  .supportsReasoning
+                                                              ? AppLocalizations.of(
+                                                                  context,
+                                                                )!.chatInputBarReasoningStrengthTooltip
+                                                              : AppLocalizations.of(
+                                                                  context,
+                                                                )!.chatInputBarSelectModelTooltip,
+                                                          icon:
+                                                              widget
+                                                                  .supportsReasoning
+                                                              ? Lucide.Brain
+                                                              : Lucide.Boxes,
+                                                          active:
+                                                              widget
+                                                                  .supportsReasoning &&
+                                                              widget
+                                                                  .reasoningActive,
+                                                          onTap: _composerLocked
+                                                              ? null
+                                                              : () => unawaited(
+                                                                  _openComposerReasoning(
+                                                                    anchorKey:
+                                                                        anchorKey,
+                                                                  ),
+                                                                ),
+                                                          onLongPress:
+                                                              _composerLocked
+                                                              ? null
+                                                              : widget
+                                                                    .onSelectModel,
+                                                          allowLongPressOnDesktop:
+                                                              isMobileLayout,
+                                                          childBuilder:
+                                                              widget
+                                                                  .supportsReasoning
+                                                              ? (
+                                                                  color,
+                                                                ) => ReasoningIcons.budgetIcon(
+                                                                  widget
+                                                                      .reasoningBudget,
+                                                                  size: 20,
+                                                                  color: color,
+                                                                )
+                                                              : null,
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                ],
+                                                if (showVoiceInput) ...[
+                                                  ComposerVoiceMicTrigger(
+                                                    tooltip: AppLocalizations.of(
+                                                      context,
+                                                    )!.chatInputBarVoiceInputTooltip,
+                                                    onTap:
+                                                        _composerLocked ||
+                                                            widget.loading
+                                                        ? null
+                                                        : settings
+                                                              .asrServices
+                                                              .isEmpty
+                                                        ? () => unawaited(
+                                                            _openVoiceServicesSettings(),
+                                                          )
+                                                        : selectedVoiceServiceUsable
+                                                        ? () => unawaited(
+                                                            _startVoiceInput(),
+                                                          )
+                                                        : _toggleInlineVoiceSettings,
+                                                    onLongPressStart:
+                                                        _composerLocked ||
+                                                            widget.loading ||
+                                                            !selectedVoiceServiceUsable
+                                                        ? null
+                                                        : _beginVoicePtt,
+                                                    onLongPressMoveUpdate:
+                                                        selectedVoiceServiceUsable
+                                                        ? _updateVoicePtt
+                                                        : null,
+                                                    onLongPressEnd:
+                                                        selectedVoiceServiceUsable
+                                                        ? _endVoicePtt
+                                                        : null,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                ],
+                                                _CompactSendButton(
+                                                  enabled:
+                                                      (hasText ||
+                                                          hasImages ||
+                                                          hasDocs) &&
+                                                      !_hasUnreadyImages &&
+                                                      !widget.loading,
+                                                  loading: widget.loading,
+                                                  paused:
+                                                      widget.generationPaused,
+                                                  onSend: _handleSend,
+                                                  onTogglePaused: widget
+                                                      .onToggleGenerationPaused,
+                                                  color:
+                                                      theme.colorScheme.primary,
+                                                  icon: Lucide.ArrowUp,
+                                                  tooltip:
+                                                      widget.sendButtonTooltip,
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
-                                      ],
-                                    ),
-                            ),
-                          ),
-                        ],
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                if (_imageModeActive)
-                  PositionedDirectional(
-                    top: -12,
-                    start: AppSpacing.sm,
-                    child: _ImageModePill(
-                      label: AppLocalizations.of(
-                        context,
-                      )!.chatInputBarImageMode,
-                      closeTooltip: AppLocalizations.of(
-                        context,
-                      )!.chatInputBarDisableImageModeTooltip,
-                      onClose: _composerLocked
-                          ? null
-                          : () {
-                              final key = _imageModeModelKey;
-                              if (key == null) return;
-                              setState(() {
-                                _dismissedImageModeModelKey = key;
-                              });
-                            },
+                  if (_imageModeActive)
+                    PositionedDirectional(
+                      top: -12,
+                      start: AppSpacing.sm,
+                      child: _ImageModePill(
+                        label: AppLocalizations.of(
+                          context,
+                        )!.chatInputBarImageMode,
+                        closeTooltip: AppLocalizations.of(
+                          context,
+                        )!.chatInputBarDisableImageModeTooltip,
+                        onClose: _composerLocked
+                            ? null
+                            : () {
+                                final key = _imageModeModelKey;
+                                if (key == null) return;
+                                setState(() {
+                                  _dismissedImageModeModelKey = key;
+                                });
+                              },
+                      ),
                     ),
-                  ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
