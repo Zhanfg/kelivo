@@ -1,0 +1,72 @@
+name: Story Test Shards
+
+on:
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: story-test-shards-${{ github.event.pull_request.number }}-${{ github.sha }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+
+jobs:
+  shard:
+    name: Non-baseline tests / shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Run shard
+        shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARD_COUNT: '6'
+        run: |
+          set -euo pipefail
+          mapfile -t all_files < <(
+            find test -type f -name '*_test.dart' | sort \
+              | grep -v '^test/core/services/backup/backup_progress_kernel_test.dart$' \
+              | grep -v '^test/core/services/backup/restore_bundle_staging_test.dart$'
+          )
+          selected=()
+          for i in "${!all_files[@]}"; do
+            if (( i % SHARD_COUNT == SHARD )); then
+              selected+=("${all_files[$i]}")
+            fi
+          done
+
+          echo "Shard ${SHARD}/${SHARD_COUNT}: ${#selected[@]} non-baseline test files"
+          printf '%s\n' "${selected[@]}"
+
+          set +e
+          flutter test --concurrency=1 --reporter expanded "${selected[@]}" > /tmp/flutter-test-shard.log 2>&1
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ]; then
+            echo "::group::Shard failure tail"
+            tail -n 250 /tmp/flutter-test-shard.log
+            echo "::endgroup::"
+          else
+            tail -n 40 /tmp/flutter-test-shard.log
+          fi
+          exit "$status"

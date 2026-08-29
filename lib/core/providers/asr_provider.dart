@@ -90,6 +90,15 @@ class AsrProvider extends ChangeNotifier {
       _state == AsrSessionState.transcribing;
   bool get isListening => _state == AsrSessionState.listening;
 
+  /// Whether the active recognizer can publish transcript updates before
+  /// recording finishes. Offline Sherpa currently buffers the whole clip and
+  /// only transcribes after Stop; system and cloud sessions publish partials.
+  bool get supportsLiveTranscript => switch (_activeService) {
+    SherpaOnnxAsrOptions() => false,
+    null => false,
+    _ => true,
+  };
+
   bool canUse(AsrServiceOptions? options) {
     if (options == null || !options.isConfigured) return false;
     return switch (options) {

@@ -63,7 +63,13 @@ final class RestoreBundleStaging {
   static const workspaceRootName = RestoreWorkspaceLock.workspaceRootName;
   static const _backupFormat = 'kelivo-backup';
   static const _backupFormatVersion = 2;
-  static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];
+  static const _assetRoots = [
+    'upload',
+    'images',
+    'avatars',
+    'fonts',
+    'story_skills',
+  ];
   static const _databaseEntry = 'database/kelivo.db';
   static const _maximumManifestBytes = 16 * 1024 * 1024;
   // Settings contain structured preferences, never chat rows or binary assets.
@@ -887,7 +893,10 @@ final class RestoreBundleStaging {
     BackupCancelToken? cancelToken,
   }) async {
     final databaseInfo =
-        await runBackupIsolate<ChatDatabaseSnapshotInfo, _CandidateDbIsolateArgs>(
+        await runBackupIsolate<
+          ChatDatabaseSnapshotInfo,
+          _CandidateDbIsolateArgs
+        >(
           body: _prepareCandidateDatabaseInIsolate,
           payload: _CandidateDbIsolateArgs(
             databasePath: databaseFile.path,
@@ -903,8 +912,7 @@ final class RestoreBundleStaging {
           cancelToken: cancelToken,
           onProgress: onProgress,
           timeout: debugIsolateTimeout,
-          killGrace:
-              debugIsolateKillGrace ?? const Duration(seconds: 3),
+          killGrace: debugIsolateKillGrace ?? const Duration(seconds: 3),
           isolateExitDeadline:
               debugIsolateExitDeadline ?? const Duration(seconds: 2),
         );
@@ -960,10 +968,7 @@ final class RestoreBundleStaging {
       includeFiles: candidate.includeFiles,
     );
     ctx.throwIfCancelled();
-    await _validateCandidateEntries(
-      candidateDirectory,
-      candidate.entries,
-    );
+    await _validateCandidateEntries(candidateDirectory, candidate.entries);
     ctx.throwIfCancelled();
     return candidate;
   }

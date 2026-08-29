@@ -2343,8 +2343,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           ? (isDark
                 ? cs.primary.withValues(alpha: 0.15)
                 : cs.primary.withValues(alpha: 0.08))
-          : null,
-      bareOnDefault: !isUser,
+          : cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.06),
       isUser: isUser,
       child: child,
     );
@@ -2415,14 +2414,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
   }
 
+  /// Assistant bubbles always hug their content; long text still wraps at the
+  /// same maximum width.
+  Widget _assistantBlockWidth(BuildContext context, {required Widget child}) {
+    return Align(alignment: Alignment.centerLeft, child: child);
+  }
+
   Widget _buildAssistantTextBlock(
     BuildContext context,
     String visualContent,
     bool enableAssistantMarkdown,
     Map<String, String> citationIndexLookup,
   ) {
-    return SizedBox(
-      width: double.infinity,
+    return _assistantBlockWidth(
+      context,
       child: _buildAssistantBubbleContainer(
         context: context,
         child: _buildAssistantTextContent(
@@ -2779,12 +2784,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   widget.message.isStreaming &&
                   visualContent.isEmpty) {
                 return <Widget>[
-                  SizedBox(
-                    width: double.infinity,
+                  _assistantBlockWidth(
+                    context,
                     child: _buildAssistantBubbleContainer(
                       context: context,
                       child: Align(
                         alignment: Alignment.centerLeft,
+                        // widthFactor keeps the waiting bubble from filling a
+                        // loose row under the fit-content option; with tight
+                        // constraints (option off) Align ignores it.
+                        widthFactor: 1,
                         child: Semantics(
                           label: l10n.chatMessageWidgetThinking,
                           child: widget.hideStreamingIndicator

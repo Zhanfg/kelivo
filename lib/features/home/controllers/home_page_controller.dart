@@ -4,6 +4,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
@@ -49,6 +50,8 @@ import '../services/file_upload_service.dart';
 import '../utils/chat_layout_constants.dart';
 import '../widgets/chat_input_bar.dart';
 import '../../model/widgets/model_select_sheet.dart';
+import '../../story_runtime/orchestration/story_native_lifecycle_bridge.dart';
+import '../../story_runtime/voice/story_voice_playback_service.dart';
 
 enum ChatSelectionMode { share, delete }
 
@@ -336,8 +339,13 @@ class HomePageController extends ChangeNotifier {
 
   bool get isCurrentConversationLoading =>
       _viewModel.isCurrentConversationLoading;
+  bool get isCurrentConversationGenerating =>
+      _viewModel.isCurrentConversationGenerating;
+  bool get isCurrentGenerationPaused => _viewModel.isCurrentGenerationPaused;
 
   QueuedChatInput? get currentQueuedInput => _viewModel.currentQueuedInput;
+  List<QueuedChatInput> get currentQueuedInputs =>
+      _viewModel.currentQueuedInputs;
 
   ValueNotifier<String?> get processingFilesMessageId =>
       _viewModel.processingFilesMessageId;
@@ -925,6 +933,12 @@ class HomePageController extends ChangeNotifier {
     return result;
   }
 
+  Future<ChatInputSubmissionResult> guideMessage(ChatInputData input) async {
+    final result = await _viewModel.guideMessage(input);
+    if (result != ChatInputSubmissionResult.rejected) notifyListeners();
+    return result;
+  }
+
   Future<void> sendSuggestion(String suggestion) async {
     final text = suggestion.trim();
     if (text.isEmpty) return;
@@ -964,18 +978,40 @@ class HomePageController extends ChangeNotifier {
     final restored = _viewModel.cancelCurrentQueuedInput();
     if (restored == null) return;
 
+    final current = _mediaController.snapshotInput(_inputController.text);
+    final restoredText = restored.text.trim();
+    final currentText = current.text.trim();
+    final merged = ChatInputData(
+      text: [
+        if (restoredText.isNotEmpty) restoredText,
+        if (currentText.isNotEmpty) currentText,
+      ].join('\n'),
+      imagePaths: [...restored.imagePaths, ...current.imagePaths],
+      documents: [...restored.documents, ...current.documents],
+      allowImagesApiRouting:
+          restored.allowImagesApiRouting && current.allowImagesApiRouting,
+    );
+
     _inputController.value = TextEditingValue(
-      text: restored.text,
-      selection: TextSelection.collapsed(offset: restored.text.length),
+      text: merged.text,
+      selection: TextSelection.collapsed(offset: merged.text.length),
       composing: TextRange.empty,
     );
-    _mediaController.restoreInput(restored);
+    _mediaController.restoreInput(merged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_context.mounted) return;
       _inputFocus.requestFocus();
     });
     notifyListeners();
   }
+
+  void removeQueuedMessageAt(int index) =>
+      _viewModel.removeCurrentQueuedInputAt(index);
+
+  void clearQueuedMessages() => _viewModel.clearCurrentQueuedInputs();
+
+  void reorderQueuedMessage(int oldIndex, int newIndex) =>
+      _viewModel.reorderCurrentQueuedInput(oldIndex, newIndex);
 
   Future<void> regenerateAtMessage(
     ChatMessage message, {
@@ -1059,6 +1095,12 @@ class HomePageController extends ChangeNotifier {
       message,
       allowImagesApiRouting: _mediaController.allowImagesApiRouting,
     );
+  }
+
+  void toggleGenerationPaused() {
+    if (_viewModel.toggleCurrentGenerationPaused()) {
+      notifyListeners();
+    }
   }
 
   Future<void> cancelStreaming() async {
@@ -1713,6 +1755,7 @@ class HomePageController extends ChangeNotifier {
 
   void _handleAssistantMessageFinished(ChatMessage message) {
     if (!_context.mounted || message.role != 'assistant') return;
+    unawaited(_commitStoryFinalizedAssistant(message));
     final settings = _context.read<SettingsProvider>();
     final shouldNotify = NotificationService.shouldShowChatCompleted(
       isAndroid: _isAndroid,
@@ -1736,6 +1779,17 @@ class HomePageController extends ChangeNotifier {
 
     if (settings.ttsAutoPlayAssistantReplies) {
       unawaited(_speakAssistantMessage(message, autoPlay: true));
+    }
+  }
+
+  Future<void> _commitStoryFinalizedAssistant(ChatMessage message) async {
+    try {
+      final preferences = _context.read<BusinessPreferences>();
+      await StoryNativeLifecycleBridge(
+        preferences,
+      ).commitFinalizedAssistant(message);
+    } catch (error) {
+      debugPrint('Story finalize bridge failed: $error');
     }
   }
 
@@ -1793,6 +1847,33 @@ class HomePageController extends ChangeNotifier {
       mode: sp.ttsTextSelectionMode,
     );
     if (text.trim().isEmpty) return;
+
+    try {
+      final preferences = _context.read<BusinessPreferences>();
+      final bridge = StoryNativeLifecycleBridge(preferences);
+      final narrator = await bridge.resolveNarratorAssignment(message);
+      if (narrator != null) {
+        final voiceContext = await bridge.resolveNarratorContext(message);
+        await StoryVoicePlaybackService(
+          preferences: preferences,
+          ttsProvider: tts,
+        ).speakAssignment(
+          assignment: narrator,
+          text: text,
+          context: voiceContext,
+        );
+        return;
+      }
+    } catch (error) {
+      debugPrint('Story narrator playback failed: $error');
+    }
+
+    final selectedService = sp.selectedTtsService;
+    if (selectedService != null && selectedService.enabled) {
+      await tts.speakWithNetworkService(selectedService, text);
+      return;
+    }
+
     await tts.speak(text);
   }
 

@@ -20,6 +20,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/services/backup/data_sync.dart';
+import '../encrypted_full_backup_actions.dart';
 import '../backup_task_runner.dart';
 import '../widgets/backup_progress_dialog.dart';
 import '../../../core/services/native_file_save.dart';
@@ -637,11 +638,13 @@ class _BackupPageState extends State<BackupPage> {
                                                   item,
                                                   mode: mode,
                                                   onProgress: handle.report,
-                                                  cancelToken: handle.cancelToken,
+                                                  cancelToken:
+                                                      handle.cancelToken,
                                                 ),
                                               );
                                             } catch (e) {
-                                              if (e is BackupCancelledException) {
+                                              if (e
+                                                  is BackupCancelledException) {
                                                 return;
                                               }
                                               if (!context.mounted) return;
@@ -1059,15 +1062,18 @@ class _BackupPageState extends State<BackupPage> {
                                             try {
                                               await _runWithImportingOverlay(
                                                 context,
-                                                (handle) => s3Vm.restoreFromItem(
-                                                  item,
-                                                  mode: mode,
-                                                  onProgress: handle.report,
-                                                  cancelToken: handle.cancelToken,
-                                                ),
+                                                (handle) =>
+                                                    s3Vm.restoreFromItem(
+                                                      item,
+                                                      mode: mode,
+                                                      onProgress: handle.report,
+                                                      cancelToken:
+                                                          handle.cancelToken,
+                                                    ),
                                               );
                                             } catch (e) {
-                                              if (e is BackupCancelledException) {
+                                              if (e
+                                                  is BackupCancelledException) {
                                                 return;
                                               }
                                               if (!context.mounted) return;
@@ -1224,6 +1230,24 @@ class _BackupPageState extends State<BackupPage> {
       header(l10n.backupPageLocalBackup),
       _iosSectionCard(
         children: [
+          _iosNavRow(
+            context,
+            icon: Lucide.Export,
+            label: Localizations.localeOf(context).languageCode.startsWith('zh')
+                ? '导出完整加密备份'
+                : 'Export encrypted complete backup',
+            onTap: () => exportEncryptedFullBackupAction(context, vm),
+          ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.Import2,
+            label: Localizations.localeOf(context).languageCode.startsWith('zh')
+                ? '恢复完整加密备份'
+                : 'Restore encrypted complete backup',
+            onTap: () => importEncryptedFullBackupAction(context, vm),
+          ),
+          _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Export,

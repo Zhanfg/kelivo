@@ -21,6 +21,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
+import '../../story_runtime/ui/story_conversation_mode_control.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -37,14 +38,12 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.title,
     required this.providerName,
     required this.modelDisplay,
-    // Sidebar state
     required this.tabletSidebarOpen,
     required this.rightSidebarOpen,
     required this.embeddedSidebarWidth,
     required this.rightSidebarWidth,
     required this.sidebarMinWidth,
     required this.sidebarMaxWidth,
-    // Callbacks
     required this.onToggleSidebar,
     required this.onToggleRightSidebar,
     required this.onSelectConversation,
@@ -73,16 +72,12 @@ class HomeDesktopScaffold extends StatelessWidget {
   final String title;
   final String? providerName;
   final String? modelDisplay;
-
-  // Sidebar state
   final bool tabletSidebarOpen;
   final bool rightSidebarOpen;
   final double embeddedSidebarWidth;
   final double rightSidebarWidth;
   final double sidebarMinWidth;
   final double sidebarMaxWidth;
-
-  // Callbacks
   final VoidCallback onToggleSidebar;
   final VoidCallback onToggleRightSidebar;
   final void Function(String id) onSelectConversation;
@@ -124,9 +119,7 @@ class HomeDesktopScaffold extends StatelessWidget {
       child: SizedBox.expand(
         child: Row(
           children: [
-            // Left sidebar
             _buildLeftSidebar(context, cs, topicsOnRight),
-            // Left sidebar resize handle / divider
             if (_isDesktop)
               SidebarResizeHandle(
                 visible: tabletSidebarOpen,
@@ -146,7 +139,6 @@ class HomeDesktopScaffold extends StatelessWidget {
                       )
                     : const SizedBox.shrink(),
               ),
-            // Main content
             Expanded(
               child: Scaffold(
                 key: scaffoldKey,
@@ -158,7 +150,6 @@ class HomeDesktopScaffold extends StatelessWidget {
                 body: body,
               ),
             ),
-            // Right sidebar (desktop only with topics on right)
             _buildRightSidebar(context, cs, topicsOnRight),
           ],
         ),
@@ -307,7 +298,7 @@ class HomeDesktopScaffold extends StatelessWidget {
         onTap: onToggleSidebar,
       ),
       titleSpacing: 2,
-      title: _buildTitle(context, cs),
+      title: StoryConversationModeTitle(fallback: _buildTitle(context, cs)),
       actions: _buildActions(context, topicsOnRight),
     );
   }
@@ -543,7 +534,6 @@ class HomeDesktopScaffold extends StatelessWidget {
 
   List<Widget> _buildActions(BuildContext context, bool topicsOnRight) {
     return [
-      // Right sidebar toggle (desktop + topics on right)
       if (_isDesktop && topicsOnRight)
         IosIconButton(
           size: 20,
@@ -552,6 +542,7 @@ class HomeDesktopScaffold extends StatelessWidget {
           icon: Lucide.panelRight,
           onTap: onToggleRightSidebar,
         ),
+      const StoryConversationModeAction(),
       const SizedBox(width: 2),
       IosIconButton(
         size: 20,
@@ -584,7 +575,6 @@ class HomeDesktopScaffold extends StatelessWidget {
   }
 }
 
-/// Sidebar resize handle widget for desktop
 class SidebarResizeHandle extends StatefulWidget {
   const SidebarResizeHandle({
     super.key,
@@ -634,7 +624,6 @@ class _SidebarResizeHandleState extends State<SidebarResizeHandle> {
   }
 }
 
-/// Desktop background widget with assistant-specific image
 class DesktopBackgroundLayer extends StatelessWidget {
   const DesktopBackgroundLayer({super.key});
 
@@ -687,7 +676,6 @@ class DesktopBackgroundLayer extends StatelessWidget {
   }
 }
 
-/// Scroll navigation buttons for desktop (same as mobile but with different padding)
 class DesktopScrollNavigationButtons extends StatelessWidget {
   const DesktopScrollNavigationButtons({
     super.key,
@@ -714,7 +702,6 @@ class DesktopScrollNavigationButtons extends StatelessWidget {
 
     return Stack(
       children: [
-        // Scroll to bottom button
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(
@@ -743,7 +730,6 @@ class DesktopScrollNavigationButtons extends StatelessWidget {
             ),
           ),
         ),
-        // Scroll to previous message button
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(
@@ -832,7 +818,6 @@ class _DesktopScrollButton extends StatelessWidget {
   }
 }
 
-/// Selection mode toolbar overlay for desktop
 class DesktopSelectionToolbarOverlay extends StatelessWidget {
   const DesktopSelectionToolbarOverlay({
     super.key,

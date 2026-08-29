@@ -14,11 +14,16 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/database/business_preferences.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
+import '../../story_runtime/ui/story_conversation_mode_control.dart';
+import '../../story_runtime/orchestration/story_mode_transition_service.dart';
+import '../../story_runtime/ui/story_workspace_drawer.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -94,28 +99,52 @@ class HomeMobileScaffold extends StatelessWidget {
       scrimColor: cs.onSurface,
       maxScrimOpacity: 0.12,
       barrierDismissible: true,
-      drawer: SideDrawer(
-        userName: context.watch<UserProvider>().name,
-        assistantName: _getAssistantName(context),
-        closePickerTicker: assistantPickerCloseTick,
-        loadingConversationIds: loadingConversationIds,
-        globalSearchMode: globalSearchMode,
-        globalSearchQuery: globalSearchQuery,
-        onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
-        onEnterGlobalSearch: onEnterGlobalSearch,
-        onExitGlobalSearch: onExitGlobalSearch,
-        onOpenGlobalSearchResult: (conversationId, messageId) async {
-          await onOpenGlobalSearchResult(conversationId, messageId);
-          drawerController.close();
-        },
-        onSelectConversation: (id, {closeDrawer = true}) {
-          onSelectConversation(id);
-          if (closeDrawer) drawerController.close();
-        },
-        onNewConversation: ({closeDrawer = true}) async {
-          await onCreateNewConversation();
-          if (closeDrawer) drawerController.close();
-        },
+      drawer: ValueListenableBuilder<int>(
+        valueListenable: storyConversationModeRevision,
+        builder: (context, _, _) =>
+            isStoryWorkspaceSelected(context.read<BusinessPreferences>())
+            ? StoryWorkspaceDrawer(
+                onSelectStory: (id) {
+                  onSelectConversation(id);
+                  drawerController.close();
+                },
+                onNewStory: () async {
+                  await onCreateNewConversation();
+                  if (!context.mounted) return;
+                  final id = context.read<ChatService>().currentConversationId;
+                  if (id != null) {
+                    await StoryModeTransitionService(
+                      preferences: context.read<BusinessPreferences>(),
+                      chatService: context.read<ChatService>(),
+                    ).setMode(conversationId: id, storyEnabled: true);
+                    storyConversationModeRevision.value++;
+                  }
+                  drawerController.close();
+                },
+              )
+            : SideDrawer(
+                userName: context.watch<UserProvider>().name,
+                assistantName: _getAssistantName(context),
+                closePickerTicker: assistantPickerCloseTick,
+                loadingConversationIds: loadingConversationIds,
+                globalSearchMode: globalSearchMode,
+                globalSearchQuery: globalSearchQuery,
+                onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
+                onEnterGlobalSearch: onEnterGlobalSearch,
+                onExitGlobalSearch: onExitGlobalSearch,
+                onOpenGlobalSearchResult: (conversationId, messageId) async {
+                  await onOpenGlobalSearchResult(conversationId, messageId);
+                  drawerController.close();
+                },
+                onSelectConversation: (id, {closeDrawer = true}) {
+                  onSelectConversation(id);
+                  if (closeDrawer) drawerController.close();
+                },
+                onNewConversation: ({closeDrawer = true}) async {
+                  await onCreateNewConversation();
+                  if (closeDrawer) drawerController.close();
+                },
+              ),
       ),
       child: ChatFrostedBackdrop(
         backdrop: const MobileBackgroundLayer(),
@@ -147,6 +176,84 @@ class HomeMobileScaffold extends StatelessWidget {
         .watch<SettingsProvider>()
         .useNewAssistantAvatarUx;
 
+    final nativeTitle = useNewAssistantAvatarUx
+        ? Row(
+            children: [
+              _buildAssistantTitleAvatar(context),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedTextSwap(
+                      text: title,
+                      style: TextStyle(
+                        fontSize: isDesktopPlatform ? 14 : 16,
+                        fontWeight: AppFontWeights.medium,
+                      ),
+                    ),
+                    if (providerName != null && modelDisplay != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(6),
+                          onTap: onSelectModel,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            child: AnimatedTextSwap(
+                              text: '$modelDisplay ($providerName)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurface.withValues(alpha: 0.6),
+                                fontWeight: AppFontWeights.medium,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedTextSwap(
+                text: title,
+                style: TextStyle(
+                  fontSize: isDesktopPlatform ? 14 : 16,
+                  fontWeight: AppFontWeights.medium,
+                ),
+              ),
+              if (providerName != null && modelDisplay != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: onSelectModel,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 0),
+                      child: AnimatedTextSwap(
+                        text: '$modelDisplay ($providerName)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                          fontWeight: AppFontWeights.medium,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+
     return AppBar(
       systemOverlayStyle: (Theme.of(context).brightness == Brightness.dark)
           ? const SystemUiOverlayStyle(
@@ -165,7 +272,8 @@ class HomeMobileScaffold extends StatelessWidget {
       scrolledUnderElevation: 0,
       leading: Builder(
         builder: (context) {
-          return IosIconButton(
+          final drawerController = InteractiveDrawer.maybeControllerOf(context);
+          final button = IosIconButton(
             size: 20,
             padding: const EdgeInsets.all(8),
             minSize: 40,
@@ -180,87 +288,23 @@ class HomeMobileScaffold extends StatelessWidget {
               onToggleDrawer();
             },
           );
+          if (drawerController == null) return button;
+          return AnimatedBuilder(
+            animation: drawerController,
+            builder: (context, _) {
+              final drawerOpen = drawerController.value > 0.01;
+              return IgnorePointer(
+                ignoring: drawerOpen,
+                child: Opacity(opacity: drawerOpen ? 0 : 1, child: button),
+              );
+            },
+          );
         },
       ),
       titleSpacing: 2,
-      title: useNewAssistantAvatarUx
-          ? Row(
-              children: [
-                _buildAssistantTitleAvatar(context),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedTextSwap(
-                        text: title,
-                        style: TextStyle(
-                          fontSize: isDesktopPlatform ? 14 : 16,
-                          fontWeight: AppFontWeights.medium,
-                        ),
-                      ),
-                      if (providerName != null && modelDisplay != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(6),
-                            onTap: onSelectModel,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 0),
-                              child: AnimatedTextSwap(
-                                text: '$modelDisplay ($providerName)',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: cs.onSurface.withValues(alpha: 0.6),
-                                  fontWeight: AppFontWeights.medium,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedTextSwap(
-                  text: title,
-                  style: TextStyle(
-                    fontSize: isDesktopPlatform ? 14 : 16,
-                    fontWeight: AppFontWeights.medium,
-                  ),
-                ),
-                if (providerName != null && modelDisplay != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(6),
-                      onTap: onSelectModel,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 0),
-                        child: AnimatedTextSwap(
-                          text: '$modelDisplay ($providerName)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: cs.onSurface.withValues(alpha: 0.6),
-                            fontWeight: AppFontWeights.medium,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+      title: StoryConversationModeTitle(fallback: nativeTitle),
       actions: [
+        const StoryConversationModeAction(),
         IosIconButton(
           size: 20,
           minSize: 44,
@@ -420,7 +464,6 @@ class ScrollNavigationButtons extends StatelessWidget {
 
     return Stack(
       children: [
-        // Scroll to bottom button
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(
@@ -449,7 +492,6 @@ class ScrollNavigationButtons extends StatelessWidget {
             ),
           ),
         ),
-        // Scroll to previous message button
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(

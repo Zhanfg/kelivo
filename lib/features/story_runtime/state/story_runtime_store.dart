@@ -1,0 +1,135 @@
+import '../../../core/services/json_blob_store.dart';
+import 'story_runtime_state.dart';
+
+abstract interface class StoryRuntimeSessionRepository {
+  Future<StoryRuntimeSessionState?> readForConversation(String conversationId);
+
+  Future<StoryRuntimeSessionState> readOrDefault(String conversationId);
+
+  Future<void> upsert(StoryRuntimeSessionState state);
+
+  Future<void> setEnabled(String conversationId, bool enabled);
+
+  Future<void> removeForConversation(String conversationId);
+}
+
+/// Versioned Story Mode state keyed by conversation id.
+///
+/// This deliberately uses Kelivo's existing business-preference repository
+/// instead of adding fields to Conversation/Hive/Drift. Story Mode therefore
+/// remains opt-in without changing Chat Mode's persistence contract.
+final class StoryRuntimeStore extends JsonBlobStore<StoryRuntimeSessionState>
+    implements StoryRuntimeSessionRepository {
+  StoryRuntimeStore(super.preferences);
+
+  static const String key = 'story_runtime_sessions_v1';
+
+  @override
+  String get storageKey => key;
+
+  @override
+  StoryRuntimeSessionState decodeItem(Map<String, dynamic> json) =>
+      StoryRuntimeSessionState.fromJson(json);
+
+  @override
+  Map<String, dynamic> encodeItem(StoryRuntimeSessionState item) =>
+      item.toJson();
+
+  @override
+  Future<StoryRuntimeSessionState?> readForConversation(
+    String conversationId,
+  ) async {
+    final id = _normalizeConversationId(conversationId);
+    final items = await readAll();
+    for (final item in items) {
+      if (item.conversationId == id) return item;
+    }
+    return null;
+  }
+
+  @override
+  Future<StoryRuntimeSessionState> readOrDefault(String conversationId) async {
+    final id = _normalizeConversationId(conversationId);
+    return await readForConversation(id) ??
+        StoryRuntimeSessionState(conversationId: id);
+  }
+
+  @override
+  Future<void> upsert(StoryRuntimeSessionState state) {
+    return runExclusive(() async {
+      final items = await readAll();
+      final next = <StoryRuntimeSessionState>[];
+      var replaced = false;
+      for (final item in items) {
+        if (item.conversationId != state.conversationId) {
+          next.add(item);
+          continue;
+        }
+        if (!replaced) {
+          next.add(state);
+          replaced = true;
+        }
+      }
+      if (!replaced) next.add(state);
+      next.sort((a, b) => a.conversationId.compareTo(b.conversationId));
+      await writeAll(next);
+    });
+  }
+
+  /// Explicitly selects Chat (`enabled == false`) or Story (`enabled == true`).
+  ///
+  /// This operation never deletes Story sidecar state. Switching Story off
+  /// merely stops Story Runtime participation for future requests; switching it
+  /// back on can continue the existing World Tree/worldline state.
+  @override
+  Future<void> setEnabled(String conversationId, bool enabled) {
+    return runExclusive(() async {
+      final id = _normalizeConversationId(conversationId);
+      final items = await readAll();
+      final next = <StoryRuntimeSessionState>[];
+      var replaced = false;
+      for (final item in items) {
+        if (item.conversationId != id) {
+          next.add(item);
+          continue;
+        }
+        if (!replaced) {
+          next.add(
+            item.copyWith(enabled: enabled, modeSelectionCommitted: true),
+          );
+          replaced = true;
+        }
+      }
+      if (!replaced) {
+        next.add(
+          StoryRuntimeSessionState(
+            conversationId: id,
+            enabled: enabled,
+            modeSelectionCommitted: true,
+          ),
+        );
+      }
+      next.sort((a, b) => a.conversationId.compareTo(b.conversationId));
+      await writeAll(next);
+    });
+  }
+
+  @override
+  Future<void> removeForConversation(String conversationId) {
+    return runExclusive(() async {
+      final id = _normalizeConversationId(conversationId);
+      final items = await readAll();
+      final next = items
+          .where((item) => item.conversationId != id)
+          .toList(growable: false);
+      if (next.length == items.length) return;
+      await writeAll(next);
+    });
+  }
+}
+
+String _normalizeConversationId(String value) {
+  final id = value.trim();
+  if (id.isEmpty) throw ArgumentError.value(value, 'conversationId');
+  return id;
+}

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/chat_input_data.dart';
 import '../../../core/providers/asr_provider.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
-import '../../../core/providers/instruction_injection_provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../utils/model_display_helper.dart';
 import 'chat_input_bar.dart';
@@ -37,6 +37,8 @@ class ChatInputSection extends StatelessWidget {
     required this.mediaController,
     required this.isTablet,
     required this.isLoading,
+    this.isGenerationPaused = false,
+    this.onToggleGenerationPaused,
     required this.isToolModel,
     required this.isReasoningModel,
     required this.isReasoningEnabled,
@@ -47,11 +49,18 @@ class ChatInputSection extends StatelessWidget {
     this.onLongPressMcp,
     this.onOpenSearch,
     this.onConfigureReasoning,
+    this.onReasoningBudgetChanged,
+    this.onComposerModelChanged,
     this.onSend,
+    this.onGuide,
     this.onStop,
     this.hasQueuedInput = false,
     this.queuedPreviewText,
+    this.queuedInputs = const <QueuedChatInput>[],
     this.onCancelQueuedInput,
+    this.onRemoveQueuedInput,
+    this.onClearQueuedInputs,
+    this.onReorderQueuedInput,
     this.onQuickPhrase,
     this.onLongPressQuickPhrase,
     this.onToggleOcr,
@@ -60,13 +69,14 @@ class ChatInputSection extends StatelessWidget {
     this.onPickPhotos,
     this.onUploadFiles,
     this.onToggleLearningMode,
-    this.onOpenWorldBook, // 新增世界书支持桌面端
+    this.onOpenWorldBook,
     this.onLongPressLearning,
     this.onClearContext,
     this.onCompressContext,
     this.conversationId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
+    this.storyMode = false,
   });
 
   final GlobalKey inputBarKey;
@@ -75,13 +85,13 @@ class ChatInputSection extends StatelessWidget {
   final ChatInputBarController mediaController;
   final bool isTablet;
   final bool isLoading;
+  final bool isGenerationPaused;
+  final VoidCallback? onToggleGenerationPaused;
 
-  // Model capability checkers
   final IsToolModelCallback isToolModel;
   final IsReasoningModelCallback isReasoningModel;
   final IsReasoningEnabledCallback isReasoningEnabled;
 
-  // Callbacks
   final VoidCallback? onMore;
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
@@ -89,11 +99,19 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onLongPressMcp;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
+  final Future<void> Function(int budget)? onReasoningBudgetChanged;
+  final Future<void> Function(String providerKey, String modelId)?
+  onComposerModelChanged;
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
+  final Future<ChatInputSubmissionResult> Function(ChatInputData)? onGuide;
   final VoidCallback? onStop;
   final bool hasQueuedInput;
   final String? queuedPreviewText;
+  final List<QueuedChatInput> queuedInputs;
   final VoidCallback? onCancelQueuedInput;
+  final ValueChanged<int>? onRemoveQueuedInput;
+  final VoidCallback? onClearQueuedInputs;
+  final void Function(int oldIndex, int newIndex)? onReorderQueuedInput;
   final VoidCallback? onQuickPhrase;
   final VoidCallback? onLongPressQuickPhrase;
   final VoidCallback? onToggleOcr;
@@ -109,6 +127,7 @@ class ChatInputSection extends StatelessWidget {
   final String? conversationId;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
+  final bool storyMode;
 
   @override
   Widget build(BuildContext context) {
@@ -118,101 +137,124 @@ class ChatInputSection extends StatelessWidget {
     final a = ap.currentAssistant;
     final assistantId = a?.id;
 
-    // Use unified helper to get model identifiers
     final modelIds = getActiveModelIds(settings, assistant: a);
     final pk = modelIds.providerKey;
     final mid = modelIds.modelId;
 
-    // Enforce model capabilities: disable MCP selection if model doesn't support tools
     _enforceModelCapabilities(context, settings, ap, a, pk, mid);
 
     final isDesktop = _isDesktopPlatform(context);
     final hasWorldBooks =
         isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
 
-    return ChatInputBar(
-      key: inputBarKey,
-      onMore: onMore,
-      onSelectModel: onSelectModel,
-      onLongPressSelectModel: onLongPressSelectModel,
-      conversationId: conversationId,
-      onOpenMcp: onOpenMcp,
-      onLongPressMcp: onLongPressMcp,
-      onStop: onStop,
-      modelIcon: (pk != null && mid != null)
-          ? CurrentModelIcon(
-              providerKey: pk,
-              modelId: mid,
-              size: 40,
-              withBackground: true,
-              backgroundColor: Colors.transparent,
-            )
-          : null,
-      focusNode: inputFocus,
-      controller: inputController,
-      mediaController: mediaController,
-      asrProvider: asr,
-      onConfigureReasoning: onConfigureReasoning,
-      reasoningActive: isReasoningEnabled(
-        (context.watch<AssistantProvider>().currentAssistant?.thinkingBudget) ??
-            settings.thinkingBudget,
-      ),
-      reasoningBudget:
-          (context
-              .watch<AssistantProvider>()
-              .currentAssistant
-              ?.thinkingBudget) ??
-          settings.thinkingBudget,
-      supportsReasoning: (pk != null && mid != null)
-          ? isReasoningModel(pk, mid)
-          : false,
-      onOpenSearch: onOpenSearch,
-      onSend: onSend,
-      loading: isLoading,
-      sendButtonTooltip: sendButtonTooltip,
-      hasQueuedInput: hasQueuedInput,
-      queuedPreviewText: queuedPreviewText,
-      onCancelQueuedInput: onCancelQueuedInput,
-      showMcpButton: _shouldShowMcpButton(context, settings, a, pk, mid),
-      mcpActive: _isMcpActive(context, a),
-      showQuickPhraseButton: _hasQuickPhrases(context, a),
-      onQuickPhrase: onQuickPhrase,
-      onLongPressQuickPhrase: onLongPressQuickPhrase,
-      // OCR button: show on desktop for mobile layout, always check settings for tablet layout
-      showOcrButton: isTablet
-          ? (settings.ocrModelProvider != null && settings.ocrModelId != null)
-          : (isDesktop &&
-                settings.ocrModelProvider != null &&
-                settings.ocrModelId != null),
-      ocrActive: settings.ocrEnabled,
-      onToggleOcr: onToggleOcr,
-      // Tablet-specific parameters
-      showMiniMapButton: isTablet,
-      onOpenMiniMap: isTablet ? onOpenMiniMap : null,
-      onPickCamera: isTablet ? (isDesktop ? null : onPickCamera) : null,
-      onPickPhotos: isTablet ? (isDesktop ? null : onPickPhotos) : null,
-      onUploadFiles: isTablet ? onUploadFiles : null,
-      onToggleLearningMode: isTablet ? onToggleLearningMode : null,
-      onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
-      onLongPressLearning: isTablet ? onLongPressLearning : null,
-      learningModeActive: isTablet
-          ? context
-                .watch<InstructionInjectionProvider>()
-                .activeIdsFor(assistantId)
-                .isNotEmpty
-          : false,
-      worldBookActive: isTablet
-          ? context
-                .watch<WorldBookProvider>()
-                .activeBookIdsFor(assistantId)
-                .isNotEmpty
-          : false,
-      showMoreButton: !isTablet,
-      onClearContext: isTablet ? onClearContext : null,
-      onCompressContext: isTablet ? onCompressContext : null,
-      backgroundImageActive: backgroundImageActive,
-      inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
-      inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ChatInputBar(
+          key: inputBarKey,
+          onMore: onMore,
+          onSelectModel: onSelectModel,
+          onLongPressSelectModel: onLongPressSelectModel,
+          conversationId: conversationId,
+          onOpenMcp: onOpenMcp,
+          onLongPressMcp: onLongPressMcp,
+          onStop: onStop,
+          modelIcon: (pk != null && mid != null)
+              ? CurrentModelIcon(
+                  providerKey: pk,
+                  modelId: mid,
+                  size: 40,
+                  withBackground: true,
+                  backgroundColor: Colors.transparent,
+                )
+              : null,
+          focusNode: inputFocus,
+          controller: inputController,
+          mediaController: mediaController,
+          asrProvider: asr,
+          onConfigureReasoning: onConfigureReasoning,
+          onReasoningBudgetChanged: onReasoningBudgetChanged,
+          onComposerModelChanged: onComposerModelChanged,
+          currentModelProvider: pk,
+          currentModelId: mid,
+          supportsXhighReasoning: pk != null && mid != null
+              ? settings.supportsXhighReasoning(pk, mid)
+              : false,
+          supportsMaxReasoning: pk != null && mid != null
+              ? settings.supportsMaxReasoning(pk, mid)
+              : false,
+          reasoningActive: isReasoningEnabled(
+            (context
+                    .watch<AssistantProvider>()
+                    .currentAssistant
+                    ?.thinkingBudget) ??
+                settings.thinkingBudget,
+          ),
+          reasoningBudget:
+              (context
+                  .watch<AssistantProvider>()
+                  .currentAssistant
+                  ?.thinkingBudget) ??
+              settings.thinkingBudget,
+          supportsReasoning: (pk != null && mid != null)
+              ? isReasoningModel(pk, mid)
+              : false,
+          onOpenSearch: onOpenSearch,
+          onSend: onSend,
+          onGuide: onGuide,
+          loading: isLoading,
+          generationPaused: isGenerationPaused,
+          onToggleGenerationPaused: onToggleGenerationPaused,
+          sendButtonTooltip: sendButtonTooltip,
+          hasQueuedInput: hasQueuedInput,
+          queuedPreviewText: queuedPreviewText,
+          queuedInputs: queuedInputs,
+          onCancelQueuedInput: onCancelQueuedInput,
+          onRemoveQueuedInput: onRemoveQueuedInput,
+          onClearQueuedInputs: onClearQueuedInputs,
+          onReorderQueuedInput: onReorderQueuedInput,
+          showMcpButton: _shouldShowMcpButton(context, settings, a, pk, mid),
+          mcpActive: _isMcpActive(context, a),
+          showQuickPhraseButton: _hasQuickPhrases(context, a),
+          onQuickPhrase: onQuickPhrase,
+          onLongPressQuickPhrase: onLongPressQuickPhrase,
+          showOcrButton: isTablet
+              ? (settings.ocrModelProvider != null &&
+                    settings.ocrModelId != null)
+              : (isDesktop &&
+                    settings.ocrModelProvider != null &&
+                    settings.ocrModelId != null),
+          ocrActive: settings.ocrEnabled,
+          onToggleOcr: onToggleOcr,
+          showMiniMapButton: isTablet,
+          onOpenMiniMap: isTablet ? onOpenMiniMap : null,
+          onPickCamera: isTablet ? (isDesktop ? null : onPickCamera) : null,
+          onPickPhotos: isTablet ? (isDesktop ? null : onPickPhotos) : null,
+          onUploadFiles: isTablet ? onUploadFiles : null,
+          onToggleLearningMode: isTablet ? onToggleLearningMode : null,
+          onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
+          onLongPressLearning: isTablet ? onLongPressLearning : null,
+          learningModeActive: isTablet
+              ? context
+                    .watch<InstructionInjectionProvider>()
+                    .activeIdsFor(assistantId)
+                    .isNotEmpty
+              : false,
+          worldBookActive: isTablet
+              ? context
+                    .watch<WorldBookProvider>()
+                    .activeBookIdsFor(assistantId)
+                    .isNotEmpty
+              : false,
+          showMoreButton: !isTablet,
+          onClearContext: isTablet ? onClearContext : null,
+          onCompressContext: isTablet ? onCompressContext : null,
+          backgroundImageActive: backgroundImageActive,
+          inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
+          inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
+          storyMode: storyMode,
+        ),
+      ],
     );
   }
 

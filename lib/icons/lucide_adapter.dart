@@ -35,6 +35,7 @@ class Lucide {
   static const IconData Search = lucide.LucideIcons.search;
   static const IconData SearchX = lucide.LucideIcons.searchX;
   static const IconData Play = lucide.LucideIcons.play;
+  static const IconData Pause = lucide.LucideIcons.pause;
   static const IconData ExternalLink = lucide.LucideIcons.externalLink;
   static const IconData Edit = lucide.LucideIcons.pencil;
   static const IconData Pin = lucide.LucideIcons.pin;
@@ -198,4 +199,14 @@ class Lucide {
   static const IconData clock = lucide.LucideIcons.clock;
   static const IconData Wallet = lucide.LucideIcons.walletMinimal;
   static const IconData Coins = lucide.LucideIcons.coins;
+
+  // Story Runtime aliases intentionally resolve to Kelivo's existing native
+  // icon vocabulary rather than introducing a second icon system.
+  static const IconData CircleCheck = CheckCircle;
+  static const IconData HardDriveDownload = Download;
+  static const IconData FolderInput = Import2;
+  static const IconData CircleOff = XCircle;
+  static const IconData Users = User;
+  static const IconData Cpu = Activity;
+  static const IconData Cloud = Network;
 }

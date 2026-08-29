@@ -317,7 +317,13 @@ Future<_CutoverFixture> _prepareCutoverFixture({
     candidateDatabase,
   );
   final databaseDescriptor = await _manifestDescriptor(candidateDatabase);
-  for (final root in const ['upload', 'images', 'avatars', 'fonts']) {
+  for (final root in const [
+    'upload',
+    'images',
+    'avatars',
+    'fonts',
+    'story_skills',
+  ]) {
     await Directory(p.join(candidateDirectory.path, root)).create();
   }
   final newUpload = File(p.join(candidateDirectory.path, 'upload', 'new'));

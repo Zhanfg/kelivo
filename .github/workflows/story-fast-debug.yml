@@ -1,0 +1,117 @@
+# Fast Android debug build for focused Story regressions and verified Composer v8 integration.
+name: Story Fast Debug
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+    paths:
+      - .github/workflows/story-fast-debug.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact triggering commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Use hosted JDK 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+          "$JAVA_HOME_17_X64/bin/java" -version
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Inject fallback
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
+          EOF
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Static analysis
+        run: dart analyze --fatal-infos lib test
+
+      - name: Focused Skill lifecycle regression
+        run: |
+          flutter test --concurrency=1 \
+            test/features/story_runtime/story_skill_github_install_dialog_test.dart \
+            test/features/story_runtime/built_in_story_skill_assets_test.dart \
+            test/features/story_runtime/story_conversation_mode_control_test.dart
+
+      - name: Build Android debug APKs
+        run: flutter build apk --debug --split-per-abi
+
+      - name: Verify debug APK signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$apksigner"
+          for apk in build/app/outputs/flutter-apk/app-*-debug.apk; do
+            "$apksigner" verify --verbose "$apk"
+          done
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | tr -d ' ')"
+          SHORT_SHA="$(git rev-parse --short=8 HEAD)"
+          mkdir -p dist
+          for file in build/app/outputs/flutter-apk/app-*-debug.apk; do
+            abi="$(basename "$file" | sed -E 's/app-(.*)-debug\.apk/\1/')"
+            cp "$file" "dist/Kelivo_${VERSION}_Story_TEST_${SHORT_SHA}_${abi}-debug.apk"
+          done
+          sha256sum dist/*.apk > dist/SHA256SUMS.txt
+          printf 'commit=%s\nversion=%s\nabi=split-per-abi\nsigning=android-debug\nvalidation=static-analysis+focused-skill-regression+apk-signature\n' \
+            "$(git rev-parse HEAD)" "$VERSION" > dist/BUILD_INFO.txt
+
+      - name: Publish prerelease
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | tr -d ' ')"
+          VERSION_NAME="${VERSION%%+*}"
+          SHORT_SHA="$(git rev-parse --short=8 HEAD)"
+          TAG="story-test-v${VERSION_NAME}-${SHORT_SHA}"
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$(git rev-parse HEAD)" \
+            --title "Kelivo Story Runtime TEST ${VERSION} (${SHORT_SHA})" \
+            --notes "Android debug-signed validation build for the verified Composer v8 and Story Runtime integration. Static analysis, focused Story regressions and APK signature verification passed before publishing. Full non-baseline validation continues independently." \
+            --prerelease
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: story-fast-debug-apks
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14

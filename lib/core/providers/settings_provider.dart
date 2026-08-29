@@ -286,6 +286,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_desktop_minimize_to_tray_on_close_v1';
   static const String _displayUsePureBackgroundKey =
       'display_use_pure_background_v1';
+  static const String _displayAssistantBubbleFitContentKey =
+      'display_assistant_bubble_fit_content_v1';
   static const String _displayChatMessageBackgroundStyleKey =
       'display_chat_message_background_style_v1';
   static const String _chatBubbleStyleOverridesKey =
@@ -491,6 +493,9 @@ class SettingsProvider extends ChangeNotifier {
   bool _usePureBackground = false;
   bool get usePureBackground => _usePureBackground;
 
+  // When on, assistant bubbles hug their text instead of spanning the row.
+  bool _assistantBubbleFitContent = true;
+  bool get assistantBubbleFitContent => _assistantBubbleFitContent;
   // Desktop UI persisted state
   double _desktopSidebarWidth = 240;
   bool _desktopSidebarOpen = true;
@@ -1166,6 +1171,8 @@ class SettingsProvider extends ChangeNotifier {
     } else {
       _usePureBackground = pureBgPref;
     }
+    _assistantBubbleFitContent =
+        prefs.getBool(_displayAssistantBubbleFitContentKey) ?? true;
     // display: markdown/math rendering
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering =
@@ -2585,6 +2592,13 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_displayUsePureBackgroundKey, v);
+  }
+
+  Future<void> setAssistantBubbleFitContent(bool v) async {
+    if (_assistantBubbleFitContent == v) return;
+    _assistantBubbleFitContent = v;
+    notifyListeners();
+    await _preferences.setBool(_displayAssistantBubbleFitContentKey, v);
   }
 
   void _loadCustomThemes(BusinessPreferences prefs) {
@@ -5498,6 +5512,7 @@ Requirements:
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;
+    copy._assistantBubbleFitContent = _assistantBubbleFitContent;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
     copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;

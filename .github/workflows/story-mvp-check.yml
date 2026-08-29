@@ -1,0 +1,57 @@
+name: Story MVP Check
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+
+permissions:
+  contents: read
+
+jobs:
+  story-mvp-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.6'
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Format check
+        run: |
+          set -euo pipefail
+          files="$(git diff --diff-filter=ACMR --name-only origin/master...HEAD -- | grep -E '^(lib|test)/.*\.dart$' || true)"
+          if [ -n "$files" ]; then
+            dart format --output=none --set-exit-if-changed $files
+          fi
+
+      - name: Analyze
+        run: dart analyze --fatal-infos lib test
+
+      - name: Test Story MVP
+        run: |
+          flutter test \
+            test/story_runtime_foundation_test.dart \
+            test/story_runtime_state_test.dart \
+            test/story_runtime_controller_test.dart \
+            test/story_capability_epoch_test.dart \
+            test/story_prompt_compiler_test.dart \
+            test/story_response_parser_test.dart \
+            test/story_skill_system_test.dart \
+            test/story_skill_package_test.dart \
+            test/story_reference_library_test.dart \
+            test/story_reference_epub_test.dart \
+            test/story_runtime_assembler_test.dart
+
+      - name: Full test suite
+        run: flutter test

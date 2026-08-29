@@ -20,13 +20,20 @@ void main() {
     required FocusNode focusNode,
     required Future<ChatInputSubmissionResult> Function(ChatInputData input)
     onSend,
+    Future<ChatInputSubmissionResult> Function(ChatInputData input)? onGuide,
     SettingsProvider? settingsProvider,
     AssistantProvider? assistantProvider,
     ChatInputBarController? mediaController,
     bool loading = false,
+    bool generationPaused = false,
+    VoidCallback? onToggleGenerationPaused,
     bool hasQueuedInput = false,
     String? queuedPreviewText,
+    List<QueuedChatInput> queuedInputs = const <QueuedChatInput>[],
     VoidCallback? onCancelQueuedInput,
+    ValueChanged<int>? onRemoveQueuedInput,
+    VoidCallback? onClearQueuedInputs,
+    void Function(int oldIndex, int newIndex)? onReorderQueuedInput,
     String? conversationId,
     String? sendButtonTooltip,
     ThemeData? theme,
@@ -61,10 +68,17 @@ void main() {
             focusNode: focusNode,
             mediaController: mediaController,
             onSend: onSend,
+            onGuide: onGuide,
             loading: loading,
+            generationPaused: generationPaused,
+            onToggleGenerationPaused: onToggleGenerationPaused,
             hasQueuedInput: hasQueuedInput,
             queuedPreviewText: queuedPreviewText,
+            queuedInputs: queuedInputs,
             onCancelQueuedInput: onCancelQueuedInput,
+            onRemoveQueuedInput: onRemoveQueuedInput,
+            onClearQueuedInputs: onClearQueuedInputs,
+            onReorderQueuedInput: onReorderQueuedInput,
             conversationId: conversationId,
             sendButtonTooltip: sendButtonTooltip,
             backgroundImageActive: backgroundImageActive,
@@ -96,6 +110,165 @@ void main() {
 
     expect(submitted?.text, 'queued message');
     expect(controller.text, isEmpty);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('生成中有草稿时显示队列和引导操作', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = TextEditingController(text: 'change direction');
+    final focusNode = FocusNode();
+    ChatInputData? guided;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        loading: true,
+        onSend: (_) async => ChatInputSubmissionResult.queued,
+        onGuide: (input) async {
+          guided = input;
+          return ChatInputSubmissionResult.sent;
+        },
+      ),
+    );
+
+    expect(find.text('Queue'), findsOneWidget);
+    expect(find.text('Guide'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Guide'));
+    await tester.pumpAndSettle();
+
+    expect(guided?.text, 'change direction');
+    expect(controller.text, isEmpty);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('生成草稿操作附着在文本上方且底栏保留推理入口', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = TextEditingController(text: 'change direction');
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        loading: true,
+        onToggleGenerationPaused: () {},
+        onSend: (_) async => ChatInputSubmissionResult.queued,
+        onGuide: (_) async => ChatInputSubmissionResult.sent,
+      ),
+    );
+    await tester.pump();
+
+    final generationActions = find.byKey(
+      const ValueKey('composer-generation-actions'),
+    );
+    final textField = find.byType(TextField);
+    final reasoning = find.byKey(const ValueKey('composer-reasoning-button'));
+
+    expect(generationActions, findsOneWidget);
+    expect(reasoning, findsOneWidget);
+    expect(
+      tester.getTopLeft(generationActions).dy,
+      lessThan(tester.getTopLeft(textField).dy),
+    );
+    expect(find.byKey(const ValueKey('pause')), findsOneWidget);
+    expect(find.byKey(const ValueKey('stop')), findsNothing);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('生成主按钮切换 Pause 和 Resume 而不是 Stop', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    var toggles = 0;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        loading: true,
+        onToggleGenerationPaused: () => toggles++,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('pause')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('composer-primary-task')));
+    await tester.pump();
+    expect(toggles, 1);
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        loading: true,
+        generationPaused: true,
+        onToggleGenerationPaused: () => toggles++,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('resume')), findsOneWidget);
+    expect(find.byKey(const ValueKey('stop')), findsNothing);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('多项队列可打开管理面板并删除', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    final removed = <int>[];
+    const queued = <QueuedChatInput>[
+      QueuedChatInput(
+        conversationId: 'conversation-a',
+        input: ChatInputData(text: 'first'),
+      ),
+      QueuedChatInput(
+        conversationId: 'conversation-a',
+        input: ChatInputData(text: 'second'),
+      ),
+    ];
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        hasQueuedInput: true,
+        queuedPreviewText: 'first',
+        queuedInputs: queued,
+        onRemoveQueuedInput: removed.add,
+        onClearQueuedInputs: () {},
+        onReorderQueuedInput: (_, _) {},
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    await tester.tap(find.text('Queued to send · 2'));
+    await tester.pumpAndSettle();
+    expect(find.text('first'), findsWidgets);
+    expect(find.text('second'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Lucide.Trash2).first);
+    await tester.pumpAndSettle();
+    expect(removed, <int>[0]);
+    expect(find.text('second'), findsOneWidget);
 
     controller.dispose();
     focusNode.dispose();
@@ -160,8 +333,15 @@ void main() {
     );
 
     final textField = tester.widget<TextField>(find.byType(TextField));
-    expect(textField.readOnly, isTrue);
+    expect(textField.readOnly, isFalse);
     expect(find.text('Queued to send'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('Queued to send'),
+        matching: find.byType(ClipRRect),
+      ),
+      findsWidgets,
+    );
     expect(find.text('Cancel Queue'), findsOneWidget);
     expect(find.text(preview), findsOneWidget);
 

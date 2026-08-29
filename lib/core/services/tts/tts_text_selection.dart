@@ -25,7 +25,10 @@ class TtsTextSelection {
     required TtsTextSelectionMode mode,
     bool fallbackToOriginal = true,
   }) {
-    final original = input.trim();
+    // HTML comments are non-visible metadata in Markdown/HTML. They must never
+    // reach speech output; Story Runtime also uses one trailing comment for its
+    // structured event sidecar while keeping the visible prose unchanged.
+    final original = _stripHtmlComments(input).trim();
     if (original.isEmpty) return '';
 
     final selected = switch (mode) {
@@ -39,6 +42,9 @@ class TtsTextSelection {
     if (normalized.isNotEmpty || !fallbackToOriginal) return normalized;
     return original;
   }
+
+  static String _stripHtmlComments(String input) =>
+      input.replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
 
   static String _quotedText(String input) {
     final ranges = <_TextRange>[];
