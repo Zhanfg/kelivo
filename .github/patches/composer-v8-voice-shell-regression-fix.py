@@ -33,10 +33,18 @@ if b.count(old_reset) != 1:
     raise SystemExit(f'ptt-origin-reset: expected 1 match, found {b.count(old_reset)}')
 b = b.replace(old_reset, new_reset, 1)
 
+old_signature = """  void _beginVoicePtt(LongPressStartDetails _) {
+"""
+new_signature = """  void _beginVoicePtt(LongPressStartDetails details) {
+"""
+if b.count(old_signature) != 1:
+    raise SystemExit(f'ptt-begin-signature: expected 1 match, found {b.count(old_signature)}')
+b = b.replace(old_signature, new_signature, 1)
+
 old_begin = """    _voicePttPending = true;
     _voicePttActive = false;
 """
-new_begin = """    _voicePttOrigin = _.globalPosition;
+new_begin = """    _voicePttOrigin = details.globalPosition;
     _voicePttPending = true;
     _voicePttActive = false;
 """
