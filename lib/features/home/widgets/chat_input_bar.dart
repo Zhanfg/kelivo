@@ -2866,7 +2866,9 @@ class _ChatInputBarState extends State<ChatInputBar>
     // hide the recovery entrance. Keep the mic whenever at least one service
     // exists; tapping an unusable selection opens the inline service switcher.
     final showVoiceInput =
-        asr != null && settings.asrServices.isNotEmpty && !asr.isActive;
+        asr != null &&
+        (settings.asrServices.isNotEmpty || widget.storyMode) &&
+        !asr.isActive;
     final voiceTranscriptEditable =
         _ownsVoiceSession &&
         !_finishingVoice &&
@@ -3388,6 +3390,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     _composerLocked ||
                                                         widget.loading
                                                     ? null
+                                                    : settings
+                                                          .asrServices
+                                                          .isEmpty
+                                                    ? () => unawaited(
+                                                        _openVoiceServicesSettings(),
+                                                      )
                                                     : selectedVoiceServiceUsable
                                                     ? () => unawaited(
                                                         _startVoiceInput(),
@@ -3397,6 +3405,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     _composerLocked ||
                                                         widget.loading
                                                     ? null
+                                                    : settings
+                                                          .asrServices
+                                                          .isEmpty
+                                                    ? () => unawaited(
+                                                        _openVoiceServicesSettings(),
+                                                      )
                                                     : _toggleInlineVoiceSettings,
                                                 allowLongPressOnDesktop:
                                                     isMobileLayout,
