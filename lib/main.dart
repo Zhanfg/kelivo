@@ -686,9 +686,8 @@ class MyApp extends StatelessWidget {
         ),
         Provider<BusinessPreferences>.value(value: businessPreferences),
         ChangeNotifierProvider(
-          create: (_) => WorkspaceModeProvider(
-            preferences: businessPreferences,
-          ),
+          create: (_) =>
+              WorkspaceModeProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
           create: (_) => UserProvider(preferences: businessPreferences),

@@ -186,120 +186,129 @@ class HomeMobileScaffold extends StatelessWidget {
         },
       ),
       titleSpacing: 2,
-      title: titleOverride ?? (useNewAssistantAvatarUx
-          ? Row(
-              children: [
-                _buildAssistantTitleAvatar(context),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedTextSwap(
-                        text: title,
-                        style: TextStyle(
-                          fontSize: isDesktopPlatform ? 14 : 16,
-                          fontWeight: AppFontWeights.medium,
-                        ),
-                      ),
-                      if (providerName != null && modelDisplay != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(6),
-                            onTap: onSelectModel,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 0),
-                              child: AnimatedTextSwap(
-                                text: '$modelDisplay ($providerName)',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: cs.onSurface.withValues(alpha: 0.6),
-                                  fontWeight: AppFontWeights.medium,
+      title:
+          titleOverride ??
+          (useNewAssistantAvatarUx
+              ? Row(
+                  children: [
+                    _buildAssistantTitleAvatar(context),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedTextSwap(
+                            text: title,
+                            style: TextStyle(
+                              fontSize: isDesktopPlatform ? 14 : 16,
+                              fontWeight: AppFontWeights.medium,
+                            ),
+                          ),
+                          if (providerName != null && modelDisplay != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: onSelectModel,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 0,
+                                  ),
+                                  child: AnimatedTextSwap(
+                                    text: '$modelDisplay ($providerName)',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                      fontWeight: AppFontWeights.medium,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedTextSwap(
+                      text: title,
+                      style: TextStyle(
+                        fontSize: isDesktopPlatform ? 14 : 16,
+                        fontWeight: AppFontWeights.medium,
+                      ),
+                    ),
+                    if (providerName != null && modelDisplay != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(6),
+                          onTap: onSelectModel,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            child: AnimatedTextSwap(
+                              text: '$modelDisplay ($providerName)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurface.withValues(alpha: 0.6),
+                                fontWeight: AppFontWeights.medium,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),
-                    ],
-                  ),
-                ),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedTextSwap(
-                  text: title,
-                  style: TextStyle(
-                    fontSize: isDesktopPlatform ? 14 : 16,
-                    fontWeight: AppFontWeights.medium,
-                  ),
-                ),
-                if (providerName != null && modelDisplay != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(6),
-                      onTap: onSelectModel,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 0),
-                        child: AnimatedTextSwap(
-                          text: '$modelDisplay ($providerName)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: cs.onSurface.withValues(alpha: 0.6),
-                            fontWeight: AppFontWeights.medium,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
                       ),
-                    ),
-                  ),
-              ],
-            )),
+                  ],
+                )),
       actions: showChatActions
           ? [
-        IosIconButton(
-          size: 20,
-          minSize: 44,
-          onTap: onOpenMiniMap,
-          semanticLabel: AppLocalizations.of(context)!.miniMapTooltip,
-          icon: Lucide.Map,
-        ),
-        IosIconButton(
-          size: 22,
-          minSize: 44,
-          onTap: () async {
-            if (canToggleTemporaryConversation) {
-              await onToggleTemporaryConversation();
-            } else {
-              await onCreateNewConversation();
-            }
-          },
-          semanticLabel: canToggleTemporaryConversation
-              ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
-              : AppLocalizations.of(context)!.titleForLocale,
-          icon: canToggleTemporaryConversation && !temporaryConversationEnabled
-              ? Lucide.MessageCircleDashed
-              : Lucide.MessageCirclePlus,
-          builder:
-              canToggleTemporaryConversation && temporaryConversationEnabled
-              ? (color) => SvgPicture.asset(
-                  'assets/icons/temporary_chat_checked.svg',
-                  width: 22,
-                  height: 22,
-                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-                )
-              : null,
-        ),
-        const SizedBox(width: 4),
-      ]
+              IosIconButton(
+                size: 20,
+                minSize: 44,
+                onTap: onOpenMiniMap,
+                semanticLabel: AppLocalizations.of(context)!.miniMapTooltip,
+                icon: Lucide.Map,
+              ),
+              IosIconButton(
+                size: 22,
+                minSize: 44,
+                onTap: () async {
+                  if (canToggleTemporaryConversation) {
+                    await onToggleTemporaryConversation();
+                  } else {
+                    await onCreateNewConversation();
+                  }
+                },
+                semanticLabel: canToggleTemporaryConversation
+                    ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
+                    : AppLocalizations.of(context)!.titleForLocale,
+                icon:
+                    canToggleTemporaryConversation &&
+                        !temporaryConversationEnabled
+                    ? Lucide.MessageCircleDashed
+                    : Lucide.MessageCirclePlus,
+                builder:
+                    canToggleTemporaryConversation &&
+                        temporaryConversationEnabled
+                    ? (color) => SvgPicture.asset(
+                        'assets/icons/temporary_chat_checked.svg',
+                        width: 22,
+                        height: 22,
+                        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 4),
+            ]
           : const <Widget>[],
     );
   }

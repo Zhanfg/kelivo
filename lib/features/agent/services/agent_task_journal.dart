@@ -54,7 +54,8 @@ class AgentTaskEvent {
         orElse: () => AgentTaskEventKind.note,
       ),
       createdAt: DateTime.parse(json['createdAt'] as String),
-      payload: (json['payload'] as Map?)?.cast<String, dynamic>() ??
+      payload:
+          (json['payload'] as Map?)?.cast<String, dynamic>() ??
           const <String, dynamic>{},
     );
   }
@@ -111,9 +112,7 @@ class AgentTaskJournal {
       try {
         final decoded = jsonDecode(line);
         if (decoded is! Map) continue;
-        final event = AgentTaskEvent.fromJson(
-          decoded.cast<String, dynamic>(),
-        );
+        final event = AgentTaskEvent.fromJson(decoded.cast<String, dynamic>());
         if (event.taskId == taskId) events.add(event);
       } catch (_) {
         // A process may die while appending the final line. Earlier committed

@@ -105,7 +105,8 @@ class _AgentModePageState extends State<AgentModePage> {
       }
     }
 
-    final assistantWorkspaceId = assistants.currentAssistant?.defaultWorkspaceId;
+    final assistantWorkspaceId =
+        assistants.currentAssistant?.defaultWorkspaceId;
     if (assistantWorkspaceId != null && assistantWorkspaceId.isNotEmpty) {
       final existing = workspaces.byId(assistantWorkspaceId);
       if (existing != null) return existing;
@@ -308,7 +309,8 @@ class _HeroCard extends StatelessWidget {
                       label: zh ? '正在载入上下文' : 'Loading context',
                     );
                   }
-                  final counts = data.memories.length.toString() +
+                  final counts =
+                      data.memories.length.toString() +
                       ' · ' +
                       data.skills.length.toString() +
                       ' · ' +
@@ -370,9 +372,7 @@ class _TaskComposer extends StatelessWidget {
               hintText: zh
                   ? '描述你希望代理完成的任务…'
                   : 'Describe the task you want Agent to complete…',
-              hintStyle: TextStyle(
-                color: cs.onSurface.withValues(alpha: 0.38),
-              ),
+              hintStyle: TextStyle(color: cs.onSurface.withValues(alpha: 0.38)),
               contentPadding: EdgeInsets.zero,
             ),
           ),
@@ -480,7 +480,9 @@ class _EmptyTasks extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            zh ? '上方输入一个目标即可创建第一项任务。' : 'Enter a goal above to create the first task.',
+            zh
+                ? '上方输入一个目标即可创建第一项任务。'
+                : 'Enter a goal above to create the first task.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,

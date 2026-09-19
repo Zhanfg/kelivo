@@ -182,10 +182,7 @@ class _ModeTapTarget extends StatelessWidget {
 }
 
 class _ScreenCenteredSlot extends StatefulWidget {
-  const _ScreenCenteredSlot({
-    required this.controlWidth,
-    required this.child,
-  });
+  const _ScreenCenteredSlot({required this.controlWidth, required this.child});
 
   final double controlWidth;
   final Widget child;
@@ -214,10 +211,9 @@ class _ScreenCenteredSlotState extends State<_ScreenCenteredSlot> {
       final maxLeft = (slotWidth - widget.controlWidth)
           .clamp(0.0, double.infinity)
           .toDouble();
-      final nextLeft =
-          (screenWidth / 2 - globalLeft - widget.controlWidth / 2)
-              .clamp(0.0, maxLeft)
-              .toDouble();
+      final nextLeft = (screenWidth / 2 - globalLeft - widget.controlWidth / 2)
+          .clamp(0.0, maxLeft)
+          .toDouble();
       if (_left == null || (_left! - nextLeft).abs() >= 0.5) {
         setState(() => _left = nextLeft);
       }

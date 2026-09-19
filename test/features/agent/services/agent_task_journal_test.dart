@@ -45,11 +45,7 @@ void main() {
     await journal.append('task-1', AgentTaskEventKind.note);
 
     final file = File('${root.path}/task-1/journal.ndjson');
-    await file.writeAsString(
-      '{"broken":',
-      mode: FileMode.append,
-      flush: true,
-    );
+    await file.writeAsString('{"broken":', mode: FileMode.append, flush: true);
 
     final events = await journal.read('task-1');
     expect(events, hasLength(1));
