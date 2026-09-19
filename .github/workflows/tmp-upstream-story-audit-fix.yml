@@ -1,0 +1,207 @@
+name: Story Merge Audit Fix
+
+on:
+  push:
+    branches:
+      - probe/upstream-native-merge-20260920
+
+permissions:
+  contents: write
+
+jobs:
+  audit-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout validated final candidate
+        uses: actions/checkout@v4
+        with:
+          ref: sync/upstream-native-final-20260920
+          fetch-depth: 0
+
+      - name: Apply audited Story unions
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Kelivo Story Merge Audit"
+          git config user.email "actions@users.noreply.github.com"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def read(path):
+              return Path(path).read_text()
+
+          def write(path, text):
+              Path(path).write_text(text)
+
+          def add_after_once(path, anchor, addition, guard=None):
+              s = read(path)
+              if guard and guard in s:
+                  return
+              if s.count(anchor) != 1:
+                  raise SystemExit(f"{path}: anchor count {s.count(anchor)} for {anchor!r}")
+              write(path, s.replace(anchor, anchor + addition, 1))
+
+          # Story-installed skill packages live under appData/story_skills.
+          # Register that root in all three pieces of the new upstream backup
+          # architecture so pack, manifest validation, staging, cutover and
+          # restore-previous rollback all agree on the same root set.
+          for p in [
+              "lib/core/services/backup/data_sync.dart",
+              "lib/core/services/backup/restore_bundle_staging.dart",
+              "lib/core/services/backup/restore_previous_plan.dart",
+          ]:
+              add_after_once(
+                  p,
+                  "    'skills',\n",
+                  "    'story_skills',\n",
+                  guard="'story_skills',",
+              )
+
+          # Built-in tool reservation is a union: upstream Workspace tools and
+          # Story serialization tools are both client-owned names.
+          p = "lib/features/home/services/built_in_tool_names.dart"
+          s = read(p)
+          story_import = "import '../../story_runtime/serialization/story_serialization_tools.dart';\n"
+          if story_import not in s:
+              anchor = "import '../../../core/services/workspace/workspace_tools_service.dart';\n"
+              if anchor not in s:
+                  raise SystemExit("built_in_tool_names: workspace import anchor missing")
+              s = s.replace(anchor, anchor + story_import, 1)
+          if "...StorySerializationTools.names," not in s:
+              anchor = "    ...WorkspaceToolsService.toolNames,\n"
+              if anchor not in s:
+                  raise SystemExit("built_in_tool_names: workspace names anchor missing")
+              s = s.replace(
+                  anchor,
+                  anchor + "    ...StorySerializationTools.names,\n",
+                  1,
+              )
+          write(p, s)
+
+          # Keep the upstream SettingsPage as the primary screen, but add the
+          # Story-native entries that the pre-sync wrapper exposed.
+          p = "lib/features/settings/pages/settings_page.dart"
+          s = read(p)
+          imports = [
+              "import '../../story_runtime/ui/story_reference_library_page.dart';\n",
+              "import '../../story_runtime/ui/story_skill_manager_page.dart';\n",
+              "import '../../story_runtime/ui/story_studio_page.dart';\n",
+          ]
+          anchor = "import '../../world_book/pages/world_book_page.dart';\n"
+          if anchor not in s:
+              raise SystemExit("settings_page: import anchor missing")
+          for imp in imports:
+              if imp not in s:
+                  s = s.replace(anchor, anchor + imp, 1)
+                  anchor = imp
+
+          label_anchor = "    final settings = context.watch<SettingsProvider>();\n"
+          if "final storyModeLabel =" not in s:
+              if label_anchor not in s:
+                  raise SystemExit("settings_page: label anchor missing")
+              labels = """    final languageCode = Localizations.localeOf(context).languageCode;
+              final referenceTextsLabel = languageCode == 'zh'
+                  ? '参考文本'
+                  : 'Reference Texts';
+              const storySkillsLabel = 'Story Skills';
+              final storyModeLabel = languageCode == 'zh' ? '故事模式' : 'Story Mode';
+          """
+              s = s.replace(label_anchor, label_anchor + labels, 1)
+
+          if "StoryReferenceLibraryPage()" not in s:
+              memory_marker = """              _iosNavRow(
+                context,
+                icon: Lucide.Brain,
+                label: l10n.settingsPageMemory,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MemorySettingsPage(),
+                    ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+          """
+              if memory_marker not in s:
+                  raise SystemExit("settings_page: memory row anchor missing")
+              story_rows = """              _iosNavRow(
+                context,
+                icon: Lucide.BookOpenText,
+                label: referenceTextsLabel,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const StoryReferenceLibraryPage(),
+                    ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Shapes,
+                label: storySkillsLabel,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const StorySkillManagerPage(),
+                    ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Compass,
+                label: storyModeLabel,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StoryStudioPage()),
+                  );
+                },
+              ),
+              _iosDivider(context),
+          """
+              s = s.replace(memory_marker, memory_marker + story_rows, 1)
+          write(p, s)
+
+          print("Audited Story unions applied")
+          PY
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Generate localization
+        run: flutter gen-l10n
+
+      - name: Format audited files
+        run: |
+          dart format             lib/core/services/backup/data_sync.dart             lib/core/services/backup/restore_bundle_staging.dart             lib/core/services/backup/restore_previous_plan.dart             lib/features/home/services/built_in_tool_names.dart             lib/features/settings/pages/settings_page.dart
+
+      - name: Commit audited candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(sync): preserve Story backup tools and settings"
+            git push origin HEAD:refs/heads/sync/upstream-native-final-20260920 --force
+          fi
+
+      - name: Analyze
+        run: dart analyze --fatal-infos lib test integration_test
+
+      - name: Backup and Story regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter test --concurrency=2             test/story_*_test.dart             test/features/story_runtime             test/encrypted_full_backup_test.dart             test/core/services/backup/restore_bundle_mover_test.dart             test/core/services/backup/restore_previous_builder_test.dart             test/core/services/backup/restore_previous_plan_test.dart             test/core/services/backup/restore_receipt_test.dart             test/features/chat/widgets/bottom_tools_sheet_test.dart             test/features/home/widgets/chat_input_bar_queue_test.dart             test/features/home/widgets/chat_input_bar_mobile_composer_test.dart             test/core/services/tts/local_tts_test.dart
