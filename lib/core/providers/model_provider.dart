@@ -595,7 +595,7 @@ class ProviderManager {
           }
         } catch (_) {}
         final headers = <String, String>{
-          'Authorization': 'Bearer $apiKey',
+          if (apiKey.trim().isNotEmpty) 'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
           ...?sessionHeaders,
         };
