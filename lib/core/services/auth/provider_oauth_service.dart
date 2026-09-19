@@ -234,6 +234,8 @@ class ProviderOAuthService extends ChangeNotifier {
           DateTime.now(),
           leeway: current.oauthProvider == OAuthProvider.claude
               ? const Duration(minutes: 5)
+              : current.oauthProvider == OAuthProvider.pollinations
+              ? Duration.zero
               : const Duration(minutes: 1),
         )) {
       return _forRequest(current);
