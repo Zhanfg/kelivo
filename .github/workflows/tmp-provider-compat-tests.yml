@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/provider-compat-opencode-free
+  pull_request:
+    branches:
+      - master
 
 jobs:
   targeted:
