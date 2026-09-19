@@ -460,18 +460,8 @@ jobs:
               raise SystemExit("message_generation_service.dart: route marker not found")
           s = s.replace(route_old, route_new, 1)
 
-          tools_tail = """      conversationId: currentConversation?.id,
-            );
-            final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
-          """
-          if tools_tail not in s:
-              tools_tail = """      conversationId: currentConversation?.id,
-            );
-            final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
-          """
-          tools_repl = """      conversationId: currentConversation?.id,
-            );
-            final storySerializationEnabled =
+          sandbox_anchor = "    final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(\n"
+          serialization = """    final storySerializationEnabled =
                 storyPreferences != null &&
                 storyRuntime != null &&
                 StorySerializationTools.enabledFor(storyRuntime.activeSkillIds) &&
@@ -479,11 +469,10 @@ jobs:
             if (storySerializationEnabled) {
               toolDefs.addAll(_storySerializationToolDefinitions(kind));
             }
-            final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
           """
-          if tools_tail not in s:
-              raise SystemExit("message_generation_service.dart: tool tail not found")
-          s = s.replace(tools_tail, tools_repl, 1)
+          if sandbox_anchor not in s:
+              raise SystemExit("message_generation_service.dart: sandbox anchor not found")
+          s = s.replace(sandbox_anchor, serialization + sandbox_anchor, 1)
           s = s.replace("    final onToolCall = toolDefs.isNotEmpty\n",
                         "    final nativeOnToolCall = toolDefs.isNotEmpty\n", 1)
           write(p, s)
