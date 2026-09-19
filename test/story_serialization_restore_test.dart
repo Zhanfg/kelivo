@@ -51,70 +51,73 @@ final class _MemoryStorySerializationStore implements StorySerializationStore {
 }
 
 void main() {
-  test('Story serialization restore rolls back every touched key on failure', () async {
-    const firstKey = 'story_runtime_execution_v1';
-    const secondKey = 'story_runtime_sessions_v1';
+  test(
+    'Story serialization restore rolls back every touched key on failure',
+    () async {
+      const firstKey = 'story_runtime_execution_v1';
+      const secondKey = 'story_runtime_sessions_v1';
 
-    final source = _MemoryStorySerializationStore(<String, Object>{
-      firstKey: jsonEncode(<Object?>[
-        <String, Object?>{'id': 'new-execution'},
-      ]),
-      secondKey: jsonEncode(<Object?>[
-        <String, Object?>{'id': 'new-session'},
-      ]),
-      storyBreakArmorEnabledKey: true,
-    });
-    final bundle = await StorySerializationService.withStore(
-      source,
-    ).exportJson(pretty: false);
+      final source = _MemoryStorySerializationStore(<String, Object>{
+        firstKey: jsonEncode(<Object?>[
+          <String, Object?>{'id': 'new-execution'},
+        ]),
+        secondKey: jsonEncode(<Object?>[
+          <String, Object?>{'id': 'new-session'},
+        ]),
+        storyBreakArmorEnabledKey: true,
+      });
+      final bundle = await StorySerializationService.withStore(
+        source,
+      ).exportJson(pretty: false);
 
-    final oldFirst = jsonEncode(<Object?>[
-      <String, Object?>{'id': 'old-execution'},
-    ]);
-    final target = _MemoryStorySerializationStore(
-      <String, Object>{
+      final oldFirst = jsonEncode(<Object?>[
+        <String, Object?>{'id': 'old-execution'},
+      ]);
+      final target = _MemoryStorySerializationStore(<String, Object>{
         firstKey: oldFirst,
         storyBreakArmorEnabledKey: false,
-      },
-      failOnStringKey: secondKey,
-    );
+      }, failOnStringKey: secondKey);
 
-    await expectLater(
-      StorySerializationService.withStore(target).restoreJson(bundle),
-      throwsA(
-        isA<StateError>().having(
-          (error) => error.toString(),
-          'message',
-          contains('injected_story_serialization_write_failure'),
+      await expectLater(
+        StorySerializationService.withStore(target).restoreJson(bundle),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.toString(),
+            'message',
+            contains('injected_story_serialization_write_failure'),
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(target.getString(firstKey), oldFirst);
-    expect(target.containsKey(secondKey), isFalse);
-    expect(target.getBool(storyBreakArmorEnabledKey), isFalse);
-  });
+      expect(target.getString(firstKey), oldFirst);
+      expect(target.containsKey(secondKey), isFalse);
+      expect(target.getBool(storyBreakArmorEnabledKey), isFalse);
+    },
+  );
 
-  test('Story serialization restore still reports successful touched keys', () async {
-    const key = 'story_runtime_sessions_v1';
-    final source = _MemoryStorySerializationStore(<String, Object>{
-      key: jsonEncode(<Object?>[
-        <String, Object?>{'id': 'session-1'},
-      ]),
-      storyBreakArmorEnabledKey: true,
-    });
-    final bundle = await StorySerializationService.withStore(
-      source,
-    ).exportJson(pretty: false);
+  test(
+    'Story serialization restore still reports successful touched keys',
+    () async {
+      const key = 'story_runtime_sessions_v1';
+      final source = _MemoryStorySerializationStore(<String, Object>{
+        key: jsonEncode(<Object?>[
+          <String, Object?>{'id': 'session-1'},
+        ]),
+        storyBreakArmorEnabledKey: true,
+      });
+      final bundle = await StorySerializationService.withStore(
+        source,
+      ).exportJson(pretty: false);
 
-    final target = _MemoryStorySerializationStore(<String, Object>{});
-    final report = await StorySerializationService.withStore(
-      target,
-    ).restoreJson(bundle);
+      final target = _MemoryStorySerializationStore(<String, Object>{});
+      final report = await StorySerializationService.withStore(
+        target,
+      ).restoreJson(bundle);
 
-    expect(report.restoredBlobKeys, <String>[key]);
-    expect(report.restoredSettingKeys, <String>[storyBreakArmorEnabledKey]);
-    expect(target.getBool(storyBreakArmorEnabledKey), isTrue);
-    expect(target.getString(key), isNotNull);
-  });
+      expect(report.restoredBlobKeys, <String>[key]);
+      expect(report.restoredSettingKeys, <String>[storyBreakArmorEnabledKey]);
+      expect(target.getBool(storyBreakArmorEnabledKey), isTrue);
+      expect(target.getString(key), isNotNull);
+    },
+  );
 }

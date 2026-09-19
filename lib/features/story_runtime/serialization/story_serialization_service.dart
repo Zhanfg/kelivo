@@ -38,7 +38,8 @@ final class _BusinessPreferencesStorySerializationStore
       preferences.setString(key, value);
 
   @override
-  Future<bool> setBool(String key, bool value) => preferences.setBool(key, value);
+  Future<bool> setBool(String key, bool value) =>
+      preferences.setBool(key, value);
 
   @override
   Future<bool> remove(String key) => preferences.remove(key);
@@ -308,10 +309,7 @@ final class StorySerializationService {
         try {
           if (item.isBool) {
             if (previousBreakArmor.present) {
-              await _store.setBool(
-                item.key,
-                previousBreakArmor.value ?? false,
-              );
+              await _store.setBool(item.key, previousBreakArmor.value ?? false);
             } else {
               await _store.remove(item.key);
             }

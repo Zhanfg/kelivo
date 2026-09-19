@@ -12,7 +12,9 @@ final class _MemoryWorldTreeRepository implements StoryWorldTreeRepository {
       state?.worldTreeId == worldTreeId ? state : null;
 
   @override
-  Future<StoryWorldTreeState?> readForConversation(String conversationId) async =>
+  Future<StoryWorldTreeState?> readForConversation(
+    String conversationId,
+  ) async =>
       state?.worldlineForConversation(conversationId) != null ? state : null;
 
   @override
@@ -56,76 +58,82 @@ void main() {
     expect(second.worldlines, hasLength(1));
   });
 
-  test('checkpoint rewind creates a child without mutating the source', () async {
-    final root = await coordinator.bootstrap(
-      conversationId: 'conversation-root',
-      name: 'Story',
-      rootContentHash: 'root-hash',
-    );
-    final checkpointed = await coordinator.createCheckpoint(
-      worldTreeId: root.worldTreeId,
-      worldlineId: root.headWorldlineId,
-      messageId: 'message-10',
-      nodeId: 'group-10@0',
-      snapshotId: 'snapshot-10',
-      label: 'Before the choice',
-    );
-    final checkpoint = checkpointed.checkpoints.single;
+  test(
+    'checkpoint rewind creates a child without mutating the source',
+    () async {
+      final root = await coordinator.bootstrap(
+        conversationId: 'conversation-root',
+        name: 'Story',
+        rootContentHash: 'root-hash',
+      );
+      final checkpointed = await coordinator.createCheckpoint(
+        worldTreeId: root.worldTreeId,
+        worldlineId: root.headWorldlineId,
+        messageId: 'message-10',
+        nodeId: 'group-10@0',
+        snapshotId: 'snapshot-10',
+        label: 'Before the choice',
+      );
+      final checkpoint = checkpointed.checkpoints.single;
 
-    final rewound = await coordinator.rewindFromCheckpoint(
-      worldTreeId: root.worldTreeId,
-      checkpointId: checkpoint.id,
-      childConversationId: 'conversation-rewind',
-    );
-    final source = rewound.worldlineById(root.headWorldlineId)!;
-    final child = rewound.worldlineForConversation('conversation-rewind')!;
+      final rewound = await coordinator.rewindFromCheckpoint(
+        worldTreeId: root.worldTreeId,
+        checkpointId: checkpoint.id,
+        childConversationId: 'conversation-rewind',
+      );
+      final source = rewound.worldlineById(root.headWorldlineId)!;
+      final child = rewound.worldlineForConversation('conversation-rewind')!;
 
-    expect(source.parentWorldlineId, isNull);
-    expect(source.status, StoryWorldlineStatus.active);
-    expect(child.parentWorldlineId, source.id);
-    expect(child.branchPointMessageId, 'message-10');
-    expect(child.baseSnapshotId, 'snapshot-10');
-    expect(child.metadata['operation'], 'rewind');
-    expect(child.metadata['checkpointId'], checkpoint.id);
-    expect(rewound.headWorldlineId, child.id);
-    expect(rewound.worldlines, hasLength(2));
-  });
+      expect(source.parentWorldlineId, isNull);
+      expect(source.status, StoryWorldlineStatus.active);
+      expect(child.parentWorldlineId, source.id);
+      expect(child.branchPointMessageId, 'message-10');
+      expect(child.baseSnapshotId, 'snapshot-10');
+      expect(child.metadata['operation'], 'rewind');
+      expect(child.metadata['checkpointId'], checkpoint.id);
+      expect(rewound.headWorldlineId, child.id);
+      expect(rewound.worldlines, hasLength(2));
+    },
+  );
 
-  test('merge marks only the source merged and moves the head to target', () async {
-    final root = await coordinator.bootstrap(
-      conversationId: 'conversation-root',
-      name: 'Story',
-      rootContentHash: 'root-hash',
-    );
-    final forked = await coordinator.fork(
-      worldTreeId: root.worldTreeId,
-      sourceWorldlineId: root.headWorldlineId,
-      childConversationId: 'conversation-child',
-      branchPointMessageId: 'message-5',
-      baseSnapshotId: 'snapshot-5',
-    );
-    final child = forked.worldlineForConversation('conversation-child')!;
+  test(
+    'merge marks only the source merged and moves the head to target',
+    () async {
+      final root = await coordinator.bootstrap(
+        conversationId: 'conversation-root',
+        name: 'Story',
+        rootContentHash: 'root-hash',
+      );
+      final forked = await coordinator.fork(
+        worldTreeId: root.worldTreeId,
+        sourceWorldlineId: root.headWorldlineId,
+        childConversationId: 'conversation-child',
+        branchPointMessageId: 'message-5',
+        baseSnapshotId: 'snapshot-5',
+      );
+      final child = forked.worldlineForConversation('conversation-child')!;
 
-    final merged = await coordinator.merge(
-      worldTreeId: root.worldTreeId,
-      sourceWorldlineId: root.headWorldlineId,
-      targetWorldlineId: child.id,
-      strategy: 'manual',
-    );
+      final merged = await coordinator.merge(
+        worldTreeId: root.worldTreeId,
+        sourceWorldlineId: root.headWorldlineId,
+        targetWorldlineId: child.id,
+        strategy: 'manual',
+      );
 
-    expect(
-      merged.worldlineById(root.headWorldlineId)!.status,
-      StoryWorldlineStatus.merged,
-    );
-    expect(
-      merged.worldlineById(child.id)!.status,
-      StoryWorldlineStatus.active,
-    );
-    expect(merged.headWorldlineId, child.id);
-    expect(merged.merges, hasLength(1));
-    expect(merged.merges.single.sourceWorldlineId, root.headWorldlineId);
-    expect(merged.merges.single.targetWorldlineId, child.id);
-  });
+      expect(
+        merged.worldlineById(root.headWorldlineId)!.status,
+        StoryWorldlineStatus.merged,
+      );
+      expect(
+        merged.worldlineById(child.id)!.status,
+        StoryWorldlineStatus.active,
+      );
+      expect(merged.headWorldlineId, child.id);
+      expect(merged.merges, hasLength(1));
+      expect(merged.merges.single.sourceWorldlineId, root.headWorldlineId);
+      expect(merged.merges.single.targetWorldlineId, child.id);
+    },
+  );
 
   test('active head must be switched before it can be archived', () async {
     final root = await coordinator.bootstrap(
