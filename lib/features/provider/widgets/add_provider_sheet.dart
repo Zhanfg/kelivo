@@ -188,7 +188,9 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
           'Presets',
           style: TextStyle(
             fontSize: 13,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 6),
