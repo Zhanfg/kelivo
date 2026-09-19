@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -139,9 +137,10 @@ class _AgentModePageState extends State<AgentModePage> {
     final conversation = conversationId == null
         ? null
         : chat.getConversation(conversationId);
+    final skillIds = assistant?.skillIds;
     final key = [
       assistant?.id ?? '',
-      ...(assistant?.skillIds ?? const <String>[]),
+      ...(skillIds ?? const <String>[]),
       ...(conversation?.mcpServerIds ?? const <String>[]),
     ].join('|');
 
@@ -149,9 +148,7 @@ class _AgentModePageState extends State<AgentModePage> {
       _contextKey = key;
       _contextFuture = context.read<AgentContextBridge>().build(
         assistantId: conversation?.assistantId ?? assistant?.id,
-        skillIds: assistant?.skillIds == null
-            ? null
-            : assistant!.skillIds.toSet(),
+        skillIds: skillIds?.toSet(),
         mcpServerIds: conversation?.mcpServerIds.toSet(),
       );
     }
