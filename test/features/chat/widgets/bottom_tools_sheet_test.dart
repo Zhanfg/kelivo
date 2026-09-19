@@ -244,7 +244,7 @@ void main() {
     expect(find.text('Characters'), findsOneWidget);
     expect(find.text('Voices'), findsOneWidget);
     expect(find.text('References'), findsOneWidget);
-    expect(find.text('Skills'), findsOneWidget);
+    expect(find.text('Story Skills'), findsOneWidget);
     expect(find.text(l10n.chatInputBarOnlineSearchTooltip), findsNothing);
   });
 
