@@ -18,13 +18,6 @@ jobs:
           ref: sync/upstream-native-theirs-20260920
           fetch-depth: 0
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.44.9'
-          channel: stable
-          cache: true
-
       - name: Apply Story compatibility integration
         shell: bash
         run: |
@@ -195,12 +188,20 @@ jobs:
 
           # ---- Bottom tools: preserve upstream conversation id and Story-scoped id.
           p = "lib/features/chat/widgets/bottom_tools_sheet.dart"
-          replace_once(p, "    this.conversationId,\n    this.onClose,\n",
-                       "    this.conversationId,\n    this.storyConversationId,\n    this.onClose,\n")
-          replace_once(p, "  final String? conversationId;\n  final VoidCallback? onClose;\n",
-                       "  final String? conversationId;\n  final String? storyConversationId;\n  final VoidCallback? onClose;\n")
-          replace_once(p, "    final storyConversationId = this.storyConversationId;\n",
-                       "    final storyConversationId = this.storyConversationId ?? conversationId;\n")
+          s = read(p)
+          class_pos = s.index("class BottomToolsSheet")
+          ctor_old = "    this.conversationId,\n    this.onClose,\n"
+          ctor_pos = s.index(ctor_old, class_pos)
+          s = s[:ctor_pos] + "    this.conversationId,\n    this.storyConversationId,\n    this.onClose,\n" + s[ctor_pos + len(ctor_old):]
+          field_old = "  final String? conversationId;\n  final VoidCallback? onClose;\n"
+          field_pos = s.index(field_old, class_pos)
+          s = s[:field_pos] + "  final String? conversationId;\n  final String? storyConversationId;\n  final VoidCallback? onClose;\n" + s[field_pos + len(field_old):]
+          s = s.replace(
+              "    final storyConversationId = this.storyConversationId;\n",
+              "    final storyConversationId = this.storyConversationId ?? conversationId;\n",
+              1,
+          )
+          write(p, s)
 
           # ---- Input section: recover Story/queue model types lost at import conflict.
           p = "lib/features/home/widgets/chat_input_section.dart"
@@ -620,6 +621,13 @@ jobs:
 
           print("Story compatibility integration applied successfully")
           PY
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
 
       - name: Resolve dependencies
         run: flutter pub get
