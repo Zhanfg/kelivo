@@ -59,29 +59,29 @@ jobs:
               1,
           )
           anchor = """                    const SizedBox(height: 12),
-                              _LearningAndClearSection(
+                    _LearningAndClearSection(
           """
           row = """                    const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  roundedAction(
-                                    icon: Lucide.Paperclip,
-                                    label: l10n.bottomToolsSheetUpload,
-                                    onTap: onUpload,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  roundedAction(
-                                    icon: Lucide.Brush,
-                                    label:
-                                        Localizations.localeOf(context).languageCode == 'zh'
-                                        ? '绘画'
-                                        : 'Draw',
-                                    onTap: onDrawing,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              _LearningAndClearSection(
+                    Row(
+                      children: [
+                        roundedAction(
+                          icon: Lucide.Paperclip,
+                          label: l10n.bottomToolsSheetUpload,
+                          onTap: onUpload,
+                        ),
+                        const SizedBox(width: 12),
+                        roundedAction(
+                          icon: Lucide.Brush,
+                          label:
+                              Localizations.localeOf(context).languageCode == 'zh'
+                              ? '绘画'
+                              : 'Draw',
+                          onTap: onDrawing,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _LearningAndClearSection(
           """
           if "label: l10n.bottomToolsSheetUpload" not in s:
               if anchor not in s:
@@ -94,20 +94,20 @@ jobs:
           p = "lib/features/home/pages/home_page.dart"
           s = read(p)
           old = """                onUpload: () {
-                          Navigator.of(ctx).maybePop();
-                          _controller.onPickFiles();
-                        },
-                        onClear: () async {
+                  Navigator.of(ctx).maybePop();
+                  _controller.onPickFiles();
+                },
+                onClear: () async {
           """
           new = """                onUpload: () {
-                          Navigator.of(ctx).maybePop();
-                          _controller.onPickFiles();
-                        },
-                        onDrawing: () {
-                          Navigator.of(ctx).maybePop();
-                          _startDrawingPrompt();
-                        },
-                        onClear: () async {
+                  Navigator.of(ctx).maybePop();
+                  _controller.onPickFiles();
+                },
+                onDrawing: () {
+                  Navigator.of(ctx).maybePop();
+                  _startDrawingPrompt();
+                },
+                onClear: () async {
           """
           if "onDrawing: () {" not in s:
               if old not in s:
@@ -115,15 +115,15 @@ jobs:
               s = s.replace(old, new, 1)
 
           old = """                assistantId: assistantId,
-                        conversationId: _controller.currentConversation?.id,
-                        onClose: () => Navigator.of(ctx).maybePop(),
+                conversationId: _controller.currentConversation?.id,
+                onClose: () => Navigator.of(ctx).maybePop(),
           """
           new = """                assistantId: assistantId,
-                        conversationId: _controller.currentConversation?.id,
-                        storyConversationId: storyMode
-                            ? _controller.currentConversation?.id
-                            : null,
-                        onClose: () => Navigator.of(ctx).maybePop(),
+                conversationId: _controller.currentConversation?.id,
+                storyConversationId: storyMode
+                    ? _controller.currentConversation?.id
+                    : null,
+                onClose: () => Navigator.of(ctx).maybePop(),
           """
           if "storyConversationId: storyMode" not in s:
               if old not in s:
