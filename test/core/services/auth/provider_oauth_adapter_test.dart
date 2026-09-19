@@ -132,6 +132,93 @@ void main() {
     );
   });
 
+  test('Pollinations device OAuth returns a scoped user key', () {
+    fakeAsync((async) {
+      var polls = 0;
+      ProviderOAuthCredentials? result;
+      OAuthLoginPrompt? prompt;
+      final wire = OAuthWire(
+        MockClient((request) async {
+          if (request.url.path == '/api/device/code') {
+            expect(request.method, 'POST');
+            return response({
+              'device_code': 'pollinations-device',
+              'user_code': 'POLL-1234',
+              'verification_uri': '/device',
+              'expires_in': 60,
+              'interval': 1,
+            });
+          }
+          if (request.url.path == '/api/device/token') {
+            expect(jsonDecode(request.body)['device_code'], 'pollinations-device');
+            polls++;
+            if (polls == 1) {
+              return response({'error': 'authorization_pending'}, 400);
+            }
+            return response({
+              'access_token': 'sk_pollinations_user',
+              'token_type': 'bearer',
+              'expires_in': 604800,
+            });
+          }
+          if (request.url.path == '/api/device/userinfo') {
+            expect(
+              request.headers['Authorization'],
+              'Bearer sk_pollinations_user',
+            );
+            return response({
+              'sub': 'pollinations-user',
+              'email': 'pollinations@example.com',
+            });
+          }
+          fail('unexpected request: ${request.method} ${request.url}');
+        }),
+      );
+
+      PollinationsOAuthAdapter()
+          .login(wire, OAuthCancellation(), (value) async => prompt = value)
+          .then((value) => result = value);
+      async.flushMicrotasks();
+
+      expect(prompt?.url.toString(), 'https://enter.pollinations.ai/device');
+      expect(prompt?.userCode, 'POLL-1234');
+      expect(result, isNull);
+
+      async.elapse(const Duration(seconds: 1));
+      expect(polls, 1);
+      async.elapse(const Duration(seconds: 1));
+      async.flushMicrotasks();
+
+      expect(result?.accessToken, 'sk_pollinations_user');
+      expect(result?.refreshToken, isEmpty);
+      expect(result?.accountId, 'pollinations-user');
+      expect(result?.email, 'pollinations@example.com');
+      expect(result?.plan, 'Pollinations');
+    });
+  });
+
+  test('Pollinations expired device keys require consent again', () async {
+    final stored = ProviderOAuthCredentials(
+      accessToken: 'sk_pollinations_user',
+      refreshToken: '',
+      expiresAt: DateTime.now(),
+      sessionId: 'session',
+    );
+    await expectLater(
+      PollinationsOAuthAdapter().refresh(
+        OAuthWire(MockClient((_) async => response({}))),
+        stored,
+      ),
+      throwsA(
+        isA<ProviderOAuthException>().having(
+          (e) => e.kind,
+          'kind',
+          ProviderOAuthFailure.loginRequired,
+        ),
+      ),
+    );
+  });
+
   test(
     'Grok device code respects slow_down, then returns account identity',
     () {
