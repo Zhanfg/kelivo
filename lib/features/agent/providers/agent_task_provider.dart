@@ -3,13 +3,15 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/database/extension_entity_store.dart';
 import '../models/agent_task.dart';
+import '../services/agent_task_journal.dart';
 
 class AgentTaskProvider extends ChangeNotifier {
-  AgentTaskProvider({required this.store}) {
+  AgentTaskProvider({required this.store, this.journal}) {
     loaded = _load();
   }
 
   final ExtensionEntityStore store;
+  final AgentTaskJournal? journal;
   final List<AgentTask> _tasks = <AgentTask>[];
 
   late final Future<void> loaded;
@@ -113,6 +115,15 @@ class AgentTaskProvider extends ChangeNotifier {
         clearFinishedAt: !isFinishing,
       ),
     );
+    await journal?.append(
+      id,
+      AgentTaskEventKind.phaseChanged,
+      payload: <String, dynamic>{
+        'phase': phase.name,
+        if (currentStep != null) 'step': currentStep,
+        if (error != null) 'hasError': true,
+      },
+    );
   }
 
   /// Marks unfinished work as recoverable after a worker/runtime crash.
@@ -129,12 +140,7 @@ class AgentTaskProvider extends ChangeNotifier {
           task.phase != AgentTaskPhase.recovering) {
         continue;
       }
-      await update(
-        task.copyWith(
-          phase: AgentTaskPhase.interrupted,
-          clearFinishedAt: true,
-        ),
-      );
+      await setPhase(task.id, AgentTaskPhase.interrupted);
       count++;
     }
     return count;
