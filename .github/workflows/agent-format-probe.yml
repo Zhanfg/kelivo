@@ -5,17 +5,22 @@ on:
     branches:
       - feat/agent-runtime-foundation
 
+permissions:
+  contents: write
+
 jobs:
   format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: feat/agent-runtime-foundation
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.44.9'
           channel: stable
           cache: true
-      - name: Show exact dart format patch
+      - name: Format Agent changes
         shell: bash
         run: |
           set -euo pipefail
@@ -29,4 +34,13 @@ jobs:
             test/features/agent/services/agent_task_journal_test.dart
           )
           dart format "${files[@]}"
+          if git diff --quiet -- "${files[@]}"; then
+            echo "Already formatted."
+            exit 0
+          fi
           git diff -- "${files[@]}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "${files[@]}"
+          git commit -m "style(agent): apply dart format"
+          git push origin HEAD:feat/agent-runtime-foundation
