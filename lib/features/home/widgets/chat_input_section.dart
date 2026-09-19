@@ -1,3 +1,6 @@
+import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,7 +13,12 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
-import '../utils/model_display_helper.dart';
+import '../../../core/providers/instruction_injection_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/skills/skills_service.dart';
+import '../../../features/workspace/widgets/environment/environment_status_chip.dart';
+import '../../../features/workspace/workspace_navigation.dart';
+import '../../../theme/design_tokens.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
 
@@ -32,6 +40,9 @@ class ChatInputSection extends StatelessWidget {
   const ChatInputSection({
     super.key,
     required this.inputBarKey,
+    this.chatModelProviderKey,
+    this.chatModelId,
+    this.chatModelIsConversationOverride = false,
     required this.inputFocus,
     required this.inputController,
     required this.mediaController,
@@ -45,8 +56,10 @@ class ChatInputSection extends StatelessWidget {
     this.onMore,
     this.onSelectModel,
     this.onLongPressSelectModel,
-    this.onOpenMcp,
-    this.onLongPressMcp,
+    this.onOpenTools,
+    this.onLongPressTools,
+    this.onOpenWorkspace,
+    this.onOpenSkills,
     this.onOpenSearch,
     this.onConfigureReasoning,
     this.onReasoningBudgetChanged,
@@ -95,8 +108,10 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onMore;
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
-  final VoidCallback? onOpenMcp;
-  final VoidCallback? onLongPressMcp;
+  final VoidCallback? onOpenTools;
+  final VoidCallback? onLongPressTools;
+  final VoidCallback? onOpenWorkspace;
+  final VoidCallback? onOpenSkills;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
   final Future<void> Function(int budget)? onReasoningBudgetChanged;
@@ -125,6 +140,21 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onClearContext;
   final VoidCallback? onCompressContext;
   final String? conversationId;
+
+  /// The model this conversation sends with, already resolved through
+  /// conversation override -> assistant -> global default. Resolved by the
+  /// caller because only it holds the Conversation; watching ChatService here
+  /// would rebuild the composer on every streaming notification.
+  final String? chatModelProviderKey;
+  final String? chatModelId;
+
+  /// Whether the resolved model above comes from this conversation's own
+  /// override rather than from the assistant.
+  ///
+  /// Gates the capability enforcement below, which writes to the ASSISTANT: a
+  /// model picked for one conversation must not wipe the MCP selection or the
+  /// thinking budget shared by every other conversation under that assistant.
+  final bool chatModelIsConversationOverride;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
   final bool storyMode;
@@ -135,7 +165,6 @@ class ChatInputSection extends StatelessWidget {
     final asr = context.watch<AsrProvider>();
     final ap = context.watch<AssistantProvider>();
     final a = ap.currentAssistant;
-    final assistantId = a?.id;
 
     final modelIds = getActiveModelIds(settings, assistant: a);
     final pk = modelIds.providerKey;
@@ -146,6 +175,12 @@ class ChatInputSection extends StatelessWidget {
     final isDesktop = _isDesktopPlatform(context);
     final hasWorldBooks =
         isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
+    final showWorkspaceButton = isDesktop && onOpenWorkspace != null;
+    final showEnvChip = !isDesktop && (Platform.isAndroid || Platform.isIOS);
+    var workspaceBound = false;
+    if (showWorkspaceButton || showEnvChip) {
+      workspaceBound = _isWorkspaceBound(context);
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -256,6 +291,77 @@ class ChatInputSection extends StatelessWidget {
         ),
       ],
     );
+
+    if (!showEnvChip || !workspaceBound) return bar;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showEnvChip && workspaceBound)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.sm,
+              AppSpacing.xxs,
+              AppSpacing.sm,
+              0,
+            ),
+            child: EnvironmentStatusChip(
+              onTap: () => WorkspaceNavigation.openEnvironmentPage(context),
+            ),
+          ),
+        bar,
+      ],
+    );
+  }
+
+  bool _isPromptSelectionActive(
+    BuildContext context,
+    Assistant? assistant,
+    PromptSelectionKind kind,
+  ) {
+    final scoped = assistant?.allowConversationPromptInjection == true;
+    if (scoped && conversationId == null) return false;
+    final ids = promptSelectionIds(
+      context,
+      kind: kind,
+      assistantId: assistant?.id,
+      conversationId: scoped ? conversationId : null,
+    ).toSet();
+    return kind == PromptSelectionKind.worldBook
+        ? context.watch<WorldBookProvider>().books.any(
+            (book) => book.enabled && ids.contains(book.id),
+          )
+        : context.watch<InstructionInjectionProvider>().items.any(
+            (item) => ids.contains(item.id),
+          );
+  }
+
+  bool _isSkillsActive(BuildContext context, Assistant? assistant) {
+    final skillIds = context.select<ChatService?, List<String>?>((chat) {
+      final extras = chat?.getConversation(conversationId ?? '')?.extras;
+      return SkillsBinding.fromExtras(extras ?? const {}).skillIds;
+    });
+    return context.select<SkillsService?, bool>(
+      (skills) =>
+          skills
+              ?.resolveForAssistant(assistant, conversationOverride: skillIds)
+              .isNotEmpty ??
+          false,
+    );
+  }
+
+  bool _isWorkspaceBound(BuildContext context) {
+    try {
+      return context.select<ChatService, bool>((chat) {
+        final id = conversationId;
+        if (id == null) return false;
+        final conversation = chat.getConversation(id);
+        if (conversation == null) return false;
+        return WorkspaceBinding.fromExtras(conversation.extras).isBound;
+      });
+    } catch (_) {
+      return false;
+    }
   }
 
   bool _isDesktopPlatform(BuildContext context) {
@@ -301,21 +407,16 @@ class ChatInputSection extends StatelessWidget {
     }
   }
 
-  bool _shouldShowMcpButton(
-    BuildContext context,
-    SettingsProvider settings,
-    Assistant? a,
-    String? pk,
-    String? mid,
-  ) {
-    final pk2 = a?.chatModelProvider ?? settings.currentModelProvider;
-    final mid3 = a?.chatModelId ?? settings.currentModelId;
-    if (pk2 == null || mid3 == null) return false;
-    final hasEnabledMcp = context.watch<McpProvider>().hasAnyEnabled;
-    return isToolModel(pk2, mid3) && hasEnabledMcp;
+  /// The button hosts local tools and the workspace as well as MCP, so it
+  /// shows for every tool-capable model rather than only when MCP is set up.
+  bool _shouldShowToolsButton(String? pk, String? mid) {
+    if (pk == null || mid == null) return false;
+    return isToolModel(pk, mid);
   }
 
-  bool _isMcpActive(BuildContext context, Assistant? a) {
+  bool _isToolsActive(BuildContext context, Assistant? a, bool workspaceBound) {
+    if (workspaceBound) return true;
+    if ((a?.localToolIds ?? const <String>[]).isNotEmpty) return true;
     final connected = context.watch<McpProvider>().connectedServers;
     final selected = a?.mcpServerIds ?? const <String>[];
     if (selected.isEmpty || connected.isEmpty) return false;

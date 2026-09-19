@@ -1,3 +1,4 @@
+import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -11,6 +12,7 @@ import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
+import '../../generation/tool_loop_runner.dart';
 import '../../kimi_formula_search.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
@@ -112,6 +114,7 @@ Stream<StreamChunk> sendOpenAIStream(
   bool stream = true,
   bool builtInSearchOnly = false,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
   // Utility calls (title / summary generation) only want search injected.
@@ -130,21 +133,37 @@ Stream<StreamChunk> sendOpenAIStream(
   final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
   final wantsImageOutput = effectiveInfo.output.contains(Modality.image);
   final bool canImageInput = effectiveInfo.input.contains(Modality.image);
-  final bool allowRemoteImages =
-      canImageInput && !isKimiK3Model(upstreamModelId);
 
   final effort = openAIEffortForBudget(thinkingBudget, upstreamModelId);
+  final modelMetadata = config.modelOverrides[modelId];
   final info = OpenAIProviderInfo(
     host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
     providerId: config.id.toLowerCase(),
     upstreamModelId: upstreamModelId,
+    // Kimi Code can advertise opaque IDs such as k3. Its declared protocol and
+    // thinking capability apply even when the ID has no kimi-* prefix.
+    isKimiCodeThinkingModel:
+        config.oauthProvider == OAuthProvider.kimi &&
+        config.useResponseApi != true &&
+        modelMetadata is Map &&
+        modelMetadata['oauthProtocol'] == 'openai' &&
+        (isReasoning || modelMetadata['oauthThinkingRequired'] == true),
   );
+  final bool allowRemoteImages =
+      canImageInput &&
+      !isKimiK3Model(upstreamModelId) &&
+      !info.isKimiCodeK3Model;
   // OpenRouter documents delta-style `reasoning_details` chunks that must be
   // concatenated in order, so cumulative-snapshot detection is disabled for
   // it; other providers may resend the full array-so-far with each chunk.
   final reasoningDetailsAllowSnapshots =
       !BuiltInToolsHelper.isOpenRouterProvider(config);
-  final bool needsReasoningEcho = info.needsReasoningEcho && isReasoning;
+  final bool needsReasoningEcho =
+      info.isKimiCodeThinkingModel ||
+      (info.needsReasoningEcho &&
+          (isReasoning ||
+              info.isKimiCodingModel ||
+              (info.isDeepSeek && tools?.isNotEmpty == true)));
   void setMaxTokens(Map<String, dynamic> map) {
     if (maxTokens != null) map[info.completionTokensKey] = maxTokens;
   }
@@ -595,6 +614,7 @@ Stream<StreamChunk> sendOpenAIStream(
     if (info.isKimiThinkingModel) {
       normalizeMoonshotKimiChatBody(
         body,
+        info: info,
         upstreamModelId: upstreamModelId,
         isReasoning: isReasoning,
         thinkingBudget: thinkingBudget,
@@ -636,6 +656,12 @@ Stream<StreamChunk> sendOpenAIStream(
   if (extraBodyCfg.isNotEmpty) {
     body.addAll(extraBodyCfg);
   }
+  applyPoolsideThinkingIfNeeded(
+    body,
+    info: info,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
   // Built-in tools run after the custom body and merge by type so custom
   // function tools and provider server tools coexist.
   if (config.useResponseApi != true) {
@@ -655,7 +681,15 @@ Stream<StreamChunk> sendOpenAIStream(
   );
   normalizeMoonshotKimiChatBody(
     body,
+    info: info,
     upstreamModelId: upstreamModelId,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
+  applyKimiCodeChatThinking(
+    body,
+    config: config,
+    modelId: modelId,
     isReasoning: isReasoning,
     thinkingBudget: thinkingBudget,
   );
@@ -794,6 +828,7 @@ Stream<StreamChunk> sendOpenAIStream(
           needsReasoningEcho: needsReasoningEcho,
           extraHeaders: extraHeaders,
           initialUsage: firstUsage,
+          retryRound: retryRound,
         );
         return;
       }
@@ -982,6 +1017,7 @@ Stream<StreamChunk> sendOpenAIStream(
             streamRound: streamRound,
             approxPromptTokens: approxPromptTokens,
             approxCompletionChars: approxCompletionChars,
+            retryRound: retryRound,
           );
           return;
         }
@@ -1051,6 +1087,7 @@ Stream<StreamChunk> sendOpenAIStream(
               approxPromptTokens: approxPromptTokens,
               approxCompletionChars: approxCompletionChars,
               includeReasoningDetailsOnDone: true,
+              retryRound: retryRound,
             );
             return;
           }
@@ -1117,6 +1154,7 @@ Stream<StreamChunk> sendOpenAIStream(
           approxPromptTokens: approxPromptTokens,
           approxCompletionChars: approxCompletionChars,
           includeReasoningDetailsOnDone: true,
+          retryRound: retryRound,
         );
         return;
       }
@@ -1170,10 +1208,13 @@ Stream<StreamChunk> sendOpenAIStream(
             approxPromptTokens: approxPromptTokens,
             approxCompletionChars: approxCompletionChars,
             includeReasoningDetailsOnDone: false,
+            retryRound: retryRound,
           );
           return;
         }
       }
+    } on ProviderOAuthException {
+      rethrow;
     } on HttpException {
       // In-band error frames raised inside this block (follow-up tool-call
       // streams call throwIfInBandStreamError in here) and failed follow-up

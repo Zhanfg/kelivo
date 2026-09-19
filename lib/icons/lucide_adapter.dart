@@ -78,6 +78,7 @@ class Lucide {
   static const IconData Languages = lucide.LucideIcons.languages;
   static const IconData User = lucide.LucideIcons.user;
   static const IconData Hammer = lucide.LucideIcons.hammer;
+  static const IconData ToolCase = lucide.LucideIcons.toolCase;
   static const IconData Brain = lucide.LucideIcons.brain;
   static const IconData Lightbulb = lucide.LucideIcons.lightbulb;
   static const IconData Check = lucide.LucideIcons.check;
@@ -96,6 +97,7 @@ class Lucide {
   static const IconData ClipboardCheck = lucide.LucideIcons.clipboardCheck;
   static const IconData ClipboardPen = lucide.LucideIcons.clipboardPen;
   static const IconData Sparkles = lucide.LucideIcons.sparkles;
+  static const IconData WandSparkles = lucide.LucideIcons.wandSparkles;
   static const IconData Phone = lucide.LucideIcons.phone;
   static const IconData Code = lucide.LucideIcons.code;
   static const IconData Hash = lucide.LucideIcons.hash;
@@ -130,6 +132,10 @@ class Lucide {
   static const IconData Paperclip = lucide.LucideIcons.paperclip;
   static const IconData ChevronUp = lucide.LucideIcons.chevronUp;
   static const IconData Map = lucide.LucideIcons.map;
+  static const IconData MapPin = lucide.LucideIcons.mapPin;
+  static const IconData CloudSun = lucide.LucideIcons.cloudSun;
+  static const IconData ListTodo = lucide.LucideIcons.listTodo;
+  static const IconData ListPlus = lucide.LucideIcons.listPlus;
   static const IconData SquarePen = lucide.LucideIcons.squarePen;
   static const IconData info = lucide.LucideIcons.info;
   static const IconData Zap = lucide.LucideIcons.zap;
@@ -193,6 +199,8 @@ class Lucide {
   static const IconData FileQuestion = lucide.LucideIcons.fileQuestionMark;
   static const IconData FileClock = lucide.LucideIcons.fileClock;
   static const IconData Folder = lucide.LucideIcons.folder;
+  static const IconData FolderCode = lucide.LucideIcons.folderCode;
+  static const IconData Lock = lucide.LucideIcons.lock;
   static const IconData CornerDownLeft = lucide.LucideIcons.cornerDownLeft;
   static const IconData package2 = lucide.LucideIcons.package2;
   static const IconData workflow = lucide.LucideIcons.workflow;

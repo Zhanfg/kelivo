@@ -21,8 +21,12 @@ class ChatMessage extends HiveObject {
   final List<MessagePart> parts;
 
   /// Derived text body: concatenation of every [TextPart] in [parts] order.
-  String get content =>
-      parts.whereType<TextPart>().map((part) => part.text).join();
+  late final String _content = parts
+      .whereType<TextPart>()
+      .map((part) => part.text)
+      .join();
+
+  String get content => _content;
 
   @HiveField(3)
   final DateTime timestamp;
@@ -228,6 +232,20 @@ class ChatMessage extends HiveObject {
       replaced = true;
     }
     return next;
+  }
+
+  /// Body-only assistant edit: drop thinking and tool cards, keep attachments.
+  ///
+  /// Writes [newContent] into the first [TextPart] (or prepends one). Image,
+  /// file, and unknown parts stay in place so generated media is not lost.
+  static List<MessagePart> partsWithoutThinkingAndToolCards(
+    List<MessagePart> original,
+    String newContent,
+  ) {
+    return partsWithReplacedText([
+      for (final part in original)
+        if (part is! ReasoningPart && part is! ToolCallPart) part,
+    ], newContent);
   }
 
   ChatMessage copyWith({

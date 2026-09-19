@@ -9,6 +9,29 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get settingsSearchHint => '搜索设置';
+
+  @override
+  String get settingsSearchCancel => '取消';
+
+  @override
+  String get settingsSearchClear => '清空搜索';
+
+  @override
+  String get settingsSearchSuggestions => '常用设置';
+
+  @override
+  String get settingsSearchNoResults => '未找到相关设置';
+
+  @override
+  String get settingsSearchNoResultsHint => '试试其他名称，或更简短的关键词。';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    return '找到 $count 项设置';
+  }
+
+  @override
   String get helloWorld => '你好，世界！';
 
   @override
@@ -87,11 +110,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageCalculating => '统计中…';
 
   @override
-  String settingsPageFilesCount(int count, String size) {
-    return '共 $count 个文件 · $size';
-  }
-
-  @override
   String get storageSpacePageTitle => '存储空间';
 
   @override
@@ -141,10 +159,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
 
   @override
+  String get storageSpaceCategoryDisplacedDatabases => '保留的旧数据库';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases => '自动重建前保留的数据库';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      '确定删除这些保留的旧数据库吗？它们是 Kelivo 重建数据库时留下的，可能是那些聊天记录和设置仅存的一份。删除后无法恢复。';
+
+  @override
   String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
 
   @override
   String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton => '删除保留的旧数据库';
 
   @override
   String get storageSpaceClearRestoreTracesConfirmMessage =>
@@ -164,11 +195,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceCategoryOther => '其他';
-
-  @override
-  String storageSpaceFilesCount(int count) {
-    return '$count 个文件';
-  }
 
   @override
   String get storageSpaceSafeToClearHint => '可安全清理，不影响聊天记录。';
@@ -286,7 +312,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
-    return '删除 $count 个项目？删除后聊天记录中的附件可能无法打开。';
+    return '删除 $count 个项目及其对应的会话附件副本？删除后，聊天记录中的这些附件将无法使用。';
   }
 
   @override
@@ -533,8 +559,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageClearContext => '清空上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 条消息';
   }
 
   @override
@@ -651,9 +682,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpTransportTagHttp => 'HTTP';
 
   @override
-  String get mcpServerEditSheetStdioOnlyDesktop => 'STDIO 仅在桌面端可用';
-
-  @override
   String get mcpServerEditSheetStdioCommandLabel => '命令';
 
   @override
@@ -661,6 +689,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpServerEditSheetStdioWorkingDirectoryLabel => '工作目录（可选）';
+
+  @override
+  String get mcpWorkspaceBindingLabel => '绑定工作区（可选）';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      '服务器可通过 /workspace 访问此工作区。工作目录留空时默认进入该目录，切换聊天不会改变绑定。';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      '工作区绑定适用于移动端 Linux 环境。在桌面端运行此服务器前，请先解除绑定。';
 
   @override
   String get mcpServerEditSheetStdioEnvironmentTitle => '环境变量';
@@ -745,6 +784,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditPageNotFound => '助手不存在';
+
+  @override
+  String get assistantEditPageWorkspaceTab => '工作区设置';
 
   @override
   String get assistantEditPageBasicTab => '基础设置';
@@ -1020,26 +1062,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageIosBackgroundChatTitle => 'iOS 后台生成';
 
   @override
-  String get iosBackgroundSettingsPageTitle => 'iOS 后台生成';
-
-  @override
   String get iosBackgroundStatusOn => '开启';
 
   @override
   String get iosBackgroundStatusOff => '关闭';
-
-  @override
-  String get iosBackgroundGenerationEnableTitle => '后台生成';
-
-  @override
-  String get iosBackgroundGenerationEnableSubtitle =>
-      'App 离开前台后，使用 iOS 分配的后台时间继续当前回复。';
-
-  @override
-  String get iosBackgroundTaskRefreshTitle => '后台任务恢复';
-
-  @override
-  String get iosBackgroundTaskRefreshSubtitle => '在系统条件允许时，向 iOS 请求刷新和处理机会。';
 
   @override
   String get iosLiveActivityTitle => '实时活动';
@@ -1048,98 +1074,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get iosLiveActivitySubtitle => '支持时在锁屏和灵动岛显示后台回复状态。';
 
   @override
-  String get iosBackgroundNotificationsTitle => '任务通知';
-
-  @override
-  String get iosBackgroundNotificationsSubtitle => '后台回复完成或中断时发送本地通知。';
-
-  @override
-  String get iosBackgroundLimitNoticeTitle => 'iOS 仍可能暂停任务';
-
-  @override
-  String get iosBackgroundLimitNoticeBody =>
-      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
-
-  @override
-  String get iosBackgroundUnsupportedLiveActivity =>
-      '需要 iOS 16.1 或更高版本，并在系统设置中允许实时活动。';
-
-  @override
-  String get iosBackgroundNativeStatusTitle => '系统状态';
-
-  @override
-  String get iosBackgroundNativeStatusUnavailable => '需要在 iOS 上运行后查看';
-
-  @override
-  String get iosBackgroundLiveActivityAvailable => '实时活动可用';
-
-  @override
-  String get iosBackgroundLiveActivityUnavailable => '实时活动不可用';
-
-  @override
-  String get iosBackgroundNotificationsAuthorized => '通知已允许';
-
-  @override
-  String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
-
-  @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
-
-  @override
-  String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
-
-  @override
-  String get iosBackgroundGenerationStreamingDetail => '正在接收助手回复';
-
-  @override
-  String iosBackgroundGenerationTokenCount(int count) {
-    return '$count tokens';
-  }
-
-  @override
-  String get iosBackgroundGenerationCompleteTitle => '生成完成';
-
-  @override
-  String get iosBackgroundGenerationCompleteDetail => '助手回复已准备好';
-
-  @override
-  String get iosBackgroundGenerationInterruptedTitle => '生成已中断';
-
-  @override
-  String get iosBackgroundGenerationInterruptedDetail => '后台回复在完成前停止';
-
-  @override
-  String get iosBackgroundGenerationCancelledDetail => '生成已停止';
-
-  @override
-  String get androidBackgroundStatusOn => '开启';
-
-  @override
-  String get androidBackgroundStatusOff => '关闭';
-
-  @override
-  String get androidBackgroundStatusOther => '开启并通知';
-
-  @override
-  String get androidBackgroundOptionOn => '开启';
-
-  @override
-  String get androidBackgroundOptionOnNotify => '开启并在生成完时发送消息';
-
-  @override
-  String get androidBackgroundOptionOff => '关闭';
-
-  @override
   String get notificationChatCompletedTitle => '生成完成';
 
   @override
   String get notificationChatCompletedBody => '助手回复已生成';
-
-  @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在运行';
-
-  @override
-  String get androidBackgroundNotificationText => '后台保持聊天生成';
 
   @override
   String get assistantEditEmojiDialogTitle => '选择表情';
@@ -1357,6 +1295,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get assistantEditPromptTimeVarWarning =>
       '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
+
+  @override
+  String get assistantEditPromptIso8601Title => '使用 ISO 8601 格式';
+
+  @override
+  String get assistantEditPromptIso8601Subtitle =>
+      '包含时区偏移，例如 2026-08-08T14:30:05+08:00';
 
   @override
   String get assistantEditPromptAppendTimeTitle => '追加当前时间';
@@ -1633,6 +1578,30 @@ class AppLocalizationsZh extends AppLocalizations {
       'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
 
   @override
+  String get restoreProgressTitle => '正在恢复备份';
+
+  @override
+  String get restoreProgressWarning => '请保持 Kelivo 开启直到完成。此时关闭应用，下次启动会从头再来一次。';
+
+  @override
+  String get restoreProgressStageCheckingBackup => '正在校验备份';
+
+  @override
+  String get restoreProgressStagePreservingCurrentData => '正在保留当前数据';
+
+  @override
+  String get restoreProgressStageInstallingBackup => '正在写入备份';
+
+  @override
+  String get restoreProgressStageVerifying => '正在验证';
+
+  @override
+  String get restoreProgressStageRollingBack => '正在恢复原有数据';
+
+  @override
+  String get restoreProgressStageFinishing => '即将完成';
+
+  @override
   String get backupRestoreFailureRestartButton => '重启 Kelivo';
 
   @override
@@ -1687,11 +1656,143 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
+  String get startupRecoveryWhatFailed => '失败原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失败阶段';
+
+  @override
+  String get startupRecoveryStageRestore => '恢复关卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '数据库启动';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '诊断码';
+
+  @override
+  String get startupRecoverySchemaLabel => '数据库版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁盘上为 $installed · 当前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '应用';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集诊断信息…';
+
+  @override
+  String get startupRecoveryShowDetails => '展开技术细节';
+
+  @override
+  String get startupRecoveryHideDetails => '收起技术细节';
+
+  @override
+  String get startupRecoveryCopyReport => '复制完整报告';
+
+  @override
+  String get startupRecoveryReportCopied => '已复制完整报告';
+
+  @override
+  String get startupRecoveryShareReport => '导出报告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '报告已导出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '无法导出报告。';
+
+  @override
+  String get startupRecoverySectionDataTitle => '你的数据';
+
+  @override
+  String get startupRecoverySectionDataBody =>
+      '目前没有任何数据被删除。在尝试下面的操作前，先把副本保存到安全的地方。';
+
+  @override
+  String startupRecoveryExportSavedTo(String path) {
+    return '数据副本已保存到 $path';
+  }
+
+  @override
+  String get startupRecoverySectionRepairTitle => '诊断与修复';
+
+  @override
+  String get startupRecoverySectionRepairBody =>
+      '完整性检查只读取数据库。修复会清理上次更新中断留下的元数据并重新启动，不会删除聊天记录。';
+
+  @override
+  String get startupRecoveryIntegrityButton => '检查数据库完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在数据库文件中发现损坏。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 报告了问题 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityMissing => '数据目录中没有找到数据库文件。';
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性检查无法运行。';
+
+  @override
+  String get startupRecoveryDangerZone => '危险操作';
+
+  @override
+  String get startupRecoveryDangerBody =>
+      '重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。';
+
+  @override
+  String get startupRecoveryResetAcknowledge => '我已导出副本，或不需要这些数据。';
+
+  @override
   String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
       '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeTitle => '若要改用旧版';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeIntro =>
+      '当前版本打不开本机这份数据库。若你必须留在旧版，请按下面的步骤处理；在备份完成之前，不要删除或覆盖这里的数据。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep1 =>
+      '先安装并打开最新版 Kelivo，在「设置 → 数据备份」导出一份备份文件。';
+
+  @override
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
+    return '打开 $url，把备份转换成你打算使用的旧版格式。';
+  }
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep3 =>
+      '确认本机数据已经另外备份好之后，再安装旧版，并导入转换后的备份。';
+
+  @override
+  String get startupDatabaseUpdateRequiredOpenTool => '打开转换工具';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -1731,6 +1832,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupPageRestore => '恢复';
+
+  @override
+  String get backupPageForwardCompatTitle => '备份来自更新的版本';
+
+  @override
+  String backupPageForwardCompatBody(int backupVersion, int currentVersion) {
+    return '这份备份由更新版本的 Kelivo 创建（数据格式 $backupVersion，当前版本支持 $currentVersion），且未声明旧版本能否读取。\n\n你可以继续导入：当前版本不认识的内容会被跳过，备份文件本身不会被修改。但如果新版本改变了已有数据的存储方式，部分内容可能会被错误导入。\n\n更稳妥的做法是先升级 Kelivo。';
+  }
+
+  @override
+  String get backupPageForwardCompatContinue => '仍然导入';
+
+  @override
+  String get backupPageForwardCompatCancel => '取消';
+
+  @override
+  String get backupPageSchemaTooNewMessage =>
+      '这份备份由更新版本的 Kelivo 创建，当前版本无法读取。请先升级 Kelivo 后重试。';
 
   @override
   String get backupPageBackupUploaded => '已上传备份';
@@ -2518,6 +2637,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit => '行';
 
   @override
+  String get displaySettingsPageCollapseLongUserMessagesTitle => '折叠过长消息';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle =>
+      '超过阈值的用户消息折叠显示，点击可展开';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle =>
+      '超过多少字符折叠';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit => '字符';
+
+  @override
+  String get chatMessageExpandLongText => '展开';
+
+  @override
+  String get chatMessageCollapseLongText => '收起';
+
+  @override
   String get messageExportSheetFormatTitle => '导出格式';
 
   @override
@@ -2835,6 +2974,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarMcpServersTooltip => 'MCP服务器';
 
   @override
+  String get chatInputBarToolsTooltip => '工具';
+
+  @override
   String get chatInputBarMoreTooltip => '更多';
 
   @override
@@ -2983,9 +3125,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpServerEditSheetTransportLabel => '传输类型';
 
   @override
-  String get mcpServerEditSheetSseRetryHint => '如果SSE连接失败，请多试几次';
-
-  @override
   String get mcpServerEditSheetUrlLabel => '服务器地址';
 
   @override
@@ -3053,7 +3192,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用于总结对话标题的模型，推荐使用快速且便宜的模型。选择模型后才会启用。';
+      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -3069,7 +3208,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      '用于在助手回复后生成继续对话的建议气泡。选择模型后才会启用。';
+      '用于在助手回复后生成聊天建议，可跟随当前对话模型或指定其他模型。默认未启用。';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新频率';
@@ -3146,6 +3285,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageResetDefault => '重置为默认';
+
+  @override
+  String get defaultModelPageDisable => '禁用';
 
   @override
   String get defaultModelPageSave => '保存';
@@ -3268,13 +3410,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetReasoningAbility => '推理';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      '供应商重写：允许为特定模型自定义供应商设置。（暂未实现）';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => '添加供应商重写';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => '自定义 Headers';
 
   @override
@@ -3294,9 +3429,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
-
-  @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
 
   @override
   String get modelDetailSheetSearchTool => '搜索';
@@ -3328,11 +3460,19 @@ class AppLocalizationsZh extends AppLocalizations {
       '需要启用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '网页抓取';
+  String get modelDetailSheetWebFetchTool => '网页抓取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '启用 OpenRouter 网页抓取服务端工具';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允许 Claude 抓取对话中出现的网页与 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允许 Claude 在 Anthropic 沙箱中运行 Python 与 Bash';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
@@ -3386,6 +3526,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelSelectSheetFavoritesSection => '收藏';
+
+  @override
+  String get modelSelectSheetFollowAssistant => '跟随助手';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -4139,11 +4282,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchSettingsSheetBuiltinSearchDescription => '是否启用模型内置的搜索功能';
 
   @override
-  String get searchSettingsSheetClaudeDynamicSearchTitle => '模型内置搜索(新)';
+  String get searchSettingsSheetClaudeDynamicSearchTitle => '动态过滤';
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '在支持的 Claude 官方模型上使用 `web_search_20260209`，支持动态过滤能力。';
+      '筛选搜索结果，节省 token';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '网络搜索';
@@ -4346,6 +4489,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageForkKeepMessageVersionsTitle => '创建分支时保留消息版本';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      '编辑助手时保留思考与工具卡片';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      '关闭后，当前编辑版本只保留助手正文；切回上一版本仍可查看思考与工具卡片';
 
   @override
   String chainOfThoughtExpandSteps(Object count) {
@@ -4580,6 +4731,23 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get themeSettingsPageUsePureBackgroundSubtitle => '仅气泡与强调色随主题变化';
+
+  @override
+  String get themeAdvancedSettingsPageTitle => '主题高级设置';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle => '新版分层配色（实验）';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      '页面更深、卡片更亮，两者都保留主题色相；关闭可恢复旧外观';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle => '弹窗内瓦片分层';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      '默认瓦片与弹窗同色';
 
   @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
@@ -5328,6 +5496,52 @@ class AppLocalizationsZh extends AppLocalizations {
       'TinyFish Search API，支持地区与语言参数。需要 API Key。此处不支持 Fetch/Scrape。';
 
   @override
+  String get searchServiceNameAnySearch => 'AnySearch';
+
+  @override
+  String get searchProviderAnySearchDescription =>
+      '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
+
+  @override
+  String get searchServiceNameParallel => 'Parallel';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜索 API。返回面向 LLM 优化的网页摘录，支持 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜索模式';
+
+  @override
+  String get searchServiceNameYou => 'You.com';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。';
+
+  @override
+  String get searchServicesDialogContentMode => '内容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 数';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 数必须介于 1024 和 32768 之间。';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override
@@ -5575,6 +5789,193 @@ class AppLocalizationsZh extends AppLocalizations {
       '在你确认后于本设备创建日历日程，需要授予日历权限。';
 
   @override
+  String get assistantEditLocalToolLocationTitle => '当前位置';
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '读取本设备的一次性位置，需要授予定位权限。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天气';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '获取当前位置或指定地点的 Apple 天气，结果中会展示 WeatherKit 数据来源。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '读取本设备的健康活动摘要，需要授予健康数据读取权限。';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已选择 $selected/$total 项';
+  }
+
+  @override
+  String get healthDataSettingsTitle => '健康数据';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 Kelivo 可以尝试读取该范围，实际授权仍由 iOS 管理。';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 开启';
+  }
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康读取';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '设备可用，读取范围由 iOS 管理';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '打开系统设置';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部开启';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部关闭';
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活动';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身体';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步数';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步数摘要';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '户外日光时间';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活动能量消耗';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '锻炼';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 锻炼分钟数';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立时间';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距离';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距离';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身训练';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '训练记录：类型、时长、距离与消耗';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '最近 24 小时的睡眠、卧床、清醒与睡眠分期';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '静息';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或静息时段';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率样本';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '静息心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '静息状态心率';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧饱和度';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '摄入能量';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '饮食热量记录';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '饮水';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '饮水量记录';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '体重';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '体重样本';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身体质量指数';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖样本';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查询提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '读取本设备上的提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '创建提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你确认后于本设备创建提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你确认后将提醒事项标记为完成，需要授予提醒事项完整访问权限。';
+
+  @override
   String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
 
   @override
@@ -5768,6 +6169,56 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get networkProxyPriorityNote => '当同时开启全局代理与供应商代理时，将优先使用供应商代理。';
+
+  @override
+  String get settingsPageAutoRetry => '自动重试';
+
+  @override
+  String get autoRetryEnableLabel => '开启自动重试';
+
+  @override
+  String get autoRetryMaxRetries => '最大重试次数';
+
+  @override
+  String get autoRetryInitialDelay => '首次延迟（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '退避倍率';
+
+  @override
+  String get autoRetryMaxDelay => '最大延迟（毫秒）';
+
+  @override
+  String get autoRetryJitter => '抖动';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待随机 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '网络错误时重试';
+
+  @override
+  String get autoRetryStatusCodes => '可重试状态码';
+
+  @override
+  String get autoRetryKeywords => '重试关键字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重试关键字';
+
+  @override
+  String get autoRetryAddHint => '添加';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢复默认';
+
+  @override
+  String get autoRetryFooter => '仅在当前这轮模型响应尚未产生任何输出时才会自动重试。';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒后重试 ($attempt/$maxRetries)';
+  }
 
   @override
   String get desktopShowProviderInModelCapsule => '模型胶囊显示供应商';
@@ -7468,6 +7919,17 @@ class AppLocalizationsZh extends AppLocalizations {
       '压缩在添加图片时进行，已保存或已发送的图片不受影响；压缩后图片以 JPEG 格式随消息发送。';
 
   @override
+  String get imageSettingsPageSendSectionTitle => '发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksTitle =>
+      '将 Markdown 图片链接作为图片发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksSubtitle =>
+      '开启后，消息文本中的 ![alt](url) 会作为图片发送给视觉模型；关闭后仅作为普通文本发送。手动添加的图片附件不受影响。';
+
+  @override
   String get memoryTraceSettingsTitle => '流程追踪';
 
   @override
@@ -7773,11 +8235,3161 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手设定同时作用于思考、工具调用和翻译卡片。';
+
+  @override
+  String get localSnapshotSectionTitle => '本地副本';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本地副本';
+
+  @override
+  String get localSnapshotEnabledSubtitle => 'Kelivo 会定期在本机存一份数据库副本，让数据不只有一份。';
+
+  @override
+  String get localSnapshotIntervalTitle => '备份频率';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自动';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，数据库越大间隔越长';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepTitle => '保留份数';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepSubtitle => '另外各留一份上周和上个月的，万一问题过了很久才发现也还能找回来。';
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上周的';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上个月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '无论设成几份，最近一份仍有内容的副本都不会被自动清理。';
+
+  @override
+  String get localSnapshotMaximumTitle => '占用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotAnnounceTitle => '备份完成时提示';
+
+  @override
+  String get localSnapshotAnnounceSubtitle => '失败一定会告诉你。这里只是成功时多一句提示。';
+
+  @override
+  String get localSnapshotTakeNow => '立即备份一份';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暂无副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '还没有备份过';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次备份：$when';
+  }
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次备份失败（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳过：本机剩余空间不足';
+
+  @override
+  String get localSnapshotStatusUnchanged => '距上次备份数据没有变化';
+
+  @override
+  String get localSnapshotCopiesTitle => '本地副本';
+
+  @override
+  String get localSnapshotCopiesEmpty => '还没有本地副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '数据有变化时会自动存一份，恢复数据前也一定会先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本地副本只存在这台设备上。它防的是应用内数据被损坏或误删，防不了设备丢失或卸载应用——那要靠 WebDAV / S3 备份。';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自动备份';
+
+  @override
+  String get localSnapshotOriginManual => '手动备份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '恢复前备份';
+
+  @override
+  String get localSnapshotKindRecovered => '故障恢复时留下的';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 个对话',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 条消息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '内容需恢复后才能确认';
+
+  @override
+  String get localSnapshotCopyPinned => '已保留';
+
+  @override
+  String get localSnapshotActionRestore => '恢复';
+
+  @override
+  String get localSnapshotActionExport => '导出';
+
+  @override
+  String get localSnapshotActionDelete => '删除';
+
+  @override
+  String get localSnapshotActionPin => '保留这份';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotRestoreTitle => '恢复这份副本？';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '当前的对话和设置会被 $when 的这份副本替换。系统会先把现在的数据存一份，所以这一步可以撤销。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在准备副本';
+
+  @override
+  String get localSnapshotDeleteTitle => '删除这份副本？';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '这份副本会从设备上永久删除。它里面有、而当前数据库里没有的数据将无法找回。';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '这是唯一一份还有内容的副本。';
+
+  @override
+  String get localSnapshotExportPreparing => '正在准备导出';
+
+  @override
+  String get localSnapshotExportDone => '副本已导出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '导出副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已保存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '保存副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotDeleteDone => '副本已删除';
+
+  @override
+  String get localSnapshotBusyMessage => '已有备份任务在进行中';
+
+  @override
+  String get localSnapshotRunInBackground => '转到后台继续';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在后台备份副本';
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本机还保留着 $count 份本地副本，最新一份是 $when 的。重置不会删除它们——重启后可以在 设置 › 备份 › 本地副本 里恢复。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外还有 $count 份故障恢复时留下的数据库副本，重置会把它们一并永久删除。想留住的话请先导出数据。';
+  }
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜索';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '记忆';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本地工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部恢复默认？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '将把所有内置工具的描述恢复为应用默认文案，自定义措辞会丢失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '恢复';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '参数描述 ($count)';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '记忆工具的默认描述会随记忆提示语言在中/英之间切换。自定义描述按工具名只存一份，切换语言后不会跟着变。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '编辑描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
+
+  @override
+  String get workspaceFileNotAvailable => '文件不可用';
+
+  @override
+  String get workspaceTerminalNotAvailable => '终端不可用';
+
+  @override
+  String get workspacePreviewCopyPath => '复制路径';
+
+  @override
+  String get workspacePreviewShare => '分享';
+
+  @override
+  String get workspacePreviewOpenExternally => '用其他应用打开';
+
+  @override
+  String get workspacePreviewOpenWith => '打开方式…';
+
+  @override
+  String get workspacePreviewFileTooLarge => '文件过大，无法预览，请用其他应用打开。';
+
+  @override
+  String get workspacePreviewSource => '源码';
+
+  @override
+  String get workspacePreviewRendered => '渲染';
+
+  @override
+  String get workspacePreviewFileName => '名称';
+
+  @override
+  String get workspacePreviewFileSize => '大小';
+
+  @override
+  String get workspacePreviewFileModified => '修改时间';
+
+  @override
+  String get workspacePreviewPathCopied => '已复制路径';
+
+  @override
+  String workspacePreviewLineCount(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String get workspaceFilesSort => '排序';
+
+  @override
+  String get workspaceFilesSortName => '名称';
+
+  @override
+  String get workspaceFilesSortModified => '修改时间';
+
+  @override
+  String get workspaceFilesSortSize => '大小';
+
+  @override
+  String get workspaceFilesSortAscending => '升序';
+
+  @override
+  String get workspaceFilesSortDescending => '降序';
+
+  @override
+  String get workspaceFilesShowHidden => '显示隐藏文件';
+
+  @override
+  String get workspaceFilesHideHidden => '隐藏隐藏文件';
+
+  @override
+  String get workspaceFilesRefresh => '刷新';
+
+  @override
+  String get workspaceFilesNewFolder => '新建文件夹';
+
+  @override
+  String get workspaceFilesNewFile => '新建文件';
+
+  @override
+  String get workspaceFilesImport => '导入';
+
+  @override
+  String get workspaceFilesExport => '导出';
+
+  @override
+  String get workspaceFilesExportFolder => '导出当前文件夹';
+
+  @override
+  String get workspaceFilesEmpty => '此文件夹为空';
+
+  @override
+  String get workspaceFilesError => '无法加载这些文件';
+
+  @override
+  String get workspaceFilesRetry => '重试';
+
+  @override
+  String get workspaceFilesPreview => '预览';
+
+  @override
+  String get workspaceFilesRename => '重命名';
+
+  @override
+  String get workspaceFilesMove => '移动';
+
+  @override
+  String get workspaceFilesDelete => '删除';
+
+  @override
+  String get workspaceFilesShare => '分享';
+
+  @override
+  String get workspaceFilesCopyPath => '复制路径';
+
+  @override
+  String get workspaceFilesExportItem => '导出';
+
+  @override
+  String get workspaceFilesNameLabel => '名称';
+
+  @override
+  String get workspaceFilesNameHint => '输入名称';
+
+  @override
+  String get workspaceFilesCreate => '创建';
+
+  @override
+  String get workspaceFilesCancel => '取消';
+
+  @override
+  String get workspaceFilesConfirm => '确认';
+
+  @override
+  String get workspaceFilesSave => '保存';
+
+  @override
+  String get workspaceFilesDeleteTitle => '删除此项？';
+
+  @override
+  String workspaceFilesDeleteMessage(String name) {
+    return '删除 $name？';
+  }
+
+  @override
+  String workspaceFilesDeleteFolderMessage(String name) {
+    return '删除文件夹 $name 及其全部内容？';
+  }
+
+  @override
+  String get workspaceFilesMoveTitle => '移动到文件夹';
+
+  @override
+  String get workspaceFilesMoveHere => '移动到此处';
+
+  @override
+  String get workspaceFilesPathCopied => '已复制路径';
+
+  @override
+  String get workspaceFilesInvalidName => '名称无效';
+
+  @override
+  String get workspaceFilesInvalidPath => '该路径超出当前文件夹';
+
+  @override
+  String workspaceFilesOperationFailed(String error) {
+    return '操作失败：$error';
+  }
+
+  @override
+  String get workspaceFilesActions => '操作';
+
+  @override
+  String get workspaceFilesMore => '更多';
+
+  @override
+  String get workspaceFilesJustNow => '刚刚';
+
+  @override
+  String workspaceFilesMinutesAgo(int count) {
+    return '$count 分钟前';
+  }
+
+  @override
+  String workspaceFilesHoursAgo(int count) {
+    return '$count 小时前';
+  }
+
+  @override
+  String workspaceFilesDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String get workspaceFilesPanelTitle => '对话文件';
+
+  @override
+  String get workspaceFilesTabAttachments => '附件';
+
+  @override
+  String get workspaceFilesTabOutputs => '输出';
+
+  @override
+  String get workspaceFilesTabWorkspace => '工作区';
+
+  @override
+  String get workspaceFilesNoWorkspaceBound => '尚未绑定工作区';
+
+  @override
+  String get workspaceFilesKindManaged => '托管';
+
+  @override
+  String get workspaceFilesKindLinked => '链接';
+
+  @override
+  String get workspaceFilesMissingWorkspace => '找不到工作区';
+
+  @override
+  String get workspaceFilesClose => '关闭';
+
+  @override
+  String get workspacesTitle => '工作区';
+
+  @override
+  String get workspacesCreate => '创建';
+
+  @override
+  String get workspacesCreateTitle => '新建工作区';
+
+  @override
+  String get workspacesNameLabel => '名称';
+
+  @override
+  String get workspacesNameHint => '工作区名称';
+
+  @override
+  String get workspacesLinkFolder => '链接文件夹';
+
+  @override
+  String get workspacesEmpty => '还没有工作区';
+
+  @override
+  String get workspacesEmptyCta => '创建工作区';
+
+  @override
+  String get workspacesSettings => '设置';
+
+  @override
+  String get workspacesOpenFiles => '打开文件';
+
+  @override
+  String get workspacesLastUsedNever => '从未使用';
+
+  @override
+  String workspacesLastUsed(String when) {
+    return '最近使用 $when';
+  }
+
+  @override
+  String get workspacesDeleteTitle => '删除此工作区？';
+
+  @override
+  String workspacesDeleteMessage(String name) {
+    return '删除工作区 $name？';
+  }
+
+  @override
+  String get workspacesDeleteAlsoFiles => '同时删除文件';
+
+  @override
+  String get workspacesUnlinkTitle => '取消链接此工作区？';
+
+  @override
+  String workspacesUnlinkMessage(String name) {
+    return '取消链接 $name？磁盘上的文件会保留。';
+  }
+
+  @override
+  String get workspacesSettingsTitle => '工作区设置';
+
+  @override
+  String get workspacesShellNeedsApproval => '运行终端命令前询问';
+
+  @override
+  String get workspacesDefaultCwd => '默认工作目录';
+
+  @override
+  String get workspacesDefaultCwdHint => '相对路径，例如 src';
+
+  @override
+  String get workspacesDefaultCwdInvalid => '请使用不含 .. 的相对路径';
+
+  @override
+  String get workspacesCreateManaged => '创建工作区';
+
+  @override
+  String get workspacesLinkExisting => '链接已有文件夹';
+
+  @override
+  String get workspacesUnlink => '取消链接';
+
+  @override
+  String get workspacesItemMore => '工作区操作';
+
+  @override
+  String get workspaceToolDenied => '已拒绝';
+
+  @override
+  String get workspaceToolTimeout => '超时';
+
+  @override
+  String get workspaceToolCancelled => '已取消';
+
+  @override
+  String get workspaceToolInterrupted => '已中断';
+
+  @override
+  String get workspaceToolEnvironmentNotReady => '沙箱环境未安装';
+
+  @override
+  String get workspaceToolInstall => '安装';
+
+  @override
+  String get workspaceToolFuzzy => '模糊';
+
+  @override
+  String get workspaceToolCreated => '已创建';
+
+  @override
+  String get workspaceToolUpdated => '已更新';
+
+  @override
+  String get workspaceToolTruncated => '已截断';
+
+  @override
+  String get workspaceToolImageTag => '图片';
+
+  @override
+  String get workspaceToolAllowAll => '本会话全部允许';
+
+  @override
+  String get workspaceToolStdout => 'stdout';
+
+  @override
+  String get workspaceToolStderr => 'stderr';
+
+  @override
+  String get workspaceToolOpenFullOutput => '打开完整输出';
+
+  @override
+  String get workspaceToolChangedFiles => '变更的文件';
+
+  @override
+  String get workspaceToolCancel => '取消';
+
+  @override
+  String get workspaceToolCopyCommand => '复制命令';
+
+  @override
+  String get workspaceToolCopyOutput => '复制输出';
+
+  @override
+  String get workspaceToolCopyDiff => '复制差异';
+
+  @override
+  String get workspaceToolCopied => '已复制';
+
+  @override
+  String get workspaceToolDiffTruncated => '差异已截断';
+
+  @override
+  String get workspaceToolOpenPreview => '打开预览';
+
+  @override
+  String get workspaceToolNoOutput => '无输出';
+
+  @override
+  String get workspaceToolNotAvailable => '不可用';
+
+  @override
+  String get workspaceToolClose => '关闭';
+
+  @override
+  String get workspaceToolTitleShell => '运行命令';
+
+  @override
+  String get workspaceToolTitleReadFile => '读取文件';
+
+  @override
+  String get workspaceToolTitleWriteFile => '写入文件';
+
+  @override
+  String get workspaceToolTitleEditFile => '编辑文件';
+
+  @override
+  String get workspaceToolTitleListDir => '列出目录';
+
+  @override
+  String get workspaceToolTitleGlob => 'Glob';
+
+  @override
+  String get workspaceToolTitleGrep => 'Grep';
+
+  @override
+  String workspaceToolCount(int count) {
+    return '$count';
+  }
+
+  @override
+  String workspaceToolMoreFiles(int count) {
+    return '+$count';
+  }
+
+  @override
+  String workspaceToolDurationMs(int ms) {
+    return '${ms}ms';
+  }
+
+  @override
+  String workspaceToolDurationSec(String sec) {
+    return '${sec}s';
+  }
+
+  @override
+  String get workspaceEnvTitle => '环境';
+
+  @override
+  String workspaceEnvEngineUbuntu(String version) {
+    return 'Ubuntu $version (PRoot)';
+  }
+
+  @override
+  String workspaceEnvEngineAlpine(String version) {
+    return 'Alpine $version (iSH)';
+  }
+
+  @override
+  String get workspaceEnvEngineNative => '系统终端';
+
+  @override
+  String get workspaceEnvPhaseNotInstalled => '未安装';
+
+  @override
+  String get workspaceEnvPhaseDownloading => '下载中';
+
+  @override
+  String get workspaceEnvPhaseVerifying => '校验中';
+
+  @override
+  String get workspaceEnvPhaseExtracting => '解压中';
+
+  @override
+  String get workspaceEnvPhasePatching => '配置中';
+
+  @override
+  String get workspaceEnvPhaseReady => '就绪';
+
+  @override
+  String get workspaceEnvPhaseError => '错误';
+
+  @override
+  String get workspaceEnvPhaseNeedsRestart => '需要重启';
+
+  @override
+  String workspaceEnvMetaLine(String version, String arch) {
+    return '$version · $arch';
+  }
+
+  @override
+  String workspaceEnvInstalledAt(String date) {
+    return '安装于 $date';
+  }
+
+  @override
+  String workspaceEnvDiskUsage(String size) {
+    return '占用空间 $size';
+  }
+
+  @override
+  String workspaceEnvRuntimeReason(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvInstall => '安装';
+
+  @override
+  String get workspaceEnvInstallSubtitleAndroid =>
+      '可选择 Ubuntu、Alpine、Debian，也可导入本地 rootfs 镜像。';
+
+  @override
+  String get workspaceEnvInstallSubtitleIos => '已内置，无需下载';
+
+  @override
+  String get workspaceEnvCancel => '取消';
+
+  @override
+  String get workspaceEnvRetry => '重试';
+
+  @override
+  String get workspaceEnvRepair => '修复';
+
+  @override
+  String get workspaceEnvReset => '重置';
+
+  @override
+  String get workspaceEnvResetConfirmTitle => '重置环境？';
+
+  @override
+  String get workspaceEnvResetConfirmBody => '这将删除已安装的软件包和沙箱文件系统。';
+
+  @override
+  String get workspaceEnvCheckForUpdate => '检查更新';
+
+  @override
+  String get workspaceEnvUpdate => '更新';
+
+  @override
+  String workspaceEnvAvailableVersion(String version) {
+    return '新版本 $version 可用';
+  }
+
+  @override
+  String get workspaceEnvUpToDate => '已是最新';
+
+  @override
+  String get workspaceEnvRestartBanner => '请重启 Kelivo 以完成安装';
+
+  @override
+  String get workspaceEnvDetectingMirrors => '正在检测最快镜像…';
+
+  @override
+  String workspaceEnvApplyingMirror(String category) {
+    return '正在应用 $category 镜像…';
+  }
+
+  @override
+  String get workspaceEnvMirrorsSection => '镜像';
+
+  @override
+  String get workspaceEnvUseMirror => '使用镜像';
+
+  @override
+  String get workspaceEnvDetect => '测速';
+
+  @override
+  String get workspaceEnvOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorsDisabled => '镜像设置在沙箱中执行，就绪后才能更改。';
+
+  @override
+  String workspaceEnvMirrorsDisabledReason(String reason) {
+    return '镜像设置在沙箱中执行，当前不可用：$reason';
+  }
+
+  @override
+  String get workspaceEnvMirrorDetectTitle => '镜像测速';
+
+  @override
+  String workspaceEnvMirrorLatency(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String workspaceEnvMirrorFailed(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvErrorUnsupportedAbi => '当前设备架构不受支持。';
+
+  @override
+  String get workspaceEnvErrorArchitectureMismatch =>
+      '已安装的沙盒架构与当前应用不匹配，请重新安装沙盒后使用。原沙盒文件已保留。';
+
+  @override
+  String get workspaceEnvErrorProotMissing => '缺少 PRoot 可执行文件。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDisk => '存储空间不足，无法安装沙箱。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDiskHint => '请为所选镜像释放更多存储空间后重试。';
+
+  @override
+  String get workspaceEnvErrorNetwork => '下载失败，请检查网络后重试。';
+
+  @override
+  String get workspaceEnvErrorChecksumMismatch => '下载文件已损坏，请重试。';
+
+  @override
+  String get workspaceEnvErrorExtractFailed => '无法解压沙箱镜像。';
+
+  @override
+  String get workspaceEnvErrorPatchFailed => '无法完成沙箱配置。';
+
+  @override
+  String get workspaceEnvErrorCancelled => '安装已取消。';
+
+  @override
+  String get workspaceEnvErrorGeneric => '安装沙箱时出错。';
+
+  @override
+  String get workspaceEnvChipInstall => '安装沙箱';
+
+  @override
+  String workspaceEnvChipInstalling(int percent) {
+    return '正在安装… $percent %';
+  }
+
+  @override
+  String get workspaceEnvChipInstallingIndeterminate => '正在安装…';
+
+  @override
+  String get workspaceEnvChipError => '沙箱错误';
+
+  @override
+  String get workspaceEnvChipRestart => '需要重启';
+
+  @override
+  String get workspaceEnvNativeExplanation =>
+      '在桌面端，Kelivo 使用系统终端，而不是 Linux 沙箱。';
+
+  @override
+  String workspaceEnvNativeShellPath(String path) {
+    return '终端：$path';
+  }
+
+  @override
+  String get workspaceEnvNativeShellApproval => '除非此会话允许全部工具，否则 shell 工具需要批准。';
+
+  @override
+  String workspaceEnvDownloadProgress(
+    String downloaded,
+    String total,
+    int percent,
+  ) {
+    return '$downloaded / $total MB ($percent%)';
+  }
+
+  @override
+  String get workspaceEnvMirrorsFailed => '无法检测镜像';
+
+  @override
+  String get workspaceEnvCategoryApt => 'APT';
+
+  @override
+  String get workspaceEnvCategoryApk => 'APK';
+
+  @override
+  String get workspaceEnvCategoryPip => 'pip';
+
+  @override
+  String get workspaceEnvCategoryNpm => 'npm';
+
+  @override
+  String get skillsTitle => '技能';
+
+  @override
+  String get skillsTab => '技能';
+
+  @override
+  String get skillsSearchHint => '搜索技能';
+
+  @override
+  String get skillsEmptyTitle => '还没有技能';
+
+  @override
+  String get skillsEmptyBody =>
+      '技能是包含 SKILL.md 的文件夹。可粘贴 Markdown、导入 .md/.zip，或从 GitHub 安装。';
+
+  @override
+  String get skillsEmptyFormat =>
+      '---\nname: my-skill\ndescription: 这个技能做什么\n---\n\n# 说明';
+
+  @override
+  String get skillsImport => '导入';
+
+  @override
+  String get skillsImportPaste => '粘贴 Markdown';
+
+  @override
+  String get skillsImportFile => '从文件';
+
+  @override
+  String get skillsImportGitHub => '从 GitHub';
+
+  @override
+  String get skillsImportPasteLabel => 'SKILL.md';
+
+  @override
+  String get skillsImportPasteHint => '粘贴带 YAML 前置元数据的 SKILL.md';
+
+  @override
+  String get skillsImportGitHubLabel => 'GitHub 链接';
+
+  @override
+  String get skillsImportGitHubHint =>
+      'github.com/owner/repo 或 github.com/owner/repo/tree/ref/path';
+
+  @override
+  String get skillsImportConfirm => '导入';
+
+  @override
+  String get skillsCancel => '取消';
+
+  @override
+  String get skillsSave => '保存';
+
+  @override
+  String skillsUsedCount(int count) {
+    return '已使用 $count 次';
+  }
+
+  @override
+  String get skillsEnabled => '启用';
+
+  @override
+  String get skillsBrowseFiles => '浏览文件';
+
+  @override
+  String get skillsEdit => '编辑';
+
+  @override
+  String get skillsExport => '导出';
+
+  @override
+  String get skillsDelete => '删除';
+
+  @override
+  String get skillsDeleteTitle => '删除此技能？';
+
+  @override
+  String skillsDeleteMessage(String name) {
+    return '删除 $name？此操作无法撤销。';
+  }
+
+  @override
+  String get skillsUseAll => '使用全部技能';
+
+  @override
+  String get skillsUseAllSubtitle => '此助手可以使用所有已启用的技能。';
+
+  @override
+  String get skillsDisabledHint => '请先在技能页启用此技能。';
+
+  @override
+  String get skillsOpenPage => '管理技能';
+
+  @override
+  String get skillsInheritAssistant => '跟随助手';
+
+  @override
+  String get skillsInheritAssistantSubtitle => '使用与此对话助手相同的技能。';
+
+  @override
+  String get skillsActiveLabel => '生效中';
+
+  @override
+  String get skillsSessionTitle => '此对话的技能';
+
+  @override
+  String get skillsEditTitle => '编辑技能';
+
+  @override
+  String get skillsDetailKindLabel => 'Skill';
+
+  @override
+  String get skillsNoEnabled => '没有已启用的技能';
+
+  @override
+  String get terminalTitle => '终端';
+
+  @override
+  String get terminalOpenInSystem => '在系统终端中打开';
+
+  @override
+  String get terminalHostDirectory => '主机目录';
+
+  @override
+  String get terminalBindWorkspaceFirst => '请先绑定工作区';
+
+  @override
+  String get terminalNotAvailable => '不可用';
+
+  @override
+  String get terminalRuntimeUnavailable => '终端环境尚未就绪';
+
+  @override
+  String get terminalRename => '重命名';
+
+  @override
+  String get terminalClose => '关闭';
+
+  @override
+  String get terminalClear => '清屏';
+
+  @override
+  String get terminalCloseSession => '关闭会话';
+
+  @override
+  String get terminalCopy => '复制';
+
+  @override
+  String get terminalPaste => '粘贴';
+
+  @override
+  String get terminalNewSession => '新建会话';
+
+  @override
+  String get terminalMore => '更多';
+
+  @override
+  String get terminalNameLabel => '名称';
+
+  @override
+  String get terminalCancel => '取消';
+
+  @override
+  String get terminalSave => '保存';
+
+  @override
+  String get workspaceDeskMenuWorkspace => '工作区';
+
+  @override
+  String get workspaceDeskMenuSkills => '技能';
+
+  @override
+  String get workspaceDeskBarTitle => '工作区';
+
+  @override
+  String get workspaceDeskBarNoWorkspace => '无工作区';
+
+  @override
+  String get workspaceDeskBarEmptyHint => '从工具栏绑定工作区后即可在此浏览文件';
+
+  @override
+  String get workspaceDeskBarToggle => '工作区文件';
+
+  @override
+  String get workspaceDeskOpenSystemTerminal => '在系统终端中打开';
+
+  @override
+  String get workspaceDeskReveal => '在文件管理器中显示';
+
+  @override
+  String get workspaceDeskBarClose => '关闭工作区栏';
+
+  @override
+  String get workspaceEntryBind => '绑定工作区';
+
+  @override
+  String get workspaceEntryUnbind => '解除绑定';
+
+  @override
+  String get workspaceEntryChange => '更换';
+
+  @override
+  String get workspaceEntrySetAssistantDefault => '设为助手默认工作区';
+
+  @override
+  String get workspaceEntryLocked => '已锁定';
+
+  @override
+  String get workspaceEntryChangeConfirmTitle => '更换工作区？';
+
+  @override
+  String get workspaceEntryUnbindConfirmTitle => '解除绑定？';
+
+  @override
+  String get workspaceEntryChangeConfirmBody =>
+      '此对话已使用过工作区工具，之前消息中的文件链接可能不再可用。';
+
+  @override
+  String get workspaceEntryCwd => '工作目录';
+
+  @override
+  String get workspaceEntryCwdHint => '相对于工作区根目录';
+
+  @override
+  String get workspaceEntryCwdInvalid => '路径无效或已超出工作区';
+
+  @override
+  String get workspaceEntryCwdMissing => '该目录不存在';
+
+  @override
+  String get workspaceEntryCwdCreate => '创建它';
+
+  @override
+  String get workspaceEntryFiles => '文件';
+
+  @override
+  String get workspaceEntryTerminal => '终端';
+
+  @override
+  String get workspaceEntryOpenSystemTerminal => '在系统终端中打开';
+
+  @override
+  String get workspaceEntryReveal => '在文件管理器中显示';
+
+  @override
+  String get workspaceEntrySessionSkills => '技能';
+
+  @override
+  String get workspaceEntryAllowAll => '本会话全部允许';
+
+  @override
+  String get workspaceEntryAllowAllSubtitle => '此对话中的 Shell 命令将不再需要批准。';
+
+  @override
+  String get workspaceEntryEnvironment => '环境';
+
+  @override
+  String get workspaceEntryManage => '管理工作区';
+
+  @override
+  String get workspaceEntryCreate => '新建工作区…';
+
+  @override
+  String get workspaceEntryDefaultWorkspace => '默认工作区';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新对话将绑定到该工作区。';
+
+  @override
+  String get workspaceEntryNone => '无';
+
+  @override
+  String get workspaceEntryStartConversationFirst => '请先开始对话';
+
+  @override
+  String get workspaceEntryTooltip => '工作区';
+
+  @override
+  String get workspaceEntryPickerTitle => '选择工作区';
+
+  @override
+  String get settingsPageWorkspace => '工作区与环境';
+
+  @override
+  String get settingsPageSkills => '技能';
+
+  @override
+  String get commonClose => '关闭';
+
+  @override
+  String get terminalCopyAllOutput => '复制全部输出';
+
+  @override
+  String get terminalFontDecrease => '字号 −';
+
+  @override
+  String get terminalFontIncrease => '字号 +';
+
+  @override
+  String get terminalCloseSessionConfirmMessage => '会话仍在运行。关闭将结束该进程。';
+
+  @override
+  String get terminalCopiedAll => '已复制全部输出';
+
+  @override
+  String get terminalConfirm => '确认';
+
+  @override
+  String terminalExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceMgmtNewWorkspace => '新建工作区';
+
+  @override
+  String get workspaceMgmtEmptyHint => '新建一个工作区来存放项目文件和工作目录。';
+
+  @override
+  String get workspaceMgmtKindManagedTitle => '托管工作区';
+
+  @override
+  String get workspaceMgmtKindManagedSubtitle => '应用内目录，沙盒可读写';
+
+  @override
+  String get workspaceMgmtKindLinkedTitle => '链接文件夹';
+
+  @override
+  String get workspaceMgmtKindLinkedSubtitle => '直接使用本机文件夹';
+
+  @override
+  String get workspaceMgmtImportFromFolder => '从文件夹导入';
+
+  @override
+  String get workspaceMgmtImportFromFolderSubtitle => '将文件夹复制到新的托管工作区';
+
+  @override
+  String get workspaceMgmtKindSection => '类型';
+
+  @override
+  String get workspaceMgmtCreate => '创建';
+
+  @override
+  String get workspaceMgmtShellApprovalSubtitle => '每次运行命令前询问';
+
+  @override
+  String get workspaceMgmtDefaultCwdRoot => '/';
+
+  @override
+  String get workspaceMgmtPickCwdTitle => '默认工作目录';
+
+  @override
+  String get workspaceMgmtFolderPickerUnavailable => '此设备不支持选择文件夹。';
+
+  @override
+  String get workspaceMgmtImportProgressTitle => '正在导入文件夹';
+
+  @override
+  String get workspaceMgmtImportProgressPhase => '正在复制文件…';
+
+  @override
+  String get workspaceMgmtImportFailed => '无法导入该文件夹。';
+
+  @override
+  String workspaceMgmtImportDone(String name) {
+    return '已导入 $name';
+  }
+
+  @override
+  String get workspaceMgmtLastUsedJustNow => '刚刚';
+
+  @override
+  String workspaceMgmtLastUsedMinutesAgo(int n) {
+    return '$n 分钟前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedHoursAgo(int n) {
+    return '$n 小时前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedDaysAgo(int n) {
+    return '$n 天前';
+  }
+
+  @override
+  String workspaceMgmtRowDetail(String kind, String when) {
+    return '$kind · 上次使用 $when';
+  }
+
+  @override
+  String workspaceMgmtRowDetailNever(String kind) {
+    return '$kind · 从未使用';
+  }
+
+  @override
+  String get workspacePreviewBack => '返回';
+
+  @override
+  String get workspacePreviewWrap => '自动换行';
+
+  @override
+  String get workspacePreviewFontDecrease => '减小字号';
+
+  @override
+  String get workspacePreviewFontIncrease => '增大字号';
+
+  @override
+  String get workspacePreviewCopy => '复制';
+
+  @override
+  String get workspacePreviewRetry => '重试';
+
+  @override
+  String get workspacePreviewLoadError => '无法加载此文件。';
+
+  @override
+  String get workspacePreviewRevealInFinder => '在 Finder 中显示';
+
+  @override
+  String get workspacePreviewOpenInSystemApp => '用系统应用打开';
+
+  @override
+  String get workspacePreviewOpenInBrowser => '在浏览器中打开';
+
+  @override
+  String get workspacePreviewTable => '表格';
+
+  @override
+  String get workspacePreviewPlainLanguage => '代码';
+
+  @override
+  String get workspacePreviewOpen => '打开';
+
+  @override
+  String get workspacePreviewRevealFailed => '无法在文件管理器中显示此文件。';
+
+  @override
+  String get workspacePreviewEmptyTable => '此表格为空。';
+
+  @override
+  String get workspaceFilesNew => '新建';
+
+  @override
+  String get workspaceFilesFoldersFirst => '文件夹优先';
+
+  @override
+  String get workspaceFilesSelectDirectory => '选择此目录';
+
+  @override
+  String get workspaceFilesEmptyHint => '用「新建」或「导入」添加文件';
+
+  @override
+  String get workspaceFilesEmptyAttachments => '还没有附件';
+
+  @override
+  String get workspaceFilesEmptyOutputs => '助手还没有产出文件';
+
+  @override
+  String get workspaceFilesMoveTo => '移动到…';
+
+  @override
+  String workspaceFilesItemCount(int count) {
+    return '$count 项';
+  }
+
+  @override
+  String get skillsImportTooltip => '导入技能';
+
+  @override
+  String get skillsImportPasteSubtitle => '粘贴带 frontmatter 的 SKILL.md';
+
+  @override
+  String get skillsImportFileSubtitle => '选择 .md 或 .zip 文件';
+
+  @override
+  String get skillsImportGitHubSubtitle => '从仓库导入 SKILL.md';
+
+  @override
+  String get skillsImportResolving => '正在解析仓库…';
+
+  @override
+  String get skillsImportDownloading => '正在下载…';
+
+  @override
+  String get skillsImportExtracting => '正在解压…';
+
+  @override
+  String get skillsImportInstalling => '正在安装…';
+
+  @override
+  String get skillsImportGitHubRepoLabel => '仓库地址';
+
+  @override
+  String get skillsImportGitHubUrlHint =>
+      'https://github.com/owner/repo 或 owner/repo[/path]';
+
+  @override
+  String get skillsImportGitHubHelp => '支持仓库根目录或子目录下的 SKILL.md';
+
+  @override
+  String get skillsEmptyHint => '技能是带 frontmatter 的 SKILL.md，导入后助手可按需调用';
+
+  @override
+  String get skillsMoreActions => '更多';
+
+  @override
+  String get skillsSearchClear => '清除';
+
+  @override
+  String get skillsSessionEmpty => '还没有已启用的技能，请先在技能库中启用';
+
+  @override
+  String get workspaceToolRunning => '运行中';
+
+  @override
+  String workspaceToolExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceToolAwaitingApproval => '等待批准';
+
+  @override
+  String get workspaceToolCompleted => '完成';
+
+  @override
+  String workspaceToolLines(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String workspaceToolItems(int count) {
+    return '$count 项';
+  }
+
+  @override
+  String workspaceToolFileMatches(int count) {
+    return '$count 个匹配';
+  }
+
+  @override
+  String workspaceToolContentMatches(int count) {
+    return '$count 处匹配';
+  }
+
+  @override
+  String get workspaceToolExpand => '展开';
+
+  @override
+  String get workspaceToolSectionCommand => '命令';
+
+  @override
+  String get workspaceToolSectionPath => '路径';
+
+  @override
+  String get workspaceToolSectionPattern => '模式';
+
+  @override
+  String get workspaceToolSectionOutput => '输出';
+
+  @override
+  String get workspaceToolSectionDiff => '差异';
+
+  @override
+  String get workspaceToolSectionError => '错误';
+
+  @override
+  String get workspaceToolSavedOutput => '已保存完整输出';
+
+  @override
+  String get workspaceToolApprove => '允许';
+
+  @override
+  String get workspaceToolDeny => '拒绝';
+
+  @override
+  String get workspaceToolCopy => '复制';
+
+  @override
+  String get workspaceEnvEngineLocalShell => '本机 Shell';
+
+  @override
+  String get workspaceEnvInstallEnvironment => '安装环境';
+
+  @override
+  String get workspaceEnvInstallDescription => '安装 Linux 环境，以便在沙盒中运行工具。';
+
+  @override
+  String get workspaceEnvStatusLabel => '状态';
+
+  @override
+  String get workspaceEnvStatusInstalled => '已安装';
+
+  @override
+  String get workspaceEnvSizeLabel => '大小';
+
+  @override
+  String get workspaceEnvPathLabel => '路径';
+
+  @override
+  String get workspaceEnvInstalledAtLabel => '安装于';
+
+  @override
+  String get workspaceEnvArchLabel => '架构';
+
+  @override
+  String workspaceEnvArchVersion(String arch, String version) {
+    return '$arch · $version';
+  }
+
+  @override
+  String get workspaceEnvBrowseSection => '浏览';
+
+  @override
+  String get workspaceEnvBrowseFiles => '浏览文件系统';
+
+  @override
+  String get workspaceEnvBrowseFilesDetail => '查看沙盒中的完整目录';
+
+  @override
+  String get workspaceEnvDetectFastMirrors => '检测快速镜像';
+
+  @override
+  String get workspaceEnvActionsSection => '操作';
+
+  @override
+  String get workspaceEnvInfoSection => '信息';
+
+  @override
+  String get workspaceEnvInfoBody =>
+      '环境是沙盒使用的 Linux 根文件系统。工作区单独存放，重置环境不会删除工作区文件。数据保存在本机已解压的 rootfs 中。';
+
+  @override
+  String get workspaceEnvRepairDetail => '重新校验并修补文件';
+
+  @override
+  String get workspaceEnvUpdateCurrent => '已是最新';
+
+  @override
+  String workspaceEnvUpdateAvailableShort(String version) {
+    return '可更新到 $version';
+  }
+
+  @override
+  String get workspaceEnvResetConfirmMessage =>
+      '这将删除整个 Linux 环境及其中安装的软件包。工作区文件不受影响。';
+
+  @override
+  String get workspaceEnvRestartDoneBanner => '重置已完成，请重启应用以完成安装。';
+
+  @override
+  String get workspaceEnvPathCopied => '已复制路径';
+
+  @override
+  String get workspaceEnvUseMirrorSubtitle => '将所选镜像写入沙盒';
+
+  @override
+  String get workspaceEnvRegionGlobal => '全球';
+
+  @override
+  String get workspaceEnvRegionChina => '中国';
+
+  @override
+  String get workspaceEnvRegionEurope => '欧洲';
+
+  @override
+  String get workspaceEnvRegionAsia => '亚洲';
+
+  @override
+  String get workspaceEnvMirrorTimeout => '超时';
+
+  @override
+  String get workspaceEnvSpeedTest => '测速';
+
+  @override
+  String get workspaceEnvApplySuccess => '镜像已应用';
+
+  @override
+  String get workspaceEnvApplyFailed => '无法应用镜像';
+
+  @override
+  String get workspaceEnvRestoreSuccess => '已恢复官方源';
+
+  @override
+  String get workspaceEnvMirrorsTested => '已应用最快镜像';
+
+  @override
+  String get workspaceEnvRelativeJustNow => '刚刚';
+
+  @override
+  String workspaceEnvRelativeMinutesAgo(int count) {
+    return '$count 分钟前';
+  }
+
+  @override
+  String workspaceEnvRelativeHoursAgo(int count) {
+    return '$count 小时前';
+  }
+
+  @override
+  String workspaceEnvRelativeDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String workspaceEnvDownloadLine(
+    String downloaded,
+    String total,
+    String phase,
+  ) {
+    return '$downloaded / $total · $phase';
+  }
+
+  @override
+  String get workspaceEnvNativeUnsandboxed =>
+      '命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。';
+
+  @override
+  String get workspaceEnvRootfsTitle => '/';
+
+  @override
+  String get workspaceEnvBrowserUnavailable => '沙盒文件系统不可用。';
+
+  @override
+  String get workspaceEnvMirrorNameOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialCdn => '官方 CDN';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialPypi => '官方 PyPI';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialNpm => '官方 npm';
+
+  @override
+  String get workspaceEnvMirrorNameTuna => '清华 TUNA';
+
+  @override
+  String get workspaceEnvMirrorNameAlibaba => '阿里云';
+
+  @override
+  String get workspaceEnvMirrorNameUstc => '中科大 USTC';
+
+  @override
+  String get workspaceEnvMirrorNameHuawei => '华为云';
+
+  @override
+  String get workspaceEnvMirrorNameTencent => '腾讯云';
+
+  @override
+  String get workspaceEnvMirrorNameNetease => '网易';
+
+  @override
+  String get workspaceEnvMirrorNameLeaseweb => 'LEASEWEB UK';
+
+  @override
+  String get workspaceEnvMirrorNameRwth => 'RWTH Germany';
+
+  @override
+  String get workspaceEnvMirrorNameJaist => 'JAIST Japan';
+
+  @override
+  String get workspaceEnvMirrorNameKakao => 'Kakao Korea';
+
+  @override
+  String get workspaceEnvMirrorNameNpmmirror => 'npmmirror';
+
+  @override
+  String workspaceEnvSelectionNamed(String name, String region) {
+    return '$name · $region';
+  }
+
+  @override
+  String get workspaceFilesEmptyPickerHint => '点「新建文件夹」添加子文件夹';
+
+  @override
+  String get skillsDetailBodyEmpty => '还没有技能正文';
+
+  @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '文件较大，暂不支持预览（$size）。';
+  }
+
+  @override
+  String get workspaceEnvSizeTimeout => '计算超时';
+
+  @override
+  String get workspaceEnvInfoCopied => '已复制环境信息';
+
+  @override
+  String get workspacePreviewEmptyFile => '文件为空';
+
+  @override
+  String get workspacePreviewEmptyHint => '此文件没有任何可预览的内容。';
+
+  @override
+  String get workspacePreviewRevealInExplorer => '在文件资源管理器中显示';
+
+  @override
+  String get workspacePreviewRevealInFileManager => '在文件管理器中显示';
+
+  @override
+  String workspaceBindingSetAssistantDefault(String assistant) {
+    return '已设为「$assistant」的默认工作区';
+  }
+
+  @override
+  String get storageSpaceCategoryWorkspaceFiles => '工作区文件';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFilesHint => '托管工作区中保存的文件。';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironment => '沙箱环境';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironmentHint => '沙箱安装目录与根文件系统。';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategorySkillsHint => '已安装的技能文件。';
+
+  @override
+  String get storageSpaceCategorySessionFiles => '会话文件';
+
+  @override
+  String get storageSpaceCategorySessionFilesHint => '各对话的附件与输出。';
+
+  @override
+  String get storageSpaceManageSkills => '管理技能';
+
+  @override
+  String get storageSessionFilesCleanOrphans => '清理无对话的会话文件';
+
+  @override
+  String storageSessionFilesCleanOrphansHint(String size) {
+    return '删除已无对应对话的会话目录。可回收 $size。';
+  }
+
+  @override
+  String get workspaceDesktopFolderPath => '文件夹路径';
+
+  @override
+  String get workspaceDesktopFolderMissing => '请选择已存在的文件夹，或输入它的绝对路径。';
+
+  @override
+  String get workspaceDesktopManagedHint => '由 Kelivo 为此项目创建并管理文件夹。';
+
+  @override
+  String get workspaceDesktopHostHint => '在本机访问文件和执行命令。';
+
+  @override
+  String get workspaceDesktopSearch => '搜索工作区';
+
+  @override
+  String get workspaceDesktopNoResults => '没有匹配的工作区';
+
+  @override
+  String get workspaceEnvDependencies => '环境预设';
+
+  @override
+  String get workspaceEnvDependenciesDetail => '安装到共享沙盒，所有工作区均可使用。';
+
+  @override
+  String get workspaceEnvDependencyPython => 'Python、pip 和虚拟环境';
+
+  @override
+  String get workspaceEnvDependencyNode => 'Node.js 和 npm';
+
+  @override
+  String get workspaceEnvDependencyGit => '克隆仓库与版本管理';
+
+  @override
+  String get workspaceEnvDependencySsh => 'SSH、SCP、SFTP 与密钥生成';
+
+  @override
+  String get workspaceEnvDependencyNetwork => '网络工具';
+
+  @override
+  String get workspaceEnvDependencyArchive => '压缩工具';
+
+  @override
+  String get workspaceEnvDependencyInstalled => '已安装';
+
+  @override
+  String get workspaceEnvDependencyUnknown => '未检测';
+
+  @override
+  String get workspaceEnvDependencyChecking => '正在检测工具…';
+
+  @override
+  String get workspaceEnvDependencyInstalling => '正在安装…';
+
+  @override
+  String get workspaceEnvDependencyCheckFailed => '未能检测工具，请刷新重试。';
+
+  @override
+  String get workspaceEnvDependencyInstallFailed => '安装未完成，请查看日志或更换软件包源后重试。';
+
+  @override
+  String get workspaceEnvDependencyLog => '安装日志';
+
+  @override
+  String get workspaceEnvDependencyRefresh => '刷新工具状态';
+
+  @override
+  String get workspaceEnvDependencyReadyFirst => '请先安装沙盒环境，再安装这些工具。';
+
+  @override
+  String get workspaceEnvDependencySources => '软件包源';
+
+  @override
+  String get workspaceEnvDependencySourcesDetail =>
+      '预设使用所选 apt/apk 源安装；pip 和 npm 源用于后续安装的软件包。';
+
+  @override
+  String get workspaceEnvDownloadSource => '沙盒下载源';
+
+  @override
+  String get workspaceEnvDownloadAutomatic => '自动选择最快源';
+
+  @override
+  String get workspaceEnvDownloadAutomaticDetail => '下载前检测官方源和内置镜像的速度。';
+
+  @override
+  String get workspaceEnvDownloadCustom => '自定义链接';
+
+  @override
+  String get workspaceEnvDownloadCustomHint =>
+      'https://example.com/ubuntu-base/releases/24.04/release/';
+
+  @override
+  String get workspaceEnvDownloadCustomDetail =>
+      '填写镜像目录或完整下载链接，镜像需匹配所选系统、版本及设备架构。';
+
+  @override
+  String get workspaceEnvDownloadInvalidUrl => '请输入有效的 HTTP 或 HTTPS 链接。';
+
+  @override
+  String get workspaceEnvDownloadVerified => '下载后会校验所选镜像的官方 SHA-256。软件包源可单独配置。';
+
+  @override
+  String get workspaceEnvDownloadStart => '下载并安装';
+
+  @override
+  String get workspaceEnvDownloadSave => '保存下载源';
+
+  @override
+  String get workspaceToolsTitle => '工具';
+
+  @override
+  String get workspaceToolsDescription => '选择此工作区的对话可以使用哪些工具，修改后自动保存。';
+
+  @override
+  String get workspaceToolHelpShell => '在工作区环境中执行命令。';
+
+  @override
+  String get workspaceToolHelpRead => '按行读取文件内容，支持分页。';
+
+  @override
+  String get workspaceToolHelpWrite => '创建文件或覆盖文件内容。';
+
+  @override
+  String get workspaceToolHelpEdit => '替换已有文件中的指定文本。';
+
+  @override
+  String get workspaceToolHelpList => '浏览目录及其中的文件。';
+
+  @override
+  String get workspaceToolHelpGlob => '按文件名或路径模式查找文件。';
+
+  @override
+  String get workspaceToolHelpGrep => '搜索文件中的文本内容。';
+
+  @override
+  String get workspaceEnvVariablesTitle => '环境变量';
+
+  @override
+  String get workspaceEnvVariablesEntryDetail => '管理命令使用的变量与输出隐私';
+
+  @override
+  String get workspaceEnvVariablesEmpty => '还没有环境变量。可以添加工具需要的 API 密钥等配置。';
+
+  @override
+  String get workspaceEnvVariablesScope =>
+      '所有工作区共用。修改会用于新的 Agent 命令和应用内终端会话，已有终端需重新打开。外部系统终端使用其自身的环境变量。';
+
+  @override
+  String get workspaceEnvPrivacyMode => '隐私模式';
+
+  @override
+  String get workspaceEnvPrivacyDetail =>
+      '命令仍能使用真实值。工作区工具输出发给模型前，匹配到的至少 5 个字符的变量值会替换为 [REDACTED]，本地日志保留原文。较短的值不做遮蔽，以免误替换常见开关和数字。';
+
+  @override
+  String get workspaceEnvVariableAdd => '添加变量';
+
+  @override
+  String get workspaceEnvVariableEdit => '编辑变量';
+
+  @override
+  String get workspaceEnvVariableName => '名称';
+
+  @override
+  String get workspaceEnvVariableValue => '值';
+
+  @override
+  String get workspaceEnvVariableNote => '备注（可选）';
+
+  @override
+  String get workspaceEnvVariableNameHint =>
+      '名称使用字母、数字和下划线，不能以数字开头，区分大小写。命令中可通过 \$NAME 使用变量。';
+
+  @override
+  String get workspaceEnvVariableInvalidName => '请输入有效的变量名称。';
+
+  @override
+  String get workspaceEnvVariableInvalidValue => '值不能为空，也不能包含空字符（NUL）。';
+
+  @override
+  String get workspaceEnvVariableDuplicate => '已存在同名变量。';
+
+  @override
+  String get workspaceEnvVariablesSaveFailed => '环境设置保存失败，请重试。';
+
+  @override
+  String get incomingShareTitle => '接收分享';
+
+  @override
+  String get incomingShareReplaceDraft => '输入框中有尚未发送的内容。是否替换为分享的内容，并开始新对话？';
+
+  @override
+  String get incomingShareFailed =>
+      '部分分享内容未能导入，请检查文件访问权限和可用存储空间。一次最多分享 32 个文件。';
+
+  @override
+  String get incomingShareImporting => '正在导入';
+
+  @override
+  String get incomingShareMoveTo => '移动到…';
+
+  @override
+  String get incomingShareNewChat => '新对话';
+
+  @override
+  String get incomingShareMoveHint => '将草稿和附件移到其他对话，内容不会自动发送。';
+
+  @override
+  String get incomingShareNoConversations => '没有匹配的对话';
+
+  @override
+  String get chatInputBarRemoveAttachment => '移除附件';
+
+  @override
+  String get incomingShareMoveFailed => '无法切换对话，草稿已保留。';
+
+  @override
+  String attachmentRequiresWorkspace(String name) {
+    return '「$name」无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。';
+  }
+
+  @override
+  String get storageSessionFilesUnlinked => '未关联的会话';
+
+  @override
+  String get workspaceExternalMount => '挂载外部文件夹';
+
+  @override
+  String get workspaceExternalMountSubtitle =>
+      '所选文件夹挂载到 /mounts/<name>，供各工作区的 AI 工具、Shell 和文件浏览器访问。最多挂载 10 个文件夹。';
+
+  @override
+  String get workspaceExternalStorageTitle => '允许访问文件';
+
+  @override
+  String get workspaceExternalStorageMessage =>
+      '工作区和 Shell 需要直接读写外部文件夹，请在 Android 系统设置中允许 Kelivo 访问文件。Android 11 及以上需开启“所有文件访问权限”，然后选择要挂载的本地文件夹。';
+
+  @override
+  String get workspaceExternalGrantAccess => '前往授权';
+
+  @override
+  String get workspaceExternalLocalOnly =>
+      'Android 仅支持挂载本地文件夹，此文件提供方没有可供 Shell 访问的本地目录。';
+
+  @override
+  String get workspaceExternalUnavailable =>
+      '外部文件夹不可用。请检查存储连接和访问权限，重新选择文件夹以恢复访问。';
+
+  @override
+  String get workspaceExternalReconnect => '重新选择文件夹';
+
+  @override
+  String get workspaceMountAdd => '添加文件夹';
+
+  @override
+  String get workspaceMountEdit => '编辑挂载';
+
+  @override
+  String get workspaceMountEmpty => '尚未挂载文件夹';
+
+  @override
+  String get workspaceMountReadOnly => '只读';
+
+  @override
+  String get workspaceMountReadWrite => '读写';
+
+  @override
+  String get workspaceMountAllowWrite => '允许写入';
+
+  @override
+  String get workspaceMountPermissionsHint =>
+      '关闭后，AI 文件工具和文件浏览器会拒绝修改此文件夹。Shell 会检查部分常用文件命令，但任意脚本不保证受限。保存挂载变更时会停止正在运行的命令和终端会话。';
+
+  @override
+  String get workspaceMountBrowse => '浏览文件';
+
+  @override
+  String get workspaceMountUnmount => '卸载';
+
+  @override
+  String get workspaceMountUnmountMessage => '卸载此挂载？原文件夹及其中的文件会保留。';
+
+  @override
+  String get workspaceMountInactive => '不可用，请重新选择文件夹';
+
+  @override
+  String get workspaceMountInvalidName =>
+      '名称最多 64 个字符，不能包含斜杠、冒号或控制字符，也不能为 . 或 ..。';
+
+  @override
+  String get workspaceMountDuplicate => '已存在同名挂载。';
+
+  @override
+  String get workspaceMountLimit => '最多挂载 10 个文件夹，请先卸载一个挂载。';
+
+  @override
+  String get workspaceMountOverlap => '此文件夹与已有挂载相同或互相包含。请选择其他文件夹，以避免权限冲突。';
+
+  @override
+  String get workspaceMountTargetOccupied =>
+      '/mounts 下的同名位置已有本地文件。请更换挂载名称，或先移走这些文件。原有文件未被删除。';
+
+  @override
+  String get workspaceEnvSystemImage => '系统镜像';
+
+  @override
+  String get workspaceEnvDistribution => '发行版';
+
+  @override
+  String get workspaceEnvSystemVersion => '版本';
+
+  @override
+  String get workspaceEnvLocalImage => '本地镜像';
+
+  @override
+  String get workspaceEnvChooseImage => '选择 rootfs 镜像文件';
+
+  @override
+  String get workspaceEnvLocalImageHint =>
+      '支持根文件系统压缩包（.tar.gz、.tar.xz、.tar），不支持 ISO 或磁盘镜像。镜像需匹配设备 CPU 架构并包含 /bin/sh，解压后自动识别系统和版本。';
+
+  @override
+  String get workspaceEnvImportImage => '导入镜像';
+
+  @override
+  String get workspaceEnvInvalidImage =>
+      '请选择适用于此设备的 rootfs 镜像，需包含可执行的 /bin/sh，且 CPU 架构匹配。';
+
+  @override
+  String get workspaceEnvReplaceSystem => '更换系统';
+
+  @override
+  String get workspaceEnvReplaceSystemHint =>
+      '更换会替换当前环境内的软件包和文件，并停止运行中的命令与终端会话。工作区、聊天文件和外部文件夹会保留。新镜像准备失败时保留原有环境。';
+
+  @override
+  String get workspaceEnvProotOptions => 'PRoot 配置';
+
+  @override
+  String get workspaceEnvShellPath => 'Shell 路径';
+
+  @override
+  String get workspaceEnvShellAutomatic => '自动选择';
+
+  @override
+  String get workspaceEnvShellHint =>
+      '留空时优先使用 /bin/bash，否则使用 /bin/sh。自定义 Shell 需填写环境内的绝对路径。';
+
+  @override
+  String get workspaceEnvProotArguments => '额外 PRoot 参数';
+
+  @override
+  String get workspaceEnvProotArgumentsHint =>
+      '每行填写一个参数，无需 Shell 引号。例如将 -k 和 5.10.0 分别放在两行，或使用 --kernel-release=5.10.0。配置对之后启动的命令和终端会话生效。';
+
+  @override
+  String get workspaceEnvProotInvalid => '请填写有效的 Shell 绝对路径，并将 PRoot 参数逐行填写。';
+
+  @override
+  String get workspaceFileMissing => '文件已不存在';
+
+  @override
+  String get workspaceFilePreviewUnavailable => '无法预览';
+
+  @override
+  String get workspaceToolRelatedFiles => '相关文件';
+
+  @override
+  String get workspaceToolFilesTruncated => '仅列出部分文件。';
+
+  @override
+  String get displaySettingsPageShowProducedFilesTitle => '显示回复底部文件卡片';
+
+  @override
+  String get displaySettingsPageShowProducedFilesSubtitle =>
+      '在回复底部显示工具创建或修改的文件。';
+
+  @override
+  String get reasoningBudgetSliderLow => 'Low';
+
+  @override
+  String get reasoningBudgetSliderMedium => 'Medium';
+
+  @override
+  String get reasoningBudgetSliderHigh => 'High';
+
+  @override
+  String get reasoningBudgetSliderXhigh => 'XHigh';
+
+  @override
+  String get reasoningBudgetSliderMax => 'Max';
+
+  @override
+  String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '开启后，在对话中切换模型只影响当前对话；关闭后会直接修改当前助手的模型，使用该助手的所有对话都会跟随。';
+
+  @override
+  String get googleFontsTitle => 'Google Fonts';
+
+  @override
+  String get googleFontsRefresh => '刷新字体列表';
+
+  @override
+  String get googleFontsSearchHint => '搜索字体或语言';
+
+  @override
+  String get googleFontsHint =>
+      '下载常规字重字体后预览并应用，已安装字体可离线使用。目录来自 Expo Google Fonts，字体从 Google Fonts 下载。';
+
+  @override
+  String get googleFontsNoResults => '没有匹配的字体';
+
+  @override
+  String get googleFontsFailed => '无法加载、下载或应用字体，请检查网络后重试。';
+
+  @override
+  String get googleFontsDownloading => '正在下载字体…';
+
+  @override
+  String get googleFontsPreview => '字体预览：你好，世界！Hello world 0123456789';
+
+  @override
+  String get googleFontsLicense => '字体许可证';
+
+  @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      '定位权限已被禁止。请在系统设置中允许定位访问，然后重新开启此工具。';
+
+  @override
+  String get healthDataSettingsCategoryReproductive => '生殖健康';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowTitle => '经期记录';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowSubtitle =>
+      '最近 90 天记录的经量与周期开始日期';
+
+  @override
+  String get assistantEditGradientBackgroundTitle => '渐变背景';
+
+  @override
+  String get assistantEditGradientStaticTitle => '静态模式';
+
+  @override
+  String get assistantEditGradientStaticDescription => '更省电，适合长对话和持续输出。';
+
+  @override
+  String get assistantEditGradientHorizontal => '水平位置';
+
+  @override
+  String get assistantEditGradientVertical => '垂直位置';
+
+  @override
+  String get assistantEditGradientPreview => '预览';
+
+  @override
+  String get assistantEditGradientNextFrame => '换一帧';
+
+  @override
+  String get backgroundSettingsTitle => '后台任务';
+
+  @override
+  String get backgroundTaskTitle => 'Kelivo 任务';
+
+  @override
+  String get backgroundCompleted => '生成完成';
+
+  @override
+  String get backgroundFailed => '生成失败，请打开会话查看详情。';
+
+  @override
+  String get backgroundCancelled => '生成已取消';
+
+  @override
+  String get backgroundInterrupted => '后台生成已中断，请打开会话继续。';
+
+  @override
+  String get backgroundRequesting => '正在请求';
+
+  @override
+  String get backgroundGenerating => '正在生成回复';
+
+  @override
+  String get backgroundThinking => '正在思考';
+
+  @override
+  String get backgroundToolRunning => '正在执行工具';
+
+  @override
+  String get backgroundRetrying => '等待重试';
+
+  @override
+  String get backgroundWorking => '正在处理';
+
+  @override
+  String get backgroundTasks => '任务';
+
+  @override
+  String get backgroundStopTasks => '停止任务';
+
+  @override
+  String get backgroundOpenChat => '打开会话';
+
+  @override
+  String get backgroundAndroidEnabled => '后台生成';
+
+  @override
+  String get backgroundAndroidEnabledDetail =>
+      '在锁屏、切到后台或划掉最近任务后继续当前生成。任务运行期间会显示系统常驻通知。';
+
+  @override
+  String get backgroundIosEnabled => '增强后台运行';
+
+  @override
+  String get backgroundIosEnabledDetail => '为当前任务申请后台执行时间。可另外开启定位或静音音频辅助保活。';
+
+  @override
+  String get backgroundNotifications => '任务通知';
+
+  @override
+  String get backgroundNotificationsDetail =>
+      '在当前查看的会话之外完成或失败时通知。此开关不控制 Android 必需的常驻通知。';
+
+  @override
+  String get backgroundPrivacy => '任务状态隐私';
+
+  @override
+  String get backgroundPrivacyDetail => '在通知和实时状态中隐藏会话标题及工具详情，仅显示通用状态、任务数量和耗时。';
+
+  @override
+  String get backgroundLiveActivities => '实时活动';
+
+  @override
+  String get backgroundLiveActivitiesDetail => '在锁屏和灵动岛显示当前任务，是否可用及展示位置由系统决定。';
+
+  @override
+  String get backgroundOverlay => '任务悬浮窗';
+
+  @override
+  String get backgroundOverlayDetail => '在其他应用上显示可拖动的任务悬浮窗。点击进入会话；关闭按钮仅隐藏悬浮窗。';
+
+  @override
+  String get backgroundLiveUpdates => '实时通知 / 灵动岛';
+
+  @override
+  String get backgroundLiveUpdatesDetail =>
+      '在支持的设备上使用 Android 16 实时通知。系统成功展示实时通知时优先于悬浮窗。';
+
+  @override
+  String get backgroundLocation => '定位辅助保活';
+
+  @override
+  String get backgroundLocationDetail =>
+      '在后台任务期间使用低精度定位辅助运行，不保存坐标或发送给 AI 服务。需要开启增强后台运行并授权定位。';
+
+  @override
+  String get backgroundSilentAudio => '静音音频保活';
+
+  @override
+  String get backgroundSilentAudioDetail =>
+      '后台任务运行时播放静音音频，并让位于录音和朗读。需要开启增强后台运行，无需麦克风权限。';
+
+  @override
+  String get backgroundSpeech => '后台朗读';
+
+  @override
+  String get backgroundSpeechDetail => '锁屏或切到后台时继续系统及网络朗读。关闭时，切到后台会暂停朗读。';
+
+  @override
+  String get backgroundFinishVisibility => '完成状态保留时间';
+
+  @override
+  String get backgroundFinishImmediately => '立即收起';
+
+  @override
+  String get backgroundFinishOneMinute => '1 分钟';
+
+  @override
+  String get backgroundFinishFiveMinutes => '5 分钟';
+
+  @override
+  String get backgroundFinishUntilForeground => '回到应用时收起';
+
+  @override
+  String get backgroundFinishVisibilityDetail =>
+      '用于 Android 悬浮窗和 iOS 锁屏完成卡片。回到应用时清理完成状态，最长保留 15 分钟；取消任务立即收起。';
+
+  @override
+  String get backgroundOverlayIcon => '悬浮窗图标';
+
+  @override
+  String get backgroundIconDefault => 'Kelivo 图标';
+
+  @override
+  String get backgroundIconImage => '选择图片';
+
+  @override
+  String get backgroundIconEmoji => '选择 Emoji';
+
+  @override
+  String get backgroundPermissionsTitle => '权限与系统设置';
+
+  @override
+  String get backgroundNotificationsPermission => '通知权限';
+
+  @override
+  String get backgroundBatteryOptimization => '电池优化';
+
+  @override
+  String get backgroundBatteryOptimizationDetail => '允许不受限制地使用电池可改善后台运行。';
+
+  @override
+  String get backgroundAutostart => '自启动与后台运行';
+
+  @override
+  String get backgroundAutostartDetail =>
+      '请手动检查设备的自启动和后台限制。Android 无法可靠查询这些厂商设置的授权状态。';
+
+  @override
+  String get backgroundLocationPermission => '定位权限';
+
+  @override
+  String get backgroundLocationAlways => '允许持续后台定位';
+
+  @override
+  String get backgroundLocationAlwaysDetail => '可进一步授予“始终允许”定位权限，仅在点击此入口时申请。';
+
+  @override
+  String get backgroundSystemSettings => '应用系统设置';
+
+  @override
+  String get backgroundPermissionGranted => '已允许';
+
+  @override
+  String get backgroundPermissionDenied => '未允许';
+
+  @override
+  String get backgroundPermissionLimited => '使用应用期间';
+
+  @override
+  String get backgroundPermissionUnknown => '需手动检查';
+
+  @override
+  String get backgroundPermissionNotDetermined => '尚未申请';
+
+  @override
+  String get backgroundRuntimeTitle => '当前状态';
+
+  @override
+  String get backgroundRuntimeActive => '正在运行';
+
+  @override
+  String get backgroundRuntimeIdle => '未运行';
+
+  @override
+  String get backgroundLocationActive => '后台定位';
+
+  @override
+  String get backgroundAudioActive => '静音音频';
+
+  @override
+  String get backgroundActivityActive => '实时活动';
+
+  @override
+  String get backgroundOverlayActive => '悬浮窗';
+
+  @override
+  String get backgroundLastError => '最近中断或错误';
+
+  @override
+  String get backgroundNoError => '暂无记录';
+
+  @override
+  String get backgroundUnsupported => '当前设备不支持或系统设置未允许';
+
+  @override
+  String get backgroundIosLimit =>
+      '后台执行由 iOS 控制，实时活动本身不能保活。强退可能停止生成，实时状态可能要等再次打开应用后才能清理。';
+
+  @override
+  String get backgroundAndroidLimit =>
+      '如任务中断，请检查通知、电池及厂商后台设置。系统强行停止或终止进程仍可能中断生成。';
+
+  @override
+  String get backgroundStale => '状态暂未更新，请打开应用查看。';
+
+  @override
+  String get backgroundIconError => '无法导入此图片，请选择其他图片。';
+
+  @override
+  String get backgroundNotificationChannels => '通知渠道';
+
+  @override
+  String get backgroundCompletionChannel => '任务完成通知渠道';
+
+  @override
+  String get backgroundOngoingChannel => '任务运行通知渠道';
+
+  @override
+  String get backgroundOverlayAppearance => '悬浮窗外观';
+
+  @override
+  String get backgroundOverlayAppearanceDetail => '调整尺寸、图标、进度环和显示内容';
+
+  @override
+  String get backgroundOverlayPreviewHint => '拖动可移动 · 点击进入会话 · 长按可收起';
+
+  @override
+  String get backgroundOverlayCard => '信息卡片';
+
+  @override
+  String get backgroundOverlayCircle => '圆形图标';
+
+  @override
+  String get backgroundOverlaySize => '尺寸与形状';
+
+  @override
+  String get backgroundOverlayWidth => '宽度';
+
+  @override
+  String get backgroundOverlayHeight => '高度';
+
+  @override
+  String get backgroundOverlayCornerRadius => '圆角';
+
+  @override
+  String get backgroundOverlayIconSize => '图标大小';
+
+  @override
+  String get backgroundOverlayProgressSize => '进度环直径';
+
+  @override
+  String get backgroundOverlayProgressStroke => '进度环粗细';
+
+  @override
+  String get backgroundOverlayContent => '显示内容';
+
+  @override
+  String get backgroundOverlayShowProgress => '显示进度环';
+
+  @override
+  String get backgroundOverlayShowTitle => '显示标题';
+
+  @override
+  String get backgroundOverlayShowSubtitle => '显示副标题';
+
+  @override
+  String get backgroundOverlayShowTime => '显示耗时';
+
+  @override
+  String get backgroundOverlayShowClose => '显示关闭按钮';
+
+  @override
+  String get backgroundOverlayShowBackground => '显示背景';
+
+  @override
+  String get backgroundOverlayShowBorder => '显示边框';
+
+  @override
+  String get backgroundOverlayReset => '恢复默认样式';
+
+  @override
+  String get mcpStdioEnvironmentRequired => '请先安装工作区运行环境，再使用移动端 STDIO。';
+
+  @override
+  String get mcpArgumentsHint => '用空格分隔参数，包含空格的内容用引号包裹；空参数写成 \'\'。';
+
+  @override
+  String get mcpArgumentsInvalid => '请检查参数中的引号是否闭合、末尾是否有未完成的转义。';
+
+  @override
+  String get mcpImportEnvironment => '从环境导入';
+
+  @override
+  String get mcpEnvironmentEmpty => '还没有环境变量，请先在环境设置中添加。';
+
+  @override
+  String get mcpEnvironmentHint => '默认继承运行环境的变量，导入后可为此服务器单独修改。';
+
+  @override
+  String get mcpImportJson => '导入 JSON';
+
+  @override
+  String get mcpImportJsonHint =>
+      '粘贴 Claude Desktop 或 Cursor 的 MCP 配置，预览后添加服务器，不覆盖现有配置。';
+
+  @override
+  String get mcpImportPaste => '从剪贴板粘贴';
+
+  @override
+  String get mcpImportPreview => '预览';
+
+  @override
+  String get mcpImportConfirm => '导入';
+
+  @override
+  String get startupRecoverySnapshotTitle => '从数据库快照恢复';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      '即使数据库无法打开，也可以选择本机快照恢复聊天和设置。请勿卸载 Kelivo，卸载会一并删除这些快照。';
+
+  @override
+  String get startupRecoverySnapshotEmpty => '未在本机找到数据库快照。请先导出数据，再尝试其他恢复操作。';
+
+  @override
+  String get startupRecoverySnapshotButton => '选择快照恢复';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return '将聊天和设置恢复到 $when 的快照？快照之后的更改不会包含在内。现有附件文件和快照会保留，Kelivo 将重启以完成恢复。';
+  }
+
+  @override
+  String startupRecoverySnapshotFailed(String reason) {
+    return '无法准备快照恢复：$reason';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady => '快照已准备好，请重启 Kelivo 完成恢复。';
+
+  @override
+  String get scheduledTasksTitle => '定时任务';
+
+  @override
+  String get scheduledTasksDescription => '在指定时间自动执行任务，支持新建聊天、继续追问或重新运行。';
+
+  @override
+  String get scheduledTasksEmpty => '把任务交给时间';
+
+  @override
+  String get scheduledTasksEmptyDetail => '晨间简报、每日复盘，或任何希望定期完成的事。';
+
+  @override
+  String get scheduledTasksAdd => '添加任务';
+
+  @override
+  String get scheduledTasksEdit => '编辑任务';
+
+  @override
+  String get scheduledTasksName => '任务名称';
+
+  @override
+  String get scheduledTasksNameHint => '晨间简报';
+
+  @override
+  String get scheduledTasksPrompt => '任务内容';
+
+  @override
+  String get scheduledTasksPromptHint => '希望助手为你完成什么？';
+
+  @override
+  String get scheduledTasksAssistant => '执行助手';
+
+  @override
+  String get scheduledTasksChooseAssistant => '选择助手';
+
+  @override
+  String get scheduledTasksAssistantMissing => '助手已不存在';
+
+  @override
+  String get scheduledTasksTime => '执行时间';
+
+  @override
+  String get scheduledTasksTimeHint => '24 小时制，例如 08:00';
+
+  @override
+  String get scheduledTasksRepeat => '重复';
+
+  @override
+  String get scheduledTasksEveryDay => '每天';
+
+  @override
+  String get scheduledTasksWeekdays => '工作日';
+
+  @override
+  String get scheduledTasksEnabled => '启用任务';
+
+  @override
+  String get scheduledTasksPermission => '闹钟和提醒';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      '允许设置闹钟，才能按指定时间执行。未授权时，已启用的任务会等待授权。';
+
+  @override
+  String get scheduledTasksPermissionAction => '去授权';
+
+  @override
+  String get scheduledTasksReliability =>
+      '建议在电池设置中允许 Kelivo 后台运行。强行停止后需重新打开应用。错过的任务不会补跑，执行时间跟随设备时区。';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      '结果保存在对话中，完成后会发送回复预览通知，点击可打开对话。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
+
+  @override
+  String get scheduledTasksRunNow => '立即运行';
+
+  @override
+  String get scheduledTasksHistory => '执行记录';
+
+  @override
+  String get scheduledTasksNoRuns => '尚无执行记录';
+
+  @override
+  String get scheduledTasksRunning => '正在运行';
+
+  @override
+  String get scheduledTasksCompleted => '已完成';
+
+  @override
+  String get scheduledTasksFailed => '执行失败';
+
+  @override
+  String get scheduledTasksInterrupted => '已中断';
+
+  @override
+  String get scheduledTasksPaused => '已暂停';
+
+  @override
+  String get scheduledTasksWaitingPermission => '等待授权';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return '下次：$time';
+  }
+
+  @override
+  String get scheduledTasksDelete => '删除任务';
+
+  @override
+  String get scheduledTasksDeleteDetail => '删除此任务及执行记录？已经生成的对话会保留。';
+
+  @override
+  String get scheduledTasksSave => '保存';
+
+  @override
+  String get scheduledTasksCancel => '取消';
+
+  @override
+  String get scheduledTasksInvalid => '请填写名称、任务内容和助手，自定义重复需至少选择一天。';
+
+  @override
+  String get scheduledTasksLoading => '正在加载…';
+
+  @override
+  String get scheduledTasksOpenChat => '查看对话';
+
+  @override
+  String get scheduledTasksNeedsInput => '任务需要用户回答或工具确认，已停止。可打开对话继续。';
+
+  @override
+  String get scheduledTasksTimeout => '已达到执行时限。';
+
+  @override
+  String get scheduledTasksProcessTerminated => '上次执行被系统终止。';
+
+  @override
+  String get scheduledTasksOnce => '仅一次';
+
+  @override
+  String get scheduledTasksCustom => '自定义';
+
+  @override
+  String get scheduledTasksExecution => '执行任务';
+
+  @override
+  String get scheduledTasksMode => '执行方式';
+
+  @override
+  String get scheduledTasksNewChat => '新建聊天';
+
+  @override
+  String get scheduledTasksFollowUp => '继续追问';
+
+  @override
+  String get scheduledTasksRegenerate => '重新运行';
+
+  @override
+  String get scheduledTasksChat => '目标聊天';
+
+  @override
+  String get scheduledTasksChooseChat => '选择聊天';
+
+  @override
+  String get scheduledTasksMessage => '重新运行的问题';
+
+  @override
+  String get scheduledTasksChooseMessage => '选择问题';
+
+  @override
+  String get scheduledTasksAttachmentMessage => '含附件的消息';
+
+  @override
+  String get scheduledTasksModel => '模型';
+
+  @override
+  String get scheduledTasksChooseModel => '选择模型';
+
+  @override
+  String get scheduledTasksModelDefault => '跟随聊天或助手的模型';
+
+  @override
+  String get scheduledTasksSchedule => '执行时间';
+
+  @override
+  String get scheduledTasksActiveWindow => '活动时段';
+
+  @override
+  String get scheduledTasksStartDate => '开始日期';
+
+  @override
+  String get scheduledTasksEndDate => '结束日期';
+
+  @override
+  String get scheduledTasksActiveWindowDetail =>
+      '仅在此日期范围内执行，包含结束当天。未设置的日期不作限制。';
+
+  @override
+  String get scheduledTasksDate => '日期';
+
+  @override
+  String get scheduledTasksDateUnrestricted => '不限';
+
+  @override
+  String get scheduledTasksClear => '清除';
+
+  @override
+  String get scheduledTasksSearch => '搜索';
+
+  @override
+  String get scheduledTasksNoTargets => '此助手下没有符合条件的内容';
+
+  @override
+  String get scheduledTasksFutureDate => '请选择未来的执行日期和时间。';
+
+  @override
+  String get scheduledTasksDateRangeInvalid => '结束日期不能早于开始日期。';
+
+  @override
+  String get scheduledTasksRegenerateDetail =>
+      '使用原有上下文，为所选问题生成新的回答，保留已有回答和后续消息。';
+
+  @override
+  String get scheduledTasksSaving => '正在保存…';
+
+  @override
+  String get scheduledTasksFinished => '计划已结束';
+
+  @override
+  String get scheduledTasksModelMissing => '所选模型已不可用，请编辑任务重新选择。';
+
+  @override
+  String get scheduledTasksChatMissing => '目标聊天已不存在或已移至其他助手。';
+
+  @override
+  String get scheduledTasksMessageMissing => '所选问题已不存在，请重新选择。';
+
+  @override
+  String get scheduledTasksChatBusy => '此聊天正在生成回答，本次任务已跳过。';
+
+  @override
+  String get scheduledTasksDesktopEmpty => '暂无定时任务';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      '仅在 Kelivo 运行时执行，最小化或驻留托盘时也会继续。退出或电脑休眠期间错过的任务不会补运行，也不会自动启动应用。';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      '结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
+
+  @override
+  String get worldBookStickyLabel => '粘滞（消息数）';
+
+  @override
+  String get worldBookStickyHint => '触发后在后续 N 条消息中保持激活，重复命中不延长。0 表示关闭。';
+
+  @override
+  String get worldBookCooldownLabel => '冷却（消息数）';
+
+  @override
+  String get worldBookCooldownHint => '触发后（或粘滞结束后）N 条消息内不再触发。0 表示关闭。';
+
+  @override
+  String get worldBookDelayLabel => '延迟（消息数）';
+
+  @override
+  String get worldBookDelayHint => '对话至少有 N 条消息时才允许触发。按单条消息计数，不是对话轮数。0 表示关闭。';
+
+  @override
+  String get worldBookDragToReorder => '拖动调整顺序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已启用 $enabled/$total';
+  }
+
+  @override
+  String get assistantConversationSystemPromptTitle => '独立对话系统提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允许每个对话设置自己的系统提示词。';
+
+  @override
+  String get assistantConversationInjectionTitle => '独立对话指令注入';
+
+  @override
+  String get assistantConversationInjectionHint => '每个对话单独选择指令注入和世界书，默认不选中。';
+
+  @override
+  String get conversationSystemPromptTitle => '对话系统提示词';
+
+  @override
+  String get conversationSystemPromptHint => '仅对当前对话生效，留空时使用助手的系统提示词。';
+
+  @override
+  String get conversationSystemPromptClear => '恢复助手提示词';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '为这个对话编写系统提示词…';
+
+  @override
+  String get conversationPromptScope => '仅当前对话';
+
+  @override
+  String get oauthAccountsTab => '账号登录';
+
+  @override
+  String get oauthLogin => '登录';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return '登录 $provider';
+  }
+
+  @override
+  String get oauthConnected => '已连接';
+
+  @override
+  String get oauthNotConnected => '未连接';
+
+  @override
+  String oauthWaiting(String provider) {
+    return '正在等待 $provider 授权';
+  }
+
+  @override
+  String get oauthCancel => '取消授权';
+
+  @override
+  String get oauthOpenBrowser => '打开授权页面';
+
+  @override
+  String get oauthCopyCode => '复制验证码';
+
+  @override
+  String get oauthCodeHint => '在授权页面输入此验证码';
+
+  @override
+  String get oauthDeviceHint => '请先在 ChatGPT 安全设置或工作区权限中启用设备码登录。';
+
+  @override
+  String get oauthDeviceLogin => '使用设备码登录';
+
+  @override
+  String get oauthDetails => '查看账号详情';
+
+  @override
+  String get oauthConnectAnother => '再连一个';
+
+  @override
+  String get oauthRelogin => '重新登录';
+
+  @override
+  String get oauthNeedsLogin => '需重新登录';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider 登录已过期';
+  }
+
+  @override
+  String get oauthLoginRestored => '已重新登录，可使用消息的重试按钮再次发送。';
+
+  @override
+  String get oauthLogout => '退出登录';
+
+  @override
+  String get oauthLogoutDescription => '清除此账号在本机保存的授权凭证';
+
+  @override
+  String get oauthRefreshing => '正在续期授权…';
+
+  @override
+  String get oauthRefreshUsage => '刷新用量';
+
+  @override
+  String get oauthUsageDetails => '用量明细';
+
+  @override
+  String get oauthUsageUnavailable => '暂时无法获取用量';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return '更新于 $time';
+  }
+
+  @override
+  String get oauthSyncModels => '同步';
+
+  @override
+  String get oauthSyncing => '正在同步模型…';
+
+  @override
+  String get oauthModelsHint => '可用模型由账号同步。';
+
+  @override
+  String get oauthNoModels => '同步模型后即可开始对话';
+
+  @override
+  String get oauthConnection => '接入';
+
+  @override
+  String get oauthConnectionInfo => '接入信息';
+
+  @override
+  String get oauthEndpoint => '接入端点';
+
+  @override
+  String get oauthScope => '授权范围';
+
+  @override
+  String get oauthAccountId => '账号 ID';
+
+  @override
+  String get oauthTokenExpiry => '令牌有效期';
+
+  @override
+  String get oauthName => '供应商名称';
+
+  @override
+  String get oauthEnabledHint => '在模型选择器中显示这些模型';
+
+  @override
+  String get oauthNetwork => '网络代理';
+
+  @override
+  String get oauthFollowGlobal => '跟随全局设置';
+
+  @override
+  String get oauthCustomRequest => '自定义请求';
+
+  @override
+  String get oauthWeekly => '本周窗口';
+
+  @override
+  String get oauthMonthly => '本月窗口';
+
+  @override
+  String get oauthTotal => '总额度';
+
+  @override
+  String oauthHours(String count) {
+    return '$count 小时窗口';
+  }
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count 分钟窗口';
+  }
+
+  @override
+  String oauthDays(String count) {
+    return '$count 天窗口';
+  }
+
+  @override
+  String get oauthWindow => '用量窗口';
+
+  @override
+  String oauthResetsAt(String time) {
+    return '重置于 $time';
+  }
+
+  @override
+  String get oauthNetworkError => '连接失败，请检查网络后重试。';
+
+  @override
+  String get oauthInvalidResponse => '授权未完成，请重试。';
+
+  @override
+  String get oauthTimeout => '授权超时，请重试。';
+
+  @override
+  String get oauthDenied => '授权未获批准，请重试。';
+
+  @override
+  String get oauthSaving => '正在连接账号…';
+
+  @override
+  String get oauthQuotaExceeded => '该账号暂无可用额度。';
+
+  @override
+  String get oauthRateLimited => '请求过于频繁，请稍后重试。';
+
+  @override
+  String get oauthPermissionDenied => '该账号无权访问此资源。';
+
+  @override
+  String get oauthRequestFailed => '供应商未能完成请求。';
+
+  @override
+  String get oauthQuotaAvailable => '额度可用';
+
+  @override
+  String oauthSavedResets(String count) {
+    return '可用额度重置次数：$count';
+  }
+
+  @override
+  String get oauthPrimaryWindow => '主要窗口';
+
+  @override
+  String get oauthSecondaryWindow => '次要窗口';
+
+  @override
+  String get oauthAuthorizationCode => '授权码或回调链接';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果浏览器没有自动返回，请将最后的回调链接或授权码粘贴到这里。';
+
+  @override
+  String get oauthInvalidAuthorizationCode => '请输入本次登录的授权码或回调链接。';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登录';
+
+  @override
+  String get oauthExtraUsage => '额外用量';
+
+  @override
+  String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
 class AppLocalizationsZhHans extends AppLocalizationsZh {
   AppLocalizationsZhHans() : super('zh_Hans');
+
+  @override
+  String get settingsSearchHint => '搜索设置';
+
+  @override
+  String get settingsSearchCancel => '取消';
+
+  @override
+  String get settingsSearchClear => '清空搜索';
+
+  @override
+  String get settingsSearchSuggestions => '常用设置';
+
+  @override
+  String get settingsSearchNoResults => '未找到相关设置';
+
+  @override
+  String get settingsSearchNoResultsHint => '试试其他名称，或更简短的关键词。';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    return '找到 $count 项设置';
+  }
 
   @override
   String get helloWorld => '你好，世界！';
@@ -7858,11 +11470,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsPageCalculating => '统计中…';
 
   @override
-  String settingsPageFilesCount(int count, String size) {
-    return '共 $count 个文件 · $size';
-  }
-
-  @override
   String get storageSpacePageTitle => '存储空间';
 
   @override
@@ -7912,10 +11519,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
 
   @override
+  String get storageSpaceCategoryDisplacedDatabases => '保留的旧数据库';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases => '自动重建前保留的数据库';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      '确定删除这些保留的旧数据库吗？它们是 Kelivo 重建数据库时留下的，可能是那些聊天记录和设置仅存的一份。删除后无法恢复。';
+
+  @override
   String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
 
   @override
   String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton => '删除保留的旧数据库';
 
   @override
   String get storageSpaceClearRestoreTracesConfirmMessage =>
@@ -7935,11 +11555,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceCategoryOther => '其他';
-
-  @override
-  String storageSpaceFilesCount(int count) {
-    return '$count 个文件';
-  }
 
   @override
   String get storageSpaceSafeToClearHint => '可安全清理，不影响聊天记录。';
@@ -8057,7 +11672,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
-    return '删除 $count 个项目？删除后聊天记录中的附件可能无法打开。';
+    return '删除 $count 个项目及其对应的会话附件副本？删除后，聊天记录中的这些附件将无法使用。';
   }
 
   @override
@@ -8304,8 +11919,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageClearContext => '清空上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 条消息';
   }
 
   @override
@@ -8422,9 +12042,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpTransportTagHttp => 'HTTP';
 
   @override
-  String get mcpServerEditSheetStdioOnlyDesktop => 'STDIO 仅在桌面端可用';
-
-  @override
   String get mcpServerEditSheetStdioCommandLabel => '命令';
 
   @override
@@ -8432,6 +12049,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetStdioWorkingDirectoryLabel => '工作目录（可选）';
+
+  @override
+  String get mcpWorkspaceBindingLabel => '绑定工作区（可选）';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      '服务器可通过 /workspace 访问此工作区。工作目录留空时默认进入该目录，切换聊天不会改变绑定。';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      '工作区绑定适用于移动端 Linux 环境。在桌面端运行此服务器前，请先解除绑定。';
 
   @override
   String get mcpServerEditSheetStdioEnvironmentTitle => '环境变量';
@@ -8516,6 +12144,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageNotFound => '助手不存在';
+
+  @override
+  String get assistantEditPageWorkspaceTab => '工作区设置';
 
   @override
   String get assistantEditPageBasicTab => '基础设置';
@@ -8791,26 +12422,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageIosBackgroundChatTitle => 'iOS 后台生成';
 
   @override
-  String get iosBackgroundSettingsPageTitle => 'iOS 后台生成';
-
-  @override
   String get iosBackgroundStatusOn => '开启';
 
   @override
   String get iosBackgroundStatusOff => '关闭';
-
-  @override
-  String get iosBackgroundGenerationEnableTitle => '后台生成';
-
-  @override
-  String get iosBackgroundGenerationEnableSubtitle =>
-      'App 离开前台后，使用 iOS 分配的后台时间继续当前回复。';
-
-  @override
-  String get iosBackgroundTaskRefreshTitle => '后台任务恢复';
-
-  @override
-  String get iosBackgroundTaskRefreshSubtitle => '在系统条件允许时，向 iOS 请求刷新和处理机会。';
 
   @override
   String get iosLiveActivityTitle => '实时活动';
@@ -8819,98 +12434,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get iosLiveActivitySubtitle => '支持时在锁屏和灵动岛显示后台回复状态。';
 
   @override
-  String get iosBackgroundNotificationsTitle => '任务通知';
-
-  @override
-  String get iosBackgroundNotificationsSubtitle => '后台回复完成或中断时发送本地通知。';
-
-  @override
-  String get iosBackgroundLimitNoticeTitle => 'iOS 仍可能暂停任务';
-
-  @override
-  String get iosBackgroundLimitNoticeBody =>
-      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
-
-  @override
-  String get iosBackgroundUnsupportedLiveActivity =>
-      '需要 iOS 16.1 或更高版本，并在系统设置中允许实时活动。';
-
-  @override
-  String get iosBackgroundNativeStatusTitle => '系统状态';
-
-  @override
-  String get iosBackgroundNativeStatusUnavailable => '需要在 iOS 上运行后查看';
-
-  @override
-  String get iosBackgroundLiveActivityAvailable => '实时活动可用';
-
-  @override
-  String get iosBackgroundLiveActivityUnavailable => '实时活动不可用';
-
-  @override
-  String get iosBackgroundNotificationsAuthorized => '通知已允许';
-
-  @override
-  String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
-
-  @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
-
-  @override
-  String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
-
-  @override
-  String get iosBackgroundGenerationStreamingDetail => '正在接收助手回复';
-
-  @override
-  String iosBackgroundGenerationTokenCount(int count) {
-    return '$count tokens';
-  }
-
-  @override
-  String get iosBackgroundGenerationCompleteTitle => '生成完成';
-
-  @override
-  String get iosBackgroundGenerationCompleteDetail => '助手回复已准备好';
-
-  @override
-  String get iosBackgroundGenerationInterruptedTitle => '生成已中断';
-
-  @override
-  String get iosBackgroundGenerationInterruptedDetail => '后台回复在完成前停止';
-
-  @override
-  String get iosBackgroundGenerationCancelledDetail => '生成已停止';
-
-  @override
-  String get androidBackgroundStatusOn => '开启';
-
-  @override
-  String get androidBackgroundStatusOff => '关闭';
-
-  @override
-  String get androidBackgroundStatusOther => '开启并通知';
-
-  @override
-  String get androidBackgroundOptionOn => '开启';
-
-  @override
-  String get androidBackgroundOptionOnNotify => '开启并在生成完时通知';
-
-  @override
-  String get androidBackgroundOptionOff => '关闭';
-
-  @override
   String get notificationChatCompletedTitle => '生成完成';
 
   @override
   String get notificationChatCompletedBody => '助手回复已生成';
-
-  @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在运行';
-
-  @override
-  String get androidBackgroundNotificationText => '后台保持聊天生成';
 
   @override
   String get assistantEditEmojiDialogTitle => '选择表情';
@@ -9128,6 +12655,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get assistantEditPromptTimeVarWarning =>
       '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
+
+  @override
+  String get assistantEditPromptIso8601Title => '使用 ISO 8601 格式';
+
+  @override
+  String get assistantEditPromptIso8601Subtitle =>
+      '包含时区偏移，例如 2026-08-08T14:30:05+08:00';
 
   @override
   String get assistantEditPromptAppendTimeTitle => '追加当前时间';
@@ -9404,6 +12938,30 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
 
   @override
+  String get restoreProgressTitle => '正在恢复备份';
+
+  @override
+  String get restoreProgressWarning => '请保持 Kelivo 开启直到完成。此时关闭应用，下次启动会从头再来一次。';
+
+  @override
+  String get restoreProgressStageCheckingBackup => '正在校验备份';
+
+  @override
+  String get restoreProgressStagePreservingCurrentData => '正在保留当前数据';
+
+  @override
+  String get restoreProgressStageInstallingBackup => '正在写入备份';
+
+  @override
+  String get restoreProgressStageVerifying => '正在验证';
+
+  @override
+  String get restoreProgressStageRollingBack => '正在恢复原有数据';
+
+  @override
+  String get restoreProgressStageFinishing => '即将完成';
+
+  @override
   String get backupRestoreFailureRestartButton => '重启 Kelivo';
 
   @override
@@ -9458,11 +13016,143 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
+  String get startupRecoveryWhatFailed => '失败原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失败阶段';
+
+  @override
+  String get startupRecoveryStageRestore => '恢复关卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '数据库启动';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '诊断码';
+
+  @override
+  String get startupRecoverySchemaLabel => '数据库版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁盘上为 $installed · 当前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '应用';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集诊断信息…';
+
+  @override
+  String get startupRecoveryShowDetails => '展开技术细节';
+
+  @override
+  String get startupRecoveryHideDetails => '收起技术细节';
+
+  @override
+  String get startupRecoveryCopyReport => '复制完整报告';
+
+  @override
+  String get startupRecoveryReportCopied => '已复制完整报告';
+
+  @override
+  String get startupRecoveryShareReport => '导出报告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '报告已导出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '无法导出报告。';
+
+  @override
+  String get startupRecoverySectionDataTitle => '你的数据';
+
+  @override
+  String get startupRecoverySectionDataBody =>
+      '目前没有任何数据被删除。在尝试下面的操作前，先把副本保存到安全的地方。';
+
+  @override
+  String startupRecoveryExportSavedTo(String path) {
+    return '数据副本已保存到 $path';
+  }
+
+  @override
+  String get startupRecoverySectionRepairTitle => '诊断与修复';
+
+  @override
+  String get startupRecoverySectionRepairBody =>
+      '完整性检查只读取数据库。修复会清理上次更新中断留下的元数据并重新启动，不会删除聊天记录。';
+
+  @override
+  String get startupRecoveryIntegrityButton => '检查数据库完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在数据库文件中发现损坏。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 报告了问题 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityMissing => '数据目录中没有找到数据库文件。';
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性检查无法运行。';
+
+  @override
+  String get startupRecoveryDangerZone => '危险操作';
+
+  @override
+  String get startupRecoveryDangerBody =>
+      '重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。';
+
+  @override
+  String get startupRecoveryResetAcknowledge => '我已导出副本，或不需要这些数据。';
+
+  @override
   String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
       '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeTitle => '若要改用旧版';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeIntro =>
+      '当前版本打不开本机这份数据库。若你必须留在旧版，请按下面的步骤处理；在备份完成之前，不要删除或覆盖这里的数据。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep1 =>
+      '先安装并打开最新版 Kelivo，在「设置 → 数据备份」导出一份备份文件。';
+
+  @override
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
+    return '打开 $url，把备份转换成你打算使用的旧版格式。';
+  }
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep3 =>
+      '确认本机数据已经另外备份好之后，再安装旧版，并导入转换后的备份。';
+
+  @override
+  String get startupDatabaseUpdateRequiredOpenTool => '打开转换工具';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -9502,6 +13192,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageRestore => '恢复';
+
+  @override
+  String get backupPageForwardCompatTitle => '备份来自更新的版本';
+
+  @override
+  String backupPageForwardCompatBody(int backupVersion, int currentVersion) {
+    return '这份备份由更新版本的 Kelivo 创建（数据格式 $backupVersion，当前版本支持 $currentVersion），且未声明旧版本能否读取。\n\n你可以继续导入：当前版本不认识的内容会被跳过，备份文件本身不会被修改。但如果新版本改变了已有数据的存储方式，部分内容可能会被错误导入。\n\n更稳妥的做法是先升级 Kelivo。';
+  }
+
+  @override
+  String get backupPageForwardCompatContinue => '仍然导入';
+
+  @override
+  String get backupPageForwardCompatCancel => '取消';
+
+  @override
+  String get backupPageSchemaTooNewMessage =>
+      '这份备份由更新版本的 Kelivo 创建，当前版本无法读取。请先升级 Kelivo 后重试。';
 
   @override
   String get backupPageBackupUploaded => '已上传备份';
@@ -10289,6 +13997,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit => '行';
 
   @override
+  String get displaySettingsPageCollapseLongUserMessagesTitle => '折叠过长消息';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle =>
+      '超过阈值的用户消息折叠显示，点击可展开';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle =>
+      '超过多少字符折叠';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit => '字符';
+
+  @override
+  String get chatMessageExpandLongText => '展开';
+
+  @override
+  String get chatMessageCollapseLongText => '收起';
+
+  @override
   String get messageExportSheetFormatTitle => '导出格式';
 
   @override
@@ -10606,6 +14334,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarMcpServersTooltip => 'MCP服务器';
 
   @override
+  String get chatInputBarToolsTooltip => '工具';
+
+  @override
   String get chatInputBarMoreTooltip => '更多';
 
   @override
@@ -10754,9 +14485,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpServerEditSheetTransportLabel => '传输类型';
 
   @override
-  String get mcpServerEditSheetSseRetryHint => '如果SSE连接失败，请多试几次';
-
-  @override
   String get mcpServerEditSheetUrlLabel => '服务器地址';
 
   @override
@@ -10824,7 +14552,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用于总结对话标题的模型，推荐使用快速且便宜的模型。选择模型后才会启用。';
+      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -10840,7 +14568,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      '用于在助手回复后生成继续对话的建议气泡。选择模型后才会启用。';
+      '用于在助手回复后生成聊天建议，可跟随当前对话模型或指定其他模型。默认未启用。';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新频率';
@@ -10917,6 +14645,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageResetDefault => '重置为默认';
+
+  @override
+  String get defaultModelPageDisable => '禁用';
 
   @override
   String get defaultModelPageSave => '保存';
@@ -11039,13 +14770,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetReasoningAbility => '推理';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      '供应商重写：允许为特定模型自定义供应商设置。（暂未实现）';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => '添加供应商重写';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => '自定义 Headers';
 
   @override
@@ -11065,9 +14789,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
-
-  @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
 
   @override
   String get modelDetailSheetSearchTool => '搜索';
@@ -11099,11 +14820,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '需要启用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '网页抓取';
+  String get modelDetailSheetWebFetchTool => '网页抓取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '启用 OpenRouter 网页抓取服务端工具';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允许 Claude 抓取对话中出现的网页与 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允许 Claude 在 Anthropic 沙箱中运行 Python 与 Bash';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
@@ -11157,6 +14886,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelSelectSheetFavoritesSection => '收藏';
+
+  @override
+  String get modelSelectSheetFollowAssistant => '跟随助手';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -11910,11 +15642,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchSettingsSheetBuiltinSearchDescription => '是否启用模型内置的搜索功能';
 
   @override
-  String get searchSettingsSheetClaudeDynamicSearchTitle => '模型内置搜索(新)';
+  String get searchSettingsSheetClaudeDynamicSearchTitle => '动态过滤';
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '在支持的 Claude 官方模型上使用 `web_search_20260209`，支持动态过滤能力。';
+      '筛选搜索结果，节省 token';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '网络搜索';
@@ -12117,6 +15849,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageForkKeepMessageVersionsTitle => '创建分支时保留消息版本';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      '编辑助手时保留思考与工具卡片';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      '关闭后，当前编辑版本只保留助手正文；切回上一版本仍可查看思考与工具卡片';
 
   @override
   String chainOfThoughtExpandSteps(Object count) {
@@ -12351,6 +16091,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get themeSettingsPageUsePureBackgroundSubtitle => '仅气泡与强调色随主题变化';
+
+  @override
+  String get themeAdvancedSettingsPageTitle => '主题高级设置';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle => '新版分层配色（实验）';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      '页面更深、卡片更亮，两者都保留主题色相；关闭可恢复旧外观';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle => '弹窗内瓦片分层';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      '默认瓦片与弹窗同色';
 
   @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
@@ -13025,6 +16782,52 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'TinyFish Search API，支持地区与语言参数。需要 API Key。此处不支持 Fetch/Scrape。';
 
   @override
+  String get searchServiceNameAnySearch => 'AnySearch';
+
+  @override
+  String get searchProviderAnySearchDescription =>
+      '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
+
+  @override
+  String get searchServiceNameParallel => 'Parallel';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜索 API。返回面向 LLM 优化的网页摘录，支持 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜索模式';
+
+  @override
+  String get searchServiceNameYou => 'You.com';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。';
+
+  @override
+  String get searchServicesDialogContentMode => '内容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 数';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 数必须介于 1024 和 32768 之间。';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override
@@ -13272,6 +17075,193 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '在你确认后于本设备创建日历日程，需要授予日历权限。';
 
   @override
+  String get assistantEditLocalToolLocationTitle => '当前位置';
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '读取本设备的一次性位置，需要授予定位权限。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天气';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '获取当前位置或指定地点的 Apple 天气，结果中会展示 WeatherKit 数据来源。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '读取本设备的健康活动摘要，需要授予健康数据读取权限。';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已选择 $selected/$total 项';
+  }
+
+  @override
+  String get healthDataSettingsTitle => '健康数据';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 Kelivo 可以尝试读取该范围，实际授权仍由 iOS 管理。';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 开启';
+  }
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康读取';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '设备可用，读取范围由 iOS 管理';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '打开系统设置';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部开启';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部关闭';
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活动';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身体';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步数';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步数摘要';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '户外日光时间';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活动能量消耗';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '锻炼';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 锻炼分钟数';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立时间';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距离';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距离';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身训练';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '训练记录：类型、时长、距离与消耗';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '最近 24 小时的睡眠、卧床、清醒与睡眠分期';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '静息';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或静息时段';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率样本';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '静息心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '静息状态心率';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧饱和度';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '摄入能量';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '饮食热量记录';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '饮水';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '饮水量记录';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '体重';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '体重样本';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身体质量指数';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖样本';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查询提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '读取本设备上的提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '创建提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你确认后于本设备创建提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你确认后将提醒事项标记为完成，需要授予提醒事项完整访问权限。';
+
+  @override
   String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
 
   @override
@@ -13465,6 +17455,56 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get networkProxyPriorityNote => '当同时开启全局代理与供应商代理时，将优先使用供应商代理。';
+
+  @override
+  String get settingsPageAutoRetry => '自动重试';
+
+  @override
+  String get autoRetryEnableLabel => '开启自动重试';
+
+  @override
+  String get autoRetryMaxRetries => '最大重试次数';
+
+  @override
+  String get autoRetryInitialDelay => '首次延迟（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '退避倍率';
+
+  @override
+  String get autoRetryMaxDelay => '最大延迟（毫秒）';
+
+  @override
+  String get autoRetryJitter => '抖动';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待随机 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '网络错误时重试';
+
+  @override
+  String get autoRetryStatusCodes => '可重试状态码';
+
+  @override
+  String get autoRetryKeywords => '重试关键字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重试关键字';
+
+  @override
+  String get autoRetryAddHint => '添加';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢复默认';
+
+  @override
+  String get autoRetryFooter => '仅在当前这轮模型响应尚未产生任何输出时才会自动重试。';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒后重试 ($attempt/$maxRetries)';
+  }
 
   @override
   String get desktopShowProviderInModelCapsule => '模型胶囊显示供应商';
@@ -15165,6 +19205,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '压缩在添加图片时进行，已保存或已发送的图片不受影响；压缩后图片以 JPEG 格式随消息发送。';
 
   @override
+  String get imageSettingsPageSendSectionTitle => '发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksTitle =>
+      '将 Markdown 图片链接作为图片发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksSubtitle =>
+      '开启后，消息文本中的 ![alt](url) 会作为图片发送给视觉模型；关闭后仅作为普通文本发送。手动添加的图片附件不受影响。';
+
+  @override
   String get memoryTraceSettingsTitle => '流程追踪';
 
   @override
@@ -15470,11 +19521,3161 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手设定同时作用于思考、工具调用和翻译卡片。';
+
+  @override
+  String get localSnapshotSectionTitle => '本地副本';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本地副本';
+
+  @override
+  String get localSnapshotEnabledSubtitle => 'Kelivo 会定期在本机存一份数据库副本，让数据不只有一份。';
+
+  @override
+  String get localSnapshotIntervalTitle => '备份频率';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自动';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，数据库越大间隔越长';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepTitle => '保留份数';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepSubtitle => '另外各留一份上周和上个月的，万一问题过了很久才发现也还能找回来。';
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上周的';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上个月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '无论设成几份，最近一份仍有内容的副本都不会被自动清理。';
+
+  @override
+  String get localSnapshotMaximumTitle => '占用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotAnnounceTitle => '备份完成时提示';
+
+  @override
+  String get localSnapshotAnnounceSubtitle => '失败一定会告诉你。这里只是成功时多一句提示。';
+
+  @override
+  String get localSnapshotTakeNow => '立即备份一份';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暂无副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '还没有备份过';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次备份：$when';
+  }
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次备份失败（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳过：本机剩余空间不足';
+
+  @override
+  String get localSnapshotStatusUnchanged => '距上次备份数据没有变化';
+
+  @override
+  String get localSnapshotCopiesTitle => '本地副本';
+
+  @override
+  String get localSnapshotCopiesEmpty => '还没有本地副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '数据有变化时会自动存一份，恢复数据前也一定会先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本地副本只存在这台设备上。它防的是应用内数据被损坏或误删，防不了设备丢失或卸载应用——那要靠 WebDAV / S3 备份。';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自动备份';
+
+  @override
+  String get localSnapshotOriginManual => '手动备份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '恢复前备份';
+
+  @override
+  String get localSnapshotKindRecovered => '故障恢复时留下的';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 个对话',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 条消息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '内容需恢复后才能确认';
+
+  @override
+  String get localSnapshotCopyPinned => '已保留';
+
+  @override
+  String get localSnapshotActionRestore => '恢复';
+
+  @override
+  String get localSnapshotActionExport => '导出';
+
+  @override
+  String get localSnapshotActionDelete => '删除';
+
+  @override
+  String get localSnapshotActionPin => '保留这份';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotRestoreTitle => '恢复这份副本？';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '当前的对话和设置会被 $when 的这份副本替换。系统会先把现在的数据存一份，所以这一步可以撤销。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在准备副本';
+
+  @override
+  String get localSnapshotDeleteTitle => '删除这份副本？';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '这份副本会从设备上永久删除。它里面有、而当前数据库里没有的数据将无法找回。';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '这是唯一一份还有内容的副本。';
+
+  @override
+  String get localSnapshotExportPreparing => '正在准备导出';
+
+  @override
+  String get localSnapshotExportDone => '副本已导出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '导出副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已保存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '保存副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotDeleteDone => '副本已删除';
+
+  @override
+  String get localSnapshotBusyMessage => '已有备份任务在进行中';
+
+  @override
+  String get localSnapshotRunInBackground => '转到后台继续';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在后台备份副本';
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本机还保留着 $count 份本地副本，最新一份是 $when 的。重置不会删除它们——重启后可以在 设置 › 备份 › 本地副本 里恢复。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外还有 $count 份故障恢复时留下的数据库副本，重置会把它们一并永久删除。想留住的话请先导出数据。';
+  }
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜索';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '记忆';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本地工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部恢复默认？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '将把所有内置工具的描述恢复为应用默认文案，自定义措辞会丢失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '恢复';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '参数描述 ($count)';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '记忆工具的默认描述会随记忆提示语言在中/英之间切换。自定义描述按工具名只存一份，切换语言后不会跟着变。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '编辑描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
+
+  @override
+  String get workspaceFileNotAvailable => '文件不可用';
+
+  @override
+  String get workspaceTerminalNotAvailable => '终端不可用';
+
+  @override
+  String get workspacePreviewCopyPath => '复制路径';
+
+  @override
+  String get workspacePreviewShare => '分享';
+
+  @override
+  String get workspacePreviewOpenExternally => '用其他应用打开';
+
+  @override
+  String get workspacePreviewOpenWith => '打开方式…';
+
+  @override
+  String get workspacePreviewFileTooLarge => '文件过大，无法预览，请用其他应用打开。';
+
+  @override
+  String get workspacePreviewSource => '源码';
+
+  @override
+  String get workspacePreviewRendered => '渲染';
+
+  @override
+  String get workspacePreviewFileName => '名称';
+
+  @override
+  String get workspacePreviewFileSize => '大小';
+
+  @override
+  String get workspacePreviewFileModified => '修改时间';
+
+  @override
+  String get workspacePreviewPathCopied => '已复制路径';
+
+  @override
+  String workspacePreviewLineCount(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String get workspaceFilesSort => '排序';
+
+  @override
+  String get workspaceFilesSortName => '名称';
+
+  @override
+  String get workspaceFilesSortModified => '修改时间';
+
+  @override
+  String get workspaceFilesSortSize => '大小';
+
+  @override
+  String get workspaceFilesSortAscending => '升序';
+
+  @override
+  String get workspaceFilesSortDescending => '降序';
+
+  @override
+  String get workspaceFilesShowHidden => '显示隐藏文件';
+
+  @override
+  String get workspaceFilesHideHidden => '隐藏隐藏文件';
+
+  @override
+  String get workspaceFilesRefresh => '刷新';
+
+  @override
+  String get workspaceFilesNewFolder => '新建文件夹';
+
+  @override
+  String get workspaceFilesNewFile => '新建文件';
+
+  @override
+  String get workspaceFilesImport => '导入';
+
+  @override
+  String get workspaceFilesExport => '导出';
+
+  @override
+  String get workspaceFilesExportFolder => '导出当前文件夹';
+
+  @override
+  String get workspaceFilesEmpty => '此文件夹为空';
+
+  @override
+  String get workspaceFilesError => '无法加载这些文件';
+
+  @override
+  String get workspaceFilesRetry => '重试';
+
+  @override
+  String get workspaceFilesPreview => '预览';
+
+  @override
+  String get workspaceFilesRename => '重命名';
+
+  @override
+  String get workspaceFilesMove => '移动';
+
+  @override
+  String get workspaceFilesDelete => '删除';
+
+  @override
+  String get workspaceFilesShare => '分享';
+
+  @override
+  String get workspaceFilesCopyPath => '复制路径';
+
+  @override
+  String get workspaceFilesExportItem => '导出';
+
+  @override
+  String get workspaceFilesNameLabel => '名称';
+
+  @override
+  String get workspaceFilesNameHint => '输入名称';
+
+  @override
+  String get workspaceFilesCreate => '创建';
+
+  @override
+  String get workspaceFilesCancel => '取消';
+
+  @override
+  String get workspaceFilesConfirm => '确认';
+
+  @override
+  String get workspaceFilesSave => '保存';
+
+  @override
+  String get workspaceFilesDeleteTitle => '删除此项？';
+
+  @override
+  String workspaceFilesDeleteMessage(String name) {
+    return '删除 $name？';
+  }
+
+  @override
+  String workspaceFilesDeleteFolderMessage(String name) {
+    return '删除文件夹 $name 及其全部内容？';
+  }
+
+  @override
+  String get workspaceFilesMoveTitle => '移动到文件夹';
+
+  @override
+  String get workspaceFilesMoveHere => '移动到此处';
+
+  @override
+  String get workspaceFilesPathCopied => '已复制路径';
+
+  @override
+  String get workspaceFilesInvalidName => '名称无效';
+
+  @override
+  String get workspaceFilesInvalidPath => '该路径超出当前文件夹';
+
+  @override
+  String workspaceFilesOperationFailed(String error) {
+    return '操作失败：$error';
+  }
+
+  @override
+  String get workspaceFilesActions => '操作';
+
+  @override
+  String get workspaceFilesMore => '更多';
+
+  @override
+  String get workspaceFilesJustNow => '刚刚';
+
+  @override
+  String workspaceFilesMinutesAgo(int count) {
+    return '$count 分钟前';
+  }
+
+  @override
+  String workspaceFilesHoursAgo(int count) {
+    return '$count 小时前';
+  }
+
+  @override
+  String workspaceFilesDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String get workspaceFilesPanelTitle => '对话文件';
+
+  @override
+  String get workspaceFilesTabAttachments => '附件';
+
+  @override
+  String get workspaceFilesTabOutputs => '输出';
+
+  @override
+  String get workspaceFilesTabWorkspace => '工作区';
+
+  @override
+  String get workspaceFilesNoWorkspaceBound => '尚未绑定工作区';
+
+  @override
+  String get workspaceFilesKindManaged => '托管';
+
+  @override
+  String get workspaceFilesKindLinked => '链接';
+
+  @override
+  String get workspaceFilesMissingWorkspace => '找不到工作区';
+
+  @override
+  String get workspaceFilesClose => '关闭';
+
+  @override
+  String get workspacesTitle => '工作区';
+
+  @override
+  String get workspacesCreate => '创建';
+
+  @override
+  String get workspacesCreateTitle => '新建工作区';
+
+  @override
+  String get workspacesNameLabel => '名称';
+
+  @override
+  String get workspacesNameHint => '工作区名称';
+
+  @override
+  String get workspacesLinkFolder => '链接文件夹';
+
+  @override
+  String get workspacesEmpty => '还没有工作区';
+
+  @override
+  String get workspacesEmptyCta => '创建工作区';
+
+  @override
+  String get workspacesSettings => '设置';
+
+  @override
+  String get workspacesOpenFiles => '打开文件';
+
+  @override
+  String get workspacesLastUsedNever => '从未使用';
+
+  @override
+  String workspacesLastUsed(String when) {
+    return '最近使用 $when';
+  }
+
+  @override
+  String get workspacesDeleteTitle => '删除此工作区？';
+
+  @override
+  String workspacesDeleteMessage(String name) {
+    return '删除工作区 $name？';
+  }
+
+  @override
+  String get workspacesDeleteAlsoFiles => '同时删除文件';
+
+  @override
+  String get workspacesUnlinkTitle => '取消链接此工作区？';
+
+  @override
+  String workspacesUnlinkMessage(String name) {
+    return '取消链接 $name？磁盘上的文件会保留。';
+  }
+
+  @override
+  String get workspacesSettingsTitle => '工作区设置';
+
+  @override
+  String get workspacesShellNeedsApproval => '运行终端命令前询问';
+
+  @override
+  String get workspacesDefaultCwd => '默认工作目录';
+
+  @override
+  String get workspacesDefaultCwdHint => '相对路径，例如 src';
+
+  @override
+  String get workspacesDefaultCwdInvalid => '请使用不含 .. 的相对路径';
+
+  @override
+  String get workspacesCreateManaged => '创建工作区';
+
+  @override
+  String get workspacesLinkExisting => '链接已有文件夹';
+
+  @override
+  String get workspacesUnlink => '取消链接';
+
+  @override
+  String get workspacesItemMore => '工作区操作';
+
+  @override
+  String get workspaceToolDenied => '已拒绝';
+
+  @override
+  String get workspaceToolTimeout => '超时';
+
+  @override
+  String get workspaceToolCancelled => '已取消';
+
+  @override
+  String get workspaceToolInterrupted => '已中断';
+
+  @override
+  String get workspaceToolEnvironmentNotReady => '沙箱环境未安装';
+
+  @override
+  String get workspaceToolInstall => '安装';
+
+  @override
+  String get workspaceToolFuzzy => '模糊';
+
+  @override
+  String get workspaceToolCreated => '已创建';
+
+  @override
+  String get workspaceToolUpdated => '已更新';
+
+  @override
+  String get workspaceToolTruncated => '已截断';
+
+  @override
+  String get workspaceToolImageTag => '图片';
+
+  @override
+  String get workspaceToolAllowAll => '本会话全部允许';
+
+  @override
+  String get workspaceToolStdout => 'stdout';
+
+  @override
+  String get workspaceToolStderr => 'stderr';
+
+  @override
+  String get workspaceToolOpenFullOutput => '打开完整输出';
+
+  @override
+  String get workspaceToolChangedFiles => '变更的文件';
+
+  @override
+  String get workspaceToolCancel => '取消';
+
+  @override
+  String get workspaceToolCopyCommand => '复制命令';
+
+  @override
+  String get workspaceToolCopyOutput => '复制输出';
+
+  @override
+  String get workspaceToolCopyDiff => '复制差异';
+
+  @override
+  String get workspaceToolCopied => '已复制';
+
+  @override
+  String get workspaceToolDiffTruncated => '差异已截断';
+
+  @override
+  String get workspaceToolOpenPreview => '打开预览';
+
+  @override
+  String get workspaceToolNoOutput => '无输出';
+
+  @override
+  String get workspaceToolNotAvailable => '不可用';
+
+  @override
+  String get workspaceToolClose => '关闭';
+
+  @override
+  String get workspaceToolTitleShell => '运行命令';
+
+  @override
+  String get workspaceToolTitleReadFile => '读取文件';
+
+  @override
+  String get workspaceToolTitleWriteFile => '写入文件';
+
+  @override
+  String get workspaceToolTitleEditFile => '编辑文件';
+
+  @override
+  String get workspaceToolTitleListDir => '列出目录';
+
+  @override
+  String get workspaceToolTitleGlob => 'Glob';
+
+  @override
+  String get workspaceToolTitleGrep => 'Grep';
+
+  @override
+  String workspaceToolCount(int count) {
+    return '$count';
+  }
+
+  @override
+  String workspaceToolMoreFiles(int count) {
+    return '+$count';
+  }
+
+  @override
+  String workspaceToolDurationMs(int ms) {
+    return '${ms}ms';
+  }
+
+  @override
+  String workspaceToolDurationSec(String sec) {
+    return '${sec}s';
+  }
+
+  @override
+  String get workspaceEnvTitle => '环境';
+
+  @override
+  String workspaceEnvEngineUbuntu(String version) {
+    return 'Ubuntu $version (PRoot)';
+  }
+
+  @override
+  String workspaceEnvEngineAlpine(String version) {
+    return 'Alpine $version (iSH)';
+  }
+
+  @override
+  String get workspaceEnvEngineNative => '系统终端';
+
+  @override
+  String get workspaceEnvPhaseNotInstalled => '未安装';
+
+  @override
+  String get workspaceEnvPhaseDownloading => '下载中';
+
+  @override
+  String get workspaceEnvPhaseVerifying => '校验中';
+
+  @override
+  String get workspaceEnvPhaseExtracting => '解压中';
+
+  @override
+  String get workspaceEnvPhasePatching => '配置中';
+
+  @override
+  String get workspaceEnvPhaseReady => '就绪';
+
+  @override
+  String get workspaceEnvPhaseError => '错误';
+
+  @override
+  String get workspaceEnvPhaseNeedsRestart => '需要重启';
+
+  @override
+  String workspaceEnvMetaLine(String version, String arch) {
+    return '$version · $arch';
+  }
+
+  @override
+  String workspaceEnvInstalledAt(String date) {
+    return '安装于 $date';
+  }
+
+  @override
+  String workspaceEnvDiskUsage(String size) {
+    return '占用空间 $size';
+  }
+
+  @override
+  String workspaceEnvRuntimeReason(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvInstall => '安装';
+
+  @override
+  String get workspaceEnvInstallSubtitleAndroid =>
+      '可选择 Ubuntu、Alpine、Debian，也可导入本地 rootfs 镜像。';
+
+  @override
+  String get workspaceEnvInstallSubtitleIos => '已内置，无需下载';
+
+  @override
+  String get workspaceEnvCancel => '取消';
+
+  @override
+  String get workspaceEnvRetry => '重试';
+
+  @override
+  String get workspaceEnvRepair => '修复';
+
+  @override
+  String get workspaceEnvReset => '重置';
+
+  @override
+  String get workspaceEnvResetConfirmTitle => '重置环境？';
+
+  @override
+  String get workspaceEnvResetConfirmBody => '这将删除已安装的软件包和沙箱文件系统。';
+
+  @override
+  String get workspaceEnvCheckForUpdate => '检查更新';
+
+  @override
+  String get workspaceEnvUpdate => '更新';
+
+  @override
+  String workspaceEnvAvailableVersion(String version) {
+    return '新版本 $version 可用';
+  }
+
+  @override
+  String get workspaceEnvUpToDate => '已是最新';
+
+  @override
+  String get workspaceEnvRestartBanner => '请重启 Kelivo 以完成安装';
+
+  @override
+  String get workspaceEnvDetectingMirrors => '正在检测最快镜像…';
+
+  @override
+  String workspaceEnvApplyingMirror(String category) {
+    return '正在应用 $category 镜像…';
+  }
+
+  @override
+  String get workspaceEnvMirrorsSection => '镜像';
+
+  @override
+  String get workspaceEnvUseMirror => '使用镜像';
+
+  @override
+  String get workspaceEnvDetect => '测速';
+
+  @override
+  String get workspaceEnvOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorsDisabled => '镜像设置在沙箱中执行，就绪后才能更改。';
+
+  @override
+  String workspaceEnvMirrorsDisabledReason(String reason) {
+    return '镜像设置在沙箱中执行，当前不可用：$reason';
+  }
+
+  @override
+  String get workspaceEnvMirrorDetectTitle => '镜像测速';
+
+  @override
+  String workspaceEnvMirrorLatency(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String workspaceEnvMirrorFailed(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvErrorUnsupportedAbi => '当前设备架构不受支持。';
+
+  @override
+  String get workspaceEnvErrorArchitectureMismatch =>
+      '已安装的沙盒架构与当前应用不匹配，请重新安装沙盒后使用。原沙盒文件已保留。';
+
+  @override
+  String get workspaceEnvErrorProotMissing => '缺少 PRoot 可执行文件。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDisk => '存储空间不足，无法安装沙箱。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDiskHint => '请为所选镜像释放更多存储空间后重试。';
+
+  @override
+  String get workspaceEnvErrorNetwork => '下载失败，请检查网络后重试。';
+
+  @override
+  String get workspaceEnvErrorChecksumMismatch => '下载文件已损坏，请重试。';
+
+  @override
+  String get workspaceEnvErrorExtractFailed => '无法解压沙箱镜像。';
+
+  @override
+  String get workspaceEnvErrorPatchFailed => '无法完成沙箱配置。';
+
+  @override
+  String get workspaceEnvErrorCancelled => '安装已取消。';
+
+  @override
+  String get workspaceEnvErrorGeneric => '安装沙箱时出错。';
+
+  @override
+  String get workspaceEnvChipInstall => '安装沙箱';
+
+  @override
+  String workspaceEnvChipInstalling(int percent) {
+    return '正在安装… $percent %';
+  }
+
+  @override
+  String get workspaceEnvChipInstallingIndeterminate => '正在安装…';
+
+  @override
+  String get workspaceEnvChipError => '沙箱错误';
+
+  @override
+  String get workspaceEnvChipRestart => '需要重启';
+
+  @override
+  String get workspaceEnvNativeExplanation =>
+      '在桌面端，Kelivo 使用系统终端，而不是 Linux 沙箱。';
+
+  @override
+  String workspaceEnvNativeShellPath(String path) {
+    return '终端：$path';
+  }
+
+  @override
+  String get workspaceEnvNativeShellApproval => '除非此会话允许全部工具，否则 shell 工具需要批准。';
+
+  @override
+  String workspaceEnvDownloadProgress(
+    String downloaded,
+    String total,
+    int percent,
+  ) {
+    return '$downloaded / $total MB ($percent%)';
+  }
+
+  @override
+  String get workspaceEnvMirrorsFailed => '无法检测镜像';
+
+  @override
+  String get workspaceEnvCategoryApt => 'APT';
+
+  @override
+  String get workspaceEnvCategoryApk => 'APK';
+
+  @override
+  String get workspaceEnvCategoryPip => 'pip';
+
+  @override
+  String get workspaceEnvCategoryNpm => 'npm';
+
+  @override
+  String get skillsTitle => '技能';
+
+  @override
+  String get skillsTab => '技能';
+
+  @override
+  String get skillsSearchHint => '搜索技能';
+
+  @override
+  String get skillsEmptyTitle => '还没有技能';
+
+  @override
+  String get skillsEmptyBody =>
+      '技能是包含 SKILL.md 的文件夹。可粘贴 Markdown、导入 .md/.zip，或从 GitHub 安装。';
+
+  @override
+  String get skillsEmptyFormat =>
+      '---\nname: my-skill\ndescription: 这个技能做什么\n---\n\n# 说明';
+
+  @override
+  String get skillsImport => '导入';
+
+  @override
+  String get skillsImportPaste => '粘贴 Markdown';
+
+  @override
+  String get skillsImportFile => '从文件';
+
+  @override
+  String get skillsImportGitHub => '从 GitHub';
+
+  @override
+  String get skillsImportPasteLabel => 'SKILL.md';
+
+  @override
+  String get skillsImportPasteHint => '粘贴带 YAML 前置元数据的 SKILL.md';
+
+  @override
+  String get skillsImportGitHubLabel => 'GitHub 链接';
+
+  @override
+  String get skillsImportGitHubHint =>
+      'github.com/owner/repo 或 github.com/owner/repo/tree/ref/path';
+
+  @override
+  String get skillsImportConfirm => '导入';
+
+  @override
+  String get skillsCancel => '取消';
+
+  @override
+  String get skillsSave => '保存';
+
+  @override
+  String skillsUsedCount(int count) {
+    return '已使用 $count 次';
+  }
+
+  @override
+  String get skillsEnabled => '启用';
+
+  @override
+  String get skillsBrowseFiles => '浏览文件';
+
+  @override
+  String get skillsEdit => '编辑';
+
+  @override
+  String get skillsExport => '导出';
+
+  @override
+  String get skillsDelete => '删除';
+
+  @override
+  String get skillsDeleteTitle => '删除此技能？';
+
+  @override
+  String skillsDeleteMessage(String name) {
+    return '删除 $name？此操作无法撤销。';
+  }
+
+  @override
+  String get skillsUseAll => '使用全部技能';
+
+  @override
+  String get skillsUseAllSubtitle => '此助手可以使用所有已启用的技能。';
+
+  @override
+  String get skillsDisabledHint => '请先在技能页启用此技能。';
+
+  @override
+  String get skillsOpenPage => '管理技能';
+
+  @override
+  String get skillsInheritAssistant => '跟随助手';
+
+  @override
+  String get skillsInheritAssistantSubtitle => '使用与此对话助手相同的技能。';
+
+  @override
+  String get skillsActiveLabel => '生效中';
+
+  @override
+  String get skillsSessionTitle => '此对话的技能';
+
+  @override
+  String get skillsEditTitle => '编辑技能';
+
+  @override
+  String get skillsDetailKindLabel => 'Skill';
+
+  @override
+  String get skillsNoEnabled => '没有已启用的技能';
+
+  @override
+  String get terminalTitle => '终端';
+
+  @override
+  String get terminalOpenInSystem => '在系统终端中打开';
+
+  @override
+  String get terminalHostDirectory => '主机目录';
+
+  @override
+  String get terminalBindWorkspaceFirst => '请先绑定工作区';
+
+  @override
+  String get terminalNotAvailable => '不可用';
+
+  @override
+  String get terminalRuntimeUnavailable => '终端环境尚未就绪';
+
+  @override
+  String get terminalRename => '重命名';
+
+  @override
+  String get terminalClose => '关闭';
+
+  @override
+  String get terminalClear => '清屏';
+
+  @override
+  String get terminalCloseSession => '关闭会话';
+
+  @override
+  String get terminalCopy => '复制';
+
+  @override
+  String get terminalPaste => '粘贴';
+
+  @override
+  String get terminalNewSession => '新建会话';
+
+  @override
+  String get terminalMore => '更多';
+
+  @override
+  String get terminalNameLabel => '名称';
+
+  @override
+  String get terminalCancel => '取消';
+
+  @override
+  String get terminalSave => '保存';
+
+  @override
+  String get workspaceDeskMenuWorkspace => '工作区';
+
+  @override
+  String get workspaceDeskMenuSkills => '技能';
+
+  @override
+  String get workspaceDeskBarTitle => '工作区';
+
+  @override
+  String get workspaceDeskBarNoWorkspace => '无工作区';
+
+  @override
+  String get workspaceDeskBarEmptyHint => '从工具栏绑定工作区后即可在此浏览文件';
+
+  @override
+  String get workspaceDeskBarToggle => '工作区文件';
+
+  @override
+  String get workspaceDeskOpenSystemTerminal => '在系统终端中打开';
+
+  @override
+  String get workspaceDeskReveal => '在文件管理器中显示';
+
+  @override
+  String get workspaceDeskBarClose => '关闭工作区栏';
+
+  @override
+  String get workspaceEntryBind => '绑定工作区';
+
+  @override
+  String get workspaceEntryUnbind => '解除绑定';
+
+  @override
+  String get workspaceEntryChange => '更换';
+
+  @override
+  String get workspaceEntrySetAssistantDefault => '设为助手默认工作区';
+
+  @override
+  String get workspaceEntryLocked => '已锁定';
+
+  @override
+  String get workspaceEntryChangeConfirmTitle => '更换工作区？';
+
+  @override
+  String get workspaceEntryUnbindConfirmTitle => '解除绑定？';
+
+  @override
+  String get workspaceEntryChangeConfirmBody =>
+      '此对话已使用过工作区工具，之前消息中的文件链接可能不再可用。';
+
+  @override
+  String get workspaceEntryCwd => '工作目录';
+
+  @override
+  String get workspaceEntryCwdHint => '相对于工作区根目录';
+
+  @override
+  String get workspaceEntryCwdInvalid => '路径无效或已超出工作区';
+
+  @override
+  String get workspaceEntryCwdMissing => '该目录不存在';
+
+  @override
+  String get workspaceEntryCwdCreate => '创建它';
+
+  @override
+  String get workspaceEntryFiles => '文件';
+
+  @override
+  String get workspaceEntryTerminal => '终端';
+
+  @override
+  String get workspaceEntryOpenSystemTerminal => '在系统终端中打开';
+
+  @override
+  String get workspaceEntryReveal => '在文件管理器中显示';
+
+  @override
+  String get workspaceEntrySessionSkills => '技能';
+
+  @override
+  String get workspaceEntryAllowAll => '本会话全部允许';
+
+  @override
+  String get workspaceEntryAllowAllSubtitle => '此对话中的 Shell 命令将不再需要批准。';
+
+  @override
+  String get workspaceEntryEnvironment => '环境';
+
+  @override
+  String get workspaceEntryManage => '管理工作区';
+
+  @override
+  String get workspaceEntryCreate => '新建工作区…';
+
+  @override
+  String get workspaceEntryDefaultWorkspace => '默认工作区';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新对话将绑定到该工作区。';
+
+  @override
+  String get workspaceEntryNone => '无';
+
+  @override
+  String get workspaceEntryStartConversationFirst => '请先开始对话';
+
+  @override
+  String get workspaceEntryTooltip => '工作区';
+
+  @override
+  String get workspaceEntryPickerTitle => '选择工作区';
+
+  @override
+  String get settingsPageWorkspace => '工作区与环境';
+
+  @override
+  String get settingsPageSkills => '技能';
+
+  @override
+  String get commonClose => '关闭';
+
+  @override
+  String get terminalCopyAllOutput => '复制全部输出';
+
+  @override
+  String get terminalFontDecrease => '字号 −';
+
+  @override
+  String get terminalFontIncrease => '字号 +';
+
+  @override
+  String get terminalCloseSessionConfirmMessage => '会话仍在运行。关闭将结束该进程。';
+
+  @override
+  String get terminalCopiedAll => '已复制全部输出';
+
+  @override
+  String get terminalConfirm => '确认';
+
+  @override
+  String terminalExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceMgmtNewWorkspace => '新建工作区';
+
+  @override
+  String get workspaceMgmtEmptyHint => '新建一个工作区来存放项目文件和工作目录。';
+
+  @override
+  String get workspaceMgmtKindManagedTitle => '托管工作区';
+
+  @override
+  String get workspaceMgmtKindManagedSubtitle => '应用内目录，沙盒可读写';
+
+  @override
+  String get workspaceMgmtKindLinkedTitle => '链接文件夹';
+
+  @override
+  String get workspaceMgmtKindLinkedSubtitle => '直接使用本机文件夹';
+
+  @override
+  String get workspaceMgmtImportFromFolder => '从文件夹导入';
+
+  @override
+  String get workspaceMgmtImportFromFolderSubtitle => '将文件夹复制到新的托管工作区';
+
+  @override
+  String get workspaceMgmtKindSection => '类型';
+
+  @override
+  String get workspaceMgmtCreate => '创建';
+
+  @override
+  String get workspaceMgmtShellApprovalSubtitle => '每次运行命令前询问';
+
+  @override
+  String get workspaceMgmtDefaultCwdRoot => '/';
+
+  @override
+  String get workspaceMgmtPickCwdTitle => '默认工作目录';
+
+  @override
+  String get workspaceMgmtFolderPickerUnavailable => '此设备不支持选择文件夹。';
+
+  @override
+  String get workspaceMgmtImportProgressTitle => '正在导入文件夹';
+
+  @override
+  String get workspaceMgmtImportProgressPhase => '正在复制文件…';
+
+  @override
+  String get workspaceMgmtImportFailed => '无法导入该文件夹。';
+
+  @override
+  String workspaceMgmtImportDone(String name) {
+    return '已导入 $name';
+  }
+
+  @override
+  String get workspaceMgmtLastUsedJustNow => '刚刚';
+
+  @override
+  String workspaceMgmtLastUsedMinutesAgo(int n) {
+    return '$n 分钟前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedHoursAgo(int n) {
+    return '$n 小时前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedDaysAgo(int n) {
+    return '$n 天前';
+  }
+
+  @override
+  String workspaceMgmtRowDetail(String kind, String when) {
+    return '$kind · 上次使用 $when';
+  }
+
+  @override
+  String workspaceMgmtRowDetailNever(String kind) {
+    return '$kind · 从未使用';
+  }
+
+  @override
+  String get workspacePreviewBack => '返回';
+
+  @override
+  String get workspacePreviewWrap => '自动换行';
+
+  @override
+  String get workspacePreviewFontDecrease => '减小字号';
+
+  @override
+  String get workspacePreviewFontIncrease => '增大字号';
+
+  @override
+  String get workspacePreviewCopy => '复制';
+
+  @override
+  String get workspacePreviewRetry => '重试';
+
+  @override
+  String get workspacePreviewLoadError => '无法加载此文件。';
+
+  @override
+  String get workspacePreviewRevealInFinder => '在 Finder 中显示';
+
+  @override
+  String get workspacePreviewOpenInSystemApp => '用系统应用打开';
+
+  @override
+  String get workspacePreviewOpenInBrowser => '在浏览器中打开';
+
+  @override
+  String get workspacePreviewTable => '表格';
+
+  @override
+  String get workspacePreviewPlainLanguage => '代码';
+
+  @override
+  String get workspacePreviewOpen => '打开';
+
+  @override
+  String get workspacePreviewRevealFailed => '无法在文件管理器中显示此文件。';
+
+  @override
+  String get workspacePreviewEmptyTable => '此表格为空。';
+
+  @override
+  String get workspaceFilesNew => '新建';
+
+  @override
+  String get workspaceFilesFoldersFirst => '文件夹优先';
+
+  @override
+  String get workspaceFilesSelectDirectory => '选择此目录';
+
+  @override
+  String get workspaceFilesEmptyHint => '用「新建」或「导入」添加文件';
+
+  @override
+  String get workspaceFilesEmptyAttachments => '还没有附件';
+
+  @override
+  String get workspaceFilesEmptyOutputs => '助手还没有产出文件';
+
+  @override
+  String get workspaceFilesMoveTo => '移动到…';
+
+  @override
+  String workspaceFilesItemCount(int count) {
+    return '$count 项';
+  }
+
+  @override
+  String get skillsImportTooltip => '导入技能';
+
+  @override
+  String get skillsImportPasteSubtitle => '粘贴带 frontmatter 的 SKILL.md';
+
+  @override
+  String get skillsImportFileSubtitle => '选择 .md 或 .zip 文件';
+
+  @override
+  String get skillsImportGitHubSubtitle => '从仓库导入 SKILL.md';
+
+  @override
+  String get skillsImportResolving => '正在解析仓库…';
+
+  @override
+  String get skillsImportDownloading => '正在下载…';
+
+  @override
+  String get skillsImportExtracting => '正在解压…';
+
+  @override
+  String get skillsImportInstalling => '正在安装…';
+
+  @override
+  String get skillsImportGitHubRepoLabel => '仓库地址';
+
+  @override
+  String get skillsImportGitHubUrlHint =>
+      'https://github.com/owner/repo 或 owner/repo[/path]';
+
+  @override
+  String get skillsImportGitHubHelp => '支持仓库根目录或子目录下的 SKILL.md';
+
+  @override
+  String get skillsEmptyHint => '技能是带 frontmatter 的 SKILL.md，导入后助手可按需调用';
+
+  @override
+  String get skillsMoreActions => '更多';
+
+  @override
+  String get skillsSearchClear => '清除';
+
+  @override
+  String get skillsSessionEmpty => '还没有已启用的技能，请先在技能库中启用';
+
+  @override
+  String get workspaceToolRunning => '运行中';
+
+  @override
+  String workspaceToolExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceToolAwaitingApproval => '等待批准';
+
+  @override
+  String get workspaceToolCompleted => '完成';
+
+  @override
+  String workspaceToolLines(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String workspaceToolItems(int count) {
+    return '$count 项';
+  }
+
+  @override
+  String workspaceToolFileMatches(int count) {
+    return '$count 个匹配';
+  }
+
+  @override
+  String workspaceToolContentMatches(int count) {
+    return '$count 处匹配';
+  }
+
+  @override
+  String get workspaceToolExpand => '展开';
+
+  @override
+  String get workspaceToolSectionCommand => '命令';
+
+  @override
+  String get workspaceToolSectionPath => '路径';
+
+  @override
+  String get workspaceToolSectionPattern => '模式';
+
+  @override
+  String get workspaceToolSectionOutput => '输出';
+
+  @override
+  String get workspaceToolSectionDiff => '差异';
+
+  @override
+  String get workspaceToolSectionError => '错误';
+
+  @override
+  String get workspaceToolSavedOutput => '已保存完整输出';
+
+  @override
+  String get workspaceToolApprove => '允许';
+
+  @override
+  String get workspaceToolDeny => '拒绝';
+
+  @override
+  String get workspaceToolCopy => '复制';
+
+  @override
+  String get workspaceEnvEngineLocalShell => '本机 Shell';
+
+  @override
+  String get workspaceEnvInstallEnvironment => '安装环境';
+
+  @override
+  String get workspaceEnvInstallDescription => '安装 Linux 环境，以便在沙盒中运行工具。';
+
+  @override
+  String get workspaceEnvStatusLabel => '状态';
+
+  @override
+  String get workspaceEnvStatusInstalled => '已安装';
+
+  @override
+  String get workspaceEnvSizeLabel => '大小';
+
+  @override
+  String get workspaceEnvPathLabel => '路径';
+
+  @override
+  String get workspaceEnvInstalledAtLabel => '安装于';
+
+  @override
+  String get workspaceEnvArchLabel => '架构';
+
+  @override
+  String workspaceEnvArchVersion(String arch, String version) {
+    return '$arch · $version';
+  }
+
+  @override
+  String get workspaceEnvBrowseSection => '浏览';
+
+  @override
+  String get workspaceEnvBrowseFiles => '浏览文件系统';
+
+  @override
+  String get workspaceEnvBrowseFilesDetail => '查看沙盒中的完整目录';
+
+  @override
+  String get workspaceEnvDetectFastMirrors => '检测快速镜像';
+
+  @override
+  String get workspaceEnvActionsSection => '操作';
+
+  @override
+  String get workspaceEnvInfoSection => '信息';
+
+  @override
+  String get workspaceEnvInfoBody =>
+      '环境是沙盒使用的 Linux 根文件系统。工作区单独存放，重置环境不会删除工作区文件。数据保存在本机已解压的 rootfs 中。';
+
+  @override
+  String get workspaceEnvRepairDetail => '重新校验并修补文件';
+
+  @override
+  String get workspaceEnvUpdateCurrent => '已是最新';
+
+  @override
+  String workspaceEnvUpdateAvailableShort(String version) {
+    return '可更新到 $version';
+  }
+
+  @override
+  String get workspaceEnvResetConfirmMessage =>
+      '这将删除整个 Linux 环境及其中安装的软件包。工作区文件不受影响。';
+
+  @override
+  String get workspaceEnvRestartDoneBanner => '重置已完成，请重启应用以完成安装。';
+
+  @override
+  String get workspaceEnvPathCopied => '已复制路径';
+
+  @override
+  String get workspaceEnvUseMirrorSubtitle => '将所选镜像写入沙盒';
+
+  @override
+  String get workspaceEnvRegionGlobal => '全球';
+
+  @override
+  String get workspaceEnvRegionChina => '中国';
+
+  @override
+  String get workspaceEnvRegionEurope => '欧洲';
+
+  @override
+  String get workspaceEnvRegionAsia => '亚洲';
+
+  @override
+  String get workspaceEnvMirrorTimeout => '超时';
+
+  @override
+  String get workspaceEnvSpeedTest => '测速';
+
+  @override
+  String get workspaceEnvApplySuccess => '镜像已应用';
+
+  @override
+  String get workspaceEnvApplyFailed => '无法应用镜像';
+
+  @override
+  String get workspaceEnvRestoreSuccess => '已恢复官方源';
+
+  @override
+  String get workspaceEnvMirrorsTested => '已应用最快镜像';
+
+  @override
+  String get workspaceEnvRelativeJustNow => '刚刚';
+
+  @override
+  String workspaceEnvRelativeMinutesAgo(int count) {
+    return '$count 分钟前';
+  }
+
+  @override
+  String workspaceEnvRelativeHoursAgo(int count) {
+    return '$count 小时前';
+  }
+
+  @override
+  String workspaceEnvRelativeDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String workspaceEnvDownloadLine(
+    String downloaded,
+    String total,
+    String phase,
+  ) {
+    return '$downloaded / $total · $phase';
+  }
+
+  @override
+  String get workspaceEnvNativeUnsandboxed =>
+      '命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。';
+
+  @override
+  String get workspaceEnvRootfsTitle => '/';
+
+  @override
+  String get workspaceEnvBrowserUnavailable => '沙盒文件系统不可用。';
+
+  @override
+  String get workspaceEnvMirrorNameOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialCdn => '官方 CDN';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialPypi => '官方 PyPI';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialNpm => '官方 npm';
+
+  @override
+  String get workspaceEnvMirrorNameTuna => '清华 TUNA';
+
+  @override
+  String get workspaceEnvMirrorNameAlibaba => '阿里云';
+
+  @override
+  String get workspaceEnvMirrorNameUstc => '中科大 USTC';
+
+  @override
+  String get workspaceEnvMirrorNameHuawei => '华为云';
+
+  @override
+  String get workspaceEnvMirrorNameTencent => '腾讯云';
+
+  @override
+  String get workspaceEnvMirrorNameNetease => '网易';
+
+  @override
+  String get workspaceEnvMirrorNameLeaseweb => 'LEASEWEB UK';
+
+  @override
+  String get workspaceEnvMirrorNameRwth => 'RWTH Germany';
+
+  @override
+  String get workspaceEnvMirrorNameJaist => 'JAIST Japan';
+
+  @override
+  String get workspaceEnvMirrorNameKakao => 'Kakao Korea';
+
+  @override
+  String get workspaceEnvMirrorNameNpmmirror => 'npmmirror';
+
+  @override
+  String workspaceEnvSelectionNamed(String name, String region) {
+    return '$name · $region';
+  }
+
+  @override
+  String get workspaceFilesEmptyPickerHint => '点「新建文件夹」添加子文件夹';
+
+  @override
+  String get skillsDetailBodyEmpty => '还没有技能正文';
+
+  @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '文件较大，暂不支持预览（$size）。';
+  }
+
+  @override
+  String get workspaceEnvSizeTimeout => '计算超时';
+
+  @override
+  String get workspaceEnvInfoCopied => '已复制环境信息';
+
+  @override
+  String get workspacePreviewEmptyFile => '文件为空';
+
+  @override
+  String get workspacePreviewEmptyHint => '此文件没有任何可预览的内容。';
+
+  @override
+  String get workspacePreviewRevealInExplorer => '在文件资源管理器中显示';
+
+  @override
+  String get workspacePreviewRevealInFileManager => '在文件管理器中显示';
+
+  @override
+  String workspaceBindingSetAssistantDefault(String assistant) {
+    return '已设为「$assistant」的默认工作区';
+  }
+
+  @override
+  String get storageSpaceCategoryWorkspaceFiles => '工作区文件';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFilesHint => '托管工作区中保存的文件。';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironment => '沙箱环境';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironmentHint => '沙箱安装目录与根文件系统。';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategorySkillsHint => '已安装的技能文件。';
+
+  @override
+  String get storageSpaceCategorySessionFiles => '会话文件';
+
+  @override
+  String get storageSpaceCategorySessionFilesHint => '各对话的附件与输出。';
+
+  @override
+  String get storageSpaceManageSkills => '管理技能';
+
+  @override
+  String get storageSessionFilesCleanOrphans => '清理无对话的会话文件';
+
+  @override
+  String storageSessionFilesCleanOrphansHint(String size) {
+    return '删除已无对应对话的会话目录。可回收 $size。';
+  }
+
+  @override
+  String get workspaceDesktopFolderPath => '文件夹路径';
+
+  @override
+  String get workspaceDesktopFolderMissing => '请选择已存在的文件夹，或输入它的绝对路径。';
+
+  @override
+  String get workspaceDesktopManagedHint => '由 Kelivo 为此项目创建并管理文件夹。';
+
+  @override
+  String get workspaceDesktopHostHint => '在本机访问文件和执行命令。';
+
+  @override
+  String get workspaceDesktopSearch => '搜索工作区';
+
+  @override
+  String get workspaceDesktopNoResults => '没有匹配的工作区';
+
+  @override
+  String get workspaceEnvDependencies => '环境预设';
+
+  @override
+  String get workspaceEnvDependenciesDetail => '安装到共享沙盒，所有工作区均可使用。';
+
+  @override
+  String get workspaceEnvDependencyPython => 'Python、pip 和虚拟环境';
+
+  @override
+  String get workspaceEnvDependencyNode => 'Node.js 和 npm';
+
+  @override
+  String get workspaceEnvDependencyGit => '克隆仓库与版本管理';
+
+  @override
+  String get workspaceEnvDependencySsh => 'SSH、SCP、SFTP 与密钥生成';
+
+  @override
+  String get workspaceEnvDependencyNetwork => '网络工具';
+
+  @override
+  String get workspaceEnvDependencyArchive => '压缩工具';
+
+  @override
+  String get workspaceEnvDependencyInstalled => '已安装';
+
+  @override
+  String get workspaceEnvDependencyUnknown => '未检测';
+
+  @override
+  String get workspaceEnvDependencyChecking => '正在检测工具…';
+
+  @override
+  String get workspaceEnvDependencyInstalling => '正在安装…';
+
+  @override
+  String get workspaceEnvDependencyCheckFailed => '未能检测工具，请刷新重试。';
+
+  @override
+  String get workspaceEnvDependencyInstallFailed => '安装未完成，请查看日志或更换软件包源后重试。';
+
+  @override
+  String get workspaceEnvDependencyLog => '安装日志';
+
+  @override
+  String get workspaceEnvDependencyRefresh => '刷新工具状态';
+
+  @override
+  String get workspaceEnvDependencyReadyFirst => '请先安装沙盒环境，再安装这些工具。';
+
+  @override
+  String get workspaceEnvDependencySources => '软件包源';
+
+  @override
+  String get workspaceEnvDependencySourcesDetail =>
+      '预设使用所选 apt/apk 源安装；pip 和 npm 源用于后续安装的软件包。';
+
+  @override
+  String get workspaceEnvDownloadSource => '沙盒下载源';
+
+  @override
+  String get workspaceEnvDownloadAutomatic => '自动选择最快源';
+
+  @override
+  String get workspaceEnvDownloadAutomaticDetail => '下载前检测官方源和内置镜像的速度。';
+
+  @override
+  String get workspaceEnvDownloadCustom => '自定义链接';
+
+  @override
+  String get workspaceEnvDownloadCustomHint =>
+      'https://example.com/ubuntu-base/releases/24.04/release/';
+
+  @override
+  String get workspaceEnvDownloadCustomDetail =>
+      '填写镜像目录或完整下载链接，镜像需匹配所选系统、版本及设备架构。';
+
+  @override
+  String get workspaceEnvDownloadInvalidUrl => '请输入有效的 HTTP 或 HTTPS 链接。';
+
+  @override
+  String get workspaceEnvDownloadVerified => '下载后会校验所选镜像的官方 SHA-256。软件包源可单独配置。';
+
+  @override
+  String get workspaceEnvDownloadStart => '下载并安装';
+
+  @override
+  String get workspaceEnvDownloadSave => '保存下载源';
+
+  @override
+  String get workspaceToolsTitle => '工具';
+
+  @override
+  String get workspaceToolsDescription => '选择此工作区的对话可以使用哪些工具，修改后自动保存。';
+
+  @override
+  String get workspaceToolHelpShell => '在工作区环境中执行命令。';
+
+  @override
+  String get workspaceToolHelpRead => '按行读取文件内容，支持分页。';
+
+  @override
+  String get workspaceToolHelpWrite => '创建文件或覆盖文件内容。';
+
+  @override
+  String get workspaceToolHelpEdit => '替换已有文件中的指定文本。';
+
+  @override
+  String get workspaceToolHelpList => '浏览目录及其中的文件。';
+
+  @override
+  String get workspaceToolHelpGlob => '按文件名或路径模式查找文件。';
+
+  @override
+  String get workspaceToolHelpGrep => '搜索文件中的文本内容。';
+
+  @override
+  String get workspaceEnvVariablesTitle => '环境变量';
+
+  @override
+  String get workspaceEnvVariablesEntryDetail => '管理命令使用的变量与输出隐私';
+
+  @override
+  String get workspaceEnvVariablesEmpty => '还没有环境变量。可以添加工具需要的 API 密钥等配置。';
+
+  @override
+  String get workspaceEnvVariablesScope =>
+      '所有工作区共用。修改会用于新的 Agent 命令和应用内终端会话，已有终端需重新打开。外部系统终端使用其自身的环境变量。';
+
+  @override
+  String get workspaceEnvPrivacyMode => '隐私模式';
+
+  @override
+  String get workspaceEnvPrivacyDetail =>
+      '命令仍能使用真实值。工作区工具输出发给模型前，匹配到的至少 5 个字符的变量值会替换为 [REDACTED]，本地日志保留原文。较短的值不做遮蔽，以免误替换常见开关和数字。';
+
+  @override
+  String get workspaceEnvVariableAdd => '添加变量';
+
+  @override
+  String get workspaceEnvVariableEdit => '编辑变量';
+
+  @override
+  String get workspaceEnvVariableName => '名称';
+
+  @override
+  String get workspaceEnvVariableValue => '值';
+
+  @override
+  String get workspaceEnvVariableNote => '备注（可选）';
+
+  @override
+  String get workspaceEnvVariableNameHint =>
+      '名称使用字母、数字和下划线，不能以数字开头，区分大小写。命令中可通过 \$NAME 使用变量。';
+
+  @override
+  String get workspaceEnvVariableInvalidName => '请输入有效的变量名称。';
+
+  @override
+  String get workspaceEnvVariableInvalidValue => '值不能为空，也不能包含空字符（NUL）。';
+
+  @override
+  String get workspaceEnvVariableDuplicate => '已存在同名变量。';
+
+  @override
+  String get workspaceEnvVariablesSaveFailed => '环境设置保存失败，请重试。';
+
+  @override
+  String get incomingShareTitle => '接收分享';
+
+  @override
+  String get incomingShareReplaceDraft => '输入框中有尚未发送的内容。是否替换为分享的内容，并开始新对话？';
+
+  @override
+  String get incomingShareFailed =>
+      '部分分享内容未能导入，请检查文件访问权限和可用存储空间。一次最多分享 32 个文件。';
+
+  @override
+  String get incomingShareImporting => '正在导入';
+
+  @override
+  String get incomingShareMoveTo => '移动到…';
+
+  @override
+  String get incomingShareNewChat => '新对话';
+
+  @override
+  String get incomingShareMoveHint => '将草稿和附件移到其他对话，内容不会自动发送。';
+
+  @override
+  String get incomingShareNoConversations => '没有匹配的对话';
+
+  @override
+  String get chatInputBarRemoveAttachment => '移除附件';
+
+  @override
+  String get incomingShareMoveFailed => '无法切换对话，草稿已保留。';
+
+  @override
+  String attachmentRequiresWorkspace(String name) {
+    return '「$name」无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。';
+  }
+
+  @override
+  String get storageSessionFilesUnlinked => '未关联的会话';
+
+  @override
+  String get workspaceExternalMount => '挂载外部文件夹';
+
+  @override
+  String get workspaceExternalMountSubtitle =>
+      '所选文件夹挂载到 /mounts/<name>，供各工作区的 AI 工具、Shell 和文件浏览器访问。最多挂载 10 个文件夹。';
+
+  @override
+  String get workspaceExternalStorageTitle => '允许访问文件';
+
+  @override
+  String get workspaceExternalStorageMessage =>
+      '工作区和 Shell 需要直接读写外部文件夹，请在 Android 系统设置中允许 Kelivo 访问文件。Android 11 及以上需开启“所有文件访问权限”，然后选择要挂载的本地文件夹。';
+
+  @override
+  String get workspaceExternalGrantAccess => '前往授权';
+
+  @override
+  String get workspaceExternalLocalOnly =>
+      'Android 仅支持挂载本地文件夹，此文件提供方没有可供 Shell 访问的本地目录。';
+
+  @override
+  String get workspaceExternalUnavailable =>
+      '外部文件夹不可用。请检查存储连接和访问权限，重新选择文件夹以恢复访问。';
+
+  @override
+  String get workspaceExternalReconnect => '重新选择文件夹';
+
+  @override
+  String get workspaceMountAdd => '添加文件夹';
+
+  @override
+  String get workspaceMountEdit => '编辑挂载';
+
+  @override
+  String get workspaceMountEmpty => '尚未挂载文件夹';
+
+  @override
+  String get workspaceMountReadOnly => '只读';
+
+  @override
+  String get workspaceMountReadWrite => '读写';
+
+  @override
+  String get workspaceMountAllowWrite => '允许写入';
+
+  @override
+  String get workspaceMountPermissionsHint =>
+      '关闭后，AI 文件工具和文件浏览器会拒绝修改此文件夹。Shell 会检查部分常用文件命令，但任意脚本不保证受限。保存挂载变更时会停止正在运行的命令和终端会话。';
+
+  @override
+  String get workspaceMountBrowse => '浏览文件';
+
+  @override
+  String get workspaceMountUnmount => '卸载';
+
+  @override
+  String get workspaceMountUnmountMessage => '卸载此挂载？原文件夹及其中的文件会保留。';
+
+  @override
+  String get workspaceMountInactive => '不可用，请重新选择文件夹';
+
+  @override
+  String get workspaceMountInvalidName =>
+      '名称最多 64 个字符，不能包含斜杠、冒号或控制字符，也不能为 . 或 ..。';
+
+  @override
+  String get workspaceMountDuplicate => '已存在同名挂载。';
+
+  @override
+  String get workspaceMountLimit => '最多挂载 10 个文件夹，请先卸载一个挂载。';
+
+  @override
+  String get workspaceMountOverlap => '此文件夹与已有挂载相同或互相包含。请选择其他文件夹，以避免权限冲突。';
+
+  @override
+  String get workspaceMountTargetOccupied =>
+      '/mounts 下的同名位置已有本地文件。请更换挂载名称，或先移走这些文件。原有文件未被删除。';
+
+  @override
+  String get workspaceEnvSystemImage => '系统镜像';
+
+  @override
+  String get workspaceEnvDistribution => '发行版';
+
+  @override
+  String get workspaceEnvSystemVersion => '版本';
+
+  @override
+  String get workspaceEnvLocalImage => '本地镜像';
+
+  @override
+  String get workspaceEnvChooseImage => '选择 rootfs 镜像文件';
+
+  @override
+  String get workspaceEnvLocalImageHint =>
+      '支持根文件系统压缩包（.tar.gz、.tar.xz、.tar），不支持 ISO 或磁盘镜像。镜像需匹配设备 CPU 架构并包含 /bin/sh，解压后自动识别系统和版本。';
+
+  @override
+  String get workspaceEnvImportImage => '导入镜像';
+
+  @override
+  String get workspaceEnvInvalidImage =>
+      '请选择适用于此设备的 rootfs 镜像，需包含可执行的 /bin/sh，且 CPU 架构匹配。';
+
+  @override
+  String get workspaceEnvReplaceSystem => '更换系统';
+
+  @override
+  String get workspaceEnvReplaceSystemHint =>
+      '更换会替换当前环境内的软件包和文件，并停止运行中的命令与终端会话。工作区、聊天文件和外部文件夹会保留。新镜像准备失败时保留原有环境。';
+
+  @override
+  String get workspaceEnvProotOptions => 'PRoot 配置';
+
+  @override
+  String get workspaceEnvShellPath => 'Shell 路径';
+
+  @override
+  String get workspaceEnvShellAutomatic => '自动选择';
+
+  @override
+  String get workspaceEnvShellHint =>
+      '留空时优先使用 /bin/bash，否则使用 /bin/sh。自定义 Shell 需填写环境内的绝对路径。';
+
+  @override
+  String get workspaceEnvProotArguments => '额外 PRoot 参数';
+
+  @override
+  String get workspaceEnvProotArgumentsHint =>
+      '每行填写一个参数，无需 Shell 引号。例如将 -k 和 5.10.0 分别放在两行，或使用 --kernel-release=5.10.0。配置对之后启动的命令和终端会话生效。';
+
+  @override
+  String get workspaceEnvProotInvalid => '请填写有效的 Shell 绝对路径，并将 PRoot 参数逐行填写。';
+
+  @override
+  String get workspaceFileMissing => '文件已不存在';
+
+  @override
+  String get workspaceFilePreviewUnavailable => '无法预览';
+
+  @override
+  String get workspaceToolRelatedFiles => '相关文件';
+
+  @override
+  String get workspaceToolFilesTruncated => '仅列出部分文件。';
+
+  @override
+  String get displaySettingsPageShowProducedFilesTitle => '显示回复底部文件卡片';
+
+  @override
+  String get displaySettingsPageShowProducedFilesSubtitle =>
+      '在回复底部显示工具创建或修改的文件。';
+
+  @override
+  String get reasoningBudgetSliderLow => 'Low';
+
+  @override
+  String get reasoningBudgetSliderMedium => 'Medium';
+
+  @override
+  String get reasoningBudgetSliderHigh => 'High';
+
+  @override
+  String get reasoningBudgetSliderXhigh => 'XHigh';
+
+  @override
+  String get reasoningBudgetSliderMax => 'Max';
+
+  @override
+  String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '开启后，在对话中切换模型只影响当前对话；关闭后会直接修改当前助手的模型，使用该助手的所有对话都会跟随。';
+
+  @override
+  String get googleFontsTitle => 'Google Fonts';
+
+  @override
+  String get googleFontsRefresh => '刷新字体列表';
+
+  @override
+  String get googleFontsSearchHint => '搜索字体或语言';
+
+  @override
+  String get googleFontsHint =>
+      '下载常规字重字体后预览并应用，已安装字体可离线使用。目录来自 Expo Google Fonts，字体从 Google Fonts 下载。';
+
+  @override
+  String get googleFontsNoResults => '没有匹配的字体';
+
+  @override
+  String get googleFontsFailed => '无法加载、下载或应用字体，请检查网络后重试。';
+
+  @override
+  String get googleFontsDownloading => '正在下载字体…';
+
+  @override
+  String get googleFontsPreview => '字体预览：你好，世界！Hello world 0123456789';
+
+  @override
+  String get googleFontsLicense => '字体许可证';
+
+  @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      '定位权限已被禁止。请在系统设置中允许定位访问，然后重新开启此工具。';
+
+  @override
+  String get healthDataSettingsCategoryReproductive => '生殖健康';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowTitle => '经期记录';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowSubtitle =>
+      '最近 90 天记录的经量与周期开始日期';
+
+  @override
+  String get assistantEditGradientBackgroundTitle => '渐变背景';
+
+  @override
+  String get assistantEditGradientStaticTitle => '静态模式';
+
+  @override
+  String get assistantEditGradientStaticDescription => '更省电，适合长对话和持续输出。';
+
+  @override
+  String get assistantEditGradientHorizontal => '水平位置';
+
+  @override
+  String get assistantEditGradientVertical => '垂直位置';
+
+  @override
+  String get assistantEditGradientPreview => '预览';
+
+  @override
+  String get assistantEditGradientNextFrame => '换一帧';
+
+  @override
+  String get backgroundSettingsTitle => '后台任务';
+
+  @override
+  String get backgroundTaskTitle => 'Kelivo 任务';
+
+  @override
+  String get backgroundCompleted => '生成完成';
+
+  @override
+  String get backgroundFailed => '生成失败，请打开会话查看详情。';
+
+  @override
+  String get backgroundCancelled => '生成已取消';
+
+  @override
+  String get backgroundInterrupted => '后台生成已中断，请打开会话继续。';
+
+  @override
+  String get backgroundRequesting => '正在请求';
+
+  @override
+  String get backgroundGenerating => '正在生成回复';
+
+  @override
+  String get backgroundThinking => '正在思考';
+
+  @override
+  String get backgroundToolRunning => '正在执行工具';
+
+  @override
+  String get backgroundRetrying => '等待重试';
+
+  @override
+  String get backgroundWorking => '正在处理';
+
+  @override
+  String get backgroundTasks => '任务';
+
+  @override
+  String get backgroundStopTasks => '停止任务';
+
+  @override
+  String get backgroundOpenChat => '打开会话';
+
+  @override
+  String get backgroundAndroidEnabled => '后台生成';
+
+  @override
+  String get backgroundAndroidEnabledDetail =>
+      '在锁屏、切到后台或划掉最近任务后继续当前生成。任务运行期间会显示系统常驻通知。';
+
+  @override
+  String get backgroundIosEnabled => '增强后台运行';
+
+  @override
+  String get backgroundIosEnabledDetail => '为当前任务申请后台执行时间。可另外开启定位或静音音频辅助保活。';
+
+  @override
+  String get backgroundNotifications => '任务通知';
+
+  @override
+  String get backgroundNotificationsDetail =>
+      '在当前查看的会话之外完成或失败时通知。此开关不控制 Android 必需的常驻通知。';
+
+  @override
+  String get backgroundPrivacy => '任务状态隐私';
+
+  @override
+  String get backgroundPrivacyDetail => '在通知和实时状态中隐藏会话标题及工具详情，仅显示通用状态、任务数量和耗时。';
+
+  @override
+  String get backgroundLiveActivities => '实时活动';
+
+  @override
+  String get backgroundLiveActivitiesDetail => '在锁屏和灵动岛显示当前任务，是否可用及展示位置由系统决定。';
+
+  @override
+  String get backgroundOverlay => '任务悬浮窗';
+
+  @override
+  String get backgroundOverlayDetail => '在其他应用上显示可拖动的任务悬浮窗。点击进入会话；关闭按钮仅隐藏悬浮窗。';
+
+  @override
+  String get backgroundLiveUpdates => '实时通知 / 灵动岛';
+
+  @override
+  String get backgroundLiveUpdatesDetail =>
+      '在支持的设备上使用 Android 16 实时通知。系统成功展示实时通知时优先于悬浮窗。';
+
+  @override
+  String get backgroundLocation => '定位辅助保活';
+
+  @override
+  String get backgroundLocationDetail =>
+      '在后台任务期间使用低精度定位辅助运行，不保存坐标或发送给 AI 服务。需要开启增强后台运行并授权定位。';
+
+  @override
+  String get backgroundSilentAudio => '静音音频保活';
+
+  @override
+  String get backgroundSilentAudioDetail =>
+      '后台任务运行时播放静音音频，并让位于录音和朗读。需要开启增强后台运行，无需麦克风权限。';
+
+  @override
+  String get backgroundSpeech => '后台朗读';
+
+  @override
+  String get backgroundSpeechDetail => '锁屏或切到后台时继续系统及网络朗读。关闭时，切到后台会暂停朗读。';
+
+  @override
+  String get backgroundFinishVisibility => '完成状态保留时间';
+
+  @override
+  String get backgroundFinishImmediately => '立即收起';
+
+  @override
+  String get backgroundFinishOneMinute => '1 分钟';
+
+  @override
+  String get backgroundFinishFiveMinutes => '5 分钟';
+
+  @override
+  String get backgroundFinishUntilForeground => '回到应用时收起';
+
+  @override
+  String get backgroundFinishVisibilityDetail =>
+      '用于 Android 悬浮窗和 iOS 锁屏完成卡片。回到应用时清理完成状态，最长保留 15 分钟；取消任务立即收起。';
+
+  @override
+  String get backgroundOverlayIcon => '悬浮窗图标';
+
+  @override
+  String get backgroundIconDefault => 'Kelivo 图标';
+
+  @override
+  String get backgroundIconImage => '选择图片';
+
+  @override
+  String get backgroundIconEmoji => '选择 Emoji';
+
+  @override
+  String get backgroundPermissionsTitle => '权限与系统设置';
+
+  @override
+  String get backgroundNotificationsPermission => '通知权限';
+
+  @override
+  String get backgroundBatteryOptimization => '电池优化';
+
+  @override
+  String get backgroundBatteryOptimizationDetail => '允许不受限制地使用电池可改善后台运行。';
+
+  @override
+  String get backgroundAutostart => '自启动与后台运行';
+
+  @override
+  String get backgroundAutostartDetail =>
+      '请手动检查设备的自启动和后台限制。Android 无法可靠查询这些厂商设置的授权状态。';
+
+  @override
+  String get backgroundLocationPermission => '定位权限';
+
+  @override
+  String get backgroundLocationAlways => '允许持续后台定位';
+
+  @override
+  String get backgroundLocationAlwaysDetail => '可进一步授予“始终允许”定位权限，仅在点击此入口时申请。';
+
+  @override
+  String get backgroundSystemSettings => '应用系统设置';
+
+  @override
+  String get backgroundPermissionGranted => '已允许';
+
+  @override
+  String get backgroundPermissionDenied => '未允许';
+
+  @override
+  String get backgroundPermissionLimited => '使用应用期间';
+
+  @override
+  String get backgroundPermissionUnknown => '需手动检查';
+
+  @override
+  String get backgroundPermissionNotDetermined => '尚未申请';
+
+  @override
+  String get backgroundRuntimeTitle => '当前状态';
+
+  @override
+  String get backgroundRuntimeActive => '正在运行';
+
+  @override
+  String get backgroundRuntimeIdle => '未运行';
+
+  @override
+  String get backgroundLocationActive => '后台定位';
+
+  @override
+  String get backgroundAudioActive => '静音音频';
+
+  @override
+  String get backgroundActivityActive => '实时活动';
+
+  @override
+  String get backgroundOverlayActive => '悬浮窗';
+
+  @override
+  String get backgroundLastError => '最近中断或错误';
+
+  @override
+  String get backgroundNoError => '暂无记录';
+
+  @override
+  String get backgroundUnsupported => '当前设备不支持或系统设置未允许';
+
+  @override
+  String get backgroundIosLimit =>
+      '后台执行由 iOS 控制，实时活动本身不能保活。强退可能停止生成，实时状态可能要等再次打开应用后才能清理。';
+
+  @override
+  String get backgroundAndroidLimit =>
+      '如任务中断，请检查通知、电池及厂商后台设置。系统强行停止或终止进程仍可能中断生成。';
+
+  @override
+  String get backgroundStale => '状态暂未更新，请打开应用查看。';
+
+  @override
+  String get backgroundIconError => '无法导入此图片，请选择其他图片。';
+
+  @override
+  String get backgroundNotificationChannels => '通知渠道';
+
+  @override
+  String get backgroundCompletionChannel => '任务完成通知渠道';
+
+  @override
+  String get backgroundOngoingChannel => '任务运行通知渠道';
+
+  @override
+  String get backgroundOverlayAppearance => '悬浮窗外观';
+
+  @override
+  String get backgroundOverlayAppearanceDetail => '调整尺寸、图标、进度环和显示内容';
+
+  @override
+  String get backgroundOverlayPreviewHint => '拖动可移动 · 点击进入会话 · 长按可收起';
+
+  @override
+  String get backgroundOverlayCard => '信息卡片';
+
+  @override
+  String get backgroundOverlayCircle => '圆形图标';
+
+  @override
+  String get backgroundOverlaySize => '尺寸与形状';
+
+  @override
+  String get backgroundOverlayWidth => '宽度';
+
+  @override
+  String get backgroundOverlayHeight => '高度';
+
+  @override
+  String get backgroundOverlayCornerRadius => '圆角';
+
+  @override
+  String get backgroundOverlayIconSize => '图标大小';
+
+  @override
+  String get backgroundOverlayProgressSize => '进度环直径';
+
+  @override
+  String get backgroundOverlayProgressStroke => '进度环粗细';
+
+  @override
+  String get backgroundOverlayContent => '显示内容';
+
+  @override
+  String get backgroundOverlayShowProgress => '显示进度环';
+
+  @override
+  String get backgroundOverlayShowTitle => '显示标题';
+
+  @override
+  String get backgroundOverlayShowSubtitle => '显示副标题';
+
+  @override
+  String get backgroundOverlayShowTime => '显示耗时';
+
+  @override
+  String get backgroundOverlayShowClose => '显示关闭按钮';
+
+  @override
+  String get backgroundOverlayShowBackground => '显示背景';
+
+  @override
+  String get backgroundOverlayShowBorder => '显示边框';
+
+  @override
+  String get backgroundOverlayReset => '恢复默认样式';
+
+  @override
+  String get mcpStdioEnvironmentRequired => '请先安装工作区运行环境，再使用移动端 STDIO。';
+
+  @override
+  String get mcpArgumentsHint => '用空格分隔参数，包含空格的内容用引号包裹；空参数写成 \'\'。';
+
+  @override
+  String get mcpArgumentsInvalid => '请检查参数中的引号是否闭合、末尾是否有未完成的转义。';
+
+  @override
+  String get mcpImportEnvironment => '从环境导入';
+
+  @override
+  String get mcpEnvironmentEmpty => '还没有环境变量，请先在环境设置中添加。';
+
+  @override
+  String get mcpEnvironmentHint => '默认继承运行环境的变量，导入后可为此服务器单独修改。';
+
+  @override
+  String get mcpImportJson => '导入 JSON';
+
+  @override
+  String get mcpImportJsonHint =>
+      '粘贴 Claude Desktop 或 Cursor 的 MCP 配置，预览后添加服务器，不覆盖现有配置。';
+
+  @override
+  String get mcpImportPaste => '从剪贴板粘贴';
+
+  @override
+  String get mcpImportPreview => '预览';
+
+  @override
+  String get mcpImportConfirm => '导入';
+
+  @override
+  String get startupRecoverySnapshotTitle => '从数据库快照恢复';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      '即使数据库无法打开，也可以选择本机快照恢复聊天和设置。请勿卸载 Kelivo，卸载会一并删除这些快照。';
+
+  @override
+  String get startupRecoverySnapshotEmpty => '未在本机找到数据库快照。请先导出数据，再尝试其他恢复操作。';
+
+  @override
+  String get startupRecoverySnapshotButton => '选择快照恢复';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return '将聊天和设置恢复到 $when 的快照？快照之后的更改不会包含在内。现有附件文件和快照会保留，Kelivo 将重启以完成恢复。';
+  }
+
+  @override
+  String startupRecoverySnapshotFailed(String reason) {
+    return '无法准备快照恢复：$reason';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady => '快照已准备好，请重启 Kelivo 完成恢复。';
+
+  @override
+  String get scheduledTasksTitle => '定时任务';
+
+  @override
+  String get scheduledTasksDescription => '在指定时间自动执行任务，支持新建聊天、继续追问或重新运行。';
+
+  @override
+  String get scheduledTasksEmpty => '把任务交给时间';
+
+  @override
+  String get scheduledTasksEmptyDetail => '晨间简报、每日复盘，或任何希望定期完成的事。';
+
+  @override
+  String get scheduledTasksAdd => '添加任务';
+
+  @override
+  String get scheduledTasksEdit => '编辑任务';
+
+  @override
+  String get scheduledTasksName => '任务名称';
+
+  @override
+  String get scheduledTasksNameHint => '晨间简报';
+
+  @override
+  String get scheduledTasksPrompt => '任务内容';
+
+  @override
+  String get scheduledTasksPromptHint => '希望助手为你完成什么？';
+
+  @override
+  String get scheduledTasksAssistant => '执行助手';
+
+  @override
+  String get scheduledTasksChooseAssistant => '选择助手';
+
+  @override
+  String get scheduledTasksAssistantMissing => '助手已不存在';
+
+  @override
+  String get scheduledTasksTime => '执行时间';
+
+  @override
+  String get scheduledTasksTimeHint => '24 小时制，例如 08:00';
+
+  @override
+  String get scheduledTasksRepeat => '重复';
+
+  @override
+  String get scheduledTasksEveryDay => '每天';
+
+  @override
+  String get scheduledTasksWeekdays => '工作日';
+
+  @override
+  String get scheduledTasksEnabled => '启用任务';
+
+  @override
+  String get scheduledTasksPermission => '闹钟和提醒';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      '允许设置闹钟，才能按指定时间执行。未授权时，已启用的任务会等待授权。';
+
+  @override
+  String get scheduledTasksPermissionAction => '去授权';
+
+  @override
+  String get scheduledTasksReliability =>
+      '建议在电池设置中允许 Kelivo 后台运行。强行停止后需重新打开应用。错过的任务不会补跑，执行时间跟随设备时区。';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      '结果保存在对话中，完成后会发送回复预览通知，点击可打开对话。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
+
+  @override
+  String get scheduledTasksRunNow => '立即运行';
+
+  @override
+  String get scheduledTasksHistory => '执行记录';
+
+  @override
+  String get scheduledTasksNoRuns => '尚无执行记录';
+
+  @override
+  String get scheduledTasksRunning => '正在运行';
+
+  @override
+  String get scheduledTasksCompleted => '已完成';
+
+  @override
+  String get scheduledTasksFailed => '执行失败';
+
+  @override
+  String get scheduledTasksInterrupted => '已中断';
+
+  @override
+  String get scheduledTasksPaused => '已暂停';
+
+  @override
+  String get scheduledTasksWaitingPermission => '等待授权';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return '下次：$time';
+  }
+
+  @override
+  String get scheduledTasksDelete => '删除任务';
+
+  @override
+  String get scheduledTasksDeleteDetail => '删除此任务及执行记录？已经生成的对话会保留。';
+
+  @override
+  String get scheduledTasksSave => '保存';
+
+  @override
+  String get scheduledTasksCancel => '取消';
+
+  @override
+  String get scheduledTasksInvalid => '请填写名称、任务内容和助手，自定义重复需至少选择一天。';
+
+  @override
+  String get scheduledTasksLoading => '正在加载…';
+
+  @override
+  String get scheduledTasksOpenChat => '查看对话';
+
+  @override
+  String get scheduledTasksNeedsInput => '任务需要用户回答或工具确认，已停止。可打开对话继续。';
+
+  @override
+  String get scheduledTasksTimeout => '已达到执行时限。';
+
+  @override
+  String get scheduledTasksProcessTerminated => '上次执行被系统终止。';
+
+  @override
+  String get scheduledTasksOnce => '仅一次';
+
+  @override
+  String get scheduledTasksCustom => '自定义';
+
+  @override
+  String get scheduledTasksExecution => '执行任务';
+
+  @override
+  String get scheduledTasksMode => '执行方式';
+
+  @override
+  String get scheduledTasksNewChat => '新建聊天';
+
+  @override
+  String get scheduledTasksFollowUp => '继续追问';
+
+  @override
+  String get scheduledTasksRegenerate => '重新运行';
+
+  @override
+  String get scheduledTasksChat => '目标聊天';
+
+  @override
+  String get scheduledTasksChooseChat => '选择聊天';
+
+  @override
+  String get scheduledTasksMessage => '重新运行的问题';
+
+  @override
+  String get scheduledTasksChooseMessage => '选择问题';
+
+  @override
+  String get scheduledTasksAttachmentMessage => '含附件的消息';
+
+  @override
+  String get scheduledTasksModel => '模型';
+
+  @override
+  String get scheduledTasksChooseModel => '选择模型';
+
+  @override
+  String get scheduledTasksModelDefault => '跟随聊天或助手的模型';
+
+  @override
+  String get scheduledTasksSchedule => '执行时间';
+
+  @override
+  String get scheduledTasksActiveWindow => '活动时段';
+
+  @override
+  String get scheduledTasksStartDate => '开始日期';
+
+  @override
+  String get scheduledTasksEndDate => '结束日期';
+
+  @override
+  String get scheduledTasksActiveWindowDetail =>
+      '仅在此日期范围内执行，包含结束当天。未设置的日期不作限制。';
+
+  @override
+  String get scheduledTasksDate => '日期';
+
+  @override
+  String get scheduledTasksDateUnrestricted => '不限';
+
+  @override
+  String get scheduledTasksClear => '清除';
+
+  @override
+  String get scheduledTasksSearch => '搜索';
+
+  @override
+  String get scheduledTasksNoTargets => '此助手下没有符合条件的内容';
+
+  @override
+  String get scheduledTasksFutureDate => '请选择未来的执行日期和时间。';
+
+  @override
+  String get scheduledTasksDateRangeInvalid => '结束日期不能早于开始日期。';
+
+  @override
+  String get scheduledTasksRegenerateDetail =>
+      '使用原有上下文，为所选问题生成新的回答，保留已有回答和后续消息。';
+
+  @override
+  String get scheduledTasksSaving => '正在保存…';
+
+  @override
+  String get scheduledTasksFinished => '计划已结束';
+
+  @override
+  String get scheduledTasksModelMissing => '所选模型已不可用，请编辑任务重新选择。';
+
+  @override
+  String get scheduledTasksChatMissing => '目标聊天已不存在或已移至其他助手。';
+
+  @override
+  String get scheduledTasksMessageMissing => '所选问题已不存在，请重新选择。';
+
+  @override
+  String get scheduledTasksChatBusy => '此聊天正在生成回答，本次任务已跳过。';
+
+  @override
+  String get scheduledTasksDesktopEmpty => '暂无定时任务';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      '仅在 Kelivo 运行时执行，最小化或驻留托盘时也会继续。退出或电脑休眠期间错过的任务不会补运行，也不会自动启动应用。';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      '结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
+
+  @override
+  String get worldBookStickyLabel => '粘滞（消息数）';
+
+  @override
+  String get worldBookStickyHint => '触发后在后续 N 条消息中保持激活，重复命中不延长。0 表示关闭。';
+
+  @override
+  String get worldBookCooldownLabel => '冷却（消息数）';
+
+  @override
+  String get worldBookCooldownHint => '触发后（或粘滞结束后）N 条消息内不再触发。0 表示关闭。';
+
+  @override
+  String get worldBookDelayLabel => '延迟（消息数）';
+
+  @override
+  String get worldBookDelayHint => '对话至少有 N 条消息时才允许触发。按单条消息计数，不是对话轮数。0 表示关闭。';
+
+  @override
+  String get worldBookDragToReorder => '拖动调整顺序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已启用 $enabled/$total';
+  }
+
+  @override
+  String get assistantConversationSystemPromptTitle => '独立对话系统提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允许每个对话设置自己的系统提示词。';
+
+  @override
+  String get assistantConversationInjectionTitle => '独立对话指令注入';
+
+  @override
+  String get assistantConversationInjectionHint => '每个对话单独选择指令注入和世界书，默认不选中。';
+
+  @override
+  String get conversationSystemPromptTitle => '对话系统提示词';
+
+  @override
+  String get conversationSystemPromptHint => '仅对当前对话生效，留空时使用助手的系统提示词。';
+
+  @override
+  String get conversationSystemPromptClear => '恢复助手提示词';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '为这个对话编写系统提示词…';
+
+  @override
+  String get conversationPromptScope => '仅当前对话';
+
+  @override
+  String get oauthAccountsTab => '账号登录';
+
+  @override
+  String get oauthLogin => '登录';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return '登录 $provider';
+  }
+
+  @override
+  String get oauthConnected => '已连接';
+
+  @override
+  String get oauthNotConnected => '未连接';
+
+  @override
+  String oauthWaiting(String provider) {
+    return '正在等待 $provider 授权';
+  }
+
+  @override
+  String get oauthCancel => '取消授权';
+
+  @override
+  String get oauthOpenBrowser => '打开授权页面';
+
+  @override
+  String get oauthCopyCode => '复制验证码';
+
+  @override
+  String get oauthCodeHint => '在授权页面输入此验证码';
+
+  @override
+  String get oauthDeviceHint => '请先在 ChatGPT 安全设置或工作区权限中启用设备码登录。';
+
+  @override
+  String get oauthDeviceLogin => '使用设备码登录';
+
+  @override
+  String get oauthDetails => '查看账号详情';
+
+  @override
+  String get oauthConnectAnother => '再连一个';
+
+  @override
+  String get oauthRelogin => '重新登录';
+
+  @override
+  String get oauthNeedsLogin => '需重新登录';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider 登录已过期';
+  }
+
+  @override
+  String get oauthLoginRestored => '已重新登录，可使用消息的重试按钮再次发送。';
+
+  @override
+  String get oauthLogout => '退出登录';
+
+  @override
+  String get oauthLogoutDescription => '清除此账号在本机保存的授权凭证';
+
+  @override
+  String get oauthRefreshing => '正在续期授权…';
+
+  @override
+  String get oauthRefreshUsage => '刷新用量';
+
+  @override
+  String get oauthUsageDetails => '用量明细';
+
+  @override
+  String get oauthUsageUnavailable => '暂时无法获取用量';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return '更新于 $time';
+  }
+
+  @override
+  String get oauthSyncModels => '同步';
+
+  @override
+  String get oauthSyncing => '正在同步模型…';
+
+  @override
+  String get oauthModelsHint => '可用模型由账号同步。';
+
+  @override
+  String get oauthNoModels => '同步模型后即可开始对话';
+
+  @override
+  String get oauthConnection => '接入';
+
+  @override
+  String get oauthConnectionInfo => '接入信息';
+
+  @override
+  String get oauthEndpoint => '接入端点';
+
+  @override
+  String get oauthScope => '授权范围';
+
+  @override
+  String get oauthAccountId => '账号 ID';
+
+  @override
+  String get oauthTokenExpiry => '令牌有效期';
+
+  @override
+  String get oauthName => '供应商名称';
+
+  @override
+  String get oauthEnabledHint => '在模型选择器中显示这些模型';
+
+  @override
+  String get oauthNetwork => '网络代理';
+
+  @override
+  String get oauthFollowGlobal => '跟随全局设置';
+
+  @override
+  String get oauthCustomRequest => '自定义请求';
+
+  @override
+  String get oauthWeekly => '本周窗口';
+
+  @override
+  String get oauthMonthly => '本月窗口';
+
+  @override
+  String get oauthTotal => '总额度';
+
+  @override
+  String oauthHours(String count) {
+    return '$count 小时窗口';
+  }
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count 分钟窗口';
+  }
+
+  @override
+  String oauthDays(String count) {
+    return '$count 天窗口';
+  }
+
+  @override
+  String get oauthWindow => '用量窗口';
+
+  @override
+  String oauthResetsAt(String time) {
+    return '重置于 $time';
+  }
+
+  @override
+  String get oauthNetworkError => '连接失败，请检查网络后重试。';
+
+  @override
+  String get oauthInvalidResponse => '授权未完成，请重试。';
+
+  @override
+  String get oauthTimeout => '授权超时，请重试。';
+
+  @override
+  String get oauthDenied => '授权未获批准，请重试。';
+
+  @override
+  String get oauthSaving => '正在连接账号…';
+
+  @override
+  String get oauthQuotaExceeded => '该账号暂无可用额度。';
+
+  @override
+  String get oauthRateLimited => '请求过于频繁，请稍后重试。';
+
+  @override
+  String get oauthPermissionDenied => '该账号无权访问此资源。';
+
+  @override
+  String get oauthRequestFailed => '供应商未能完成请求。';
+
+  @override
+  String get oauthQuotaAvailable => '额度可用';
+
+  @override
+  String oauthSavedResets(String count) {
+    return '可用额度重置次数：$count';
+  }
+
+  @override
+  String get oauthPrimaryWindow => '主要窗口';
+
+  @override
+  String get oauthSecondaryWindow => '次要窗口';
+
+  @override
+  String get oauthAuthorizationCode => '授权码或回调链接';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果浏览器没有自动返回，请将最后的回调链接或授权码粘贴到这里。';
+
+  @override
+  String get oauthInvalidAuthorizationCode => '请输入本次登录的授权码或回调链接。';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登录';
+
+  @override
+  String get oauthExtraUsage => '额外用量';
+
+  @override
+  String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
 class AppLocalizationsZhHant extends AppLocalizationsZh {
   AppLocalizationsZhHant() : super('zh_Hant');
+
+  @override
+  String get settingsSearchHint => '搜尋設定';
+
+  @override
+  String get settingsSearchCancel => '取消';
+
+  @override
+  String get settingsSearchClear => '清除搜尋';
+
+  @override
+  String get settingsSearchSuggestions => '常用設定';
+
+  @override
+  String get settingsSearchNoResults => '找不到相關設定';
+
+  @override
+  String get settingsSearchNoResultsHint => '試試其他名稱，或更簡短的關鍵字。';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    return '找到 $count 項設定';
+  }
 
   @override
   String get helloWorld => '你好，世界！';
@@ -15555,11 +22756,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get settingsPageCalculating => '統計中…';
 
   @override
-  String settingsPageFilesCount(int count, String size) {
-    return '共 $count 個檔案 · $size';
-  }
-
-  @override
   String get storageSpacePageTitle => '儲存空間';
 
   @override
@@ -15609,10 +22805,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryRestoreTraces => '還原痕跡';
 
   @override
+  String get storageSpaceCategoryDisplacedDatabases => '保留的舊資料庫';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases => '自動重建前保留的資料庫';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      '確定刪除這些保留的舊資料庫嗎？它們是 Kelivo 重建資料庫時留下的，可能是那些聊天記錄和設定僅存的一份。刪除後無法復原。';
+
+  @override
   String get storageSpaceRestoreTracesHint => '還原完成後保留的舊資料快照。清理不會影響目前的應用程式資料。';
 
   @override
   String get storageSpaceClearRestoreTracesButton => '清理還原痕跡';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton => '刪除保留的舊資料庫';
 
   @override
   String get storageSpaceClearRestoreTracesConfirmMessage =>
@@ -15632,11 +22841,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceCategoryOther => '其他';
-
-  @override
-  String storageSpaceFilesCount(int count) {
-    return '$count 個檔案';
-  }
 
   @override
   String get storageSpaceSafeToClearHint => '可安全清理，不影響聊天記錄。';
@@ -15754,7 +22958,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
-    return '刪除 $count 個項目？刪除後聊天記錄中的附件可能無法開啟。';
+    return '刪除 $count 個項目及其對應的對話附件副本？刪除後，聊天記錄中的這些附件將無法使用。';
   }
 
   @override
@@ -16001,8 +23205,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get homePageClearContext => '清空上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 則訊息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 則訊息';
   }
 
   @override
@@ -16119,9 +23328,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get mcpTransportTagHttp => 'HTTP';
 
   @override
-  String get mcpServerEditSheetStdioOnlyDesktop => 'STDIO 僅在桌面端可用';
-
-  @override
   String get mcpServerEditSheetStdioCommandLabel => '命令';
 
   @override
@@ -16129,6 +23335,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetStdioWorkingDirectoryLabel => '工作目錄（可選）';
+
+  @override
+  String get mcpWorkspaceBindingLabel => '綁定工作區（可選）';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      '伺服器可透過 /workspace 存取此工作區。工作目錄留空時預設進入該目錄，切換聊天不會改變綁定。';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      '工作區綁定適用於行動端 Linux 環境。在桌面端執行此伺服器前，請先解除綁定。';
 
   @override
   String get mcpServerEditSheetStdioEnvironmentTitle => '環境變數';
@@ -16213,6 +23430,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageNotFound => '助理不存在';
+
+  @override
+  String get assistantEditPageWorkspaceTab => '工作區設定';
 
   @override
   String get assistantEditPageBasicTab => '基礎設定';
@@ -16488,26 +23708,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageIosBackgroundChatTitle => 'iOS 後台生成';
 
   @override
-  String get iosBackgroundSettingsPageTitle => 'iOS 後台生成';
-
-  @override
   String get iosBackgroundStatusOn => '開啟';
 
   @override
   String get iosBackgroundStatusOff => '關閉';
-
-  @override
-  String get iosBackgroundGenerationEnableTitle => '後台生成';
-
-  @override
-  String get iosBackgroundGenerationEnableSubtitle =>
-      'App 離開前台後，使用 iOS 分配的後台時間繼續目前回覆。';
-
-  @override
-  String get iosBackgroundTaskRefreshTitle => '後台任務恢復';
-
-  @override
-  String get iosBackgroundTaskRefreshSubtitle => '在系統條件允許時，向 iOS 請求重新整理和處理機會。';
 
   @override
   String get iosLiveActivityTitle => '即時活動';
@@ -16516,98 +23720,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get iosLiveActivitySubtitle => '支援時在鎖定畫面和動態島顯示後台回覆狀態。';
 
   @override
-  String get iosBackgroundNotificationsTitle => '任務通知';
-
-  @override
-  String get iosBackgroundNotificationsSubtitle => '後台回覆完成或中斷時發送本機通知。';
-
-  @override
-  String get iosBackgroundLimitNoticeTitle => 'iOS 仍可能暫停任務';
-
-  @override
-  String get iosBackgroundLimitNoticeBody =>
-      '這些選項使用 Apple 支援的後台時間、BackgroundTasks、通知和即時活動。它們能提升連續性，但不能強制 iOS 永久保持 Kelivo 運行。';
-
-  @override
-  String get iosBackgroundUnsupportedLiveActivity =>
-      '需要 iOS 16.1 或更高版本，並在系統設定中允許即時活動。';
-
-  @override
-  String get iosBackgroundNativeStatusTitle => '系統狀態';
-
-  @override
-  String get iosBackgroundNativeStatusUnavailable => '需要在 iOS 上運行後查看';
-
-  @override
-  String get iosBackgroundLiveActivityAvailable => '即時活動可用';
-
-  @override
-  String get iosBackgroundLiveActivityUnavailable => '即時活動不可用';
-
-  @override
-  String get iosBackgroundNotificationsAuthorized => '通知已允許';
-
-  @override
-  String get iosBackgroundNotificationsNotAuthorized => '通知未允許';
-
-  @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
-
-  @override
-  String get iosBackgroundGenerationActiveDetail => '助理正在後台回覆';
-
-  @override
-  String get iosBackgroundGenerationStreamingDetail => '正在接收助理回覆';
-
-  @override
-  String iosBackgroundGenerationTokenCount(int count) {
-    return '$count tokens';
-  }
-
-  @override
-  String get iosBackgroundGenerationCompleteTitle => '生成完成';
-
-  @override
-  String get iosBackgroundGenerationCompleteDetail => '助理回覆已準備好';
-
-  @override
-  String get iosBackgroundGenerationInterruptedTitle => '生成已中斷';
-
-  @override
-  String get iosBackgroundGenerationInterruptedDetail => '後台回覆在完成前停止';
-
-  @override
-  String get iosBackgroundGenerationCancelledDetail => '生成已停止';
-
-  @override
-  String get androidBackgroundStatusOn => '開啟';
-
-  @override
-  String get androidBackgroundStatusOff => '關閉';
-
-  @override
-  String get androidBackgroundStatusOther => '關閉並發送消息';
-
-  @override
-  String get androidBackgroundOptionOn => '開啟';
-
-  @override
-  String get androidBackgroundOptionOnNotify => '開啟並在生成完時發送消息';
-
-  @override
-  String get androidBackgroundOptionOff => '關閉';
-
-  @override
   String get notificationChatCompletedTitle => '生成完成';
 
   @override
   String get notificationChatCompletedBody => '助手回覆已生成';
-
-  @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在運行';
-
-  @override
-  String get androidBackgroundNotificationText => '後台保持聊天生成';
 
   @override
   String get assistantEditEmojiDialogTitle => '選擇表情';
@@ -16825,6 +23941,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditPromptTimeVarWarning =>
       '在系統提示詞中使用時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中，費用和首字延遲都會上升。需要讓模型知道當前時間時，請改用下方的「追加當前時間」開關。';
+
+  @override
+  String get assistantEditPromptIso8601Title => '使用 ISO 8601 格式';
+
+  @override
+  String get assistantEditPromptIso8601Subtitle =>
+      '包含時區偏移，例如 2026-08-08T14:30:05+08:00';
 
   @override
   String get assistantEditPromptAppendTimeTitle => '追加當前時間';
@@ -17101,6 +24224,31 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'Kelivo 的資料仍由另一個應用程式程序使用。請關閉其他 Kelivo 視窗後重新啟動；目前程序尚未開啟聊天資料。';
 
   @override
+  String get restoreProgressTitle => '正在還原備份';
+
+  @override
+  String get restoreProgressWarning =>
+      '請保持 Kelivo 開啟直到完成。此時關閉應用程式，下次啟動會從頭再來一次。';
+
+  @override
+  String get restoreProgressStageCheckingBackup => '正在驗證備份';
+
+  @override
+  String get restoreProgressStagePreservingCurrentData => '正在保留目前資料';
+
+  @override
+  String get restoreProgressStageInstallingBackup => '正在寫入備份';
+
+  @override
+  String get restoreProgressStageVerifying => '正在驗證';
+
+  @override
+  String get restoreProgressStageRollingBack => '正在還原原有資料';
+
+  @override
+  String get restoreProgressStageFinishing => '即將完成';
+
+  @override
   String get backupRestoreFailureRestartButton => '重新啟動 Kelivo';
 
   @override
@@ -17155,11 +24303,143 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
+  String get startupRecoveryWhatFailed => '失敗原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失敗階段';
+
+  @override
+  String get startupRecoveryStageRestore => '還原關卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '資料庫啟動';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '診斷碼';
+
+  @override
+  String get startupRecoverySchemaLabel => '資料庫版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁碟上為 $installed · 目前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '應用程式';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集診斷資訊…';
+
+  @override
+  String get startupRecoveryShowDetails => '展開技術細節';
+
+  @override
+  String get startupRecoveryHideDetails => '收合技術細節';
+
+  @override
+  String get startupRecoveryCopyReport => '複製完整報告';
+
+  @override
+  String get startupRecoveryReportCopied => '已複製完整報告';
+
+  @override
+  String get startupRecoveryShareReport => '匯出報告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '報告已儲存至 $path';
+  }
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '報告已儲存至 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '報告已匯出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '無法匯出報告。';
+
+  @override
+  String get startupRecoverySectionDataTitle => '你的資料';
+
+  @override
+  String get startupRecoverySectionDataBody =>
+      '目前沒有任何資料被刪除。在嘗試下方操作前，先把副本存到安全的地方。';
+
+  @override
+  String startupRecoveryExportSavedTo(String path) {
+    return '資料副本已儲存至 $path';
+  }
+
+  @override
+  String get startupRecoverySectionRepairTitle => '診斷與修復';
+
+  @override
+  String get startupRecoverySectionRepairBody =>
+      '完整性檢查只會讀取資料庫。修復會清除上次更新中斷留下的中繼資料並重新啟動，不會刪除聊天記錄。';
+
+  @override
+  String get startupRecoveryIntegrityButton => '檢查資料庫完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在資料庫檔案中發現損壞。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 回報了問題 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityMissing => '資料目錄中找不到資料庫檔案。';
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性檢查無法執行。';
+
+  @override
+  String get startupRecoveryDangerZone => '危險操作';
+
+  @override
+  String get startupRecoveryDangerBody =>
+      '重設會永久刪除本裝置上 Kelivo 的資料庫。請先匯出資料副本——重設同時會銷毀排查根本問題所需的證據。';
+
+  @override
+  String get startupRecoveryResetAcknowledge => '我已匯出副本，或不需要這些資料。';
+
+  @override
   String get startupDatabaseUpdateRequiredTitle => '請更新 Kelivo 以繼續';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
       '本裝置上的聊天資料庫由更新版本的 Kelivo 建立，目前版本無法開啟。資料未被改動。請安裝最新版 Kelivo 後重新開啟。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeTitle => '若要改用舊版';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeIntro =>
+      '目前版本無法開啟本機這份資料庫。若你必須留在舊版，請依下列步驟處理；在備份完成之前，不要刪除或覆蓋這裡的資料。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep1 =>
+      '先安裝並開啟最新版 Kelivo，在「設定 → 資料備份」匯出一份備份檔。';
+
+  @override
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
+    return '打開 $url，把備份轉換成你打算使用的舊版格式。';
+  }
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep3 =>
+      '確認本機資料已經另外備份好之後，再安裝舊版，並匯入轉換後的備份。';
+
+  @override
+  String get startupDatabaseUpdateRequiredOpenTool => '打開轉換工具';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -17199,6 +24479,24 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageRestore => '還原';
+
+  @override
+  String get backupPageForwardCompatTitle => '備份來自更新的版本';
+
+  @override
+  String backupPageForwardCompatBody(int backupVersion, int currentVersion) {
+    return '這份備份由更新版本的 Kelivo 建立（資料格式 $backupVersion，目前版本支援 $currentVersion），且未聲明舊版本能否讀取。\n\n你可以繼續匯入：目前版本不認識的內容會被略過，備份檔案本身不會被修改。但如果新版本改變了既有資料的儲存方式，部分內容可能會被錯誤匯入。\n\n更穩妥的做法是先升級 Kelivo。';
+  }
+
+  @override
+  String get backupPageForwardCompatContinue => '仍然匯入';
+
+  @override
+  String get backupPageForwardCompatCancel => '取消';
+
+  @override
+  String get backupPageSchemaTooNewMessage =>
+      '這份備份由更新版本的 Kelivo 建立，目前版本無法讀取。請先升級 Kelivo 後重試。';
 
   @override
   String get backupPageBackupUploaded => '已上傳備份';
@@ -17985,6 +25283,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit => '行';
 
   @override
+  String get displaySettingsPageCollapseLongUserMessagesTitle => '摺疊過長訊息';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle =>
+      '超過閾值的使用者訊息摺疊顯示，點擊可展開';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle =>
+      '超過多少字元摺疊';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit => '字元';
+
+  @override
+  String get chatMessageExpandLongText => '展開';
+
+  @override
+  String get chatMessageCollapseLongText => '收起';
+
+  @override
   String get messageExportSheetFormatTitle => '匯出格式';
 
   @override
@@ -18302,6 +25620,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarMcpServersTooltip => 'MCP伺服器';
 
   @override
+  String get chatInputBarToolsTooltip => '工具';
+
+  @override
   String get chatInputBarMoreTooltip => '更多';
 
   @override
@@ -18450,9 +25771,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get mcpServerEditSheetTransportLabel => '傳輸類型';
 
   @override
-  String get mcpServerEditSheetSseRetryHint => '如果SSE連線失敗，請多試幾次';
-
-  @override
   String get mcpServerEditSheetUrlLabel => '伺服器地址';
 
   @override
@@ -18520,7 +25838,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用於總結對話標題的模型，推薦使用快速且便宜的模型。選擇模型後才會啟用。';
+      '用於總結對話標題，預設跟隨目前對話模型，也可指定其他模型。';
 
   @override
   String get titleModelThinkingTitle => '是否開啟思考';
@@ -18536,7 +25854,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      '用於在助手回覆後生成繼續對話的建議氣泡。選擇模型後才會啟用。';
+      '用於在助手回覆後生成聊天建議，可跟隨目前對話模型或指定其他模型。預設未啟用。';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新頻率';
@@ -18613,6 +25931,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageResetDefault => '重設為預設';
+
+  @override
+  String get defaultModelPageDisable => '停用';
 
   @override
   String get defaultModelPageSave => '儲存';
@@ -18735,13 +26056,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetReasoningAbility => '推理';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      '供應商覆寫：允許為特定模型自訂供應商設定。（暫未實現）';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => '新增供應商覆寫';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => '自訂 Headers';
 
   @override
@@ -18761,9 +26075,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '內建工具取決於供應商和 API 模式。';
-
-  @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '目前供應商不支援這些內建工具。';
 
   @override
   String get modelDetailSheetSearchTool => '搜尋';
@@ -18795,11 +26106,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '需要啟用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '網頁擷取';
+  String get modelDetailSheetWebFetchTool => '網頁擷取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '啟用 OpenRouter 網頁擷取伺服器工具';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允許 Claude 擷取對話中出現的網頁與 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允許 Claude 在 Anthropic 沙箱中執行 Python 與 Bash';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
@@ -18853,6 +26172,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelSelectSheetFavoritesSection => '收藏';
+
+  @override
+  String get modelSelectSheetFollowAssistant => '跟隨助手';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -19605,11 +26927,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchSettingsSheetBuiltinSearchDescription => '是否啟用模型內建的搜尋功能';
 
   @override
-  String get searchSettingsSheetClaudeDynamicSearchTitle => '模型內建搜尋(新)';
+  String get searchSettingsSheetClaudeDynamicSearchTitle => '動態過濾';
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '在支援的 Claude 官方模型上使用 `web_search_20260209`，支援動態過濾能力。';
+      '篩選搜尋結果，節省 token';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '網路搜尋';
@@ -19812,6 +27134,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageForkKeepMessageVersionsTitle => '建立分支時保留訊息版本';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      '編輯助手時保留思考與工具卡片';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      '關閉後，目前編輯版本只保留助手正文；切回上一版本仍可查看思考與工具卡片';
 
   @override
   String chainOfThoughtExpandSteps(Object count) {
@@ -20046,6 +27376,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get themeSettingsPageUsePureBackgroundSubtitle => '僅氣泡與強調色隨主題變化';
+
+  @override
+  String get themeAdvancedSettingsPageTitle => '主題進階設定';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle => '新版分層配色（實驗）';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      '頁面更深、卡片更亮，兩者都保留主題色相；關閉可恢復舊外觀';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle => '彈窗內瓦片分層';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      '預設瓦片與彈窗同色';
 
   @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
@@ -20795,6 +28142,52 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'TinyFish Search API，支援地區與語言參數。需要 API Key。此處不支援 Fetch/Scrape。';
 
   @override
+  String get searchServiceNameAnySearch => 'AnySearch';
+
+  @override
+  String get searchProviderAnySearchDescription =>
+      '面向 AI 智慧代理的統一搜尋服務，可在網頁與專業資料來源間自動路由。API Key 可選。';
+
+  @override
+  String get searchServiceNameParallel => 'Parallel';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜尋 API。返回面向 LLM 優化的網頁摘錄，支援 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜尋模式';
+
+  @override
+  String get searchServiceNameYou => 'You.com';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜尋 API。返回網頁與新聞結果，支援 Highlights 或 Snippets。';
+
+  @override
+  String get searchServicesDialogContentMode => '內容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 數';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 數必須介於 1024 和 32768 之間。';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override
@@ -21043,6 +28436,193 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '在你確認後於本裝置建立日曆行程，需要授予日曆權限。';
 
   @override
+  String get assistantEditLocalToolLocationTitle => '目前位置';
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '讀取本裝置的一次性位置，需要授予定位權限。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天氣';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '取得目前位置或指定地點的 Apple 天氣，結果中會顯示 WeatherKit 資料來源。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '讀取本裝置的健康活動摘要，需要授予健康資料讀取權限。';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已選擇 $selected/$total 項';
+  }
+
+  @override
+  String get healthDataSettingsTitle => '健康資料';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '目前助手在日常對話中可使用的 HealthKit 訊號。開關表示 Kelivo 可以嘗試讀取該範圍，實際授權仍由 iOS 管理。';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 開啟';
+  }
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康讀取';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '裝置可用，讀取範圍由 iOS 管理';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '開啟系統設定';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部開啟';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部關閉';
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活動';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身體';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步數';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步數摘要';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '戶外日光時間';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活動能量消耗';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '鍛鍊';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 鍛鍊分鐘數';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立時間';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距離';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距離';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身訓練';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '訓練紀錄：類型、時長、距離與消耗';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '最近 24 小時的睡眠、臥床、清醒與睡眠分期';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '靜息';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或靜息時段';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率樣本';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '靜息心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '靜息狀態心率';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧飽和度';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '攝入能量';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '飲食熱量紀錄';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '飲水';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '飲水量紀錄';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '體重';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '體重樣本';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身體質量指數';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖樣本';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查詢提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '讀取本裝置上的提醒事項，需要授予提醒事項完整存取權限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '建立提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你確認後於本裝置建立提醒事項，需要授予提醒事項完整存取權限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你確認後將提醒事項標記為完成，需要授予提醒事項完整存取權限。';
+
+  @override
   String get assistantEditMemorySwitchDescription => '允許助理主動儲存並在對話間引用使用者相關資訊';
 
   @override
@@ -21236,6 +28816,56 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get networkProxyPriorityNote => '同時啟用全域代理與供應商代理時，將優先使用供應商代理。';
+
+  @override
+  String get settingsPageAutoRetry => '自動重試';
+
+  @override
+  String get autoRetryEnableLabel => '開啟自動重試';
+
+  @override
+  String get autoRetryMaxRetries => '最大重試次數';
+
+  @override
+  String get autoRetryInitialDelay => '首次延遲（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '退避倍率';
+
+  @override
+  String get autoRetryMaxDelay => '最大延遲（毫秒）';
+
+  @override
+  String get autoRetryJitter => '抖動';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待隨機 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '網路錯誤時重試';
+
+  @override
+  String get autoRetryStatusCodes => '可重試狀態碼';
+
+  @override
+  String get autoRetryKeywords => '重試關鍵字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重試關鍵字';
+
+  @override
+  String get autoRetryAddHint => '新增';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢復預設';
+
+  @override
+  String get autoRetryFooter => '僅在目前這輪模型回應尚未產生任何輸出時才會自動重試。';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒後重試 ($attempt/$maxRetries)';
+  }
 
   @override
   String get desktopShowProviderInModelCapsule => '模型膠囊顯示供應商';
@@ -22936,6 +30566,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '壓縮會在加入圖片時進行，已儲存或已傳送的圖片不受影響；壓縮後圖片會以 JPEG 格式隨訊息傳送。';
 
   @override
+  String get imageSettingsPageSendSectionTitle => '傳送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksTitle =>
+      '將 Markdown 圖片連結作為圖片傳送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksSubtitle =>
+      '開啟後，訊息文字中的 ![alt](url) 會作為圖片傳送給視覺模型；關閉後僅以純文字傳送。手動加入的圖片附件不受影響。';
+
+  @override
   String get memoryTraceSettingsTitle => '流程追蹤';
 
   @override
@@ -23241,4 +30882,3135 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手設定同時作用於思考、工具呼叫和翻譯卡片。';
+
+  @override
+  String get localSnapshotSectionTitle => '本機副本';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本機副本';
+
+  @override
+  String get localSnapshotEnabledSubtitle => 'Kelivo 會定期在本機存一份資料庫副本，讓資料不只有一份。';
+
+  @override
+  String get localSnapshotIntervalTitle => '備份頻率';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自動';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，資料庫越大間隔越長';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepTitle => '保留份數';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepSubtitle => '另外各留一份上週和上個月的，萬一問題過了很久才發現也還能找回來。';
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上週的';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上個月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '無論設成幾份，最近一份仍有內容的副本都不會被自動清理。';
+
+  @override
+  String get localSnapshotMaximumTitle => '佔用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotAnnounceTitle => '備份完成時提示';
+
+  @override
+  String get localSnapshotAnnounceSubtitle => '失敗一定會告訴你。這裡只是成功時多一句提示。';
+
+  @override
+  String get localSnapshotTakeNow => '立即備份一份';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暫無副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '還沒有備份過';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次備份：$when';
+  }
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次備份失敗（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳過：本機剩餘空間不足';
+
+  @override
+  String get localSnapshotStatusUnchanged => '距上次備份資料沒有變化';
+
+  @override
+  String get localSnapshotCopiesTitle => '本機副本';
+
+  @override
+  String get localSnapshotCopiesEmpty => '還沒有本機副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '資料有變化時會自動存一份，還原資料前也一定會先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本機副本只存在這台裝置上。它防的是應用內資料被損壞或誤刪，防不了裝置遺失或解除安裝應用——那要靠 WebDAV / S3 備份。';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自動備份';
+
+  @override
+  String get localSnapshotOriginManual => '手動備份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '還原前備份';
+
+  @override
+  String get localSnapshotKindRecovered => '故障還原時留下的';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 個對話',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 則訊息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '內容需還原後才能確認';
+
+  @override
+  String get localSnapshotCopyPinned => '已保留';
+
+  @override
+  String get localSnapshotActionRestore => '還原';
+
+  @override
+  String get localSnapshotActionExport => '匯出';
+
+  @override
+  String get localSnapshotActionDelete => '刪除';
+
+  @override
+  String get localSnapshotActionPin => '保留這份';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotRestoreTitle => '還原這份副本？';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '目前的對話和設定會被 $when 的這份副本替換。系統會先把現在的資料存一份，所以這一步可以復原。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在準備副本';
+
+  @override
+  String get localSnapshotDeleteTitle => '刪除這份副本？';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '這份副本會從裝置上永久刪除。它裡面有、而目前資料庫裡沒有的資料將無法找回。';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '這是唯一一份還有內容的副本。';
+
+  @override
+  String get localSnapshotExportPreparing => '正在準備匯出';
+
+  @override
+  String get localSnapshotExportDone => '副本已匯出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '匯出副本失敗：$reason';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已儲存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '儲存副本失敗：$reason';
+  }
+
+  @override
+  String get localSnapshotDeleteDone => '副本已刪除';
+
+  @override
+  String get localSnapshotBusyMessage => '已有備份任務在進行中';
+
+  @override
+  String get localSnapshotRunInBackground => '轉到背景繼續';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在背景備份副本';
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本機還保留著 $count 份本機副本，最新一份是 $when 的。重設不會刪除它們——重新啟動後可以在 設定 › 備份 › 本機副本 裡還原。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外還有 $count 份故障還原時留下的資料庫副本，重設會把它們一併永久刪除。想留住的話請先匯出資料。';
+  }
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜尋';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '記憶';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本機工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '還原預設';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部還原預設';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部還原預設？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '將把所有內建工具的描述還原為應用預設文案，自訂措辭會遺失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '還原';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '參數描述 ($count)';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '記憶工具的預設描述會隨記憶提示語言在中/英之間切換。自訂描述依工具名只存一份，切換語言後不會跟著變。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '編輯描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
+
+  @override
+  String get workspaceFileNotAvailable => '檔案不可用';
+
+  @override
+  String get workspaceTerminalNotAvailable => '終端機不可用';
+
+  @override
+  String get workspacePreviewCopyPath => '複製路徑';
+
+  @override
+  String get workspacePreviewShare => '分享';
+
+  @override
+  String get workspacePreviewOpenExternally => '用其他應用程式開啟';
+
+  @override
+  String get workspacePreviewOpenWith => '開啟方式…';
+
+  @override
+  String get workspacePreviewFileTooLarge => '檔案過大，無法預覽，請用其他應用程式開啟。';
+
+  @override
+  String get workspacePreviewSource => '原始碼';
+
+  @override
+  String get workspacePreviewRendered => '渲染';
+
+  @override
+  String get workspacePreviewFileName => '名稱';
+
+  @override
+  String get workspacePreviewFileSize => '大小';
+
+  @override
+  String get workspacePreviewFileModified => '修改時間';
+
+  @override
+  String get workspacePreviewPathCopied => '已複製路徑';
+
+  @override
+  String workspacePreviewLineCount(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String get workspaceFilesSort => '排序';
+
+  @override
+  String get workspaceFilesSortName => '名稱';
+
+  @override
+  String get workspaceFilesSortModified => '修改時間';
+
+  @override
+  String get workspaceFilesSortSize => '大小';
+
+  @override
+  String get workspaceFilesSortAscending => '升序';
+
+  @override
+  String get workspaceFilesSortDescending => '降序';
+
+  @override
+  String get workspaceFilesShowHidden => '顯示隱藏檔案';
+
+  @override
+  String get workspaceFilesHideHidden => '隱藏隱藏檔案';
+
+  @override
+  String get workspaceFilesRefresh => '重新整理';
+
+  @override
+  String get workspaceFilesNewFolder => '新增資料夾';
+
+  @override
+  String get workspaceFilesNewFile => '新增檔案';
+
+  @override
+  String get workspaceFilesImport => '匯入';
+
+  @override
+  String get workspaceFilesExport => '匯出';
+
+  @override
+  String get workspaceFilesExportFolder => '匯出目前資料夾';
+
+  @override
+  String get workspaceFilesEmpty => '此資料夾是空的';
+
+  @override
+  String get workspaceFilesError => '無法載入這些檔案';
+
+  @override
+  String get workspaceFilesRetry => '重試';
+
+  @override
+  String get workspaceFilesPreview => '預覽';
+
+  @override
+  String get workspaceFilesRename => '重新命名';
+
+  @override
+  String get workspaceFilesMove => '移動';
+
+  @override
+  String get workspaceFilesDelete => '刪除';
+
+  @override
+  String get workspaceFilesShare => '分享';
+
+  @override
+  String get workspaceFilesCopyPath => '複製路徑';
+
+  @override
+  String get workspaceFilesExportItem => '匯出';
+
+  @override
+  String get workspaceFilesNameLabel => '名稱';
+
+  @override
+  String get workspaceFilesNameHint => '輸入名稱';
+
+  @override
+  String get workspaceFilesCreate => '建立';
+
+  @override
+  String get workspaceFilesCancel => '取消';
+
+  @override
+  String get workspaceFilesConfirm => '確認';
+
+  @override
+  String get workspaceFilesSave => '儲存';
+
+  @override
+  String get workspaceFilesDeleteTitle => '刪除此項目？';
+
+  @override
+  String workspaceFilesDeleteMessage(String name) {
+    return '刪除 $name？';
+  }
+
+  @override
+  String workspaceFilesDeleteFolderMessage(String name) {
+    return '刪除資料夾 $name 及其全部內容？';
+  }
+
+  @override
+  String get workspaceFilesMoveTitle => '移動到資料夾';
+
+  @override
+  String get workspaceFilesMoveHere => '移動到此處';
+
+  @override
+  String get workspaceFilesPathCopied => '已複製路徑';
+
+  @override
+  String get workspaceFilesInvalidName => '名稱無效';
+
+  @override
+  String get workspaceFilesInvalidPath => '該路徑超出目前資料夾';
+
+  @override
+  String workspaceFilesOperationFailed(String error) {
+    return '操作失敗：$error';
+  }
+
+  @override
+  String get workspaceFilesActions => '操作';
+
+  @override
+  String get workspaceFilesMore => '更多';
+
+  @override
+  String get workspaceFilesJustNow => '剛剛';
+
+  @override
+  String workspaceFilesMinutesAgo(int count) {
+    return '$count 分鐘前';
+  }
+
+  @override
+  String workspaceFilesHoursAgo(int count) {
+    return '$count 小時前';
+  }
+
+  @override
+  String workspaceFilesDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String get workspaceFilesPanelTitle => '對話檔案';
+
+  @override
+  String get workspaceFilesTabAttachments => '附件';
+
+  @override
+  String get workspaceFilesTabOutputs => '輸出';
+
+  @override
+  String get workspaceFilesTabWorkspace => '工作區';
+
+  @override
+  String get workspaceFilesNoWorkspaceBound => '尚未綁定工作區';
+
+  @override
+  String get workspaceFilesKindManaged => '託管';
+
+  @override
+  String get workspaceFilesKindLinked => '連結';
+
+  @override
+  String get workspaceFilesMissingWorkspace => '找不到工作區';
+
+  @override
+  String get workspaceFilesClose => '關閉';
+
+  @override
+  String get workspacesTitle => '工作區';
+
+  @override
+  String get workspacesCreate => '建立';
+
+  @override
+  String get workspacesCreateTitle => '新增工作區';
+
+  @override
+  String get workspacesNameLabel => '名稱';
+
+  @override
+  String get workspacesNameHint => '工作區名稱';
+
+  @override
+  String get workspacesLinkFolder => '連結資料夾';
+
+  @override
+  String get workspacesEmpty => '還沒有工作區';
+
+  @override
+  String get workspacesEmptyCta => '建立工作區';
+
+  @override
+  String get workspacesSettings => '設定';
+
+  @override
+  String get workspacesOpenFiles => '開啟檔案';
+
+  @override
+  String get workspacesLastUsedNever => '從未使用';
+
+  @override
+  String workspacesLastUsed(String when) {
+    return '最近使用 $when';
+  }
+
+  @override
+  String get workspacesDeleteTitle => '刪除此工作區？';
+
+  @override
+  String workspacesDeleteMessage(String name) {
+    return '刪除工作區 $name？';
+  }
+
+  @override
+  String get workspacesDeleteAlsoFiles => '同時刪除檔案';
+
+  @override
+  String get workspacesUnlinkTitle => '取消連結此工作區？';
+
+  @override
+  String workspacesUnlinkMessage(String name) {
+    return '取消連結 $name？磁碟上的檔案會保留。';
+  }
+
+  @override
+  String get workspacesSettingsTitle => '工作區設定';
+
+  @override
+  String get workspacesShellNeedsApproval => '執行終端機命令前詢問';
+
+  @override
+  String get workspacesDefaultCwd => '預設工作目錄';
+
+  @override
+  String get workspacesDefaultCwdHint => '相對路徑，例如 src';
+
+  @override
+  String get workspacesDefaultCwdInvalid => '請使用不含 .. 的相對路徑';
+
+  @override
+  String get workspacesCreateManaged => '建立工作區';
+
+  @override
+  String get workspacesLinkExisting => '連結既有資料夾';
+
+  @override
+  String get workspacesUnlink => '取消連結';
+
+  @override
+  String get workspacesItemMore => '工作區操作';
+
+  @override
+  String get workspaceToolDenied => '已拒絕';
+
+  @override
+  String get workspaceToolTimeout => '逾時';
+
+  @override
+  String get workspaceToolCancelled => '已取消';
+
+  @override
+  String get workspaceToolInterrupted => '已中斷';
+
+  @override
+  String get workspaceToolEnvironmentNotReady => '沙箱環境未安裝';
+
+  @override
+  String get workspaceToolInstall => '安裝';
+
+  @override
+  String get workspaceToolFuzzy => '模糊';
+
+  @override
+  String get workspaceToolCreated => '已建立';
+
+  @override
+  String get workspaceToolUpdated => '已更新';
+
+  @override
+  String get workspaceToolTruncated => '已截斷';
+
+  @override
+  String get workspaceToolImageTag => '圖片';
+
+  @override
+  String get workspaceToolAllowAll => '本工作階段全部允許';
+
+  @override
+  String get workspaceToolStdout => 'stdout';
+
+  @override
+  String get workspaceToolStderr => 'stderr';
+
+  @override
+  String get workspaceToolOpenFullOutput => '開啟完整輸出';
+
+  @override
+  String get workspaceToolChangedFiles => '變更的檔案';
+
+  @override
+  String get workspaceToolCancel => '取消';
+
+  @override
+  String get workspaceToolCopyCommand => '複製命令';
+
+  @override
+  String get workspaceToolCopyOutput => '複製輸出';
+
+  @override
+  String get workspaceToolCopyDiff => '複製差異';
+
+  @override
+  String get workspaceToolCopied => '已複製';
+
+  @override
+  String get workspaceToolDiffTruncated => '差異已截斷';
+
+  @override
+  String get workspaceToolOpenPreview => '開啟預覽';
+
+  @override
+  String get workspaceToolNoOutput => '無輸出';
+
+  @override
+  String get workspaceToolNotAvailable => '不可用';
+
+  @override
+  String get workspaceToolClose => '關閉';
+
+  @override
+  String get workspaceToolTitleShell => '執行命令';
+
+  @override
+  String get workspaceToolTitleReadFile => '讀取檔案';
+
+  @override
+  String get workspaceToolTitleWriteFile => '寫入檔案';
+
+  @override
+  String get workspaceToolTitleEditFile => '編輯檔案';
+
+  @override
+  String get workspaceToolTitleListDir => '列出目錄';
+
+  @override
+  String get workspaceToolTitleGlob => 'Glob';
+
+  @override
+  String get workspaceToolTitleGrep => 'Grep';
+
+  @override
+  String workspaceToolCount(int count) {
+    return '$count';
+  }
+
+  @override
+  String workspaceToolMoreFiles(int count) {
+    return '+$count';
+  }
+
+  @override
+  String workspaceToolDurationMs(int ms) {
+    return '${ms}ms';
+  }
+
+  @override
+  String workspaceToolDurationSec(String sec) {
+    return '${sec}s';
+  }
+
+  @override
+  String get workspaceEnvTitle => '環境';
+
+  @override
+  String workspaceEnvEngineUbuntu(String version) {
+    return 'Ubuntu $version (PRoot)';
+  }
+
+  @override
+  String workspaceEnvEngineAlpine(String version) {
+    return 'Alpine $version (iSH)';
+  }
+
+  @override
+  String get workspaceEnvEngineNative => '系統終端機';
+
+  @override
+  String get workspaceEnvPhaseNotInstalled => '未安裝';
+
+  @override
+  String get workspaceEnvPhaseDownloading => '下載中';
+
+  @override
+  String get workspaceEnvPhaseVerifying => '校驗中';
+
+  @override
+  String get workspaceEnvPhaseExtracting => '解壓中';
+
+  @override
+  String get workspaceEnvPhasePatching => '設定中';
+
+  @override
+  String get workspaceEnvPhaseReady => '就緒';
+
+  @override
+  String get workspaceEnvPhaseError => '錯誤';
+
+  @override
+  String get workspaceEnvPhaseNeedsRestart => '需要重新啟動';
+
+  @override
+  String workspaceEnvMetaLine(String version, String arch) {
+    return '$version · $arch';
+  }
+
+  @override
+  String workspaceEnvInstalledAt(String date) {
+    return '安裝於 $date';
+  }
+
+  @override
+  String workspaceEnvDiskUsage(String size) {
+    return '佔用空間 $size';
+  }
+
+  @override
+  String workspaceEnvRuntimeReason(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvInstall => '安裝';
+
+  @override
+  String get workspaceEnvInstallSubtitleAndroid =>
+      '可選擇 Ubuntu、Alpine、Debian，也可匯入本機 rootfs 映像。';
+
+  @override
+  String get workspaceEnvInstallSubtitleIos => '已內建，無需下載';
+
+  @override
+  String get workspaceEnvCancel => '取消';
+
+  @override
+  String get workspaceEnvRetry => '重試';
+
+  @override
+  String get workspaceEnvRepair => '修復';
+
+  @override
+  String get workspaceEnvReset => '重設';
+
+  @override
+  String get workspaceEnvResetConfirmTitle => '重設環境？';
+
+  @override
+  String get workspaceEnvResetConfirmBody => '這會刪除已安裝的套件和沙箱檔案系統。';
+
+  @override
+  String get workspaceEnvCheckForUpdate => '檢查更新';
+
+  @override
+  String get workspaceEnvUpdate => '更新';
+
+  @override
+  String workspaceEnvAvailableVersion(String version) {
+    return '新版本 $version 可用';
+  }
+
+  @override
+  String get workspaceEnvUpToDate => '已是最新';
+
+  @override
+  String get workspaceEnvRestartBanner => '請重新啟動 Kelivo 以完成安裝';
+
+  @override
+  String get workspaceEnvDetectingMirrors => '正在偵測最快鏡像…';
+
+  @override
+  String workspaceEnvApplyingMirror(String category) {
+    return '正在套用 $category 鏡像…';
+  }
+
+  @override
+  String get workspaceEnvMirrorsSection => '鏡像';
+
+  @override
+  String get workspaceEnvUseMirror => '使用鏡像';
+
+  @override
+  String get workspaceEnvDetect => '測速';
+
+  @override
+  String get workspaceEnvOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorsDisabled => '鏡像設定在沙箱中執行，就緒後才能變更。';
+
+  @override
+  String workspaceEnvMirrorsDisabledReason(String reason) {
+    return '鏡像設定在沙箱中執行，目前不可用：$reason';
+  }
+
+  @override
+  String get workspaceEnvMirrorDetectTitle => '鏡像測速';
+
+  @override
+  String workspaceEnvMirrorLatency(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String workspaceEnvMirrorFailed(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvErrorUnsupportedAbi => '目前裝置架構不受支援。';
+
+  @override
+  String get workspaceEnvErrorArchitectureMismatch =>
+      '已安裝的沙盒架構與目前應用程式不符，請重新安裝沙盒後使用。原沙盒檔案已保留。';
+
+  @override
+  String get workspaceEnvErrorProotMissing => '缺少 PRoot 執行檔。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDisk => '儲存空間不足，無法安裝沙箱。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDiskHint => '請為所選映像釋放更多儲存空間後重試。';
+
+  @override
+  String get workspaceEnvErrorNetwork => '下載失敗，請檢查網路後重試。';
+
+  @override
+  String get workspaceEnvErrorChecksumMismatch => '下載檔案已損毀，請重試。';
+
+  @override
+  String get workspaceEnvErrorExtractFailed => '無法解壓沙箱映像。';
+
+  @override
+  String get workspaceEnvErrorPatchFailed => '無法完成沙箱設定。';
+
+  @override
+  String get workspaceEnvErrorCancelled => '安裝已取消。';
+
+  @override
+  String get workspaceEnvErrorGeneric => '安裝沙箱時發生錯誤。';
+
+  @override
+  String get workspaceEnvChipInstall => '安裝沙箱';
+
+  @override
+  String workspaceEnvChipInstalling(int percent) {
+    return '正在安裝… $percent %';
+  }
+
+  @override
+  String get workspaceEnvChipInstallingIndeterminate => '正在安裝…';
+
+  @override
+  String get workspaceEnvChipError => '沙箱錯誤';
+
+  @override
+  String get workspaceEnvChipRestart => '需要重新啟動';
+
+  @override
+  String get workspaceEnvNativeExplanation =>
+      '在桌面端，Kelivo 使用系統終端機，而不是 Linux 沙箱。';
+
+  @override
+  String workspaceEnvNativeShellPath(String path) {
+    return '終端機：$path';
+  }
+
+  @override
+  String get workspaceEnvNativeShellApproval =>
+      '除非此工作階段允許全部工具，否則 shell 工具需要核准。';
+
+  @override
+  String workspaceEnvDownloadProgress(
+    String downloaded,
+    String total,
+    int percent,
+  ) {
+    return '$downloaded / $total MB ($percent%)';
+  }
+
+  @override
+  String get workspaceEnvMirrorsFailed => '無法偵測鏡像';
+
+  @override
+  String get workspaceEnvCategoryApt => 'APT';
+
+  @override
+  String get workspaceEnvCategoryApk => 'APK';
+
+  @override
+  String get workspaceEnvCategoryPip => 'pip';
+
+  @override
+  String get workspaceEnvCategoryNpm => 'npm';
+
+  @override
+  String get skillsTitle => '技能';
+
+  @override
+  String get skillsTab => '技能';
+
+  @override
+  String get skillsSearchHint => '搜尋技能';
+
+  @override
+  String get skillsEmptyTitle => '還沒有技能';
+
+  @override
+  String get skillsEmptyBody =>
+      '技能是包含 SKILL.md 的資料夾。可貼上 Markdown、匯入 .md/.zip，或從 GitHub 安裝。';
+
+  @override
+  String get skillsEmptyFormat =>
+      '---\nname: my-skill\ndescription: 這個技能做什麼\n---\n\n# 說明';
+
+  @override
+  String get skillsImport => '匯入';
+
+  @override
+  String get skillsImportPaste => '貼上 Markdown';
+
+  @override
+  String get skillsImportFile => '從檔案';
+
+  @override
+  String get skillsImportGitHub => '從 GitHub';
+
+  @override
+  String get skillsImportPasteLabel => 'SKILL.md';
+
+  @override
+  String get skillsImportPasteHint => '貼上含 YAML 前置資料的 SKILL.md';
+
+  @override
+  String get skillsImportGitHubLabel => 'GitHub 連結';
+
+  @override
+  String get skillsImportGitHubHint =>
+      'github.com/owner/repo 或 github.com/owner/repo/tree/ref/path';
+
+  @override
+  String get skillsImportConfirm => '匯入';
+
+  @override
+  String get skillsCancel => '取消';
+
+  @override
+  String get skillsSave => '儲存';
+
+  @override
+  String skillsUsedCount(int count) {
+    return '已使用 $count 次';
+  }
+
+  @override
+  String get skillsEnabled => '啟用';
+
+  @override
+  String get skillsBrowseFiles => '瀏覽檔案';
+
+  @override
+  String get skillsEdit => '編輯';
+
+  @override
+  String get skillsExport => '匯出';
+
+  @override
+  String get skillsDelete => '刪除';
+
+  @override
+  String get skillsDeleteTitle => '刪除此技能？';
+
+  @override
+  String skillsDeleteMessage(String name) {
+    return '刪除 $name？此操作無法復原。';
+  }
+
+  @override
+  String get skillsUseAll => '使用全部技能';
+
+  @override
+  String get skillsUseAllSubtitle => '此助手可以使用所有已啟用的技能。';
+
+  @override
+  String get skillsDisabledHint => '請先在技能頁啟用此技能。';
+
+  @override
+  String get skillsOpenPage => '管理技能';
+
+  @override
+  String get skillsInheritAssistant => '跟隨助手';
+
+  @override
+  String get skillsInheritAssistantSubtitle => '使用與此對話助手相同的技能。';
+
+  @override
+  String get skillsActiveLabel => '生效中';
+
+  @override
+  String get skillsSessionTitle => '此對話的技能';
+
+  @override
+  String get skillsEditTitle => '編輯技能';
+
+  @override
+  String get skillsDetailKindLabel => 'Skill';
+
+  @override
+  String get skillsNoEnabled => '沒有已啟用的技能';
+
+  @override
+  String get terminalTitle => '終端機';
+
+  @override
+  String get terminalOpenInSystem => '在系統終端機中開啟';
+
+  @override
+  String get terminalHostDirectory => '主機目錄';
+
+  @override
+  String get terminalBindWorkspaceFirst => '請先綁定工作區';
+
+  @override
+  String get terminalNotAvailable => '不可用';
+
+  @override
+  String get terminalRuntimeUnavailable => '終端機環境尚未就緒';
+
+  @override
+  String get terminalRename => '重新命名';
+
+  @override
+  String get terminalClose => '關閉';
+
+  @override
+  String get terminalClear => '清除';
+
+  @override
+  String get terminalCloseSession => '關閉工作階段';
+
+  @override
+  String get terminalCopy => '複製';
+
+  @override
+  String get terminalPaste => '貼上';
+
+  @override
+  String get terminalNewSession => '新增工作階段';
+
+  @override
+  String get terminalMore => '更多';
+
+  @override
+  String get terminalNameLabel => '名稱';
+
+  @override
+  String get terminalCancel => '取消';
+
+  @override
+  String get terminalSave => '儲存';
+
+  @override
+  String get workspaceDeskMenuWorkspace => '工作區';
+
+  @override
+  String get workspaceDeskMenuSkills => '技能';
+
+  @override
+  String get workspaceDeskBarTitle => '工作區';
+
+  @override
+  String get workspaceDeskBarNoWorkspace => '無工作區';
+
+  @override
+  String get workspaceDeskBarEmptyHint => '從工具列綁定工作區後即可在此瀏覽檔案';
+
+  @override
+  String get workspaceDeskBarToggle => '工作區檔案';
+
+  @override
+  String get workspaceDeskOpenSystemTerminal => '在系統終端機中開啟';
+
+  @override
+  String get workspaceDeskReveal => '在檔案管理員中顯示';
+
+  @override
+  String get workspaceDeskBarClose => '關閉工作區列';
+
+  @override
+  String get workspaceEntryBind => '綁定工作區';
+
+  @override
+  String get workspaceEntryUnbind => '解除綁定';
+
+  @override
+  String get workspaceEntryChange => '更換';
+
+  @override
+  String get workspaceEntrySetAssistantDefault => '設為助手預設工作區';
+
+  @override
+  String get workspaceEntryLocked => '已鎖定';
+
+  @override
+  String get workspaceEntryChangeConfirmTitle => '更換工作區？';
+
+  @override
+  String get workspaceEntryUnbindConfirmTitle => '解除綁定？';
+
+  @override
+  String get workspaceEntryChangeConfirmBody =>
+      '此對話已使用過工作區工具，之前訊息中的檔案連結可能不再可用。';
+
+  @override
+  String get workspaceEntryCwd => '工作目錄';
+
+  @override
+  String get workspaceEntryCwdHint => '相對於工作區根目錄';
+
+  @override
+  String get workspaceEntryCwdInvalid => '路徑無效或已超出工作區';
+
+  @override
+  String get workspaceEntryCwdMissing => '該目錄不存在';
+
+  @override
+  String get workspaceEntryCwdCreate => '建立它';
+
+  @override
+  String get workspaceEntryFiles => '檔案';
+
+  @override
+  String get workspaceEntryTerminal => '終端機';
+
+  @override
+  String get workspaceEntryOpenSystemTerminal => '在系統終端機中開啟';
+
+  @override
+  String get workspaceEntryReveal => '在檔案管理員中顯示';
+
+  @override
+  String get workspaceEntrySessionSkills => '技能';
+
+  @override
+  String get workspaceEntryAllowAll => '本工作階段全部允許';
+
+  @override
+  String get workspaceEntryAllowAllSubtitle => '此對話中的 Shell 命令將不再需要核准。';
+
+  @override
+  String get workspaceEntryEnvironment => '環境';
+
+  @override
+  String get workspaceEntryManage => '管理工作區';
+
+  @override
+  String get workspaceEntryCreate => '新增工作區…';
+
+  @override
+  String get workspaceEntryDefaultWorkspace => '預設工作區';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新對話將綁定到此工作區。';
+
+  @override
+  String get workspaceEntryNone => '無';
+
+  @override
+  String get workspaceEntryStartConversationFirst => '請先開始對話';
+
+  @override
+  String get workspaceEntryTooltip => '工作區';
+
+  @override
+  String get workspaceEntryPickerTitle => '選擇工作區';
+
+  @override
+  String get settingsPageWorkspace => '工作區與環境';
+
+  @override
+  String get settingsPageSkills => '技能';
+
+  @override
+  String get commonClose => '關閉';
+
+  @override
+  String get terminalCopyAllOutput => '複製全部輸出';
+
+  @override
+  String get terminalFontDecrease => '字級 −';
+
+  @override
+  String get terminalFontIncrease => '字級 +';
+
+  @override
+  String get terminalCloseSessionConfirmMessage => '工作階段仍在執行。關閉將結束該程序。';
+
+  @override
+  String get terminalCopiedAll => '已複製全部輸出';
+
+  @override
+  String get terminalConfirm => '確認';
+
+  @override
+  String terminalExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceMgmtNewWorkspace => '新增工作區';
+
+  @override
+  String get workspaceMgmtEmptyHint => '新增一個工作區來存放專案檔案和工作目錄。';
+
+  @override
+  String get workspaceMgmtKindManagedTitle => '託管工作區';
+
+  @override
+  String get workspaceMgmtKindManagedSubtitle => '應用程式內目錄，沙盒可讀寫';
+
+  @override
+  String get workspaceMgmtKindLinkedTitle => '連結資料夾';
+
+  @override
+  String get workspaceMgmtKindLinkedSubtitle => '直接使用本機資料夾';
+
+  @override
+  String get workspaceMgmtImportFromFolder => '從資料夾匯入';
+
+  @override
+  String get workspaceMgmtImportFromFolderSubtitle => '將資料夾複製到新的託管工作區';
+
+  @override
+  String get workspaceMgmtKindSection => '類型';
+
+  @override
+  String get workspaceMgmtCreate => '建立';
+
+  @override
+  String get workspaceMgmtShellApprovalSubtitle => '每次執行命令前詢問';
+
+  @override
+  String get workspaceMgmtDefaultCwdRoot => '/';
+
+  @override
+  String get workspaceMgmtPickCwdTitle => '預設工作目錄';
+
+  @override
+  String get workspaceMgmtFolderPickerUnavailable => '此裝置不支援選擇資料夾。';
+
+  @override
+  String get workspaceMgmtImportProgressTitle => '正在匯入資料夾';
+
+  @override
+  String get workspaceMgmtImportProgressPhase => '正在複製檔案…';
+
+  @override
+  String get workspaceMgmtImportFailed => '無法匯入該資料夾。';
+
+  @override
+  String workspaceMgmtImportDone(String name) {
+    return '已匯入 $name';
+  }
+
+  @override
+  String get workspaceMgmtLastUsedJustNow => '剛剛';
+
+  @override
+  String workspaceMgmtLastUsedMinutesAgo(int n) {
+    return '$n 分鐘前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedHoursAgo(int n) {
+    return '$n 小時前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedDaysAgo(int n) {
+    return '$n 天前';
+  }
+
+  @override
+  String workspaceMgmtRowDetail(String kind, String when) {
+    return '$kind · 上次使用 $when';
+  }
+
+  @override
+  String workspaceMgmtRowDetailNever(String kind) {
+    return '$kind · 從未使用';
+  }
+
+  @override
+  String get workspacePreviewBack => '返回';
+
+  @override
+  String get workspacePreviewWrap => '自動換行';
+
+  @override
+  String get workspacePreviewFontDecrease => '縮小字級';
+
+  @override
+  String get workspacePreviewFontIncrease => '增大字級';
+
+  @override
+  String get workspacePreviewCopy => '複製';
+
+  @override
+  String get workspacePreviewRetry => '重試';
+
+  @override
+  String get workspacePreviewLoadError => '無法載入此檔案。';
+
+  @override
+  String get workspacePreviewRevealInFinder => '在 Finder 中顯示';
+
+  @override
+  String get workspacePreviewOpenInSystemApp => '用系統應用程式開啟';
+
+  @override
+  String get workspacePreviewOpenInBrowser => '在瀏覽器中開啟';
+
+  @override
+  String get workspacePreviewTable => '表格';
+
+  @override
+  String get workspacePreviewPlainLanguage => '程式碼';
+
+  @override
+  String get workspacePreviewOpen => '開啟';
+
+  @override
+  String get workspacePreviewRevealFailed => '無法在檔案管理員中顯示此檔案。';
+
+  @override
+  String get workspacePreviewEmptyTable => '此表格為空。';
+
+  @override
+  String get workspaceFilesNew => '新增';
+
+  @override
+  String get workspaceFilesFoldersFirst => '資料夾優先';
+
+  @override
+  String get workspaceFilesSelectDirectory => '選擇此目錄';
+
+  @override
+  String get workspaceFilesEmptyHint => '用「新增」或「匯入」加入檔案';
+
+  @override
+  String get workspaceFilesEmptyAttachments => '還沒有附件';
+
+  @override
+  String get workspaceFilesEmptyOutputs => '助手還沒有產出檔案';
+
+  @override
+  String get workspaceFilesMoveTo => '移動到…';
+
+  @override
+  String workspaceFilesItemCount(int count) {
+    return '$count 項';
+  }
+
+  @override
+  String get skillsImportTooltip => '匯入技能';
+
+  @override
+  String get skillsImportPasteSubtitle => '貼上帶 frontmatter 的 SKILL.md';
+
+  @override
+  String get skillsImportFileSubtitle => '選擇 .md 或 .zip 檔案';
+
+  @override
+  String get skillsImportGitHubSubtitle => '從倉庫匯入 SKILL.md';
+
+  @override
+  String get skillsImportResolving => '正在解析儲存庫…';
+
+  @override
+  String get skillsImportDownloading => '正在下載…';
+
+  @override
+  String get skillsImportExtracting => '正在解壓縮…';
+
+  @override
+  String get skillsImportInstalling => '正在安裝…';
+
+  @override
+  String get skillsImportGitHubRepoLabel => '倉庫地址';
+
+  @override
+  String get skillsImportGitHubUrlHint =>
+      'https://github.com/owner/repo 或 owner/repo[/path]';
+
+  @override
+  String get skillsImportGitHubHelp => '支援倉庫根目錄或子目錄下的 SKILL.md';
+
+  @override
+  String get skillsEmptyHint => '技能是帶 frontmatter 的 SKILL.md，匯入後助手可按需呼叫';
+
+  @override
+  String get skillsMoreActions => '更多';
+
+  @override
+  String get skillsSearchClear => '清除';
+
+  @override
+  String get skillsSessionEmpty => '還沒有已啟用的技能，請先在技能庫中啟用';
+
+  @override
+  String get workspaceToolRunning => '執行中';
+
+  @override
+  String workspaceToolExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceToolAwaitingApproval => '等待核准';
+
+  @override
+  String get workspaceToolCompleted => '完成';
+
+  @override
+  String workspaceToolLines(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String workspaceToolItems(int count) {
+    return '$count 項';
+  }
+
+  @override
+  String workspaceToolFileMatches(int count) {
+    return '$count 個符合';
+  }
+
+  @override
+  String workspaceToolContentMatches(int count) {
+    return '$count 處符合';
+  }
+
+  @override
+  String get workspaceToolExpand => '展開';
+
+  @override
+  String get workspaceToolSectionCommand => '命令';
+
+  @override
+  String get workspaceToolSectionPath => '路徑';
+
+  @override
+  String get workspaceToolSectionPattern => '模式';
+
+  @override
+  String get workspaceToolSectionOutput => '輸出';
+
+  @override
+  String get workspaceToolSectionDiff => '差異';
+
+  @override
+  String get workspaceToolSectionError => '錯誤';
+
+  @override
+  String get workspaceToolSavedOutput => '已儲存完整輸出';
+
+  @override
+  String get workspaceToolApprove => '允許';
+
+  @override
+  String get workspaceToolDeny => '拒絕';
+
+  @override
+  String get workspaceToolCopy => '複製';
+
+  @override
+  String get workspaceEnvEngineLocalShell => '本機 Shell';
+
+  @override
+  String get workspaceEnvInstallEnvironment => '安裝環境';
+
+  @override
+  String get workspaceEnvInstallDescription => '安裝 Linux 環境，以便在沙盒中執行工具。';
+
+  @override
+  String get workspaceEnvStatusLabel => '狀態';
+
+  @override
+  String get workspaceEnvStatusInstalled => '已安裝';
+
+  @override
+  String get workspaceEnvSizeLabel => '大小';
+
+  @override
+  String get workspaceEnvPathLabel => '路徑';
+
+  @override
+  String get workspaceEnvInstalledAtLabel => '安裝於';
+
+  @override
+  String get workspaceEnvArchLabel => '架構';
+
+  @override
+  String workspaceEnvArchVersion(String arch, String version) {
+    return '$arch · $version';
+  }
+
+  @override
+  String get workspaceEnvBrowseSection => '瀏覽';
+
+  @override
+  String get workspaceEnvBrowseFiles => '瀏覽檔案系統';
+
+  @override
+  String get workspaceEnvBrowseFilesDetail => '檢視沙盒中的完整目錄';
+
+  @override
+  String get workspaceEnvDetectFastMirrors => '偵測快速鏡像';
+
+  @override
+  String get workspaceEnvActionsSection => '操作';
+
+  @override
+  String get workspaceEnvInfoSection => '資訊';
+
+  @override
+  String get workspaceEnvInfoBody =>
+      '環境是沙盒使用的 Linux 根檔案系統。工作區單獨存放，重設環境不會刪除工作區檔案。資料保存在本機已解壓的 rootfs 中。';
+
+  @override
+  String get workspaceEnvRepairDetail => '重新校驗並修補檔案';
+
+  @override
+  String get workspaceEnvUpdateCurrent => '已是最新';
+
+  @override
+  String workspaceEnvUpdateAvailableShort(String version) {
+    return '可更新到 $version';
+  }
+
+  @override
+  String get workspaceEnvResetConfirmMessage =>
+      '這將刪除整個 Linux 環境及其中安裝的套件。工作區檔案不受影響。';
+
+  @override
+  String get workspaceEnvRestartDoneBanner => '重設已完成，請重新啟動應用以完成安裝。';
+
+  @override
+  String get workspaceEnvPathCopied => '已複製路徑';
+
+  @override
+  String get workspaceEnvUseMirrorSubtitle => '將所選鏡像寫入沙盒';
+
+  @override
+  String get workspaceEnvRegionGlobal => '全球';
+
+  @override
+  String get workspaceEnvRegionChina => '中國';
+
+  @override
+  String get workspaceEnvRegionEurope => '歐洲';
+
+  @override
+  String get workspaceEnvRegionAsia => '亞洲';
+
+  @override
+  String get workspaceEnvMirrorTimeout => '逾時';
+
+  @override
+  String get workspaceEnvSpeedTest => '測速';
+
+  @override
+  String get workspaceEnvApplySuccess => '鏡像已套用';
+
+  @override
+  String get workspaceEnvApplyFailed => '無法套用鏡像';
+
+  @override
+  String get workspaceEnvRestoreSuccess => '已恢復官方來源';
+
+  @override
+  String get workspaceEnvMirrorsTested => '已套用最快鏡像';
+
+  @override
+  String get workspaceEnvRelativeJustNow => '剛剛';
+
+  @override
+  String workspaceEnvRelativeMinutesAgo(int count) {
+    return '$count 分鐘前';
+  }
+
+  @override
+  String workspaceEnvRelativeHoursAgo(int count) {
+    return '$count 小時前';
+  }
+
+  @override
+  String workspaceEnvRelativeDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String workspaceEnvDownloadLine(
+    String downloaded,
+    String total,
+    String phase,
+  ) {
+    return '$downloaded / $total · $phase';
+  }
+
+  @override
+  String get workspaceEnvNativeUnsandboxed =>
+      '指令在本機直接執行（無沙盒），除非允許本工作階段全部工具，否則需要核准。';
+
+  @override
+  String get workspaceEnvRootfsTitle => '/';
+
+  @override
+  String get workspaceEnvBrowserUnavailable => '沙盒檔案系統不可用。';
+
+  @override
+  String get workspaceEnvMirrorNameOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialCdn => '官方 CDN';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialPypi => '官方 PyPI';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialNpm => '官方 npm';
+
+  @override
+  String get workspaceEnvMirrorNameTuna => '清華 TUNA';
+
+  @override
+  String get workspaceEnvMirrorNameAlibaba => '阿里雲';
+
+  @override
+  String get workspaceEnvMirrorNameUstc => '中科大 USTC';
+
+  @override
+  String get workspaceEnvMirrorNameHuawei => '華為雲';
+
+  @override
+  String get workspaceEnvMirrorNameTencent => '騰訊雲';
+
+  @override
+  String get workspaceEnvMirrorNameNetease => '網易';
+
+  @override
+  String get workspaceEnvMirrorNameLeaseweb => 'LEASEWEB UK';
+
+  @override
+  String get workspaceEnvMirrorNameRwth => 'RWTH Germany';
+
+  @override
+  String get workspaceEnvMirrorNameJaist => 'JAIST Japan';
+
+  @override
+  String get workspaceEnvMirrorNameKakao => 'Kakao Korea';
+
+  @override
+  String get workspaceEnvMirrorNameNpmmirror => 'npmmirror';
+
+  @override
+  String workspaceEnvSelectionNamed(String name, String region) {
+    return '$name · $region';
+  }
+
+  @override
+  String get workspaceFilesEmptyPickerHint => '點「新增資料夾」新增子資料夾';
+
+  @override
+  String get skillsDetailBodyEmpty => '還沒有技能正文';
+
+  @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '檔案較大，暫不支援預覽（$size）。';
+  }
+
+  @override
+  String get workspaceEnvSizeTimeout => '計算逾時';
+
+  @override
+  String get workspaceEnvInfoCopied => '已複製環境資訊';
+
+  @override
+  String get workspacePreviewEmptyFile => '檔案為空';
+
+  @override
+  String get workspacePreviewEmptyHint => '此檔案沒有任何可預覽的內容。';
+
+  @override
+  String get workspacePreviewRevealInExplorer => '在檔案總管中顯示';
+
+  @override
+  String get workspacePreviewRevealInFileManager => '在檔案管理員中顯示';
+
+  @override
+  String workspaceBindingSetAssistantDefault(String assistant) {
+    return '已設為「$assistant」的預設工作區';
+  }
+
+  @override
+  String get storageSpaceCategoryWorkspaceFiles => '工作區檔案';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFilesHint => '託管工作區中儲存的檔案。';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironment => '沙箱環境';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironmentHint => '沙箱安裝目錄與根檔案系統。';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategorySkillsHint => '已安裝的技能檔案。';
+
+  @override
+  String get storageSpaceCategorySessionFiles => '會話檔案';
+
+  @override
+  String get storageSpaceCategorySessionFilesHint => '各對話的附件與輸出。';
+
+  @override
+  String get storageSpaceManageSkills => '管理技能';
+
+  @override
+  String get storageSessionFilesCleanOrphans => '清理無對話的會話檔案';
+
+  @override
+  String storageSessionFilesCleanOrphansHint(String size) {
+    return '刪除已無對應對話的會話目錄。可回收 $size。';
+  }
+
+  @override
+  String get workspaceDesktopFolderPath => '資料夾路徑';
+
+  @override
+  String get workspaceDesktopFolderMissing => '請選擇已存在的資料夾，或輸入它的絕對路徑。';
+
+  @override
+  String get workspaceDesktopManagedHint => '由 Kelivo 為此專案建立並管理資料夾。';
+
+  @override
+  String get workspaceDesktopHostHint => '在本機存取檔案和執行命令。';
+
+  @override
+  String get workspaceDesktopSearch => '搜尋工作區';
+
+  @override
+  String get workspaceDesktopNoResults => '沒有符合的工作區';
+
+  @override
+  String get workspaceEnvDependencies => '環境預設';
+
+  @override
+  String get workspaceEnvDependenciesDetail => '安裝到共用沙盒，所有工作區均可使用。';
+
+  @override
+  String get workspaceEnvDependencyPython => 'Python、pip 和虛擬環境';
+
+  @override
+  String get workspaceEnvDependencyNode => 'Node.js 和 npm';
+
+  @override
+  String get workspaceEnvDependencyGit => '複製儲存庫與版本管理';
+
+  @override
+  String get workspaceEnvDependencySsh => 'SSH、SCP、SFTP 與金鑰產生';
+
+  @override
+  String get workspaceEnvDependencyNetwork => '網路工具';
+
+  @override
+  String get workspaceEnvDependencyArchive => '壓縮工具';
+
+  @override
+  String get workspaceEnvDependencyInstalled => '已安裝';
+
+  @override
+  String get workspaceEnvDependencyUnknown => '未檢測';
+
+  @override
+  String get workspaceEnvDependencyChecking => '正在檢測工具…';
+
+  @override
+  String get workspaceEnvDependencyInstalling => '正在安裝…';
+
+  @override
+  String get workspaceEnvDependencyCheckFailed => '未能檢測工具，請重新整理再試。';
+
+  @override
+  String get workspaceEnvDependencyInstallFailed => '安裝未完成，請查看記錄或更換軟體套件來源後重試。';
+
+  @override
+  String get workspaceEnvDependencyLog => '安裝記錄';
+
+  @override
+  String get workspaceEnvDependencyRefresh => '重新整理工具狀態';
+
+  @override
+  String get workspaceEnvDependencyReadyFirst => '請先安裝沙盒環境，再安裝這些工具。';
+
+  @override
+  String get workspaceEnvDependencySources => '軟體套件來源';
+
+  @override
+  String get workspaceEnvDependencySourcesDetail =>
+      '預設使用所選 apt/apk 來源安裝；pip 和 npm 來源用於後續安裝的軟體套件。';
+
+  @override
+  String get workspaceEnvDownloadSource => '沙盒下載來源';
+
+  @override
+  String get workspaceEnvDownloadAutomatic => '自動選擇最快來源';
+
+  @override
+  String get workspaceEnvDownloadAutomaticDetail => '下載前檢測官方來源和內建鏡像的速度。';
+
+  @override
+  String get workspaceEnvDownloadCustom => '自訂連結';
+
+  @override
+  String get workspaceEnvDownloadCustomHint =>
+      'https://example.com/ubuntu-base/releases/24.04/release/';
+
+  @override
+  String get workspaceEnvDownloadCustomDetail =>
+      '填寫映像目錄或完整下載連結，映像需符合所選系統、版本及裝置架構。';
+
+  @override
+  String get workspaceEnvDownloadInvalidUrl => '請輸入有效的 HTTP 或 HTTPS 連結。';
+
+  @override
+  String get workspaceEnvDownloadVerified =>
+      '下載後會驗證所選映像的官方 SHA-256。軟體套件來源可另行設定。';
+
+  @override
+  String get workspaceEnvDownloadStart => '下載並安裝';
+
+  @override
+  String get workspaceEnvDownloadSave => '儲存下載來源';
+
+  @override
+  String get workspaceToolsTitle => '工具';
+
+  @override
+  String get workspaceToolsDescription => '選擇此工作區的對話可以使用哪些工具，修改後自動儲存。';
+
+  @override
+  String get workspaceToolHelpShell => '在工作區環境中執行命令。';
+
+  @override
+  String get workspaceToolHelpRead => '按行讀取檔案內容，支援分頁。';
+
+  @override
+  String get workspaceToolHelpWrite => '建立檔案或覆寫檔案內容。';
+
+  @override
+  String get workspaceToolHelpEdit => '取代現有檔案中的指定文字。';
+
+  @override
+  String get workspaceToolHelpList => '瀏覽目錄及其中的檔案。';
+
+  @override
+  String get workspaceToolHelpGlob => '按檔名或路徑模式尋找檔案。';
+
+  @override
+  String get workspaceToolHelpGrep => '搜尋檔案中的文字內容。';
+
+  @override
+  String get workspaceEnvVariablesTitle => '環境變數';
+
+  @override
+  String get workspaceEnvVariablesEntryDetail => '管理命令使用的變數與輸出隱私';
+
+  @override
+  String get workspaceEnvVariablesEmpty => '還沒有環境變數。可以新增工具需要的 API 金鑰等設定。';
+
+  @override
+  String get workspaceEnvVariablesScope =>
+      '所有工作區共用。修改會用於新的 Agent 命令和應用程式內終端機工作階段，已有終端機需重新開啟。外部系統終端機使用其自身的環境變數。';
+
+  @override
+  String get workspaceEnvPrivacyMode => '隱私模式';
+
+  @override
+  String get workspaceEnvPrivacyDetail =>
+      '命令仍能使用真實值。工作區工具輸出傳給模型前，匹配到的至少 5 個字元的變數值會替換為 [REDACTED]，本機日誌保留原文。較短的值不做遮蔽，以免誤替換常見開關和數字。';
+
+  @override
+  String get workspaceEnvVariableAdd => '新增變數';
+
+  @override
+  String get workspaceEnvVariableEdit => '編輯變數';
+
+  @override
+  String get workspaceEnvVariableName => '名稱';
+
+  @override
+  String get workspaceEnvVariableValue => '值';
+
+  @override
+  String get workspaceEnvVariableNote => '備註（選填）';
+
+  @override
+  String get workspaceEnvVariableNameHint =>
+      '名稱使用字母、數字和底線，不能以數字開頭，區分大小寫。命令中可透過 \$NAME 使用變數。';
+
+  @override
+  String get workspaceEnvVariableInvalidName => '請輸入有效的變數名稱。';
+
+  @override
+  String get workspaceEnvVariableInvalidValue => '值不能為空，也不能包含空字元（NUL）。';
+
+  @override
+  String get workspaceEnvVariableDuplicate => '已存在同名變數。';
+
+  @override
+  String get workspaceEnvVariablesSaveFailed => '環境設定儲存失敗，請重試。';
+
+  @override
+  String get incomingShareTitle => '接收分享';
+
+  @override
+  String get incomingShareReplaceDraft => '輸入框中有尚未傳送的內容。是否替換為分享的內容，並開始新對話？';
+
+  @override
+  String get incomingShareFailed =>
+      '部分分享內容未能匯入，請檢查檔案存取權限和可用儲存空間。一次最多分享 32 個檔案。';
+
+  @override
+  String get incomingShareImporting => '正在匯入';
+
+  @override
+  String get incomingShareMoveTo => '移動到…';
+
+  @override
+  String get incomingShareNewChat => '新對話';
+
+  @override
+  String get incomingShareMoveHint => '將草稿和附件移到其他對話，內容不會自動傳送。';
+
+  @override
+  String get incomingShareNoConversations => '沒有符合的對話';
+
+  @override
+  String get chatInputBarRemoveAttachment => '移除附件';
+
+  @override
+  String get incomingShareMoveFailed => '無法切換對話，草稿已保留。';
+
+  @override
+  String attachmentRequiresWorkspace(String name) {
+    return '「$name」無法在一般對話中直接讀取。請綁定工作區並啟用檔案工具，或將草稿移到已有工作區的對話。';
+  }
+
+  @override
+  String get storageSessionFilesUnlinked => '未關聯的對話';
+
+  @override
+  String get workspaceExternalMount => '掛載外部資料夾';
+
+  @override
+  String get workspaceExternalMountSubtitle =>
+      '所選資料夾掛載至 /mounts/<name>，供各工作區的 AI 工具、Shell 和檔案瀏覽器存取。最多掛載 10 個資料夾。';
+
+  @override
+  String get workspaceExternalStorageTitle => '允許存取檔案';
+
+  @override
+  String get workspaceExternalStorageMessage =>
+      '工作區和 Shell 需要直接讀寫外部資料夾，請在 Android 系統設定中允許 Kelivo 存取檔案。Android 11 及以上需開啟「所有檔案存取權限」，然後選擇要掛載的本機資料夾。';
+
+  @override
+  String get workspaceExternalGrantAccess => '前往授權';
+
+  @override
+  String get workspaceExternalLocalOnly =>
+      'Android 僅支援掛載本機資料夾，此檔案提供者沒有可供 Shell 存取的本機目錄。';
+
+  @override
+  String get workspaceExternalUnavailable =>
+      '外部資料夾無法使用。請檢查儲存裝置連線及存取權限，重新選擇資料夾以恢復存取。';
+
+  @override
+  String get workspaceExternalReconnect => '重新選擇資料夾';
+
+  @override
+  String get workspaceMountAdd => '新增資料夾';
+
+  @override
+  String get workspaceMountEdit => '編輯掛載';
+
+  @override
+  String get workspaceMountEmpty => '尚未掛載資料夾';
+
+  @override
+  String get workspaceMountReadOnly => '唯讀';
+
+  @override
+  String get workspaceMountReadWrite => '讀寫';
+
+  @override
+  String get workspaceMountAllowWrite => '允許寫入';
+
+  @override
+  String get workspaceMountPermissionsHint =>
+      '關閉後，AI 檔案工具和檔案瀏覽器會拒絕修改此資料夾。Shell 會檢查部分常用檔案命令，但任意腳本不保證受限。儲存掛載變更時會停止正在執行的命令和終端工作階段。';
+
+  @override
+  String get workspaceMountBrowse => '瀏覽檔案';
+
+  @override
+  String get workspaceMountUnmount => '卸載';
+
+  @override
+  String get workspaceMountUnmountMessage => '卸載此掛載？原資料夾及其中的檔案會保留。';
+
+  @override
+  String get workspaceMountInactive => '無法使用，請重新選擇資料夾';
+
+  @override
+  String get workspaceMountInvalidName =>
+      '名稱最多 64 個字元，不能包含斜線、冒號或控制字元，也不能為 . 或 ..。';
+
+  @override
+  String get workspaceMountDuplicate => '已存在同名掛載。';
+
+  @override
+  String get workspaceMountLimit => '最多掛載 10 個資料夾，請先卸載一個掛載。';
+
+  @override
+  String get workspaceMountOverlap => '此資料夾與已有掛載相同或互相包含。請選擇其他資料夾，以避免權限衝突。';
+
+  @override
+  String get workspaceMountTargetOccupied =>
+      '/mounts 下的同名位置已有本機檔案。請更換掛載名稱，或先移走這些檔案。原有檔案未被刪除。';
+
+  @override
+  String get workspaceEnvSystemImage => '系統映像';
+
+  @override
+  String get workspaceEnvDistribution => '發行版';
+
+  @override
+  String get workspaceEnvSystemVersion => '版本';
+
+  @override
+  String get workspaceEnvLocalImage => '本機映像';
+
+  @override
+  String get workspaceEnvChooseImage => '選擇 rootfs 映像檔案';
+
+  @override
+  String get workspaceEnvLocalImageHint =>
+      '支援根檔案系統壓縮包（.tar.gz、.tar.xz、.tar），不支援 ISO 或磁碟映像。映像需符合裝置 CPU 架構並包含 /bin/sh，解壓後自動識別系統和版本。';
+
+  @override
+  String get workspaceEnvImportImage => '匯入映像';
+
+  @override
+  String get workspaceEnvInvalidImage =>
+      '請選擇適用於此裝置的 rootfs 映像，需包含可執行的 /bin/sh，且 CPU 架構相符。';
+
+  @override
+  String get workspaceEnvReplaceSystem => '更換系統';
+
+  @override
+  String get workspaceEnvReplaceSystemHint =>
+      '更換會取代目前環境內的軟體套件和檔案，並停止執行中的命令與終端工作階段。工作區、聊天檔案和外部資料夾會保留。新映像準備失敗時保留原有環境。';
+
+  @override
+  String get workspaceEnvProotOptions => 'PRoot 設定';
+
+  @override
+  String get workspaceEnvShellPath => 'Shell 路徑';
+
+  @override
+  String get workspaceEnvShellAutomatic => '自動選擇';
+
+  @override
+  String get workspaceEnvShellHint =>
+      '留空時優先使用 /bin/bash，否則使用 /bin/sh。自訂 Shell 需填寫環境內的絕對路徑。';
+
+  @override
+  String get workspaceEnvProotArguments => '額外 PRoot 參數';
+
+  @override
+  String get workspaceEnvProotArgumentsHint =>
+      '每行填寫一個參數，無需 Shell 引號。例如將 -k 和 5.10.0 分別放在兩行，或使用 --kernel-release=5.10.0。設定對之後啟動的命令和終端工作階段生效。';
+
+  @override
+  String get workspaceEnvProotInvalid => '請填寫有效的 Shell 絕對路徑，並將 PRoot 參數逐行填寫。';
+
+  @override
+  String get workspaceFileMissing => '檔案已不存在';
+
+  @override
+  String get workspaceFilePreviewUnavailable => '無法預覽';
+
+  @override
+  String get workspaceToolRelatedFiles => '相關檔案';
+
+  @override
+  String get workspaceToolFilesTruncated => '僅列出部分檔案。';
+
+  @override
+  String get displaySettingsPageShowProducedFilesTitle => '顯示回覆底部檔案卡片';
+
+  @override
+  String get displaySettingsPageShowProducedFilesSubtitle =>
+      '在回覆底部顯示工具建立或修改的檔案。';
+
+  @override
+  String get reasoningBudgetSliderLow => 'Low';
+
+  @override
+  String get reasoningBudgetSliderMedium => 'Medium';
+
+  @override
+  String get reasoningBudgetSliderHigh => 'High';
+
+  @override
+  String get reasoningBudgetSliderXhigh => 'XHigh';
+
+  @override
+  String get reasoningBudgetSliderMax => 'Max';
+
+  @override
+  String get defaultModelPagePerChatModelTitle => '每個對話獨立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '開啟後，在對話中切換模型只影響目前對話；關閉後會直接修改目前助手的模型，使用該助手的所有對話都會跟隨。';
+
+  @override
+  String get googleFontsTitle => 'Google Fonts';
+
+  @override
+  String get googleFontsRefresh => '重新整理字型列表';
+
+  @override
+  String get googleFontsSearchHint => '搜尋字型或語言';
+
+  @override
+  String get googleFontsHint =>
+      '下載一般字重字型後預覽並套用，已安裝字型可離線使用。目錄來自 Expo Google Fonts，字型從 Google Fonts 下載。';
+
+  @override
+  String get googleFontsNoResults => '沒有符合的字型';
+
+  @override
+  String get googleFontsFailed => '無法載入、下載或套用字型，請檢查網路後重試。';
+
+  @override
+  String get googleFontsDownloading => '正在下載字型…';
+
+  @override
+  String get googleFontsPreview => '字型預覽：你好，世界！Hello world 0123456789';
+
+  @override
+  String get googleFontsLicense => '字型授權條款';
+
+  @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      '定位權限已被禁止。請在系統設定中允許定位存取，然後重新開啟此工具。';
+
+  @override
+  String get healthDataSettingsCategoryReproductive => '生殖健康';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowTitle => '經期記錄';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowSubtitle =>
+      '最近 90 天記錄的經量與週期開始日期';
+
+  @override
+  String get assistantEditGradientBackgroundTitle => '漸層背景';
+
+  @override
+  String get assistantEditGradientStaticTitle => '靜態模式';
+
+  @override
+  String get assistantEditGradientStaticDescription => '更省電，適合長對話和持續輸出。';
+
+  @override
+  String get assistantEditGradientHorizontal => '水平位置';
+
+  @override
+  String get assistantEditGradientVertical => '垂直位置';
+
+  @override
+  String get assistantEditGradientPreview => '預覽';
+
+  @override
+  String get assistantEditGradientNextFrame => '換一幀';
+
+  @override
+  String get backgroundSettingsTitle => '背景任務';
+
+  @override
+  String get backgroundTaskTitle => 'Kelivo 任務';
+
+  @override
+  String get backgroundCompleted => '生成完成';
+
+  @override
+  String get backgroundFailed => '生成失敗，請開啟對話查看詳情。';
+
+  @override
+  String get backgroundCancelled => '生成已取消';
+
+  @override
+  String get backgroundInterrupted => '背景生成已中斷，請開啟對話繼續。';
+
+  @override
+  String get backgroundRequesting => '正在請求';
+
+  @override
+  String get backgroundGenerating => '正在生成回覆';
+
+  @override
+  String get backgroundThinking => '正在思考';
+
+  @override
+  String get backgroundToolRunning => '正在執行工具';
+
+  @override
+  String get backgroundRetrying => '等待重試';
+
+  @override
+  String get backgroundWorking => '正在處理';
+
+  @override
+  String get backgroundTasks => '任務';
+
+  @override
+  String get backgroundStopTasks => '停止任務';
+
+  @override
+  String get backgroundOpenChat => '開啟對話';
+
+  @override
+  String get backgroundAndroidEnabled => '背景生成';
+
+  @override
+  String get backgroundAndroidEnabledDetail =>
+      '在鎖定螢幕、切到背景或劃掉最近任務後繼續目前的生成。任務執行期間會顯示系統常駐通知。';
+
+  @override
+  String get backgroundIosEnabled => '增強背景執行';
+
+  @override
+  String get backgroundIosEnabledDetail => '為目前任務申請背景執行時間。可另外開啟定位或靜音音訊輔助保活。';
+
+  @override
+  String get backgroundNotifications => '任務通知';
+
+  @override
+  String get backgroundNotificationsDetail =>
+      '在目前查看的對話之外完成或失敗時通知。此開關不控制 Android 必需的常駐通知。';
+
+  @override
+  String get backgroundPrivacy => '任務狀態隱私';
+
+  @override
+  String get backgroundPrivacyDetail => '在通知和即時狀態中隱藏對話標題及工具詳情，僅顯示通用狀態、任務數量和耗時。';
+
+  @override
+  String get backgroundLiveActivities => '即時動態';
+
+  @override
+  String get backgroundLiveActivitiesDetail =>
+      '在鎖定畫面和動態島顯示目前任務，是否可用及展示位置由系統決定。';
+
+  @override
+  String get backgroundOverlay => '任務懸浮視窗';
+
+  @override
+  String get backgroundOverlayDetail =>
+      '在其他應用程式上顯示可拖動的任務懸浮視窗。點擊進入對話；關閉按鈕僅隱藏懸浮視窗。';
+
+  @override
+  String get backgroundLiveUpdates => '即時通知 / 動態島';
+
+  @override
+  String get backgroundLiveUpdatesDetail =>
+      '在支援的裝置上使用 Android 16 即時通知。系統成功展示即時通知時優先於懸浮視窗。';
+
+  @override
+  String get backgroundLocation => '定位輔助保活';
+
+  @override
+  String get backgroundLocationDetail =>
+      '在背景任務期間使用低精度定位輔助執行，不儲存座標或傳送給 AI 服務。需要開啟增強背景執行並授權定位。';
+
+  @override
+  String get backgroundSilentAudio => '靜音音訊保活';
+
+  @override
+  String get backgroundSilentAudioDetail =>
+      '背景任務執行時播放靜音音訊，並讓位於錄音和朗讀。需要開啟增強背景執行，無需麥克風權限。';
+
+  @override
+  String get backgroundSpeech => '背景朗讀';
+
+  @override
+  String get backgroundSpeechDetail => '鎖定螢幕或切到背景時繼續系統及網路朗讀。關閉時，切到背景會暫停朗讀。';
+
+  @override
+  String get backgroundFinishVisibility => '完成狀態保留時間';
+
+  @override
+  String get backgroundFinishImmediately => '立即收起';
+
+  @override
+  String get backgroundFinishOneMinute => '1 分鐘';
+
+  @override
+  String get backgroundFinishFiveMinutes => '5 分鐘';
+
+  @override
+  String get backgroundFinishUntilForeground => '回到應用程式時收起';
+
+  @override
+  String get backgroundFinishVisibilityDetail =>
+      '用於 Android 懸浮視窗和 iOS 鎖定畫面完成卡片。回到應用程式時清理完成狀態，最長保留 15 分鐘；取消任務立即收起。';
+
+  @override
+  String get backgroundOverlayIcon => '懸浮視窗圖示';
+
+  @override
+  String get backgroundIconDefault => 'Kelivo 圖示';
+
+  @override
+  String get backgroundIconImage => '選擇圖片';
+
+  @override
+  String get backgroundIconEmoji => '選擇 Emoji';
+
+  @override
+  String get backgroundPermissionsTitle => '權限與系統設定';
+
+  @override
+  String get backgroundNotificationsPermission => '通知權限';
+
+  @override
+  String get backgroundBatteryOptimization => '電池最佳化';
+
+  @override
+  String get backgroundBatteryOptimizationDetail => '允許不受限制地使用電池可改善背景執行。';
+
+  @override
+  String get backgroundAutostart => '自動啟動與背景執行';
+
+  @override
+  String get backgroundAutostartDetail =>
+      '請手動檢查裝置的自動啟動和背景限制。Android 無法可靠查詢這些廠商設定的授權狀態。';
+
+  @override
+  String get backgroundLocationPermission => '定位權限';
+
+  @override
+  String get backgroundLocationAlways => '允許持續背景定位';
+
+  @override
+  String get backgroundLocationAlwaysDetail => '可進一步授予「永遠允許」定位權限，僅在點擊此入口時申請。';
+
+  @override
+  String get backgroundSystemSettings => '應用程式系統設定';
+
+  @override
+  String get backgroundPermissionGranted => '已允許';
+
+  @override
+  String get backgroundPermissionDenied => '未允許';
+
+  @override
+  String get backgroundPermissionLimited => '使用應用程式期間';
+
+  @override
+  String get backgroundPermissionUnknown => '需手動檢查';
+
+  @override
+  String get backgroundPermissionNotDetermined => '尚未申請';
+
+  @override
+  String get backgroundRuntimeTitle => '目前狀態';
+
+  @override
+  String get backgroundRuntimeActive => '正在執行';
+
+  @override
+  String get backgroundRuntimeIdle => '未執行';
+
+  @override
+  String get backgroundLocationActive => '背景定位';
+
+  @override
+  String get backgroundAudioActive => '靜音音訊';
+
+  @override
+  String get backgroundActivityActive => '即時動態';
+
+  @override
+  String get backgroundOverlayActive => '懸浮視窗';
+
+  @override
+  String get backgroundLastError => '最近中斷或錯誤';
+
+  @override
+  String get backgroundNoError => '暫無紀錄';
+
+  @override
+  String get backgroundUnsupported => '目前裝置不支援或系統設定未允許';
+
+  @override
+  String get backgroundIosLimit =>
+      '背景執行由 iOS 控制，即時動態本身無法保活。強制結束可能停止生成，即時狀態可能要等再次開啟應用程式後才能清理。';
+
+  @override
+  String get backgroundAndroidLimit =>
+      '如任務中斷，請檢查通知、電池及廠商背景設定。系統強制停止或終止程序仍可能中斷生成。';
+
+  @override
+  String get backgroundStale => '狀態暫未更新，請開啟應用程式查看。';
+
+  @override
+  String get backgroundIconError => '無法匯入此圖片，請選擇其他圖片。';
+
+  @override
+  String get backgroundNotificationChannels => '通知管道';
+
+  @override
+  String get backgroundCompletionChannel => '任務完成通知頻道';
+
+  @override
+  String get backgroundOngoingChannel => '任務執行通知頻道';
+
+  @override
+  String get backgroundOverlayAppearance => '懸浮窗外觀';
+
+  @override
+  String get backgroundOverlayAppearanceDetail => '調整尺寸、圖示、進度環和顯示內容';
+
+  @override
+  String get backgroundOverlayPreviewHint => '拖曳可移動 · 點擊進入對話 · 長按可收起';
+
+  @override
+  String get backgroundOverlayCard => '資訊卡片';
+
+  @override
+  String get backgroundOverlayCircle => '圓形圖示';
+
+  @override
+  String get backgroundOverlaySize => '尺寸與形狀';
+
+  @override
+  String get backgroundOverlayWidth => '寬度';
+
+  @override
+  String get backgroundOverlayHeight => '高度';
+
+  @override
+  String get backgroundOverlayCornerRadius => '圓角';
+
+  @override
+  String get backgroundOverlayIconSize => '圖示大小';
+
+  @override
+  String get backgroundOverlayProgressSize => '進度環直徑';
+
+  @override
+  String get backgroundOverlayProgressStroke => '進度環粗細';
+
+  @override
+  String get backgroundOverlayContent => '顯示內容';
+
+  @override
+  String get backgroundOverlayShowProgress => '顯示進度環';
+
+  @override
+  String get backgroundOverlayShowTitle => '顯示標題';
+
+  @override
+  String get backgroundOverlayShowSubtitle => '顯示副標題';
+
+  @override
+  String get backgroundOverlayShowTime => '顯示耗時';
+
+  @override
+  String get backgroundOverlayShowClose => '顯示關閉按鈕';
+
+  @override
+  String get backgroundOverlayShowBackground => '顯示背景';
+
+  @override
+  String get backgroundOverlayShowBorder => '顯示邊框';
+
+  @override
+  String get backgroundOverlayReset => '恢復預設樣式';
+
+  @override
+  String get mcpStdioEnvironmentRequired => '請先安裝工作區執行環境，再使用行動版 STDIO。';
+
+  @override
+  String get mcpArgumentsHint => '用空格分隔參數，包含空格的內容用引號包裹；空參數寫成 \'\'。';
+
+  @override
+  String get mcpArgumentsInvalid => '請檢查參數中的引號是否閉合、結尾是否有未完成的跳脫。';
+
+  @override
+  String get mcpImportEnvironment => '從環境匯入';
+
+  @override
+  String get mcpEnvironmentEmpty => '尚無環境變數，請先在環境設定中新增。';
+
+  @override
+  String get mcpEnvironmentHint => '預設繼承執行環境的變數，匯入後可為此伺服器個別修改。';
+
+  @override
+  String get mcpImportJson => '匯入 JSON';
+
+  @override
+  String get mcpImportJsonHint =>
+      '貼上 Claude Desktop 或 Cursor 的 MCP 設定，預覽後新增伺服器，不覆蓋現有設定。';
+
+  @override
+  String get mcpImportPaste => '從剪貼簿貼上';
+
+  @override
+  String get mcpImportPreview => '預覽';
+
+  @override
+  String get mcpImportConfirm => '匯入';
+
+  @override
+  String get startupRecoverySnapshotTitle => '從資料庫快照還原';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      '即使資料庫無法開啟，也可以選擇本機快照還原聊天和設定。請勿解除安裝 Kelivo，解除安裝會一併刪除這些快照。';
+
+  @override
+  String get startupRecoverySnapshotEmpty => '未在本機找到資料庫快照。請先匯出資料，再嘗試其他還原操作。';
+
+  @override
+  String get startupRecoverySnapshotButton => '選擇快照還原';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return '將聊天和設定還原到 $when 的快照？快照之後的變更不會包含在內。現有附件檔案和快照會保留，Kelivo 將重新啟動以完成還原。';
+  }
+
+  @override
+  String startupRecoverySnapshotFailed(String reason) {
+    return '無法準備快照還原：$reason';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady => '快照已準備好，請重新啟動 Kelivo 完成還原。';
+
+  @override
+  String get scheduledTasksTitle => '定時任務';
+
+  @override
+  String get scheduledTasksDescription => '在指定時間自動執行任務，支援新增聊天、繼續追問或重新執行。';
+
+  @override
+  String get scheduledTasksEmpty => '把任務交給時間';
+
+  @override
+  String get scheduledTasksEmptyDetail => '晨間簡報、每日回顧，或任何希望定期完成的事。';
+
+  @override
+  String get scheduledTasksAdd => '新增任務';
+
+  @override
+  String get scheduledTasksEdit => '編輯任務';
+
+  @override
+  String get scheduledTasksName => '任務名稱';
+
+  @override
+  String get scheduledTasksNameHint => '晨間簡報';
+
+  @override
+  String get scheduledTasksPrompt => '任務內容';
+
+  @override
+  String get scheduledTasksPromptHint => '希望助手為你完成什麼？';
+
+  @override
+  String get scheduledTasksAssistant => '執行助手';
+
+  @override
+  String get scheduledTasksChooseAssistant => '選擇助手';
+
+  @override
+  String get scheduledTasksAssistantMissing => '助手已不存在';
+
+  @override
+  String get scheduledTasksTime => '執行時間';
+
+  @override
+  String get scheduledTasksTimeHint => '24 小時制，例如 08:00';
+
+  @override
+  String get scheduledTasksRepeat => '重複';
+
+  @override
+  String get scheduledTasksEveryDay => '每天';
+
+  @override
+  String get scheduledTasksWeekdays => '工作日';
+
+  @override
+  String get scheduledTasksEnabled => '啟用任務';
+
+  @override
+  String get scheduledTasksPermission => '鬧鐘和提醒';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      '允許設定鬧鐘，才能按指定時間執行。未授權時，已啟用的任務會等待授權。';
+
+  @override
+  String get scheduledTasksPermissionAction => '前往授權';
+
+  @override
+  String get scheduledTasksReliability =>
+      '建議在電池設定中允許 Kelivo 背景執行。強制停止後需重新開啟應用程式。錯過的任務不會補跑，執行時間跟隨裝置時區。';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      '結果儲存在對話中，完成後會傳送回覆預覽通知，點擊可開啟對話。單次最多執行 10 分鐘；需要使用者回答或工具確認時會停止。';
+
+  @override
+  String get scheduledTasksRunNow => '立即執行';
+
+  @override
+  String get scheduledTasksHistory => '執行紀錄';
+
+  @override
+  String get scheduledTasksNoRuns => '尚無執行紀錄';
+
+  @override
+  String get scheduledTasksRunning => '正在執行';
+
+  @override
+  String get scheduledTasksCompleted => '已完成';
+
+  @override
+  String get scheduledTasksFailed => '執行失敗';
+
+  @override
+  String get scheduledTasksInterrupted => '已中斷';
+
+  @override
+  String get scheduledTasksPaused => '已暫停';
+
+  @override
+  String get scheduledTasksWaitingPermission => '等待授權';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return '下次：$time';
+  }
+
+  @override
+  String get scheduledTasksDelete => '刪除任務';
+
+  @override
+  String get scheduledTasksDeleteDetail => '刪除此任務及執行紀錄？已經產生的對話會保留。';
+
+  @override
+  String get scheduledTasksSave => '儲存';
+
+  @override
+  String get scheduledTasksCancel => '取消';
+
+  @override
+  String get scheduledTasksInvalid => '請填寫名稱、任務內容和助手，自訂重複需至少選擇一天。';
+
+  @override
+  String get scheduledTasksLoading => '正在載入…';
+
+  @override
+  String get scheduledTasksOpenChat => '查看對話';
+
+  @override
+  String get scheduledTasksNeedsInput => '任務需要使用者回答或工具確認，已停止。可開啟對話繼續。';
+
+  @override
+  String get scheduledTasksTimeout => '已達到執行時限。';
+
+  @override
+  String get scheduledTasksProcessTerminated => '上次執行被系統終止。';
+
+  @override
+  String get scheduledTasksOnce => '僅一次';
+
+  @override
+  String get scheduledTasksCustom => '自訂';
+
+  @override
+  String get scheduledTasksExecution => '執行任務';
+
+  @override
+  String get scheduledTasksMode => '執行方式';
+
+  @override
+  String get scheduledTasksNewChat => '新增聊天';
+
+  @override
+  String get scheduledTasksFollowUp => '繼續追問';
+
+  @override
+  String get scheduledTasksRegenerate => '重新執行';
+
+  @override
+  String get scheduledTasksChat => '目標聊天';
+
+  @override
+  String get scheduledTasksChooseChat => '選擇聊天';
+
+  @override
+  String get scheduledTasksMessage => '重新執行的問題';
+
+  @override
+  String get scheduledTasksChooseMessage => '選擇問題';
+
+  @override
+  String get scheduledTasksAttachmentMessage => '含附件的訊息';
+
+  @override
+  String get scheduledTasksModel => '模型';
+
+  @override
+  String get scheduledTasksChooseModel => '選擇模型';
+
+  @override
+  String get scheduledTasksModelDefault => '跟隨聊天或助手的模型';
+
+  @override
+  String get scheduledTasksSchedule => '執行時間';
+
+  @override
+  String get scheduledTasksActiveWindow => '活動時段';
+
+  @override
+  String get scheduledTasksStartDate => '開始日期';
+
+  @override
+  String get scheduledTasksEndDate => '結束日期';
+
+  @override
+  String get scheduledTasksActiveWindowDetail =>
+      '僅在此日期範圍內執行，包含結束當天。未設定的日期不作限制。';
+
+  @override
+  String get scheduledTasksDate => '日期';
+
+  @override
+  String get scheduledTasksDateUnrestricted => '不限';
+
+  @override
+  String get scheduledTasksClear => '清除';
+
+  @override
+  String get scheduledTasksSearch => '搜尋';
+
+  @override
+  String get scheduledTasksNoTargets => '此助手下沒有符合條件的內容';
+
+  @override
+  String get scheduledTasksFutureDate => '請選擇未來的執行日期和時間。';
+
+  @override
+  String get scheduledTasksDateRangeInvalid => '結束日期不能早於開始日期。';
+
+  @override
+  String get scheduledTasksRegenerateDetail =>
+      '使用原有上下文，為所選問題產生新的回答，保留已有回答和後續訊息。';
+
+  @override
+  String get scheduledTasksSaving => '正在儲存…';
+
+  @override
+  String get scheduledTasksFinished => '排程已結束';
+
+  @override
+  String get scheduledTasksModelMissing => '所選模型已無法使用，請編輯任務重新選擇。';
+
+  @override
+  String get scheduledTasksChatMissing => '目標聊天已不存在或已移至其他助手。';
+
+  @override
+  String get scheduledTasksMessageMissing => '所選問題已不存在，請重新選擇。';
+
+  @override
+  String get scheduledTasksChatBusy => '此聊天正在產生回答，本次任務已略過。';
+
+  @override
+  String get scheduledTasksDesktopEmpty => '尚無排程任務';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      '僅在 Kelivo 執行時運作，最小化或常駐系統匣時也會繼續。結束或電腦休眠期間錯過的任務不會補執行，也不會自動啟動應用程式。';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      '結果儲存在對話中，可從任務的執行記錄開啟。單次最多執行 10 分鐘；需要使用者回答或工具確認時會停止。';
+
+  @override
+  String get worldBookStickyLabel => '黏滯（訊息數）';
+
+  @override
+  String get worldBookStickyHint => '觸發後在後續 N 則訊息中保持啟用，重複命中不延長。0 表示關閉。';
+
+  @override
+  String get worldBookCooldownLabel => '冷卻（訊息數）';
+
+  @override
+  String get worldBookCooldownHint => '觸發後（或黏滯結束後）N 則訊息內不再觸發。0 表示關閉。';
+
+  @override
+  String get worldBookDelayLabel => '延遲（訊息數）';
+
+  @override
+  String get worldBookDelayHint => '對話至少有 N 則訊息時才允許觸發。按單則訊息計數，不是對話輪數。0 表示關閉。';
+
+  @override
+  String get worldBookDragToReorder => '拖曳調整順序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已啟用 $enabled/$total';
+  }
+
+  @override
+  String get assistantConversationSystemPromptTitle => '獨立對話系統提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允許每個對話設定自己的系統提示詞。';
+
+  @override
+  String get assistantConversationInjectionTitle => '獨立對話指令注入';
+
+  @override
+  String get assistantConversationInjectionHint => '每個對話單獨選擇指令注入和世界書，預設不選取。';
+
+  @override
+  String get conversationSystemPromptTitle => '對話系統提示詞';
+
+  @override
+  String get conversationSystemPromptHint => '僅對目前對話生效，留空時使用助理的系統提示詞。';
+
+  @override
+  String get conversationSystemPromptClear => '恢復助理提示詞';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '為這個對話編寫系統提示詞…';
+
+  @override
+  String get conversationPromptScope => '僅目前對話';
+
+  @override
+  String get oauthAccountsTab => '帳號登入';
+
+  @override
+  String get oauthLogin => '登入';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return '登入 $provider';
+  }
+
+  @override
+  String get oauthConnected => '已連線';
+
+  @override
+  String get oauthNotConnected => '未連線';
+
+  @override
+  String oauthWaiting(String provider) {
+    return '正在等待 $provider 授權';
+  }
+
+  @override
+  String get oauthCancel => '取消授權';
+
+  @override
+  String get oauthOpenBrowser => '開啟授權頁面';
+
+  @override
+  String get oauthCopyCode => '複製驗證碼';
+
+  @override
+  String get oauthCodeHint => '在授權頁面輸入此驗證碼';
+
+  @override
+  String get oauthDeviceHint => '請先在 ChatGPT 安全設定或工作區權限中啟用裝置碼登入。';
+
+  @override
+  String get oauthDeviceLogin => '使用裝置碼登入';
+
+  @override
+  String get oauthDetails => '查看帳號詳情';
+
+  @override
+  String get oauthConnectAnother => '再連一個';
+
+  @override
+  String get oauthRelogin => '重新登入';
+
+  @override
+  String get oauthNeedsLogin => '需重新登入';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider 登入已過期';
+  }
+
+  @override
+  String get oauthLoginRestored => '已重新登入，可使用訊息的重試按鈕再次傳送。';
+
+  @override
+  String get oauthLogout => '登出';
+
+  @override
+  String get oauthLogoutDescription => '清除此帳號在本機儲存的授權憑證';
+
+  @override
+  String get oauthRefreshing => '正在續期授權…';
+
+  @override
+  String get oauthRefreshUsage => '重新整理用量';
+
+  @override
+  String get oauthUsageDetails => '用量明細';
+
+  @override
+  String get oauthUsageUnavailable => '暫時無法取得用量';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return '更新於 $time';
+  }
+
+  @override
+  String get oauthSyncModels => '同步';
+
+  @override
+  String get oauthSyncing => '正在同步模型…';
+
+  @override
+  String get oauthModelsHint => '可用模型由帳號同步。';
+
+  @override
+  String get oauthNoModels => '同步模型後即可開始對話';
+
+  @override
+  String get oauthConnection => '連線';
+
+  @override
+  String get oauthConnectionInfo => '連線資訊';
+
+  @override
+  String get oauthEndpoint => '連線端點';
+
+  @override
+  String get oauthScope => '授權範圍';
+
+  @override
+  String get oauthAccountId => '帳號 ID';
+
+  @override
+  String get oauthTokenExpiry => '權杖有效期限';
+
+  @override
+  String get oauthName => '供應商名稱';
+
+  @override
+  String get oauthEnabledHint => '在模型選擇器中顯示這些模型';
+
+  @override
+  String get oauthNetwork => '網路代理';
+
+  @override
+  String get oauthFollowGlobal => '跟隨全域設定';
+
+  @override
+  String get oauthCustomRequest => '自訂請求';
+
+  @override
+  String get oauthWeekly => '本週視窗';
+
+  @override
+  String get oauthMonthly => '本月視窗';
+
+  @override
+  String get oauthTotal => '總額度';
+
+  @override
+  String oauthHours(String count) {
+    return '$count 小時視窗';
+  }
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count 分鐘視窗';
+  }
+
+  @override
+  String oauthDays(String count) {
+    return '$count 天視窗';
+  }
+
+  @override
+  String get oauthWindow => '用量視窗';
+
+  @override
+  String oauthResetsAt(String time) {
+    return '重設於 $time';
+  }
+
+  @override
+  String get oauthNetworkError => '連線失敗，請檢查網路後重試。';
+
+  @override
+  String get oauthInvalidResponse => '授權未完成，請重試。';
+
+  @override
+  String get oauthTimeout => '授權逾時，請重試。';
+
+  @override
+  String get oauthDenied => '授權未獲批准，請重試。';
+
+  @override
+  String get oauthSaving => '正在連接帳號…';
+
+  @override
+  String get oauthQuotaExceeded => '此帳號暫無可用額度。';
+
+  @override
+  String get oauthRateLimited => '請求過於頻繁，請稍後重試。';
+
+  @override
+  String get oauthPermissionDenied => '此帳號無權存取此資源。';
+
+  @override
+  String get oauthRequestFailed => '供應商未能完成請求。';
+
+  @override
+  String get oauthQuotaAvailable => '額度可用';
+
+  @override
+  String oauthSavedResets(String count) {
+    return '可用額度重設次數：$count';
+  }
+
+  @override
+  String get oauthPrimaryWindow => '主要視窗';
+
+  @override
+  String get oauthSecondaryWindow => '次要視窗';
+
+  @override
+  String get oauthAuthorizationCode => '授權碼或回呼連結';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果瀏覽器沒有自動返回，請將最後的回呼連結或授權碼貼到這裡。';
+
+  @override
+  String get oauthInvalidAuthorizationCode => '請輸入本次登入的授權碼或回呼連結。';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登入';
+
+  @override
+  String get oauthExtraUsage => '額外用量';
+
+  @override
+  String get oauthPromptCachingHelp => '重用多輪對話中的上下文，可設定快取保留時間。';
 }

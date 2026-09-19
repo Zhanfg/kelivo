@@ -9,7 +9,6 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/api/stream/stream_chunk_handler.dart';
-import '../../../core/services/chat/chat_service.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import 'streaming_content_notifier.dart';
@@ -29,14 +28,11 @@ export 'streaming_content_notifier.dart';
 /// by the home page to handle streaming generation without cluttering the UI code.
 class StreamController {
   StreamController({
-    required this._chatService,
     required this.onStateChanged,
     required this.getSettingsProvider,
     required this.getCurrentConversationId,
     this.onStreamTick,
   });
-
-  final ChatService _chatService;
 
   /// Callback when state changes (trigger setState in the widget).
   /// NOTE: This should only be used for non-streaming state changes.
@@ -109,10 +105,6 @@ class StreamController {
   final Map<String, List<ToolUIPart>> _toolParts = <String, List<ToolUIPart>>{};
   Map<String, List<ToolUIPart>> get toolParts => _toolParts;
 
-  /// Gemini thought signatures per assistant message.
-  final Map<String, String> _geminiThoughtSigs = <String, String>{};
-  Map<String, String> get geminiThoughtSigs => _geminiThoughtSigs;
-
   /// Vendor reasoning details (OpenRouter-style `reasoning_details`, may carry
   /// thinking signatures) per assistant message. Persisted inside the
   /// reasoningSegmentsJson payload so they can be echoed back on later turns.
@@ -168,12 +160,6 @@ class StreamController {
 
   /// Set of message IDs currently being sanitized.
   final Set<String> _inlineImageSanitizing = <String>{};
-
-  /// Regex to capture Gemini thought signature comments.
-  static final RegExp _geminiThoughtSigRe = RegExp(
-    r'<!--\s*gemini_thought_signatures:.*?-->',
-    dotAll: true,
-  );
 
   // ============================================================================
   // Public Methods - State Access
@@ -247,67 +233,35 @@ class StreamController {
     _reasoningSegments.remove(messageId);
     _contentSplits.remove(messageId);
     _toolParts.remove(messageId);
-    _geminiThoughtSigs.remove(messageId);
     _reasoningDetails.remove(messageId);
     _decodedReasoningPayloads.remove(messageId);
     _restoredUiMessageIds.remove(messageId);
     _cleanupStreamTimers(messageId);
   }
 
-  /// Clear all state maps (for new conversation).
-  void clearAllState() {
-    _reasoning.clear();
-    _reasoningSegments.clear();
-    _contentSplits.clear();
-    _toolParts.clear();
-    _geminiThoughtSigs.clear();
-    _reasoningDetails.clear();
-    _decodedReasoningPayloads.clear();
-    _restoredUiMessageIds.clear();
-    _cancelAllTimers();
-    streamingContentNotifier.clear();
+  /// Clear cached UI state while preserving any runs still owned by ChatActions.
+  void clearAllState({Set<String> keepMessageIds = const {}}) {
+    bool discard(String id) => !keepMessageIds.contains(id);
+    _reasoning.removeWhere((id, _) => discard(id));
+    _reasoningSegments.removeWhere((id, _) => discard(id));
+    _contentSplits.removeWhere((id, _) => discard(id));
+    _toolParts.removeWhere((id, _) => discard(id));
+    _reasoningDetails.removeWhere((id, _) => discard(id));
+    _decodedReasoningPayloads.removeWhere((id, _) => discard(id));
+    _restoredUiMessageIds.removeWhere(discard);
+    _cancelAllTimers(keepMessageIds: keepMessageIds);
+    streamingContentNotifier.clear(keepMessageIds: keepMessageIds);
   }
 
-  // ============================================================================
-  // Gemini Thought Signature Handling
-  // ============================================================================
-
-  /// Capture and strip Gemini thought signature from content.
-  String captureGeminiThoughtSignature(String content, String messageId) {
-    if (content.isEmpty) return content;
-    final m = _geminiThoughtSigRe.firstMatch(content);
-    if (m != null) {
-      final sig = m.group(0) ?? '';
-      if (sig.isNotEmpty) {
-        if (_geminiThoughtSigs[messageId] != sig) {
-          _geminiThoughtSigs[messageId] = sig;
-          unawaited(_chatService.setGeminiThoughtSignature(messageId, sig));
-        }
-      }
-      content = content.replaceAll(_geminiThoughtSigRe, '').trimRight();
-    }
-    return content;
-  }
-
-  /// Append Gemini thought signature for API calls (when sending history).
-  String appendGeminiThoughtSignatureForApi(
-    ChatMessage message,
-    String content,
-  ) {
-    String? sig = _geminiThoughtSigs[message.id];
-    sig ??= _chatService.getGeminiThoughtSignature(message.id);
-    if (sig != null &&
-        sig.isNotEmpty &&
-        !content.contains('gemini_thought_signatures:')) {
-      if (content.isEmpty) return sig;
-      return '$content\n$sig';
-    }
-    return content;
-  }
-
-  /// Clear Gemini thought signatures map.
-  void clearGeminiThoughtSigs() {
-    _geminiThoughtSigs.clear();
+  /// Re-apply in-bubble retry UI after [clearAllState] / conversation switch.
+  ///
+  /// [RetryStatus] on a still-alive [StreamingState] is the source of truth;
+  /// it can rebuild a notifier that was explicitly cleared.
+  /// Finished messages must not be re-marked streaming.
+  void restoreRetryStatus(String messageId, RetryStatus? status) {
+    if (status == null) return;
+    if (!_activeStreamingIds.contains(messageId)) return;
+    streamingContentNotifier.updateRetryStatus(messageId, status);
   }
 
   // ============================================================================
@@ -735,18 +689,18 @@ class StreamController {
     streamingContentNotifier.removeNotifier(messageId);
   }
 
-  /// Cancel all throttle timers.
-  void _cancelAllTimers() {
-    for (final timer in _streamThrottleTimers.values) {
+  /// Cancel timers except those belonging to retained generation runs.
+  void _cancelAllTimers({Set<String> keepMessageIds = const {}}) {
+    bool discardTimer(String id, Timer? timer) {
+      if (keepMessageIds.contains(id)) return false;
       timer?.cancel();
+      return true;
     }
-    _streamThrottleTimers.clear();
-    _streamSmoothStates.clear();
-    for (final timer in _inlineImageSanitizeTimers.values) {
-      timer?.cancel();
-    }
-    _inlineImageSanitizeTimers.clear();
-    _inlineImageSanitizing.clear();
+
+    _streamThrottleTimers.removeWhere(discardTimer);
+    _streamSmoothStates.removeWhere((id, _) => !keepMessageIds.contains(id));
+    _inlineImageSanitizeTimers.removeWhere(discardTimer);
+    _inlineImageSanitizing.removeWhere((id) => !keepMessageIds.contains(id));
   }
 
   // ============================================================================
@@ -921,8 +875,8 @@ class StreamController {
         loading: true,
       ),
     );
+    _toolParts[messageId] = dedupeToolPartsList(existing);
     if (getCurrentConversationId() == conversationId) {
-      _toolParts[messageId] = dedupeToolPartsList(existing);
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
         contentSplitOffsets: state.contentSplitOffsets,
@@ -1025,8 +979,8 @@ class StreamController {
         metadata: result.metadata,
       );
     } catch (_) {}
+    _toolParts[messageId] = dedupeToolPartsList(parts);
     if (getCurrentConversationId() == conversationId) {
-      _toolParts[messageId] = dedupeToolPartsList(parts);
       final splits = _contentSplits[messageId];
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
@@ -1471,18 +1425,11 @@ class StreamController {
     ChatMessage message, {
     required List<Map<String, dynamic>> Function(String messageId)
     getToolEventsFromDb,
-    required String? Function(String messageId) getGeminiThoughtSigFromDb,
   }) {
     if (message.role != 'assistant') return;
     if (!_restoredUiMessageIds.add(message.id)) return;
 
     final messageId = message.id;
-
-    // Restore Gemini thought signature
-    final storedSig = getGeminiThoughtSigFromDb(messageId);
-    if (storedSig != null && storedSig.isNotEmpty) {
-      _geminiThoughtSigs[messageId] = storedSig;
-    }
 
     // Restore reasoning state
     final txt = message.reasoningText ?? '';
@@ -1598,6 +1545,7 @@ class GenerationContext {
     this.ocrActive = false,
     this.generateTitleOnFinish = true,
     this.generationRunId,
+    this.scheduled = false,
   });
 
   final ChatMessage assistantMessage;
@@ -1619,6 +1567,7 @@ class GenerationContext {
   final bool ocrActive;
   final bool generateTitleOnFinish;
   final String? generationRunId;
+  final bool scheduled;
 }
 
 /// State object for streaming message generation.
@@ -1644,6 +1593,7 @@ class StreamingState {
   List<int> reasoningCountAtSplit = <int>[];
   List<int> toolCountAtSplit = <int>[];
   final StreamChunkHandler partsHandler;
+  RetryStatus? retryStatus;
 
   String get messageId => ctx.assistantMessage.id;
   String get conversationId => ctx.assistantMessage.conversationId;

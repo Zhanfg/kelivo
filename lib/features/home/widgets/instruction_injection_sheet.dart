@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,15 +11,22 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../features/instruction_injection/pages/instruction_injection_page.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 /// Bottom sheet for displaying instruction injection items on mobile/tablet.
 ///
 /// This widget shows a list of instruction injection prompts that can be
 /// toggled on/off for the current assistant.
 class InstructionInjectionSheet extends StatelessWidget {
-  const InstructionInjectionSheet({super.key, required this.assistantId});
+  const InstructionInjectionSheet({
+    super.key,
+    required this.assistantId,
+    this.conversationId,
+  });
 
   final String? assistantId;
+  final String? conversationId;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +44,12 @@ class InstructionInjectionSheet extends StatelessWidget {
           final groupUi = ctx.watch<InstructionInjectionGroupProvider>();
 
           final items = provider.items;
-          final activeIds = provider.activeIdsFor(assistantId).toSet();
+          final activeIds = promptSelectionIds(
+            ctx,
+            kind: PromptSelectionKind.instruction,
+            assistantId: assistantId,
+            conversationId: conversationId,
+          ).toSet();
 
           final Map<String, List<InstructionInjection>> grouped =
               <String, List<InstructionInjection>>{};
@@ -64,6 +77,17 @@ class InstructionInjectionSheet extends StatelessWidget {
                   controller: controller,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   children: [
+                    if (conversationId != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          l10n.conversationPromptScope,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
                     if (items.isEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 32, bottom: 24),
@@ -121,13 +145,13 @@ class InstructionInjectionSheet extends StatelessWidget {
                                           ),
                                           onTap: () async {
                                             Haptics.light();
-                                            final prov = ctx
-                                                .read<
-                                                  InstructionInjectionProvider
-                                                >();
-                                            await prov.toggleActiveId(
+                                            await togglePromptSelection(
+                                              ctx,
                                               grouped[groupName]![i].id,
+                                              kind: PromptSelectionKind
+                                                  .instruction,
                                               assistantId: assistantId,
+                                              conversationId: conversationId,
                                             );
                                           },
                                           onLongPress: () async {
@@ -139,7 +163,8 @@ class InstructionInjectionSheet extends StatelessWidget {
                                                 >(
                                                   context: ctx,
                                                   isScrollControlled: true,
-                                                  backgroundColor: cs.surface,
+                                                  backgroundColor:
+                                                      ctx.overlaySurface,
                                                   shape: const RoundedRectangleBorder(
                                                     borderRadius:
                                                         BorderRadius.vertical(
@@ -341,7 +366,7 @@ class _InstructionInjectionRow extends StatelessWidget {
       height: 48,
       child: IosCardPress(
         borderRadius: radius,
-        baseColor: Theme.of(context).colorScheme.surface,
+        baseColor: sheetTileColor(context),
         duration: const Duration(milliseconds: 260),
         onTap: onTap,
         onLongPress: onLongPress,
@@ -379,17 +404,20 @@ class _InstructionInjectionRow extends StatelessWidget {
 Future<void> showInstructionInjectionSheet(
   BuildContext context, {
   required String? assistantId,
+  String? conversationId,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (sheetCtx) {
-      return InstructionInjectionSheet(assistantId: assistantId);
+      return InstructionInjectionSheet(
+        assistantId: assistantId,
+        conversationId: conversationId,
+      );
     },
   );
 }

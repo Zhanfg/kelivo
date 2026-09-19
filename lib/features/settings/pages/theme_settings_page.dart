@@ -1,3 +1,4 @@
+import '../widgets/settings_search_target.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +11,8 @@ import '../../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../../../theme/custom_theme.dart';
 import '../widgets/custom_theme_widgets.dart';
+import '../../../shared/widgets/section_card.dart';
+import 'theme_advanced_settings_page.dart';
 
 class ThemeSettingsPage extends StatelessWidget {
   const ThemeSettingsPage({super.key});
@@ -65,6 +68,22 @@ class ThemeSettingsPage extends StatelessWidget {
           ),
         ),
         title: Text(l10n.displaySettingsPageThemeSettingsTitle),
+        actions: [
+          Tooltip(
+            message: l10n.themeAdvancedSettingsPageTitle,
+            child: _TactileIconButton(
+              icon: Lucide.Settings2,
+              color: cs.onSurface,
+              size: 22,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ThemeAdvancedSettingsPage(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -73,7 +92,7 @@ class ThemeSettingsPage extends StatelessWidget {
               defaultTargetPlatform == TargetPlatform.android &&
               settings.dynamicColorSupported) ...[
             header(l10n.themeSettingsPageDynamicColorSection),
-            _iosSectionCard(
+            SectionCard(
               children: [
                 _iosSwitchRow(
                   context,
@@ -88,7 +107,7 @@ class ThemeSettingsPage extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          _iosSectionCard(
+          SectionCard(
             children: [
               _iosSwitchRow(
                 context,
@@ -103,7 +122,7 @@ class ThemeSettingsPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           // header(l10n.themeSettingsPageColorPalettesSection),
-          _iosSectionCard(
+          SectionCard(
             children: [
               for (int i = 0; i < ThemePalettes.all.length; i++) ...[
                 _paletteRow(
@@ -169,7 +188,7 @@ Widget _customThemesSection(BuildContext context) {
 
   if (themes.isEmpty) return const SizedBox.shrink();
 
-  return _iosSectionCard(
+  return SectionCard(
     children: [
       for (int i = 0; i < themes.length; i++) ...[
         _customThemeRow(
@@ -256,35 +275,6 @@ Widget _rowAction(
 }
 
 // --- iOS-style helpers ---
-
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final settings = context.watch<SettingsProvider>();
-      final Color bg = settings.usePureBackground
-          ? (isDark ? Colors.black : const Color(0xFFFFFFFF))
-          : (isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96));
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
@@ -411,7 +401,7 @@ Widget _iosSwitchRow(
   required ValueChanged<bool> onChanged,
 }) {
   final cs = Theme.of(context).colorScheme;
-  return _TactileRow(
+  final row = _TactileRow(
     onTap: () => onChanged(!value),
     builder: (pressed) {
       final baseColor = cs.onSurface.withValues(alpha: 0.9);
@@ -447,6 +437,7 @@ Widget _iosSwitchRow(
       );
     },
   );
+  return SettingsSearchTarget.wrap(context, label, row);
 }
 
 Widget _paletteRow(
