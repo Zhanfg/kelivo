@@ -115,12 +115,13 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
   Future<void> _switchWorldline(StoryWorldline line) async {
     final tree = _tree;
     if (tree == null || line.status == StoryWorldlineStatus.archived) return;
+    final chatService = context.read<ChatService>();
     await _run(() async {
       await _coordinator.switchHead(
         worldTreeId: tree.worldTreeId,
         worldlineId: line.id,
       );
-      context.read<ChatService>().setCurrentConversation(line.conversationId);
+      chatService.setCurrentConversation(line.conversationId);
       if (mounted) {
         setState(() => _selectedWorldlineId = line.id);
       }
