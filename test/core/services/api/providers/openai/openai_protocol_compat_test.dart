@@ -176,6 +176,18 @@ void main() {
     );
   });
 
+  test('normalizes OpenCode provider-prefixed model ids', () {
+    final cfg = _cfg(baseUrl: 'https://opencode.ai/zen/go/v1');
+    expect(
+      resolveOpenAIWireProtocol(cfg, 'opencode-go/gpt-5.6-luna'),
+      OpenAIWireProtocol.responses,
+    );
+    expect(
+      resolveOpenAIWireProtocol(cfg, 'opencode-go/qwen3.8-max'),
+      OpenAIWireProtocol.anthropicMessages,
+    );
+  });
+
   test('provider Responses switch still force-enables Responses', () {
     final cfg = _cfg(
       baseUrl: 'https://example.com/v1',
