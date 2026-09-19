@@ -761,6 +761,9 @@ class ProviderManager {
         } else {
           if (effectiveKey.isNotEmpty) {
             headers['x-goog-api-key'] = effectiveKey;
+            if (Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() == 'opencode.ai') {
+              headers['Authorization'] = 'Bearer $effectiveKey';
+            }
           }
         }
         headers.addAll(_customHeaders(cfg, modelId));
