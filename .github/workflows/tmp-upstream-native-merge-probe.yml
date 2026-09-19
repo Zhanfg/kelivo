@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Probe native merge
+      - name: Merge and collect conflicts
         shell: bash
         run: |
           git config user.name "Kelivo Merge Probe"
@@ -26,9 +26,36 @@ jobs:
           git fetch origin master
           git merge --no-commit --no-ff origin/master
           rc=$?
-          echo "MERGE_EXIT_CODE=$rc"
+          set -e
+          echo "MERGE_RC=$rc" >> "$GITHUB_ENV"
+
+          rm -rf conflict_bundle
+          mkdir -p conflict_bundle/{merged,base,ours,theirs}
+          git diff --name-only --diff-filter=U > conflict_bundle/conflicts.txt || true
+
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            mkdir -p "conflict_bundle/merged/$(dirname "$p")"
+            mkdir -p "conflict_bundle/base/$(dirname "$p")"
+            mkdir -p "conflict_bundle/ours/$(dirname "$p")"
+            mkdir -p "conflict_bundle/theirs/$(dirname "$p")"
+
+            cp "$p" "conflict_bundle/merged/$p" 2>/dev/null || true
+            git show ":1:$p" > "conflict_bundle/base/$p" 2>/dev/null || true
+            git show ":2:$p" > "conflict_bundle/ours/$p" 2>/dev/null || true
+            git show ":3:$p" > "conflict_bundle/theirs/$p" 2>/dev/null || true
+          done < conflict_bundle/conflicts.txt
+
           echo "=== CONFLICT FILES ==="
-          git diff --name-only --diff-filter=U || true
-          echo "=== STATUS ==="
-          git status --short || true
-          exit "$rc"
+          cat conflict_bundle/conflicts.txt || true
+
+      - name: Upload conflict bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-merge-conflicts
+          path: conflict_bundle
+          if-no-files-found: error
+
+      - name: Finish probe
+        shell: bash
+        run: exit "$MERGE_RC"
