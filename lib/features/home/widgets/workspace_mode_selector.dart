@@ -58,7 +58,8 @@ class _WorkspaceModeSelector extends StatelessWidget {
     final zh = Localizations.localeOf(context).languageCode == 'zh';
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selectedIndex = modes.indexOf(selected).clamp(0, modes.length - 1);
+    final rawSelectedIndex = modes.indexOf(selected);
+    final selectedIndex = rawSelectedIndex < 0 ? 0 : rawSelectedIndex;
 
     return Semantics(
       container: true,
