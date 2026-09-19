@@ -244,6 +244,34 @@ class MessageGenerationService {
       modelId,
       conversation: promptConversation,
     );
+
+    BusinessPreferences? storyPreferences;
+    StoryRuntimePromptResult? storyRuntime;
+    try {
+      storyPreferences = contextProvider.read<BusinessPreferences>();
+    } on ProviderNotFoundException {
+      storyPreferences = null;
+    }
+    if (storyPreferences != null) {
+      final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();
+      if (promptConversation != null && storyAssistantId.isNotEmpty) {
+        storyRuntime = await StoryRuntimePromptService(storyPreferences).build(
+          conversation: promptConversation,
+          messages: messages,
+          assistantId: storyAssistantId,
+        );
+        if (storyRuntime != null) {
+          StoryBreakArmorMode(
+            storyPreferences,
+          ).prependToSystemPrompt(apiMessages);
+          _injectStoryRuntimeSystemPrompt(
+            apiMessages,
+            storyRuntime.providerText,
+          );
+        }
+      }
+    }
+
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,
@@ -338,9 +366,14 @@ class MessageGenerationService {
     // reads, memory injection, templating) must never show the bar.
     // Tools are assembled first: whether a data file is read into the prompt
     // or left for the sandbox depends on which tools go with it.
-    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
-      assistant,
-    );
+    var mcpRouteSnapshot = generationController.captureMcpToolRoutes(assistant);
+    if (storyRuntime?.mcpProfileId != null) {
+      mcpRouteSnapshot = mcpRouteSnapshot.filtered(
+        allowedToolNames: storyRuntime!.allowedMcpToolNames,
+        allowedServerIds: storyRuntime.allowedMcpServerIds,
+        includeUnlisted: storyRuntime.includeAssistantMcpDefaults,
+      );
+    }
     final toolDefs = generationController.buildToolDefinitions(
       settings,
       assistant,
@@ -351,6 +384,14 @@ class MessageGenerationService {
       workspaceContext: workspaceContext,
       conversationId: currentConversation?.id,
     );
+    final storySerializationEnabled =
+        storyPreferences != null &&
+        storyRuntime != null &&
+        StorySerializationTools.enabledFor(storyRuntime.activeSkillIds) &&
+        generationController.isToolModel(providerKey, modelId);
+    if (storySerializationEnabled) {
+      toolDefs.addAll(_storySerializationToolDefinitions(kind));
+    }
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,
       modelId: modelId,
@@ -422,7 +463,7 @@ class MessageGenerationService {
     }
     messageBuilderService.stripInternalRevisionIds(apiMessages);
 
-    final onToolCall = toolDefs.isNotEmpty
+    final nativeOnToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
             settings,
             assistant,

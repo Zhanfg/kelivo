@@ -53,6 +53,7 @@ class BottomToolsSheet extends StatelessWidget {
     this.clearLabel,
     this.assistantId,
     this.conversationId,
+    this.storyConversationId,
     this.onClose,
   });
 
@@ -68,6 +69,7 @@ class BottomToolsSheet extends StatelessWidget {
   final String? clearLabel;
   final String? assistantId;
   final String? conversationId;
+  final String? storyConversationId;
   final VoidCallback? onClose;
 
   @override
@@ -75,7 +77,7 @@ class BottomToolsSheet extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final bg = context.overlaySurface;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
-    final storyConversationId = this.storyConversationId;
+    final storyConversationId = this.storyConversationId ?? conversationId;
 
     void openStoryPage(Widget page) {
       final navigator = Navigator.of(context, rootNavigator: true);

@@ -33,6 +33,13 @@
   "settingsPageBackup": "Backup",
   "settingsPageChatStorage": "Chat Storage",
   "settingsPageCalculating": "Calculating…",
+  "settingsPageFilesCount": "{count} files · {size}",
+  "@settingsPageFilesCount": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "size": {"type": "String"}
+    }
+  },
   "storageSpacePageTitle": "Storage Space",
   "storageSpaceRefreshTooltip": "Refresh",
   "storageSpaceLoadFailed": "Failed to load storage usage",

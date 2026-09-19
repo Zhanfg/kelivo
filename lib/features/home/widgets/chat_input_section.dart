@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/asr_provider.dart';
@@ -12,8 +13,8 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
-import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../features/workspace/widgets/environment/environment_status_chip.dart';

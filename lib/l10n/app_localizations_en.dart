@@ -119,6 +119,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageCalculating => 'Calculating…';
 
   @override
+  String settingsPageFilesCount(int count, String size) {
+    return '$count files · $size';
+  }
+
+  @override
   String get storageSpacePageTitle => 'Storage Space';
 
   @override
