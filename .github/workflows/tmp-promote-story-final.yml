@@ -12,19 +12,19 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout verified candidate
+      - name: Checkout verified audit candidate
         uses: actions/checkout@v4
         with:
-          ref: sync/upstream-native-final-20260920
+          ref: feat/story-audit-improvements-20260920
           fetch-depth: 0
 
       - name: Promote with lease
         shell: bash
         run: |
           set -euo pipefail
-          expected="245128eded47ee573223cd66857883dc933d0f84"
+          expected="9ed91c23fceefc3f589f45f06f4dc72ef0d38fc9"
           target="feat/story-runtime-foundation"
-          candidate="9ed91c23fceefc3f589f45f06f4dc72ef0d38fc9"
+          candidate="1196bc0f2bf7acfbe6962cb4e48d48e6d13b9b99"
 
           git fetch origin "$target"
           actual="$(git rev-parse "origin/$target")"
