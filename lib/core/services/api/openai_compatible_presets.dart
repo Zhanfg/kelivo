@@ -39,6 +39,27 @@ abstract final class OpenAICompatiblePresets {
     baseUrl: 'https://opencode.ai/zen/v1',
   );
 
+  static const kiloFree = OpenAICompatiblePreset(
+    id: 'kilo-free',
+    label: 'Kilo Free',
+    name: 'Kilo Free',
+    baseUrl: 'https://api.kilo.ai/api/gateway',
+  );
+
+  static const pollinations = OpenAICompatiblePreset(
+    id: 'pollinations',
+    label: 'Pollinations',
+    name: 'Pollinations',
+    baseUrl: 'https://gen.pollinations.ai/v1',
+  );
+
+  static const openRouterFree = OpenAICompatiblePreset(
+    id: 'openrouter-free',
+    label: 'OpenRouter Free',
+    name: 'OpenRouter Free',
+    baseUrl: 'https://openrouter.ai/api/v1',
+  );
+
   static const freeBuffBridge = OpenAICompatiblePreset(
     id: 'freebuff-bridge',
     label: 'FreeBuff Bridge',
@@ -48,6 +69,9 @@ abstract final class OpenAICompatiblePresets {
   );
 
   static const all = <OpenAICompatiblePreset>[
+    kiloFree,
+    pollinations,
+    openRouterFree,
     openCodeGo,
     openCodeZen,
     freeBuffBridge,
