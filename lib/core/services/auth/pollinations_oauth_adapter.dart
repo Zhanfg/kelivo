@@ -57,13 +57,12 @@ class PollinationsOAuthAdapter extends ProviderOAuthAdapter {
     var interval = Duration(
       seconds: (oauthNumber(init.data['interval']) ?? 5).clamp(1, 60).toInt(),
     );
-    final expiresIn =
-        (oauthNumber(init.data['expires_in']) ?? 600).clamp(60, 3600).toInt();
+    final expiresIn = (oauthNumber(init.data['expires_in']) ?? 600)
+        .clamp(60, 3600)
+        .toInt();
     final deadline = DateTime.now().add(Duration(seconds: expiresIn));
 
-    await onPrompt(
-      OAuthLoginPrompt(url: verification, userCode: userCode),
-    );
+    await onPrompt(OAuthLoginPrompt(url: verification, userCode: userCode));
 
     while (DateTime.now().isBefore(deadline)) {
       await cancellation.wait(interval);
@@ -105,12 +104,9 @@ class PollinationsOAuthAdapter extends ProviderOAuthAdapter {
         return ProviderOAuthCredentials(
           accessToken: accessToken,
           refreshToken: '',
-          expiresAt: DateTime.now().add(
-            Duration(seconds: lifetimeSeconds),
-          ),
+          expiresAt: DateTime.now().add(Duration(seconds: lifetimeSeconds)),
           sessionId: const Uuid().v4(),
-          accountId:
-              oauthString(user['sub']) ?? oauthString(user['id']),
+          accountId: oauthString(user['sub']) ?? oauthString(user['id']),
           email: oauthString(user['email']),
           plan: 'Pollinations',
         );
@@ -162,7 +158,9 @@ class PollinationsOAuthAdapter extends ProviderOAuthAdapter {
     final output = row['output_modalities'];
     if (output is List &&
         output.isNotEmpty &&
-        !output.map((value) => value.toString().toLowerCase()).contains('text')) {
+        !output
+            .map((value) => value.toString().toLowerCase())
+            .contains('text')) {
       return false;
     }
     return true;
@@ -187,11 +185,7 @@ class PollinationsOAuthAdapter extends ProviderOAuthAdapter {
     OAuthWire wire,
     ProviderOAuthCredentials credentials,
   ) async {
-    await get(
-      wire,
-      '$_authBase/api/device/userinfo',
-      credentials,
-    );
+    await get(wire, '$_authBase/api/device/userinfo', credentials);
     return ProviderUsageSnapshot(
       windows: const [],
       fetchedAt: DateTime.now(),
