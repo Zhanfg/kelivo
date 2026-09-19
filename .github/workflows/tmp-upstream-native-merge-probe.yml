@@ -1,4 +1,4 @@
-name: Upstream Native Merge Theirs Candidate
+name: Upstream Native Merge Candidate V2
 
 on:
   push:
@@ -32,53 +32,38 @@ jobs:
           git config user.name "Kelivo Upstream Sync"
           git config user.email "actions@users.noreply.github.com"
           git fetch origin master sync/upstream-20260920
-          git merge --no-ff -X theirs origin/master -m "merge: sync upstream master into story runtime (upstream-preferred)"
+          git merge --no-ff -X theirs origin/master -m "merge: sync upstream master into story runtime"
 
-          # Reuse the reviewed infrastructure merge for Android + CI.
+          # Reuse reviewed two-sided infrastructure merges.
           git checkout origin/sync/upstream-20260920 -- \
             .github/workflows/pr-check.yml \
             android/app/build.gradle.kts
 
-          # Keep Story assets/dependency while retaining upstream additions.
+          # Keep Story-specific dependency/assets while retaining upstream's
+          # local flutter_math_fork path and upstream skill assets.
           python3 - <<'PY'
           from pathlib import Path
           p=Path("pubspec.yaml")
           s=p.read_text()
-          if "  cryptography: ^2.9.0" not in s:
-              s=s.replace("  hashlib: ^2.4.2\n", "  cryptography: ^2.9.0\n  hashlib: ^2.4.2\n")
-          story=[
-            "    - assets/story_skills/\n",
-            "    - assets/story_skills/lieflat-less-ai-tone/SKILL.md\n",
-            "    - assets/story_skills/lieflat-less-ai-tone/prompts/10_kelivo_human_writing_core.md\n",
-            "    - assets/story_skills/visual-taste-basics/SKILL.md\n",
-            "    - assets/story_skills/github-story-serialization/SKILL.md\n",
-          ]
-          anchor="    - assets/html/mark.html\n"
-          if story[0] not in s:
-              s=s.replace(anchor, anchor+"".join(story))
-          p.write_text(s)
-          PY
 
-          # Upstream adapter contains new icons; add Story aliases without replacing it.
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path("lib/icons/lucide_adapter.dart")
-          s=p.read_text()
-          marker="\n}"
-          aliases = "\n".join([
-              "",
-              "",
-              "  // Story Runtime aliases intentionally resolve to Kelivo's native icon set.",
-              "  static const IconData CircleCheck = CheckCircle;",
-              "  static const IconData HardDriveDownload = Download;",
-              "  static const IconData CircleOff = XCircle;",
-              "  static const IconData Users = User;",
-              "  static const IconData Cpu = Activity;",
-              "  static const IconData Cloud = Network;",
-              "",
-          ])
-          if "static const IconData CircleCheck = CheckCircle;" not in s:
-              s=s.rsplit(marker,1)[0]+aliases+marker
+          if "  hashlib: ^2.4.2" not in s:
+              s=s.replace("  cryptography: ^2.9.0\n", "  cryptography: ^2.9.0\n  hashlib: ^2.4.2\n")
+
+          story_assets=[
+              "    - assets/story_skills/lieflat-less-ai-tone/SKILL.md\n",
+              "    - assets/story_skills/lieflat-less-ai-tone/LICENSE\n",
+              "    - assets/story_skills/lieflat-less-ai-tone/prompts/10_kelivo_human_writing_core.md\n",
+              "    - assets/story_skills/visual-taste-basics/SKILL.md\n",
+              "    - assets/story_skills/github-story-serialization/SKILL.md\n",
+          ]
+          anchor="  assets:\n"
+          if anchor in s:
+              pos=s.index(anchor)+len(anchor)
+              existing=s[pos:]
+              missing=[x for x in story_assets if x.strip() not in existing]
+              if missing:
+                  s=s[:pos]+''.join(missing)+s[pos:]
+
           p.write_text(s)
           PY
 
@@ -88,15 +73,31 @@ jobs:
       - name: Regenerate localization outputs
         run: flutter gen-l10n
 
-      - name: Commit candidate
+      - name: Commit merged candidate
         shell: bash
         run: |
           set -euo pipefail
           git add -A
           if ! git diff --cached --quiet; then
-            git commit -m "fix(sync): reconcile upstream-first candidate"
+            git commit -m "fix(sync): reconcile dependencies and generated localization"
           fi
-          git push origin HEAD:refs/heads/sync/upstream-native-theirs-20260920 --force
+          git push origin HEAD:refs/heads/sync/upstream-native-candidate-v2-20260920 --force
 
       - name: Analyze merged tree
         run: dart analyze --fatal-infos lib test integration_test
+
+      - name: Story focused tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter test --concurrency=1 \
+            test/story_runtime_foundation_test.dart \
+            test/story_runtime_state_test.dart \
+            test/story_runtime_machine_test.dart \
+            test/story_runtime_controller_test.dart \
+            test/story_runtime_assembler_test.dart \
+            test/story_response_parser_test.dart \
+            test/story_prompt_compiler_test.dart \
+            test/story_worldline_memory_test.dart \
+            test/story_world_tree_models_test.dart \
+            test/story_skill_system_test.dart
