@@ -1,6 +1,7 @@
 name: Temporary Dart format probe
 
 on:
+  pull_request:
   push:
     branches:
       - feat/provider-compat-opencode-free
