@@ -155,12 +155,29 @@ jobs:
         run: |
           set -euo pipefail
           git add -A
-          git commit -m "fix(sync): restore tool routing and clear analyzer warnings"
-          git push origin HEAD:refs/heads/sync/upstream-native-final-20260920 --force
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(sync): restore tool routing and clear analyzer warnings"
+            git push origin HEAD:refs/heads/sync/upstream-native-final-20260920 --force
+          else
+            echo "Final candidate already contains cleanup; no commit needed."
+          fi
 
       - name: Analyze
         run: dart analyze --fatal-infos lib test integration_test
 
-      - name: Story focused tests
+      - name: Story broad regression
         shell: bash
-        run: flutter test --concurrency=1 test/story_runtime_foundation_test.dart test/story_runtime_state_test.dart test/story_runtime_machine_test.dart test/story_runtime_controller_test.dart test/story_runtime_assembler_test.dart test/story_response_parser_test.dart test/story_prompt_compiler_test.dart test/story_worldline_memory_test.dart test/story_world_tree_models_test.dart test/story_skill_system_test.dart test/core/services/tts/local_tts_test.dart test/features/home/widgets/chat_input_bar_queue_test.dart test/features/home/widgets/chat_input_bar_mobile_composer_test.dart
+        run: |
+          flutter test --concurrency=2 \
+            test/story_*_test.dart \
+            test/features/story_runtime \
+            test/core/services/tts/local_tts_test.dart \
+            test/features/home/composer/asr_transcript_delivery_test.dart \
+            test/features/home/composer/composer_reasoning_level_test.dart \
+            test/features/home/composer/composer_reasoning_popover_test.dart \
+            test/features/home/controllers/chat_controller_pause_test.dart \
+            test/features/home/widgets/chat_input_bar_asr_test.dart \
+            test/features/home/widgets/chat_input_bar_mobile_composer_test.dart \
+            test/features/home/widgets/chat_input_bar_queue_test.dart \
+            test/features/settings/pages/tts_services_page_test.dart \
+            test/encrypted_full_backup_test.dart
