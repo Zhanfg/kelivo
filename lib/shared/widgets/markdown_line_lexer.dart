@@ -87,6 +87,42 @@ final class MarkdownLineLexer {
   }
 }
 
+/// Removes fenced and inline code while preserving the surrounding line
+/// structure. Fence and backtick pairing stay identical to the renderer's
+/// structural scan.
+String markdownRemoveCode(String text) {
+  if (!text.contains('`') && !text.contains('~~~')) return text;
+
+  final lexer = MarkdownLineLexer();
+  final output = StringBuffer();
+  var cursor = 0;
+  while (cursor < text.length) {
+    var lineEnd = cursor;
+    while (lineEnd < text.length &&
+        !markdownIsLogicalLineBreak(text.codeUnitAt(lineEnd))) {
+      lineEnd++;
+    }
+    final line = text.substring(cursor, lineEnd);
+    final prefix = _markdownFenceContainerPrefix.firstMatch(line)!;
+    final fenceLine = line.substring(prefix.end);
+    if (lexer.consumeFence(fenceLine)) {
+      output.write(' ');
+    } else {
+      output.write(_LineBackticks.of(line).withoutCode(line));
+    }
+
+    if (lineEnd >= text.length) break;
+    final next = _skipLogicalLineBreak(text, lineEnd, text.length);
+    output.write(text.substring(lineEnd, next));
+    cursor = next;
+  }
+  return output.toString();
+}
+
+final _markdownFenceContainerPrefix = RegExp(
+  r'^[ \t]*(?:(?:>[ \t]*)|(?:(?:[*+-]|\d+\.)[ \t]+))*',
+);
+
 /// Same cap as the recursive [blockPattern] used by [DetailsHtmlMd].
 const int markdownDetailsMaxDepth = 6;
 
@@ -532,6 +568,13 @@ final class MarkdownDetailsRegistry {
   }
 
   String rewrite(String text) {
+    if (!text.contains('<') || !MarkdownDetailsWalker.open.hasMatch(text)) {
+      // A nested fragment cannot introduce a tag absent from its parent.
+      // Still reserve literal tokens from a root without details, so later
+      // fragments can never alias a user-authored placeholder.
+      if (_rootSource == null && text.contains('\uE010')) _bindRoot(text);
+      return text;
+    }
     return _rewritten.putIfAbsent(text, () {
       _bindRoot(text);
       final segments = markdownExtractTopLevelDetails(
@@ -617,6 +660,38 @@ final class _LineBackticks {
   int get slotCount => _jump?.length ?? 0;
 
   int advance(int i) => _jump![i] ?? i + 1;
+
+  String withoutCode(String line) {
+    if (_jump == null) return line;
+    final output = StringBuffer();
+    var cursor = 0;
+    var index = 0;
+    var removed = false;
+    while (index < line.length) {
+      if (line.codeUnitAt(index) != 0x60) {
+        index++;
+        continue;
+      }
+      var runEnd = index + 1;
+      while (runEnd < line.length && line.codeUnitAt(runEnd) == 0x60) {
+        runEnd++;
+      }
+      final spanEnd = advance(index);
+      if (spanEnd > runEnd) {
+        output
+          ..write(line.substring(cursor, index))
+          ..write(' ');
+        cursor = spanEnd;
+        index = spanEnd;
+        removed = true;
+      } else {
+        index = runEnd;
+      }
+    }
+    if (!removed) return line;
+    output.write(line.substring(cursor));
+    return output.toString();
+  }
 
   static _LineBackticks of(String line) {
     final starts = <int>[];
@@ -859,10 +934,13 @@ final class MarkdownDisplayMathScanner {
     _frozenFenceCloseAt = 0;
   }
 
+  /// [appendOnly] skips a second prefix comparison when the owning document
+  /// already validated the append and calls [reset] before every replacement.
   MarkdownDisplayMathScan synchronize(
     String text, {
     int? end,
     bool enableMath = true,
+    bool appendOnly = false,
   }) {
     final limit = end ?? text.length;
     if (!enableMath || limit <= 0) {
@@ -872,9 +950,10 @@ final class MarkdownDisplayMathScanner {
     if (_text.isNotEmpty &&
         (_scannedTo > limit ||
             _scannedTo > text.length ||
-            !text.startsWith(
-              _text.substring(0, _scannedTo.clamp(0, _text.length)),
-            ))) {
+            (!appendOnly &&
+                !text.startsWith(
+                  _text.substring(0, _scannedTo.clamp(0, _text.length)),
+                )))) {
       reset();
     }
     _text = text;

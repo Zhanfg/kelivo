@@ -470,6 +470,8 @@ Input:
   static const String introFullZh = '以下内容由系统提供，不是用户本轮发送的内容。';
   static const String introFullEn =
       'The following context is provided by the system. It is not what the user said in this turn.';
+  // No longer written: injection always emits a full snapshot. Kept so
+  // prompts frozen by earlier versions can still be parsed and stripped.
   static const String introUpdateZh = '以下是本次对话开始后发生的记忆更新，由系统提供。';
   static const String introUpdateEn =
       'The following memory changes happened after this conversation started, provided by the system.';
@@ -493,10 +495,14 @@ Input:
   ];
 
   /// Wraps [timestamp] as `<current_time>EEE yyyy-MM-dd HH:mm:ss</current_time>`
-  /// in the local timezone, without a UTC offset (§9.1).
+  /// in the local timezone, without a UTC offset (§9.1) by default.
+  /// With [useIso8601], emits ISO 8601 to seconds with a UTC offset.
   ///
   /// Four-digit year avoids `yy-MM-dd` / `dd-MM-yy` ambiguity (e.g. 22–26).
-  static String formatCurrentTimeTag(DateTime timestamp) {
+  static String formatCurrentTimeTag(
+    DateTime timestamp, {
+    bool useIso8601 = false,
+  }) {
     final local = timestamp.isUtc ? timestamp.toLocal() : timestamp;
     final eee = _weekdayAbbrev[local.weekday - 1];
     final yyyy = local.year.toString();
@@ -505,6 +511,15 @@ Input:
     final hh = local.hour.toString().padLeft(2, '0');
     final min = local.minute.toString().padLeft(2, '0');
     final ss = local.second.toString().padLeft(2, '0');
+    if (useIso8601) {
+      final offset = local.timeZoneOffset;
+      final sign = offset.isNegative ? '-' : '+';
+      final minutes = offset.inMinutes.abs();
+      final offsetHours = (minutes ~/ 60).toString().padLeft(2, '0');
+      final offsetMinutes = (minutes % 60).toString().padLeft(2, '0');
+      return '<current_time>${yyyy.padLeft(4, '0')}-$mm-${dd}T$hh:$min:$ss'
+          '$sign$offsetHours:$offsetMinutes</current_time>';
+    }
     return '<current_time>$eee $yyyy-$mm-$dd $hh:$min:$ss</current_time>';
   }
 
@@ -554,9 +569,6 @@ Input:
 
   static String introFullFor(MemoryPromptLang lang) =>
       lang == MemoryPromptLang.zh ? introFullZh : introFullEn;
-
-  static String introUpdateFor(MemoryPromptLang lang) =>
-      lang == MemoryPromptLang.zh ? introUpdateZh : introUpdateEn;
 
   static String moreHintFor(MemoryPromptLang lang) =>
       lang == MemoryPromptLang.zh ? moreHintZh : moreHintEn;

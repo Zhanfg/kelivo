@@ -1,3 +1,4 @@
+import '../../models/provider_oauth.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -206,7 +207,12 @@ Future<ParsedTextAndImages> parseTextAndImages(
   required bool allowRemoteImages,
   required bool allowLocalImages,
   bool allowDataImages = true,
+  // Whether `![alt](http…)` keeps its Markdown text — both when the image is
+  // extracted and when [allowRemoteImages] is false. A remote link carries no
+  // payload, so dropping it would silently delete part of the user's text.
   bool keepRemoteMarkdownText = true,
+  // Whether disallowed data: URLs and local paths keep their Markdown text.
+  // Those carry a payload a text-only request has no use for.
   bool keepDisallowedImageText = true,
   bool skipImageParsing = false,
 }) async {
@@ -305,7 +311,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
         }
         if (url.startsWith('http://') || url.startsWith('https://')) {
           if (!allowRemoteImages) {
-            if (keepDisallowedImageText) buf.write(full);
+            if (keepRemoteMarkdownText) buf.write(full);
             i = m1.end;
             continue;
           }
@@ -443,18 +449,6 @@ String effortForBudget(int? budget) {
 
 bool isClaudeReasoningEnabled(int? budget) => budget != 0;
 
-bool _isDeepSeekClaudeCompatible(String modelId, {ProviderConfig? config}) {
-  final lowerModelId = modelId.trim().toLowerCase();
-  if (lowerModelId.contains('deepseek')) return true;
-  if (config == null) return false;
-  final baseUrl = config.baseUrl.trim().toLowerCase();
-  final providerId = config.id.trim().toLowerCase();
-  final providerName = config.name.trim().toLowerCase();
-  return baseUrl.contains('api.deepseek.com') ||
-      providerId.contains('deepseek') ||
-      providerName.contains('deepseek');
-}
-
 bool _isClaude5AdaptiveThinkingModel(String modelId) {
   return RegExp(
     r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
@@ -567,14 +561,27 @@ Map<String, dynamic>? claudeThinkingConfig(
   int? budget, {
   ProviderConfig? config,
 }) {
+  if (config?.oauthProvider == OAuthProvider.kimi) {
+    final metadata = _modelOverride(config!, modelId);
+    if (!isClaudeReasoningEnabled(budget) &&
+        metadata['oauthThinkingRequired'] != true) {
+      return {'type': 'disabled'};
+    }
+    if (metadata['oauthThinkingMode'] == 'adaptive') {
+      return {'type': 'adaptive'};
+    }
+    return {
+      'type': 'enabled',
+      'budget_tokens': budget != null && budget > 0 ? budget : 2048,
+    };
+  }
   if (_isClaudeThinkingAlwaysOnModel(modelId)) {
-    if (!isClaudeReasoningEnabled(budget)) return null;
     return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
   }
   if (!isClaudeReasoningEnabled(budget)) {
     return <String, dynamic>{'type': 'disabled'};
   }
-  if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
+  if (ProviderConfig.isDeepSeekClaudeCompatible(modelId, config: config)) {
     return <String, dynamic>{'type': 'enabled'};
   }
   if (_supportsClaudeAdaptiveThinking(modelId)) {
@@ -591,15 +598,29 @@ Map<String, dynamic>? claudeOutputConfig(
   int? budget, {
   ProviderConfig? config,
 }) {
+  if (config?.oauthProvider == OAuthProvider.kimi) {
+    final metadata = _modelOverride(config!, modelId);
+    if (metadata['oauthThinkingMode'] != 'adaptive') return null;
+    var effort = _claudeEffortForBudget(budget);
+    if (effort == 'auto') return null;
+    if (effort == 'off') {
+      if (metadata['oauthThinkingRequired'] != true) return null;
+      effort = 'low';
+    }
+    return {
+      'effort': {'xhigh', 'max'}.contains(effort) ? 'high' : effort,
+    };
+  }
   if (_isClaudeThinkingAlwaysOnModel(modelId)) {
-    final effort = _normalizeClaudeEffort(
-      _claudeEffortForBudget(budget),
-      modelId,
-    );
-    if (effort == 'auto' || effort == 'off') return null;
+    // Adaptive thinking cannot be disabled. Omitting effort defaults to high,
+    // so UI "off" must send the lowest legal level instead.
+    var effort = _claudeEffortForBudget(budget);
+    if (effort == 'off') effort = 'low';
+    effort = _normalizeClaudeEffort(effort, modelId);
+    if (effort == 'auto') return null;
     return <String, dynamic>{'effort': effort};
   }
-  if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
+  if (ProviderConfig.isDeepSeekClaudeCompatible(modelId, config: config)) {
     if (!isClaudeReasoningEnabled(budget)) return null;
     final effort = _claudeEffortForBudget(budget);
     if (effort == 'auto' || effort == 'off') return null;

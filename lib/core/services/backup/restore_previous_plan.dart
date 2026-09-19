@@ -80,7 +80,9 @@ final class RestorePreviousAssetsPlan {
     'images',
     'avatars',
     'fonts',
-    'story_skills',
+    'skills',
+    'workspaces',
+    'sessions',
   ];
 
   RestorePreviousAssetsPlan({

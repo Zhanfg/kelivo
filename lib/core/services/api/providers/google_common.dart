@@ -147,7 +147,15 @@ Map<String, dynamic> _googleThinkingConfig(
 ) {
   final off = isOff(budget);
   if (_isGemma4Model(upstreamModelId)) {
-    if (off) return const <String, dynamic>{};
+    // Official toggle is thinkingLevel high/minimal. Omitting the config
+    // leaves thinking on; off must send minimal.
+    // https://ai.google.dev/gemma/docs/core/gemma_on_gemini_api
+    if (off) {
+      return const <String, dynamic>{
+        'includeThoughts': false,
+        'thinkingLevel': 'minimal',
+      };
+    }
     return const <String, dynamic>{
       'includeThoughts': true,
       'thinkingLevel': 'high',
@@ -251,9 +259,26 @@ Map<String, dynamic>? _googleFunctionCallPartFromToolCall(Map toolCall) {
   return part;
 }
 
-/// Gemini 3 validates that the first functionCall part of a replayed model
-/// turn carries a thought signature; a missing one fails the whole request
-/// with "Function call is missing a thought_signature in functionCall parts".
+/// The thought signatures a history message carries: the stored artifact
+/// under [multimodalInternalGeminiThoughtSignatureKey], or — for messages
+/// saved before the artifact existed — the comment still embedded in its text.
+GeminiSignatureMeta _geminiHistoryMeta(Map<String, dynamic> msg) {
+  final fromText = extractGeminiThoughtMeta((msg['content'] ?? '').toString());
+  return decodeGeminiThoughtSignature(
+        msg[multimodalInternalGeminiThoughtSignatureKey],
+        cleanedText: fromText.cleanedText,
+      ) ??
+      fromText;
+}
+
+/// A history message's text without any legacy signature comment.
+String _geminiHistoryText(Map<String, dynamic> msg) =>
+    extractGeminiThoughtMeta((msg['content'] ?? '').toString()).cleanedText;
+
+/// Gemini 3 requires at least one functionCall part of a replayed model turn
+/// to carry a thought signature (it signs only the first call of a parallel
+/// batch); none at all fails the whole request with "Function call is missing
+/// a thought_signature in functionCall parts".
 /// When the original signature was not persisted (legacy history, non-streaming
 /// responses), fall back to the documented placeholder so old conversations
 /// keep working.
@@ -266,7 +291,7 @@ void _ensureGeminiFunctionCallThoughtSig(List<Map<String, dynamic>> parts) {
     if (!hasSig) {
       part['thoughtSignature'] = geminiDummyThoughtSignature;
     }
-    return; // Only the first functionCall part is validated.
+    return; // One signed functionCall satisfies the check.
   }
 }
 
@@ -304,15 +329,20 @@ List<Map<String, dynamic>> _googleApiContents(
         if (content['parts'] is List)
           'parts': [
             for (final part in content['parts'] as List)
-              part is Map ? _googleApiPart(part) : part,
+              if ((part is Map ? _googleApiPart(part) : part)
+                  case final apiPart?)
+                apiPart,
           ],
       },
   ];
 }
 
-Map<String, dynamic> _googleApiPart(Map part) {
+Map<String, dynamic>? _googleApiPart(Map part) {
   final out = Map<String, dynamic>.from(part);
   out.remove('id');
+  // Some relays emit unsigned empty text chunks but reject them on replay.
+  // Keep signatures and any other part fields intact, even with empty text.
+  if (out.length == 1 && out['text'] == '') return null;
   return out;
 }
 
@@ -419,6 +449,7 @@ Stream<StreamChunk> sendGoogleStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) async* {
   // Check for Vertex AI Claude models (prefix "claude-")
   // If it's a Claude model on Vertex, route to special handling
@@ -440,6 +471,7 @@ Stream<StreamChunk> sendGoogleStream(
       extraBody: extraBody,
       stream: stream,
       skipImageParsing: skipImageParsing,
+      retryRound: retryRound,
     );
     return;
   }
@@ -491,9 +523,7 @@ Stream<StreamChunk> sendGoogleStream(
       }
       if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
         final parts = <Map<String, dynamic>>[];
-        final raw = extractGeminiThoughtMeta(
-          (msg['content'] ?? '').toString(),
-        ).cleanedText;
+        final raw = _geminiHistoryText(msg);
         if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
           parts.add({'text': raw});
         }
@@ -510,7 +540,7 @@ Stream<StreamChunk> sendGoogleStream(
       }
       final isLast = i == messages.length - 1;
       final parts = <Map<String, dynamic>>[];
-      final meta = extractGeminiThoughtMeta((msg['content'] ?? '').toString());
+      final meta = _geminiHistoryMeta(msg);
       final raw = meta.cleanedText;
       final seenSources = <String>{};
       String normalizeSrc(String src) {
@@ -732,6 +762,7 @@ Stream<StreamChunk> sendGoogleStream(
     var lastText = '';
 
     yield* runProviderToolRounds(
+      retryRound: retryRound,
       sendRound: () async* {
         pendingCalls = [];
         lastParts = [];
@@ -754,7 +785,7 @@ Stream<StreamChunk> sendGoogleStream(
           if (u != null) {
             final prompt = (u['promptTokenCount'] ?? 0) as int? ?? 0;
             final completion = (u['candidatesTokenCount'] ?? 0) as int? ?? 0;
-            totalUsage = (totalUsage ?? const TokenUsage()).accumulate(
+            totalUsage = (totalUsage ?? const TokenUsage()).merge(
               TokenUsage(
                 promptTokens: prompt,
                 completionTokens: completion,
@@ -863,12 +894,16 @@ Stream<StreamChunk> sendGoogleStream(
             totalTokens: totalUsage?.totalTokens ?? 0,
           );
         }
-        var contentStr = buf.toString();
+        lastText = buf.toString();
         if (persistGeminiThoughtSigs) {
-          final metaComment = collectThoughtSigCommentFromParts(parts);
-          if (metaComment.isNotEmpty) contentStr += metaComment;
+          final signature = collectGeminiThoughtSignatureFromParts(parts);
+          if (signature.isNotEmpty) {
+            yield ProviderArtifact(
+              kind: geminiThoughtSignatureArtifactKind,
+              payload: signature,
+            );
+          }
         }
-        lastText = contentStr;
       },
       takeCalls: () => pendingCalls,
       continueWithoutCalls: () => false,
@@ -960,9 +995,7 @@ Stream<StreamChunk> sendGoogleStream(
     }
     if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
       final parts = <Map<String, dynamic>>[];
-      final raw = extractGeminiThoughtMeta(
-        (msg['content'] ?? '').toString(),
-      ).cleanedText;
+      final raw = _geminiHistoryText(msg);
       if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
         parts.add({'text': raw});
       }
@@ -977,7 +1010,7 @@ Stream<StreamChunk> sendGoogleStream(
     }
     final isLast = i == messages.length - 1;
     final parts = <Map<String, dynamic>>[];
-    final meta = extractGeminiThoughtMeta((msg['content'] ?? '').toString());
+    final meta = _geminiHistoryMeta(msg);
     final raw = meta.cleanedText;
     final seenSources = <String>{};
     String normalizeSrc(String src) {
@@ -1167,6 +1200,7 @@ Stream<StreamChunk> sendGoogleStream(
   var retryMalformed = false;
 
   yield* runProviderToolRounds(
+    retryRound: retryRound,
     sendRound: () async* {
       pendingCalls = [];
       lastRoundCalls = [];
@@ -1421,17 +1455,15 @@ Stream<StreamChunk> sendGoogleStream(
       if (calls.isEmpty) {
         // No tool calls; this round finished. Citations already left the decoder.
         if (persistGeminiThoughtSigs) {
-          final metaComment = buildGeminiThoughtSigComment(
+          final signature = encodeGeminiThoughtSignature(
             textKey: responseTextThoughtSigKey,
             textValue: responseTextThoughtSigVal,
             imageSigs: responseImageThoughtSigs,
           );
-          if (metaComment.isNotEmpty) {
-            yield* emitDelta(
-              ids: StreamChunkIds(sourceId),
-              content: metaComment,
-              usage: usage,
-              totalTokens: totalTokens,
+          if (signature.isNotEmpty) {
+            yield ProviderArtifact(
+              kind: geminiThoughtSignatureArtifactKind,
+              payload: signature,
             );
           }
         }
