@@ -486,10 +486,55 @@ class ProviderManager {
             'anthropic') {
       cfg = cfg.copyWith(providerType: ProviderKind.claude);
     }
-    final kind = ProviderConfig.classify(
+    var kind = ProviderConfig.classify(
       cfg.id,
       explicitType: cfg.providerType,
     );
+    if (kind == ProviderKind.openai) {
+      final ov = _modelOverride(cfg, modelId);
+      var upstreamId = modelId;
+      try {
+        final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+        if (raw != null && raw.isNotEmpty) upstreamId = raw;
+      } catch (_) {}
+      final protocol = resolveOpenAIWireProtocol(
+        cfg,
+        modelId,
+        upstreamModelId: upstreamId,
+      );
+      switch (protocol) {
+        case OpenAIWireProtocol.responses:
+          cfg = cfg.copyWith(
+            providerType: ProviderKind.openai,
+            useResponseApi: true,
+          );
+          kind = ProviderKind.openai;
+          break;
+        case OpenAIWireProtocol.chatCompletions:
+          cfg = cfg.copyWith(
+            providerType: ProviderKind.openai,
+            useResponseApi: false,
+          );
+          kind = ProviderKind.openai;
+          break;
+        case OpenAIWireProtocol.anthropicMessages:
+          cfg = cfg.copyWith(
+            providerType: ProviderKind.claude,
+            useResponseApi: false,
+          );
+          kind = ProviderKind.claude;
+          break;
+        case OpenAIWireProtocol.googleGenerativeLanguage:
+          cfg = cfg.copyWith(
+            providerType: ProviderKind.google,
+            useResponseApi: false,
+            vertexAI: false,
+          );
+          kind = ProviderKind.google;
+          break;
+      }
+    }
+    final sessionHeaders = providerSessionHeaders(cfg);
     final client = ProviderOAuthService.instance.authenticatedClient(
       _Http.clientFor(cfg),
       cfg,
@@ -552,7 +597,7 @@ class ProviderManager {
         final headers = <String, String>{
           'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
-          ...?providerSessionHeaders(cfg),
+          ...?sessionHeaders,
         };
         headers.addAll(_customHeaders(cfg, modelId));
         final res = await client.post(
@@ -594,10 +639,15 @@ class ProviderManager {
         };
         final extra = _customBody(cfg, modelId);
         if (extra.isNotEmpty) body.addAll(extra);
+        final apiKey = _effectiveApiKey(cfg);
+        final isOpenCodeGateway =
+            Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() == 'opencode.ai';
         final headers = <String, String>{
-          'x-api-key': _effectiveApiKey(cfg),
+          'x-api-key': apiKey,
+          if (isOpenCodeGateway) 'Authorization': 'Bearer $apiKey',
           'anthropic-version': ClaudeProvider.anthropicVersion,
           'Content-Type': 'application/json',
+          ...?sessionHeaders,
         };
         headers.addAll(_customHeaders(cfg, modelId));
         final res = await client.post(
@@ -690,7 +740,10 @@ class ProviderManager {
                     'responseModalities': ['TEXT', 'IMAGE'],
                   },
               };
-        final headers = <String, String>{'Content-Type': 'application/json'};
+        final headers = <String, String>{
+          'Content-Type': 'application/json',
+          ...?sessionHeaders,
+        };
         final effectiveKey = _effectiveApiKey(cfg);
         if (cfg.vertexAI == true) {
           final jsonStr = (cfg.serviceAccountJson ?? '').trim();
