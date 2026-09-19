@@ -43,8 +43,8 @@ abstract final class OpenAICompatiblePresets {
     id: 'freebuff-bridge',
     label: 'FreeBuff Bridge',
     name: 'FreeBuff',
-    baseUrl: 'http://127.0.0.1:47821/v1',
-    suggestedApiKey: 'sk-local',
+    baseUrl: 'http://127.0.0.1:8765/v1',
+    suggestedApiKey: 'dummy',
   );
 
   static const all = <OpenAICompatiblePreset>[
