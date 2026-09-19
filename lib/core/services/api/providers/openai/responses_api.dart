@@ -289,7 +289,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           config,
           modelId,
           baseHeaders: <String, String>{
-            'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
+            ...bearerAuthHeadersForRequest(config, modelId),
             'Content-Type': 'application/json',
             'Accept': 'text/event-stream',
           },
