@@ -656,18 +656,27 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
     }
 
     var response = await inner.send(build());
-    if (response.statusCode != 401) return response;
+    final authRejected =
+        response.statusCode == 401 ||
+        (config.oauthProvider == OAuthProvider.freebuff &&
+            response.statusCode == 403);
+    if (!authRejected) return response;
     await response.stream.drain<void>();
     _checkSession();
     config = await service.resolve(config, force: true);
     response = await inner.send(build());
-    if (response.statusCode == 401) {
+    final retryAuthRejected =
+        response.statusCode == 401 ||
+        (config.oauthProvider == OAuthProvider.freebuff &&
+            response.statusCode == 403);
+    if (retryAuthRejected) {
+      final statusCode = response.statusCode;
       await response.stream.drain<void>();
       await service.markLoginRequired(config);
       throw ProviderOAuthException(
         ProviderOAuthFailure.loginRequired,
         providerId: config.id,
-        statusCode: 401,
+        statusCode: statusCode,
       );
     }
     return response;
