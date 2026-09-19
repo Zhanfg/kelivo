@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum OAuthProvider { chatgpt, grok, kimi, claude }
+enum OAuthProvider { chatgpt, grok, kimi, claude, freebuff }
 
 extension OAuthProviderInfo on OAuthProvider {
   String get displayName => switch (this) {
@@ -8,6 +8,7 @@ extension OAuthProviderInfo on OAuthProvider {
     OAuthProvider.grok => 'Grok',
     OAuthProvider.kimi => 'Kimi Code',
     OAuthProvider.claude => 'Claude',
+    OAuthProvider.freebuff => 'FreeBuff',
   };
 
   String get baseUrl => switch (this) {
@@ -15,6 +16,7 @@ extension OAuthProviderInfo on OAuthProvider {
     OAuthProvider.grok => 'https://api.x.ai/v1',
     OAuthProvider.kimi => 'https://api.kimi.com/coding/v1',
     OAuthProvider.claude => 'https://api.anthropic.com/v1',
+    OAuthProvider.freebuff => 'https://open.freebuff.app/v1',
   };
 
   String get clientId => switch (this) {
@@ -22,6 +24,7 @@ extension OAuthProviderInfo on OAuthProvider {
     OAuthProvider.grok => 'b1a00492-073a-47ea-816f-4c329264a828',
     OAuthProvider.kimi => '17e5f671-d194-4dfb-9706-5516cb48c098',
     OAuthProvider.claude => '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
+    OAuthProvider.freebuff => '',
   };
 
   String get tokenEndpoint => switch (this) {
@@ -29,6 +32,7 @@ extension OAuthProviderInfo on OAuthProvider {
     OAuthProvider.grok => 'https://auth.x.ai/oauth2/token',
     OAuthProvider.kimi => 'https://auth.kimi.com/api/oauth/token',
     OAuthProvider.claude => 'https://api.anthropic.com/v1/oauth/token',
+    OAuthProvider.freebuff => '',
   };
 
   String get scope => switch (this) {
@@ -39,6 +43,7 @@ extension OAuthProviderInfo on OAuthProvider {
     OAuthProvider.kimi => '',
     OAuthProvider.claude =>
       'org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload',
+    OAuthProvider.freebuff => '',
   };
 
   String get icon => switch (this) {
@@ -46,6 +51,7 @@ extension OAuthProviderInfo on OAuthProvider {
     OAuthProvider.grok => 'assets/icons/grok.svg',
     OAuthProvider.kimi => 'assets/icons/kimi-color.svg',
     OAuthProvider.claude => 'assets/icons/claude-color.svg',
+    OAuthProvider.freebuff => 'assets/icons/freebuff.svg',
   };
 
   bool get usesResponsesApi =>
