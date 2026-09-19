@@ -33,6 +33,8 @@ class HomeMobileScaffold extends StatelessWidget {
     required this.assistantPickerCloseTick,
     required this.loadingConversationIds,
     required this.title,
+    this.titleOverride,
+    this.showChatActions = true,
     required this.providerName,
     required this.modelDisplay,
     required this.onToggleDrawer,
@@ -60,6 +62,8 @@ class HomeMobileScaffold extends StatelessWidget {
   final ValueNotifier<int> assistantPickerCloseTick;
   final Set<String> loadingConversationIds;
   final String title;
+  final Widget? titleOverride;
+  final bool showChatActions;
   final String? providerName;
   final String? modelDisplay;
   final VoidCallback onToggleDrawer;
@@ -182,7 +186,7 @@ class HomeMobileScaffold extends StatelessWidget {
         },
       ),
       titleSpacing: 2,
-      title: useNewAssistantAvatarUx
+      title: titleOverride ?? (useNewAssistantAvatarUx
           ? Row(
               children: [
                 _buildAssistantTitleAvatar(context),
@@ -258,8 +262,9 @@ class HomeMobileScaffold extends StatelessWidget {
                     ),
                   ),
               ],
-            ),
-      actions: [
+            )),
+      actions: showChatActions
+          ? [
         IosIconButton(
           size: 20,
           minSize: 44,
@@ -294,7 +299,8 @@ class HomeMobileScaffold extends StatelessWidget {
               : null,
         ),
         const SizedBox(width: 4),
-      ],
+      ]
+          : const <Widget>[],
     );
   }
 
