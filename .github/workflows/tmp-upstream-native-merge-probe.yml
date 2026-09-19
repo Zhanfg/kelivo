@@ -1,0 +1,32 @@
+name: Upstream Native Merge Probe
+
+on:
+  push:
+    branches:
+      - probe/upstream-native-merge-20260920
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout story branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Probe native merge
+        shell: bash
+        run: |
+          set +e
+          git fetch origin master
+          git merge --no-commit --no-ff origin/master
+          rc=$?
+          echo "MERGE_EXIT_CODE=$rc"
+          echo "=== CONFLICT FILES ==="
+          git diff --name-only --diff-filter=U || true
+          echo "=== STATUS ==="
+          git status --short || true
+          exit "$rc"
