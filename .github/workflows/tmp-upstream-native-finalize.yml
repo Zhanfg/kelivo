@@ -1,0 +1,222 @@
+name: Finalize Upstream Story Merge
+
+on:
+  push:
+    branches:
+      - probe/upstream-native-merge-20260920
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout optimized candidate
+        uses: actions/checkout@v4
+        with:
+          ref: sync/upstream-native-optimized-20260920
+          fetch-depth: 0
+
+      - name: Apply final compatibility fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Kelivo Upstream Sync"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin backup/story-runtime-pre-upstream-20260920
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          def read(path):
+              return Path(path).read_text()
+
+          def write(path, text):
+              Path(path).write_text(text)
+
+          # 1. Story prompt integration needs the persistence provider type.
+          p = "lib/features/home/services/message_generation_service.dart"
+          s = read(p)
+          imp = "import '../../../core/database/business_preferences.dart';\n"
+          if imp not in s:
+              anchor = "import '../../../core/providers/settings_provider.dart';\n"
+              if anchor not in s:
+                  raise SystemExit("message_generation_service: settings import anchor missing")
+              s = s.replace(anchor, anchor + imp, 1)
+          write(p, s)
+
+          # 2. Restore composer model/reasoning update helpers against the
+          # upstream HomePage. They intentionally update Assistant first, then
+          # fall back to global settings when no assistant is selected.
+          p = "lib/features/home/pages/home_page.dart"
+          s = read(p)
+          if "Future<void> _setComposerReasoningBudget(" not in s:
+              anchor = "  Future<void> _openReasoningSettings"
+              pos = s.find(anchor)
+              if pos < 0:
+                  raise SystemExit("home_page: reasoning settings anchor missing")
+              methods = """  Future<void> _setComposerReasoningBudget(int budget) async {
+            final settings = context.read<SettingsProvider>();
+            await settings.setThinkingBudget(budget);
+            if (!mounted) return;
+            final assistantProvider = context.read<AssistantProvider>();
+            final assistant = assistantProvider.currentAssistant;
+            if (assistant != null && assistant.thinkingBudget != budget) {
+              await assistantProvider.updateAssistant(
+                assistant.copyWith(thinkingBudget: budget),
+              );
+            }
+          }
+
+          Future<void> _setComposerModel(String providerKey, String modelId) async {
+            final assistantProvider = context.read<AssistantProvider>();
+            final assistant = assistantProvider.currentAssistant;
+            if (assistant != null) {
+              await assistantProvider.updateAssistant(
+                assistant.copyWith(
+                  chatModelProvider: providerKey,
+                  chatModelId: modelId,
+                ),
+              );
+              return;
+            }
+            await context.read<SettingsProvider>().setCurrentModel(
+              providerKey,
+              modelId,
+            );
+          }
+
+          """
+              s = s[:pos] + methods + s[pos:]
+          write(p, s)
+
+          # 3. ChatInputSection retained the Story callback fields through the
+          # merge, but upstream's constructor call did not forward them.
+          p = "lib/features/home/widgets/chat_input_section.dart"
+          s = read(p)
+
+          old = "      onConfigureReasoning: onConfigureReasoning,\n"
+          new = """      onConfigureReasoning: onConfigureReasoning,
+                onReasoningBudgetChanged: onReasoningBudgetChanged,
+                onComposerModelChanged: onComposerModelChanged,
+                currentModelProvider: pk,
+                currentModelId: mid,
+                supportsXhighReasoning: pk != null && mid != null
+                    ? settings.supportsXhighReasoning(pk, mid)
+                    : false,
+                supportsMaxReasoning: pk != null && mid != null
+                    ? settings.supportsMaxReasoning(pk, mid)
+                    : false,
+          """
+          if "onReasoningBudgetChanged: onReasoningBudgetChanged" not in s:
+              if old not in s:
+                  raise SystemExit("chat_input_section: reasoning callback anchor missing")
+              s = s.replace(old, new, 1)
+
+          old = "      onSend: onSend,\n      loading: isLoading,\n"
+          new = """      onSend: onSend,
+                onGuide: onGuide,
+                loading: isLoading,
+                generationPaused: isGenerationPaused,
+                onToggleGenerationPaused: onToggleGenerationPaused,
+          """
+          if "onGuide: onGuide" not in s:
+              if old not in s:
+                  raise SystemExit("chat_input_section: send callback anchor missing")
+              s = s.replace(old, new, 1)
+
+          old = """      queuedPreviewText: queuedPreviewText,
+                onCancelQueuedInput: onCancelQueuedInput,
+          """
+          new = """      queuedPreviewText: queuedPreviewText,
+                queuedInputs: queuedInputs,
+                onCancelQueuedInput: onCancelQueuedInput,
+                onRemoveQueuedInput: onRemoveQueuedInput,
+                onClearQueuedInputs: onClearQueuedInputs,
+                onReorderQueuedInput: onReorderQueuedInput,
+          """
+          if "queuedInputs: queuedInputs" not in s:
+              if old not in s:
+                  raise SystemExit("chat_input_section: queue callback anchor missing")
+              s = s.replace(old, new, 1)
+
+          old = """      inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
+              );
+          """
+          new = """      inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
+                storyMode: storyMode,
+              );
+          """
+          if "storyMode: storyMode" not in s:
+              if old not in s:
+                  raise SystemExit("chat_input_section: story mode anchor missing")
+              s = s.replace(old, new, 1)
+          write(p, s)
+
+          # 4. Keep upstream's new share/workspace header above the editor, but
+          # restore the Story composer's mature editor/action body:
+          # fullscreen editor, editable live voice transcript, inline voice
+          # settings, mobile reasoning control, queue Guide and Pause/Resume.
+          p = "lib/features/home/widgets/chat_input_bar.dart"
+          current = read(p)
+          original = subprocess.check_output(
+              ["git", "show", "FETCH_HEAD:" + p], text=True
+          )
+
+          start_token = "// Input field with expand/collapse button"
+          end_token = "if (_imageModeActive)"
+
+          def line_start(text, pos):
+              return text.rfind("\n", 0, pos) + 1
+
+          c_start_token = current.index(start_token)
+          c_end_token = current.index(end_token, c_start_token)
+          o_start_token = original.index(start_token)
+          o_end_token = original.index(end_token, o_start_token)
+
+          cs = line_start(current, c_start_token)
+          ce = line_start(current, c_end_token)
+          os = line_start(original, o_start_token)
+          oe = line_start(original, o_end_token)
+
+          current = current[:cs] + original[os:oe] + current[ce:]
+          write(p, current)
+
+          print("Final compatibility fixes applied")
+          PY
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Regenerate localization
+        run: flutter gen-l10n
+
+      - name: Format changed files
+        run: |
+          dart format             lib/features/home/services/message_generation_service.dart             lib/features/home/pages/home_page.dart             lib/features/home/widgets/chat_input_section.dart             lib/features/home/widgets/chat_input_bar.dart
+
+      - name: Commit final candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git commit -m "fix(sync): finish Story Runtime upstream compatibility"
+          git push origin HEAD:refs/heads/sync/upstream-native-final-20260920 --force
+
+      - name: Analyze
+        run: dart analyze --fatal-infos lib test integration_test
+
+      - name: Story focused tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter test --concurrency=1             test/story_runtime_foundation_test.dart             test/story_runtime_state_test.dart             test/story_runtime_machine_test.dart             test/story_runtime_controller_test.dart             test/story_runtime_assembler_test.dart             test/story_response_parser_test.dart             test/story_prompt_compiler_test.dart             test/story_worldline_memory_test.dart             test/story_world_tree_models_test.dart             test/story_skill_system_test.dart             test/core/services/tts/local_tts_test.dart             test/features/home/widgets/chat_input_bar_queue_test.dart
