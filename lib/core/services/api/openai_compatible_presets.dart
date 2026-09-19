@@ -43,7 +43,7 @@ abstract final class OpenAICompatiblePresets {
     id: 'freebuff-bridge',
     label: 'FreeBuff Bridge',
     name: 'FreeBuff',
-    baseUrl: 'http://127.0.0.1:8765/v1',
+    baseUrl: 'http://127.0.0.1:23333/v1',
     suggestedApiKey: 'dummy',
   );
 
