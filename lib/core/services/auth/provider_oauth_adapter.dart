@@ -16,6 +16,7 @@ import 'claude_oauth_request.dart';
 
 part 'claude_oauth_adapter.dart';
 part 'freebuff_oauth_adapter.dart';
+part 'pollinations_oauth_adapter.dart';
 
 const codexClientVersion = '0.153.0';
 
@@ -195,6 +196,7 @@ abstract class ProviderOAuthAdapter {
         OAuthProvider.kimi => KimiOAuthAdapter(),
         OAuthProvider.claude => ClaudeOAuthAdapter(),
         OAuthProvider.freebuff => FreeBuffOAuthAdapter(),
+        OAuthProvider.pollinations => PollinationsOAuthAdapter(),
       };
 
   Map<String, String> headers(ProviderOAuthCredentials credentials) => {
