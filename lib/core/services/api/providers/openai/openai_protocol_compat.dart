@@ -1,17 +1,18 @@
 import '../../../../providers/settings_provider.dart';
 
-enum OpenAIWireProtocol { chatCompletions, responses }
+enum OpenAIWireProtocol {
+  chatCompletions,
+  responses,
+  anthropicMessages,
+  googleGenerativeLanguage,
+}
 
-/// Resolves the OpenAI-compatible wire protocol for one logical model.
+/// Resolve the wire protocol for one model exposed through an OpenAI-style
+/// provider entry.
 ///
-/// Resolution order:
-/// 1. Per-model `openaiProtocol` override.
-/// 2. Provider-level "Responses API" force switch.
-/// 3. Known mixed-protocol gateways (currently OpenCode Zen / Go).
-/// 4. Chat Completions fallback.
-///
-/// This keeps generic OpenAI-compatible gateways working while allowing one
-/// provider to expose both Chat Completions and Responses models.
+/// OpenCode Zen / Go are gateways whose single model catalog fans out to
+/// multiple upstream wire protocols. Generic OpenAI-compatible providers keep
+/// the Chat Completions default unless explicitly overridden.
 OpenAIWireProtocol resolveOpenAIWireProtocol(
   ProviderConfig config,
   String modelId, {
@@ -29,6 +30,16 @@ OpenAIWireProtocol resolveOpenAIWireProtocol(
       case 'responses_api':
       case 'responses-api':
         return OpenAIWireProtocol.responses;
+      case 'anthropic':
+      case 'messages':
+      case 'anthropic_messages':
+      case 'anthropic-messages':
+        return OpenAIWireProtocol.anthropicMessages;
+      case 'google':
+      case 'gemini':
+      case 'google_gemini':
+      case 'google-generative-language':
+        return OpenAIWireProtocol.googleGenerativeLanguage;
       case 'chat':
       case 'chat_completions':
       case 'chat-completions':
@@ -45,21 +56,50 @@ OpenAIWireProtocol resolveOpenAIWireProtocol(
   final path = (uri?.path ?? '').replaceAll(RegExp(r'/+$'), '').toLowerCase();
   final effectiveModel = (upstreamModelId ?? modelId).trim().toLowerCase();
 
-  // OpenCode Zen / Go are mixed-protocol gateways. Their OpenAI-family models
-  // use the Responses endpoint, while open coding models use Chat Completions.
-  // The base URL itself ends at /v1, so Kelivo appends the selected endpoint.
-  final isOpenCodeGateway =
-      host == 'opencode.ai' &&
-      (path.endsWith('/zen/v1') || path.endsWith('/zen/go/v1'));
-  if (isOpenCodeGateway && _openCodeUsesResponses(effectiveModel)) {
-    return OpenAIWireProtocol.responses;
+  if (host != 'opencode.ai') return OpenAIWireProtocol.chatCompletions;
+
+  if (path.endsWith('/zen/go/v1')) {
+    return _openCodeGoProtocol(effectiveModel);
+  }
+  if (path.endsWith('/zen/v1')) {
+    return _openCodeZenProtocol(effectiveModel);
   }
 
   return OpenAIWireProtocol.chatCompletions;
 }
 
-bool _openCodeUsesResponses(String modelId) {
-  return RegExp(r'^(?:gpt-|o[1-9](?:-|$)|codex(?:-|$))').hasMatch(modelId);
+OpenAIWireProtocol _openCodeGoProtocol(String modelId) {
+  // Current Go Responses models.
+  if (modelId.startsWith('gpt-') ||
+      modelId == 'grok-4.6' ||
+      modelId.startsWith('muse-spark-1.2') ||
+      modelId.startsWith('muse-spark-1.3')) {
+    return OpenAIWireProtocol.responses;
+  }
+
+  // Current Go Anthropic Messages models.
+  if (RegExp(r'^minimax-m(?:2\.[57]|3)(?:$|[-.])').hasMatch(modelId) ||
+      RegExp(r'^qwen3\.(?:6|7|8)(?:$|[-.])').hasMatch(modelId)) {
+    return OpenAIWireProtocol.anthropicMessages;
+  }
+
+  return OpenAIWireProtocol.chatCompletions;
+}
+
+OpenAIWireProtocol _openCodeZenProtocol(String modelId) {
+  if (modelId.startsWith('gpt-') ||
+      modelId.startsWith('grok-') ||
+      modelId.startsWith('muse-spark-')) {
+    return OpenAIWireProtocol.responses;
+  }
+  if (modelId.startsWith('claude-') ||
+      RegExp(r'^qwen3\.(?:5|6|7|8)(?:$|[-.])').hasMatch(modelId)) {
+    return OpenAIWireProtocol.anthropicMessages;
+  }
+  if (modelId.startsWith('gemini-')) {
+    return OpenAIWireProtocol.googleGenerativeLanguage;
+  }
+  return OpenAIWireProtocol.chatCompletions;
 }
 
 bool shouldUseOpenAIResponsesApi(
