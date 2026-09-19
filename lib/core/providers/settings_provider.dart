@@ -6476,7 +6476,7 @@ class ProviderConfig {
       if (s.contains('gemini') || s.contains('google')) return true;
       if (s.contains('silicon')) return true;
       if (s.contains('openrouter')) return true;
-       return false; // others disabled by default
+      return false; // others disabled by default
     }
 
     final kind = classify(key);
