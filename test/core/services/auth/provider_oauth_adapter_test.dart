@@ -8,6 +8,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 http.Response response(Object data, [int status = 200]) =>
     http.Response(jsonEncode(data), status);
@@ -21,6 +22,7 @@ void main() {
     'FreeBuff browser login exchanges transaction for API key',
     () {
       fakeAsync((async) {
+        SharedPreferences.setMockInitialValues({});
         var statusPolls = 0;
         ProviderOAuthCredentials? result;
         OAuthLoginPrompt? prompt;
