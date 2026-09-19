@@ -132,7 +132,6 @@ Map<String, dynamic> customBody(
   );
 }
 
-
 // Resolve effective model info by respecting per-model overrides; fallback to inference
 ModelInfo effectiveModelInfo(ProviderConfig cfg, String modelId) {
   final upstreamId = apiModelId(cfg, modelId);
