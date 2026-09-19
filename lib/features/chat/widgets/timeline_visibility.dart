@@ -9,6 +9,7 @@ import '../../../utils/mcp_structured_image.dart';
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import 'screen_time_tool_ui.dart';
+import 'weather_tool_ui.dart';
 
 /// Built-in search is cited elsewhere and must not create a timeline card.
 const String kBuiltinSearchToolName = 'builtin_search';
@@ -52,10 +53,7 @@ class PendingApprovalKey {
   if (content == null || content.isEmpty) {
     final typed = readMcpResultMetadata(metadata);
     if (typed != null) {
-      return (
-        '',
-        dedupeImageUrisFirstSeen(mcpResultImageUris(typed)),
-      );
+      return ('', dedupeImageUrisFirstSeen(mcpResultImageUris(typed)));
     }
     return ('', const []);
   }
@@ -336,9 +334,32 @@ List<List<T>> splitToolsIntoTimelineBlocks<T>(
   return blocks.isEmpty ? <List<T>>[List<T>.of(tools)] : blocks;
 }
 
+/// Workspace tools that use the 44px timeline-step shell plus an inline body.
+const Set<String> _workspaceToolNames = {
+  'shell',
+  'read_file',
+  'write_file',
+  'edit_file',
+  'list_dir',
+  'glob',
+  'grep',
+};
+
+/// Second line under the workspace tool title (path / command / pattern).
+const double kEstimateWorkspaceSummaryLine = 16.0;
+
+/// Gap plus [WorkspaceFileChip] row under a workspace tool header.
+const double kEstimateWorkspaceChipRow = 38.0;
+
+/// One stdout/stderr tail line (12px / 1.4).
+const double kEstimateWorkspaceTailLine = 17.0;
+
+/// Environment-not-ready notice plus install button.
+const double kEstimateWorkspaceEnvNotice = 36.0;
+
 /// Extra height under a collapsed tool header. Not gated on the normal
-/// four-line summary flag — ask-user, TTS, Screen Time, images, and pending
-/// approval each have their own structure.
+/// four-line summary flag — ask-user, TTS, Screen Time, images, pending
+/// approval, and workspace tool bodies each have their own structure.
 double estimateToolExtraHeight({
   required String toolName,
   required Map<String, dynamic> arguments,
@@ -386,8 +407,23 @@ double estimateToolExtraHeight({
       return _estimateScreenTimeExtra(screenTime, fontScale);
     }
   }
+  if (toolName == LocalToolNames.weather) {
+    final weather = WeatherToolResult.tryParse(cleanText);
+    if (weather != null && !weather.isError) {
+      return _estimateWeatherExtra(weather, fontScale);
+    }
+  }
 
   var extra = 0.0;
+  final isWorkspace = _workspaceToolNames.contains(toolName);
+  if (isWorkspace) {
+    extra += _estimateWorkspaceToolCardExtra(
+      toolName: toolName,
+      arguments: arguments,
+      content: content,
+      metadata: metadata,
+    );
+  }
   final summaryFontSize = 12.0 * fontScale;
   final summaryLineHeight = summaryFontSize * 1.4;
   var hasSummary = false;
@@ -401,7 +437,7 @@ double estimateToolExtraHeight({
       wrappedLineCount: wrappedLineCount,
     );
     hasSummary = showToolResultSummary;
-  } else if (showToolResultSummary) {
+  } else if (showToolResultSummary && !isWorkspace) {
     final summary = cleanText.trim();
     if (summary.isNotEmpty) {
       final charWidth = summaryFontSize * 0.55;
@@ -426,6 +462,99 @@ double estimateToolExtraHeight({
   return extra;
 }
 
+/// Height the workspace tool body adds beyond the 44px timeline-step shell.
+double _estimateWorkspaceToolCardExtra({
+  required String toolName,
+  required Map<String, dynamic> arguments,
+  required String? content,
+  Map<String, dynamic>? metadata,
+}) {
+  final path = _workspaceEstimatePath(arguments, metadata);
+  final command = (arguments['command'] ?? '').toString().trim();
+  final pattern = (arguments['pattern'] ?? '').toString().trim();
+  final hasSummary = switch (toolName) {
+    'shell' => command.isNotEmpty,
+    'glob' || 'grep' => pattern.isNotEmpty || path.isNotEmpty,
+    _ => path.isNotEmpty,
+  };
+  var extra = hasSummary ? kEstimateWorkspaceSummaryLine : 0.0;
+
+  if (toolName == 'shell') {
+    final tail = _workspaceEstimateTailLineCount(content, metadata);
+    if (tail > 0) extra += tail * kEstimateWorkspaceTailLine;
+  } else {
+    final hasChips = switch (toolName) {
+      'read_file' || 'write_file' || 'edit_file' => path.isNotEmpty,
+      'list_dir' =>
+        path.isNotEmpty || _workspaceEstimateHasResultPaths(content, metadata),
+      'glob' || 'grep' => _workspaceEstimateHasResultPaths(content, metadata),
+      _ => false,
+    };
+    if (hasChips) extra += kEstimateWorkspaceChipRow;
+  }
+  if (_workspaceEstimateEnvNotReady(metadata)) {
+    extra += kEstimateWorkspaceEnvNotice;
+  }
+  return extra;
+}
+
+String _workspaceEstimatePath(
+  Map<String, dynamic> arguments,
+  Map<String, dynamic>? metadata,
+) {
+  final fromMeta = _workspaceMetaString(metadata, 'path');
+  if (fromMeta.isNotEmpty) return fromMeta;
+  final path = (arguments['path'] ?? '').toString().trim();
+  if (path.isNotEmpty) return path;
+  return (arguments['pattern'] ?? '').toString().trim();
+}
+
+String _workspaceMetaString(Map<String, dynamic>? metadata, String key) {
+  if (metadata == null) return '';
+  final nested = metadata['workspace'];
+  final map = nested is Map ? nested : metadata;
+  return (map[key] ?? '').toString().trim();
+}
+
+bool _workspaceEstimateHasResultPaths(
+  String? content,
+  Map<String, dynamic>? metadata,
+) {
+  final nested = metadata?['workspace'];
+  final map = nested is Map ? nested : metadata;
+  final files = map?['files'];
+  if (files is List && files.isNotEmpty) return true;
+  if (content == null || content.isEmpty) return false;
+  return const LineSplitter()
+      .convert(content)
+      .any((line) => line.isNotEmpty && !line.startsWith('...'));
+}
+
+int _workspaceEstimateTailLineCount(
+  String? content,
+  Map<String, dynamic>? metadata,
+) {
+  final preview = _workspaceMetaString(metadata, 'stdoutPreview');
+  final stderr = _workspaceMetaString(metadata, 'stderrPreview');
+  final text = preview.isNotEmpty
+      ? preview
+      : (stderr.isNotEmpty ? stderr : (content ?? ''));
+  if (text.isEmpty) return 0;
+  final lines = const LineSplitter()
+      .convert(text)
+      .where((line) => line.isNotEmpty)
+      .toList();
+  if (lines.isEmpty) return 0;
+  return lines.length > 4 ? 4 : lines.length;
+}
+
+bool _workspaceEstimateEnvNotReady(Map<String, dynamic>? metadata) {
+  if (metadata == null) return false;
+  final nested = metadata['workspace'];
+  final map = nested is Map ? nested : metadata;
+  return map['status'] == 'error' && map['code'] == 'environment_not_ready';
+}
+
 const double _estimateTtsReplayRowHeight = 36;
 const double _estimateToolImageHeight = 120;
 const double _estimateToolImageSummaryGap = 8;
@@ -436,7 +565,7 @@ const double _estimateAskUserSubmitHeight = 38;
 const double _estimateAskUserAnsweredGap = 3;
 const double _estimateAskUserAnsweredPad = 4;
 
-/// Matches [_AskUserOptionRow]: 13px / 1.25, max 3 lines, minHeight 40.
+/// Matches [_AskUserOptionRow]: 13px / 1.25, unlimited lines, minHeight 40.
 double _estimateAskUserOptionRowHeight(
   String label, {
   required double textWidth,
@@ -449,7 +578,6 @@ double _estimateAskUserOptionRowHeight(
     fontSize: fontSize,
     height: 1.25,
     maxWidth: optionTextWidth,
-    maxLines: 3,
     fontWeight: FontWeight.w500,
   );
   return math.max(
@@ -463,7 +591,6 @@ double _askUserLayoutHeight(
   required double fontSize,
   required double height,
   required double maxWidth,
-  int? maxLines,
   FontWeight? fontWeight,
 }) {
   if (text.trim().isEmpty) return fontSize * height;
@@ -477,8 +604,6 @@ double _askUserLayoutHeight(
       ),
     ),
     textDirection: TextDirection.ltr,
-    maxLines: maxLines,
-    ellipsis: maxLines == null ? null : '…',
   )..layout(maxWidth: math.max(1.0, maxWidth));
   try {
     return math.max(fontSize * height, painter.height);
@@ -603,6 +728,12 @@ double _estimateScreenTimeExtra(ScreenTimeResult result, double fontScale) {
   if (result.isNoPermission) return line;
   final apps = result.apps.length.clamp(0, 3);
   return line + apps * (line + 2);
+}
+
+double _estimateWeatherExtra(WeatherToolResult result, double fontScale) {
+  if (!result.hasCurrent) return 0;
+  final line = 16.0 * fontScale;
+  return line * 2;
 }
 
 double _estimatePendingApprovalExtra(

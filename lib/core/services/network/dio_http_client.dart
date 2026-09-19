@@ -72,17 +72,24 @@ class NetworkProxyConfig {
   bool get isValid => enabled && host.trim().isNotEmpty && port > 0;
 }
 
+/// Bodies past this are file uploads; the log records their size only.
+const int _loggedBodyLimit = 4 * 1024 * 1024;
+
 class DioHttpClient extends http.BaseClient {
-  DioHttpClient({this._proxy, CancelToken? cancelToken, Duration? timeout})
-    : _cancelToken = cancelToken ?? CancelToken(),
-      _dio = Dio(
-        BaseOptions(
-          connectTimeout: timeout,
-          sendTimeout: timeout,
-          receiveTimeout: timeout,
-          validateStatus: (_) => true,
-        ),
-      ) {
+  DioHttpClient({
+    this._proxy,
+    CancelToken? cancelToken,
+    Duration? timeout,
+    this.logRequests = true,
+  }) : _cancelToken = cancelToken ?? CancelToken(),
+       _dio = Dio(
+         BaseOptions(
+           connectTimeout: timeout,
+           sendTimeout: timeout,
+           receiveTimeout: timeout,
+           validateStatus: (_) => true,
+         ),
+       ) {
     _dio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();
@@ -144,6 +151,7 @@ class DioHttpClient extends http.BaseClient {
     );
   }
 
+  final bool logRequests;
   final Dio _dio;
   final NetworkProxyConfig? _proxy;
   final CancelToken _cancelToken;
@@ -174,15 +182,16 @@ class DioHttpClient extends http.BaseClient {
     final uri = request.url;
     final method = request.method.toUpperCase();
 
-    List<int> bodyBytes = const <int>[];
-    try {
-      bodyBytes = await request.finalize().toBytes();
-    } catch (_) {}
+    // A body that cannot be read (a file upload whose file went away) must
+    // fail as such, not go out empty and come back as the server's 400.
+    final bodyBytes = await request.finalize().toBytes();
 
     final reqHeaders = Map<String, String>.from(request.headers);
-    reqHeaders.putIfAbsent('User-Agent', () => 'Kelivo');
+    if (!reqHeaders.keys.any((key) => key.toLowerCase() == 'user-agent')) {
+      reqHeaders['User-Agent'] = 'Kelivo';
+    }
 
-    if (RequestLogger.enabled) {
+    if (logRequests && RequestLogger.enabled) {
       RequestLogger.logLine(
         '[REQ $reqId] $method ${LogRedactor.redactUrl(uri.toString())}',
       );
@@ -191,7 +200,13 @@ class DioHttpClient extends http.BaseClient {
           '[REQ $reqId] headers=${RequestLogger.encodeObject(LogRedactor.redactHeaders(reqHeaders))}',
         );
       }
-      if (bodyBytes.isNotEmpty) {
+      if (bodyBytes.length > _loggedBodyLimit) {
+        // A file upload is bytes the log has no use for, and decoding them
+        // would hold the body in memory a second and third time.
+        RequestLogger.logLine(
+          '[REQ $reqId] body=<${bodyBytes.length} bytes, not logged>',
+        );
+      } else if (bodyBytes.isNotEmpty) {
         final decoded = RequestLogger.safeDecodeUtf8(bodyBytes);
         // Elide first: a multi-MB image request drops to a few KB, which
         // brings it back under redactBody's JSON-parsing size limit.
@@ -226,7 +241,7 @@ class DioHttpClient extends http.BaseClient {
         headers[name] = values.join(',');
       });
 
-      if (RequestLogger.enabled) {
+      if (logRequests && RequestLogger.enabled) {
         RequestLogger.logLine('[RES $reqId] status=$statusCode');
         if (headers.isNotEmpty) {
           RequestLogger.logLine(
@@ -243,7 +258,7 @@ class DioHttpClient extends http.BaseClient {
 
       // Error payloads are small; read them now so the log does not depend
       // on the caller consuming the stream (and the viewer can parse body=).
-      if (RequestLogger.enabled && statusCode >= 400) {
+      if ((logRequests && RequestLogger.enabled) && statusCode >= 400) {
         final bytes = await _readLimited(body.stream, maxErrorBodyBytes);
         final text = RequestLogger.safeDecodeUtf8(bytes);
         if (text.isNotEmpty) {
@@ -263,7 +278,8 @@ class DioHttpClient extends http.BaseClient {
         );
       }
 
-      final logChunks = RequestLogger.enabled && RequestLogger.saveOutput;
+      final logChunks =
+          (logRequests && RequestLogger.enabled) && RequestLogger.saveOutput;
       final controller = StreamController<List<int>>(sync: true);
       controller.onListen = () {
         body.stream.listen(
@@ -281,7 +297,7 @@ class DioHttpClient extends http.BaseClient {
             }
           },
           onError: (e, st) {
-            if (RequestLogger.enabled) {
+            if (logRequests && RequestLogger.enabled) {
               RequestLogger.logLine(
                 '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(e.toString()))}',
               );
@@ -290,7 +306,7 @@ class DioHttpClient extends http.BaseClient {
             controller.close();
           },
           onDone: () {
-            if (RequestLogger.enabled) {
+            if (logRequests && RequestLogger.enabled) {
               RequestLogger.logLine('[RES $reqId] done');
             }
             controller.close();
@@ -321,7 +337,7 @@ class DioHttpClient extends http.BaseClient {
         reasonPhrase: resp.statusMessage,
       );
     } on DioException catch (e) {
-      if (RequestLogger.enabled) {
+      if (logRequests && RequestLogger.enabled) {
         RequestLogger.logLine(
           '[RES $reqId] dio_error=${RequestLogger.escape(LogRedactor.redactText(RequestLogger.elidePayloads(e.toString())))}',
         );
@@ -338,7 +354,7 @@ class DioHttpClient extends http.BaseClient {
       }
       throw http.ClientException(e.toString(), uri);
     } catch (e) {
-      if (RequestLogger.enabled) {
+      if (logRequests && RequestLogger.enabled) {
         RequestLogger.logLine(
           '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(e.toString()))}',
         );

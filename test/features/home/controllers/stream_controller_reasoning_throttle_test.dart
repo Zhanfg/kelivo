@@ -2,7 +2,6 @@ import "../../../support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,7 +17,6 @@ void main() {
     final settingsProvider =
         settings ?? SettingsProvider(createBusinessTestPreferences());
     return StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settingsProvider,
       getCurrentConversationId: () => currentConversationId,
@@ -93,4 +91,29 @@ void main() {
       controller.dispose();
     },
   );
+
+  testWidgets('clearing completed messages preserves pending reasoning ticks', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final controller = buildController(
+      settings: settings,
+      currentConversationId: 'conversation-1',
+    );
+    final state = buildStreamingState(settings);
+    controller.markStreamingStarted(state.messageId);
+    final notifier = controller.streamingContentNotifier.getNotifier(
+      state.messageId,
+    );
+    await controller.handleReasoningChunk('before switching', state);
+    final startAt = controller.getReasoningData(state.messageId)!.startAt;
+    controller.clearAllState(keepMessageIds: {state.messageId});
+    await controller.handleReasoningChunk(' and after', state);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(notifier.value.reasoningText, 'before switching and after');
+    expect(notifier.value.reasoningStartAt, startAt);
+    expect(notifier.value.reasoningFinishedAt, isNull);
+    controller.dispose();
+  });
 }

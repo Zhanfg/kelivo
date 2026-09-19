@@ -1,3 +1,4 @@
+import 'oauth_provider_detail_page.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -7,6 +8,7 @@ import '../widgets/add_provider_sheet.dart';
 // grid reorder removed in favor of iOS-style list reordering
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
@@ -478,6 +480,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
     _p('DeepSeek', 'DeepSeek', enabled: false, models: 0),
     _p('AIhubmix', 'AIhubmix', enabled: false, models: 0),
     _p('随想AI中转站', '随想AI中转站', enabled: false, models: 0),
+    _p('MaruCode', 'MaruCode', enabled: false, models: 0),
     _p(l10n.providersPageAliyunName, 'Aliyun', enabled: false, models: 0),
     _p(l10n.providersPageZhipuName, 'Zhipu AI', enabled: false, models: 0),
     _p('Claude', 'Claude', enabled: false, models: 0),
@@ -643,6 +646,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
     final l10n = AppLocalizations.of(context)!;
     final assistantProvider = context.read<AssistantProvider>();
     final settingsProvider = context.read<SettingsProvider>();
+    final chatService = context.read<ChatService>();
     // Skip built-in providers (default ones)
     final builtInKeys = {for (final p in _providers(l10n: l10n)) p.keyName};
     final keysToDelete = _selected
@@ -685,6 +689,11 @@ class _ProvidersPageState extends State<ProvidersPage> {
           assistant.copyWith(clearChatModel: true),
         );
       }
+    }
+    // Conversations can pin a model too; clear the ones pointing at a provider
+    // that is about to disappear so they fall back to the assistant.
+    for (final key in keysToDelete) {
+      await chatService.clearConversationModelOverrides(providerKey: key);
     }
     for (final key in keysToDelete) {
       await settingsProvider.removeProviderConfig(key);
@@ -1219,10 +1228,17 @@ class _ProviderRow extends StatelessWidget {
     final enabled = cfg.enabled;
     final l10n = AppLocalizations.of(context)!;
 
-    final statusBg = enabled
+    final needsLogin =
+        cfg.isOAuth &&
+        (cfg.oauthCredentials == null || cfg.oauthCredentials!.requiresLogin);
+    final statusBg = needsLogin
+        ? cs.error.withValues(alpha: .12)
+        : enabled
         ? context.appColors.success.withValues(alpha: 0.12)
         : context.appColors.warning.withValues(alpha: 0.15);
-    final statusFg = enabled
+    final statusFg = needsLogin
+        ? cs.error
+        : enabled
         ? context.appColors.success
         : context.appColors.warning;
 
@@ -1234,10 +1250,12 @@ class _ProviderRow extends StatelessWidget {
         } else {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => ProviderDetailPage(
-                keyName: provider.keyName,
-                displayName: provider.name,
-              ),
+              builder: (_) => cfg.isOAuth
+                  ? OAuthProviderDetailPage(providerId: provider.keyName)
+                  : ProviderDetailPage(
+                      keyName: provider.keyName,
+                      displayName: provider.name,
+                    ),
             ),
           );
         }
@@ -1316,7 +1334,9 @@ class _ProviderRow extends StatelessWidget {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        enabled
+                        needsLogin
+                            ? l10n.oauthNeedsLogin
+                            : enabled
                             ? l10n.providersPageEnabledStatus
                             : l10n.providersPageDisabledStatus,
                         style: TextStyle(fontSize: 11, color: statusFg),
@@ -1538,7 +1558,7 @@ Future<void> _showMultiExportSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
