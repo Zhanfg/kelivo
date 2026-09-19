@@ -747,12 +747,13 @@ class MyApp extends StatelessWidget {
         Provider<ExtensionEntityStore>.value(
           value: databaseLease.extensionEntityStore,
         ),
+        Provider<AgentTaskJournal>(create: (_) => AgentTaskJournal()),
         ChangeNotifierProvider(
           create: (ctx) => AgentTaskProvider(
             store: ctx.read<ExtensionEntityStore>(),
+            journal: ctx.read<AgentTaskJournal>(),
           ),
         ),
-        Provider<AgentTaskJournal>(create: (_) => AgentTaskJournal()),
         if (WorkspaceChannel.isSupportedPlatform)
           ChangeNotifierProvider(
             lazy: false,
