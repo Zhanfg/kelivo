@@ -150,7 +150,10 @@ void main() {
             });
           }
           if (request.url.path == '/api/device/token') {
-            expect(jsonDecode(request.body)['device_code'], 'pollinations-device');
+            expect(
+              jsonDecode(request.body)['device_code'],
+              'pollinations-device',
+            );
             polls++;
             if (polls == 1) {
               return response({'error': 'authorization_pending'}, 400);
