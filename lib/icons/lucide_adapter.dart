@@ -248,4 +248,13 @@ class Lucide {
   static const IconData SlidersHorizontal =
       lucide.LucideIcons.slidersHorizontal;
   static const IconData AudioLines = lucide.LucideIcons.audioLines;
+
+  // Story Runtime aliases intentionally resolve to Kelivo's native icon set.
+  static const IconData CircleCheck = CheckCircle;
+  static const IconData HardDriveDownload = Download;
+  static const IconData CircleOff = XCircle;
+  static const IconData Users = User;
+  static const IconData Cpu = Activity;
+  static const IconData Cloud = Network;
+
 }
