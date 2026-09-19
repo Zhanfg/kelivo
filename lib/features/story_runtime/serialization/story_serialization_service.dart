@@ -28,10 +28,10 @@ final class _BusinessPreferencesStorySerializationStore
   bool containsKey(String key) => preferences.containsKey(key);
 
   @override
-  String? getString(String key) => _store.getString(key);
+  String? getString(String key) => preferences.getString(key);
 
   @override
-  bool? getBool(String key) => _store.getBool(key);
+  bool? getBool(String key) => preferences.getBool(key);
 
   @override
   Future<bool> setString(String key, String value) =>
