@@ -5,6 +5,60 @@ import 'package:crypto/crypto.dart';
 import '../../../core/database/business_preferences.dart';
 import '../orchestration/story_break_armor_mode.dart';
 
+abstract interface class StorySerializationStore {
+  Future<void> load();
+  bool containsKey(String key);
+  String? getString(String key);
+  bool? getBool(String key);
+  Future<bool> setString(String key, String value);
+  Future<bool> setBool(String key, bool value);
+  Future<bool> remove(String key);
+}
+
+final class _BusinessPreferencesStorySerializationStore
+    implements StorySerializationStore {
+  const _BusinessPreferencesStorySerializationStore(this.preferences);
+
+  final BusinessPreferences preferences;
+
+  @override
+  Future<void> load() => preferences.load();
+
+  @override
+  bool containsKey(String key) => preferences.containsKey(key);
+
+  @override
+  String? getString(String key) => _store.getString(key);
+
+  @override
+  bool? getBool(String key) => _store.getBool(key);
+
+  @override
+  Future<bool> setString(String key, String value) =>
+      preferences.setString(key, value);
+
+  @override
+  Future<bool> setBool(String key, bool value) => preferences.setBool(key, value);
+
+  @override
+  Future<bool> remove(String key) => preferences.remove(key);
+}
+
+final class StorySerializationRestoreRollbackException implements Exception {
+  const StorySerializationRestoreRollbackException({
+    required this.restoreError,
+    required this.rollbackError,
+  });
+
+  final Object restoreError;
+  final Object rollbackError;
+
+  @override
+  String toString() =>
+      'StorySerializationRestoreRollbackException('
+      'restoreError: $restoreError, rollbackError: $rollbackError)';
+}
+
 final class StorySerializationBundle {
   const StorySerializationBundle({
     required this.schemaVersion,
@@ -52,9 +106,13 @@ final class StorySerializationRestoreReport {
 /// generic Kelivo settings, MCP OAuth state and TTS API keys are deliberately
 /// excluded. Voice assignments contain only existing TTS service ids.
 final class StorySerializationService {
-  StorySerializationService(this.preferences);
+  StorySerializationService(BusinessPreferences preferences)
+    : _store = _BusinessPreferencesStorySerializationStore(preferences);
 
-  final BusinessPreferences preferences;
+  StorySerializationService.withStore(StorySerializationStore store)
+    : _store = store;
+
+  final StorySerializationStore _store;
 
   static const int maxBundleChars = 32 * 1024 * 1024;
 
@@ -77,11 +135,11 @@ final class StorySerializationService {
   };
 
   Future<StorySerializationBundle> exportBundle() async {
-    await preferences.load();
+    await _store.load();
     final blobs = <String, List<Object?>>{};
     final keys = storyBlobKeys.toList()..sort();
     for (final key in keys) {
-      final raw = preferences.getString(key);
+      final raw = _store.getString(key);
       if (raw == null || raw.trim().isEmpty) continue;
       final decoded = jsonDecode(raw);
       if (decoded is! List) {
@@ -91,7 +149,7 @@ final class StorySerializationService {
     }
     final settings = <String, Object?>{
       storyBreakArmorEnabledKey:
-          preferences.getBool(storyBreakArmorEnabledKey) ?? false,
+          _store.getBool(storyBreakArmorEnabledKey) ?? false,
     };
     final createdAt = DateTime.now().toUtc();
     final digest = _contentDigest(
@@ -197,21 +255,87 @@ final class StorySerializationService {
   /// deleting newer Story subsystems that an older bundle did not know about.
   Future<StorySerializationRestoreReport> restoreJson(String encoded) async {
     final bundle = decodeAndValidate(encoded);
-    await preferences.load();
-    final restoredBlobs = <String>[];
+    await _store.load();
+
     final blobKeys = bundle.blobs.keys.toList()..sort();
-    for (final key in blobKeys) {
-      await preferences.setString(key, jsonEncode(bundle.blobs[key]));
-      restoredBlobs.add(key);
-    }
+    final previousBlobs = <String, ({bool present, String? value})>{
+      for (final key in blobKeys)
+        key: (present: _store.containsKey(key), value: _store.getString(key)),
+    };
+    final restoreBreakArmor = bundle.settings.containsKey(
+      storyBreakArmorEnabledKey,
+    );
+    final previousBreakArmor = (
+      present: _store.containsKey(storyBreakArmorEnabledKey),
+      value: _store.getBool(storyBreakArmorEnabledKey),
+    );
+
+    final restoredBlobs = <String>[];
     final restoredSettings = <String>[];
-    if (bundle.settings.containsKey(storyBreakArmorEnabledKey)) {
-      await preferences.setBool(
-        storyBreakArmorEnabledKey,
-        bundle.settings[storyBreakArmorEnabledKey] == true,
-      );
-      restoredSettings.add(storyBreakArmorEnabledKey);
+    final touched = <({String key, bool isBool})>[];
+
+    try {
+      // Apply the scalar setting first so a later blob failure exercises the
+      // same rollback path as an interrupted multi-key restore.
+      if (restoreBreakArmor) {
+        final written = await _store.setBool(
+          storyBreakArmorEnabledKey,
+          bundle.settings[storyBreakArmorEnabledKey] == true,
+        );
+        if (!written) {
+          throw StateError(
+            'story_serialization_write_failed:$storyBreakArmorEnabledKey',
+          );
+        }
+        touched.add((key: storyBreakArmorEnabledKey, isBool: true));
+        restoredSettings.add(storyBreakArmorEnabledKey);
+      }
+
+      for (final key in blobKeys) {
+        final written = await _store.setString(
+          key,
+          jsonEncode(bundle.blobs[key]),
+        );
+        if (!written) {
+          throw StateError('story_serialization_write_failed:$key');
+        }
+        touched.add((key: key, isBool: false));
+        restoredBlobs.add(key);
+      }
+    } catch (error, stackTrace) {
+      Object? rollbackError;
+      for (final item in touched.reversed) {
+        try {
+          if (item.isBool) {
+            if (previousBreakArmor.present) {
+              await _store.setBool(
+                item.key,
+                previousBreakArmor.value ?? false,
+              );
+            } else {
+              await _store.remove(item.key);
+            }
+          } else {
+            final previous = previousBlobs[item.key]!;
+            if (previous.present) {
+              await _store.setString(item.key, previous.value ?? '');
+            } else {
+              await _store.remove(item.key);
+            }
+          }
+        } catch (rollbackFailure) {
+          rollbackError ??= rollbackFailure;
+        }
+      }
+      if (rollbackError != null) {
+        throw StorySerializationRestoreRollbackException(
+          restoreError: error,
+          rollbackError: rollbackError,
+        );
+      }
+      Error.throwWithStackTrace(error, stackTrace);
     }
+
     return StorySerializationRestoreReport(
       restoredBlobKeys: List.unmodifiable(restoredBlobs),
       restoredSettingKeys: List.unmodifiable(restoredSettings),
