@@ -1,4 +1,4 @@
-name: Upstream Native Merge Candidate V2
+name: Optimize Upstream Story Merge
 
 on:
   push:
@@ -9,13 +9,13 @@ permissions:
   contents: write
 
 jobs:
-  merge:
+  optimize:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout original Story head
+      - name: Checkout upstream-preferred candidate
         uses: actions/checkout@v4
         with:
-          ref: backup/story-runtime-pre-upstream-20260920
+          ref: sync/upstream-native-theirs-20260920
           fetch-depth: 0
 
       - name: Setup Flutter
@@ -25,79 +25,626 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Merge upstream preferring upstream conflict hunks
+      - name: Apply Story compatibility integration
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "Kelivo Upstream Sync"
           git config user.email "actions@users.noreply.github.com"
-          git fetch origin master sync/upstream-20260920
-          git merge --no-ff -X theirs origin/master -m "merge: sync upstream master into story runtime"
+          git fetch origin master
 
-          # Reuse reviewed two-sided infrastructure merges.
-          git checkout origin/sync/upstream-20260920 -- \
-            .github/workflows/pr-check.yml \
-            android/app/build.gradle.kts
-
-          # Keep Story-specific dependency/assets while retaining upstream's
-          # local flutter_math_fork path and upstream skill assets.
           python3 - <<'PY'
           from pathlib import Path
-          p=Path("pubspec.yaml")
-          s=p.read_text()
+          import subprocess
 
-          if "  hashlib: ^2.4.2" not in s:
-              s=s.replace("  cryptography: ^2.9.0\n", "  cryptography: ^2.9.0\n  hashlib: ^2.4.2\n")
+          def read(path):
+              return Path(path).read_text()
 
-          story_assets=[
-              "    - assets/story_skills/lieflat-less-ai-tone/SKILL.md\n",
-              "    - assets/story_skills/lieflat-less-ai-tone/LICENSE\n",
-              "    - assets/story_skills/lieflat-less-ai-tone/prompts/10_kelivo_human_writing_core.md\n",
-              "    - assets/story_skills/visual-taste-basics/SKILL.md\n",
-              "    - assets/story_skills/github-story-serialization/SKILL.md\n",
-          ]
-          anchor="  assets:\n"
-          if anchor in s:
-              pos=s.index(anchor)+len(anchor)
-              existing=s[pos:]
-              missing=[x for x in story_assets if x.strip() not in existing]
-              if missing:
-                  s=s[:pos]+''.join(missing)+s[pos:]
+          def write(path, text):
+              Path(path).write_text(text)
 
-          p.write_text(s)
+          def replace_once(path, old, new):
+              s = read(path)
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, got {count} for {old[:80]!r}")
+              write(path, s.replace(old, new, 1))
+
+          # ---- TTS: merge upstream background lifecycle with Story local MOSS backend.
+          p = "lib/core/providers/tts_provider.dart"
+          replace_once(
+              p,
+              "  final BusinessPreferences preferences;\n"
+              "  final MobileBackgroundCoordinator _background;\n"
+              "  bool _previewPlaying = false;\n",
+              "  final BusinessPreferences preferences;\n"
+              "  final MobileBackgroundCoordinator _background;\n"
+              "  final LocalTtsBackend _localBackend;\n"
+              "  bool _previewPlaying = false;\n",
+          )
+          replace_once(
+              p,
+              "  TtsProvider({\n"
+              "    required this.preferences,\n"
+              "    MobileBackgroundCoordinator? background,\n"
+              "  }) : _background = background ?? MobileBackgroundCoordinator.instance {\n",
+              "  TtsProvider({\n"
+              "    required this.preferences,\n"
+              "    MobileBackgroundCoordinator? background,\n"
+              "    LocalTtsBackend? localBackend,\n"
+              "  }) : _background = background ?? MobileBackgroundCoordinator.instance,\n"
+              "       _localBackend = localBackend ?? MossLocalTtsBackend() {\n",
+          )
+
+          s = read(p)
+          start = s.index("  /// With [waitForCompletion] false")
+          end = s.index("  Future<void> speakSystem", start)
+          speak = '''  /// With [waitForCompletion] false, returns after old-player cleanup and
+          /// native buffering setup is complete. Local, cloud and system playback
+          /// then continue independently of generation finalization.
+          Future<void> speak(
+            String text, {
+            bool flush = true,
+            bool waitForCompletion = true,
+          }) async {
+            if (!_initialized) return;
+            final selected = await _getSelectedNetworkService();
+            final cloudAvailable = selected != null && selected.enabled;
+            var localInstalled = false;
+            var localReady = false;
+            try {
+              localInstalled = await _localBackend.isInstalled();
+              if (localInstalled) {
+                localReady = await _localBackend.isReady();
+              }
+            } catch (_) {
+              localReady = false;
+            }
+
+            final choice = resolveTtsBackend(
+              mode: _backendMode,
+              localInstalled: localInstalled,
+              localReady: localReady,
+              cloudAvailable: cloudAvailable,
+            );
+            switch (choice) {
+              case TtsBackendChoice.local:
+                return _speakQueued(
+                  text,
+                  localBackend: _localBackend,
+                  flush: flush,
+                  waitForCompletion: waitForCompletion,
+                );
+              case TtsBackendChoice.cloud:
+                return _speakQueued(
+                  text,
+                  networkService: selected,
+                  flush: flush,
+                  waitForCompletion: waitForCompletion,
+                );
+              case TtsBackendChoice.system:
+                return _speakQueued(
+                  text,
+                  flush: flush,
+                  waitForCompletion: waitForCompletion,
+                );
+              case TtsBackendChoice.unavailable:
+                _setRoutingError(
+                  localInstalled
+                      ? 'Local TTS model is installed but the local runtime is unavailable.'
+                      : _backendMode == TtsBackendMode.cloudOnly
+                      ? 'No enabled cloud TTS service is selected.'
+                      : 'Local TTS is unavailable.',
+                );
+                return;
+            }
+          }
+
+          void _setRoutingError(String message) {
+            _error = message;
+            _isSpeaking = false;
+            _isPaused = false;
+            _usingNetwork = false;
+            _usingLocal = false;
+            _playbackState = _playbackState.copyWith(
+              status: TtsPlaybackStatus.error,
+              errorMessage: message,
+              usingNetwork: false,
+            );
+            notifyListeners();
+          }
+
+          '''
+          s = s[:start] + speak + s[end:]
+          write(p, s)
+
+          replace_once(
+              p,
+              "    if (_usingNetwork) {\n"
+              "      unawaited(_runNetworkQueue(session, networkService!));\n"
+              "    } else if (!_isPaused) {\n",
+              "    if (_usingLocal) {\n"
+              "      unawaited(_runLocalQueue(session, localBackend!));\n"
+              "    } else if (_usingNetwork) {\n"
+              "      unawaited(_runNetworkQueue(session, networkService!));\n"
+              "    } else if (!_isPaused) {\n",
+          )
+
+          # AudioPlayer-backed local playback follows the same pause/resume and
+          # state lifecycle as network playback.
+          s = read(p)
+          s = s.replace("        if (_usingNetwork) {\n          _releaseSpeechAudio();",
+                        "        if (_usesAudioPlayer) {\n          _releaseSpeechAudio();", 1)
+          s = s.replace("      if (!_usingNetwork) return;\n      switch (state) {",
+                        "      if (!_usesAudioPlayer) return;\n      switch (state) {", 1)
+          s = s.replace("      if (_usingNetwork) {\n        await _player.pause();",
+                        "      if (_usesAudioPlayer) {\n        await _player.pause();", 1)
+          s = s.replace("    if (_usingNetwork) {\n      final session = _sessionId;",
+                        "    if (_usesAudioPlayer) {\n      final session = _sessionId;", 1)
+          marker = "    await _player.stop();\n    await Future<void>.delayed(const Duration(milliseconds: 20));\n    _currentChunkDuration = result.duration;\n"
+          if marker in s:
+              s = s.replace(
+                  marker,
+                  "    await _player.stop();\n"
+                  "    await Future<void>.delayed(const Duration(milliseconds: 20));\n"
+                  "    await _claimSpeechAudio();\n"
+                  "    _currentChunkDuration = result.duration;\n",
+                  1,
+              )
+          write(p, s)
+
+          # ---- Bottom tools: preserve upstream conversation id and Story-scoped id.
+          p = "lib/features/chat/widgets/bottom_tools_sheet.dart"
+          replace_once(p, "    this.conversationId,\n    this.onClose,\n",
+                       "    this.conversationId,\n    this.storyConversationId,\n    this.onClose,\n")
+          replace_once(p, "  final String? conversationId;\n  final VoidCallback? onClose;\n",
+                       "  final String? conversationId;\n  final String? storyConversationId;\n  final VoidCallback? onClose;\n")
+          replace_once(p, "    final storyConversationId = this.storyConversationId;\n",
+                       "    final storyConversationId = this.storyConversationId ?? conversationId;\n")
+
+          # ---- Input section: recover Story/queue model types lost at import conflict.
+          p = "lib/features/home/widgets/chat_input_section.dart"
+          s = read(p)
+          if "core/models/chat_input_data.dart" not in s:
+              s = s.replace("import '../../../core/models/assistant.dart';\n",
+                            "import '../../../core/models/assistant.dart';\nimport '../../../core/models/chat_input_data.dart';\n", 1)
+          if "core/providers/settings_provider.dart" not in s:
+              s = s.replace("import '../../../core/providers/quick_phrase_provider.dart';\n",
+                            "import '../../../core/providers/quick_phrase_provider.dart';\nimport '../../../core/providers/settings_provider.dart';\n", 1)
+          # remove accidental duplicate import from three-way merge
+          duplicate = "import '../../../core/providers/world_book_provider.dart';\nimport '../../../core/providers/instruction_injection_provider.dart';\n"
+          s = s.replace(duplicate, "import '../../../core/providers/world_book_provider.dart';\n", 1)
+          write(p, s)
+
+          # ---- Mobile Story drawer/control imports.
+          p = "lib/features/home/pages/home_mobile_layout.dart"
+          s = read(p)
+          anchor = "import '../../chat/widgets/chat_assistant_background.dart';\n"
+          additions = (
+              "import '../../story_runtime/ui/story_conversation_mode_control.dart';\n"
+              "import '../../story_runtime/orchestration/story_mode_transition_service.dart';\n"
+              "import '../../story_runtime/ui/story_workspace_drawer.dart';\n"
+          )
+          if "story_conversation_mode_control.dart" not in s:
+              s = s.replace(anchor, anchor + additions, 1)
+          write(p, s)
+
+          # ---- Home page Story projection imports and composer callbacks.
+          p = "lib/features/home/pages/home_page.dart"
+          s = read(p)
+          anchor = "import '../../mcp/pages/mcp_page.dart';\n"
+          additions = (
+              "import '../../story_runtime/ui/story_conversation_mode_control.dart';\n"
+              "import '../../story_runtime/ui/story_narrative_view.dart';\n"
+          )
+          if "story_conversation_mode_control.dart" not in s:
+              s = s.replace(anchor, anchor + additions, 1)
+
+          old = """      onSend: (text) async {
+                  final result = await _controller.sendMessage(text);
+                  if (!mounted) return result;
+                  if (PlatformUtils.isMobile &&
+                      result == ChatInputSubmissionResult.sent) {
+                    _controller.dismissKeyboard();
+                  }
+                  return result;
+                },
+                onStop: _controller.cancelStreaming,
+                hasQueuedInput: _controller.currentQueuedInput != null,
+                queuedPreviewText: _controller.currentQueuedInput?.input.text,
+                onCancelQueuedInput: _controller.cancelQueuedMessage,
+          """
+          if old not in s:
+              # Same code is formatted at six-space widget indentation in current upstream.
+              old = """      onSend: (text) async {
+                final result = await _controller.sendMessage(text);
+                if (!mounted) return result;
+                if (PlatformUtils.isMobile &&
+                    result == ChatInputSubmissionResult.sent) {
+                  _controller.dismissKeyboard();
+                }
+                return result;
+              },
+              onStop: _controller.cancelStreaming,
+              hasQueuedInput: _controller.currentQueuedInput != null,
+              queuedPreviewText: _controller.currentQueuedInput?.input.text,
+              onCancelQueuedInput: _controller.cancelQueuedMessage,
+          """
+          new = """      onReasoningBudgetChanged: _setComposerReasoningBudget,
+                onComposerModelChanged: _setComposerModel,
+                onSend: (text) async {
+                  final result = await _controller.sendMessage(text);
+                  if (!mounted) return result;
+                  if (PlatformUtils.isMobile &&
+                      result == ChatInputSubmissionResult.sent) {
+                    _controller.dismissKeyboard();
+                  }
+                  return result;
+                },
+                onGuide: _controller.guideMessage,
+                onStop: _controller.cancelStreaming,
+                hasQueuedInput: _controller.currentQueuedInput != null,
+                queuedPreviewText: _controller.currentQueuedInput?.input.text,
+                queuedInputs: _controller.currentQueuedInputs,
+                onCancelQueuedInput: _controller.cancelQueuedMessage,
+                onRemoveQueuedInput: _controller.removeQueuedMessageAt,
+                onClearQueuedInputs: _controller.clearQueuedMessages,
+                onReorderQueuedInput: _controller.reorderQueuedMessage,
+          """
+          if old in s:
+              s = s.replace(old, new, 1)
+          else:
+              raise SystemExit("home_page.dart: composer callback block not found")
+          s = s.replace(
+              "      backgroundImageActive: _assistantBackgroundActive(context),\n    );",
+              "      backgroundImageActive: _assistantBackgroundActive(context),\n"
+              "      storyMode: isStoryWorkspaceSelected(\n"
+              "        context.read<BusinessPreferences>(),\n"
+              "      ),\n"
+              "    );",
+              1,
+          )
+          write(p, s)
+
+          # ---- Home controller: finalized Story commit + narrator voice routing.
+          p = "lib/features/home/controllers/home_page_controller.dart"
+          s = read(p)
+          marker = "  Future<void> _handleAssistantMessageFinished(ChatMessage message) async {\n"
+          if "_commitStoryFinalizedAssistant(ChatMessage message)" not in s:
+              method = """  Future<void> _commitStoryFinalizedAssistant(ChatMessage message) async {
+            try {
+              final preferences = _context.read<BusinessPreferences>();
+              await StoryNativeLifecycleBridge(
+                preferences,
+              ).commitFinalizedAssistant(message);
+            } catch (error) {
+              debugPrint('Story finalize bridge failed: $error');
+            }
+          }
+
+          """
+              s = s.replace(marker, method + marker, 1)
+
+          old = """    if (text.trim().isEmpty) return;
+              // Automatic narration acknowledges preparation, so ChatActions can release
+              // generation resources while the independent speech session keeps running.
+              await tts.speak(text, waitForCompletion: !autoPlay);
+          """
+          if old not in s:
+              old = """    if (text.trim().isEmpty) return;
+            // Automatic narration acknowledges preparation, so ChatActions can release
+            // generation resources while the independent speech session keeps running.
+            await tts.speak(text, waitForCompletion: !autoPlay);
+          """
+          new = """    if (text.trim().isEmpty) return;
+
+              try {
+                final preferences = _context.read<BusinessPreferences>();
+                final bridge = StoryNativeLifecycleBridge(preferences);
+                final narrator = await bridge.resolveNarratorAssignment(message);
+                if (narrator != null) {
+                  final voiceContext = await bridge.resolveNarratorContext(message);
+                  final playback = StoryVoicePlaybackService(
+                    preferences: preferences,
+                    ttsProvider: tts,
+                  ).speakAssignment(
+                    assignment: narrator,
+                    text: text,
+                    context: voiceContext,
+                  );
+                  if (autoPlay) {
+                    unawaited(playback);
+                  } else {
+                    await playback;
+                  }
+                  return;
+                }
+              } catch (error) {
+                debugPrint('Story narrator playback failed: $error');
+              }
+
+              // Preserve upstream background-generation handoff behavior.
+              await tts.speak(text, waitForCompletion: !autoPlay);
+          """
+          if old not in s:
+              raise SystemExit("home_page_controller.dart: TTS fallback block not found")
+          s = s.replace(old, new, 1)
+          write(p, s)
+
+          # ---- Message generation: restore Story prompt/profile/serialization on top
+          # of upstream Workspace/attachment pipeline.
+          p = "lib/features/home/services/message_generation_service.dart"
+          s = read(p)
+          prompt_marker = """    messageBuilderService.injectSystemPrompt(
+                apiMessages,
+                assistant,
+                modelId,
+                conversation: promptConversation,
+              );
+              await messageBuilderService.injectMemoryAndRecentChats(
+          """
+          if prompt_marker not in s:
+              prompt_marker = """    messageBuilderService.injectSystemPrompt(
+              apiMessages,
+              assistant,
+              modelId,
+              conversation: promptConversation,
+            );
+            await messageBuilderService.injectMemoryAndRecentChats(
+          """
+          prompt_repl = """    messageBuilderService.injectSystemPrompt(
+                apiMessages,
+                assistant,
+                modelId,
+                conversation: promptConversation,
+              );
+
+              BusinessPreferences? storyPreferences;
+              StoryRuntimePromptResult? storyRuntime;
+              try {
+                storyPreferences = contextProvider.read<BusinessPreferences>();
+              } on ProviderNotFoundException {
+                storyPreferences = null;
+              }
+              if (storyPreferences != null) {
+                final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();
+                if (promptConversation != null && storyAssistantId.isNotEmpty) {
+                  storyRuntime = await StoryRuntimePromptService(storyPreferences).build(
+                    conversation: promptConversation,
+                    messages: messages,
+                    assistantId: storyAssistantId,
+                  );
+                  if (storyRuntime != null) {
+                    StoryBreakArmorMode(
+                      storyPreferences,
+                    ).prependToSystemPrompt(apiMessages);
+                    _injectStoryRuntimeSystemPrompt(
+                      apiMessages,
+                      storyRuntime.providerText,
+                    );
+                  }
+                }
+              }
+
+              await messageBuilderService.injectMemoryAndRecentChats(
+          """
+          if prompt_marker not in s:
+              raise SystemExit("message_generation_service.dart: prompt marker not found")
+          s = s.replace(prompt_marker, prompt_repl, 1)
+
+          route_old = """    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
+                assistant,
+              );
+              final toolDefs = generationController.buildToolDefinitions(
+          """
+          if route_old not in s:
+              route_old = """    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
+              assistant,
+            );
+            final toolDefs = generationController.buildToolDefinitions(
+          """
+          route_new = """    var mcpRouteSnapshot = generationController.captureMcpToolRoutes(
+                assistant,
+              );
+              if (storyRuntime?.mcpProfileId != null) {
+                mcpRouteSnapshot = mcpRouteSnapshot.filtered(
+                  allowedToolNames: storyRuntime!.allowedMcpToolNames,
+                  allowedServerIds: storyRuntime.allowedMcpServerIds,
+                  includeUnlisted: storyRuntime.includeAssistantMcpDefaults,
+                );
+              }
+              final toolDefs = generationController.buildToolDefinitions(
+          """
+          if route_old not in s:
+              raise SystemExit("message_generation_service.dart: route marker not found")
+          s = s.replace(route_old, route_new, 1)
+
+          tools_tail = """      conversationId: currentConversation?.id,
+            );
+            final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
+          """
+          if tools_tail not in s:
+              tools_tail = """      conversationId: currentConversation?.id,
+            );
+            final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
+          """
+          tools_repl = """      conversationId: currentConversation?.id,
+            );
+            final storySerializationEnabled =
+                storyPreferences != null &&
+                storyRuntime != null &&
+                StorySerializationTools.enabledFor(storyRuntime.activeSkillIds) &&
+                generationController.isToolModel(providerKey, modelId);
+            if (storySerializationEnabled) {
+              toolDefs.addAll(_storySerializationToolDefinitions(kind));
+            }
+            final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
+          """
+          if tools_tail not in s:
+              raise SystemExit("message_generation_service.dart: tool tail not found")
+          s = s.replace(tools_tail, tools_repl, 1)
+          s = s.replace("    final onToolCall = toolDefs.isNotEmpty\n",
+                        "    final nativeOnToolCall = toolDefs.isNotEmpty\n", 1)
+          write(p, s)
+
+          # ---- Chat input: use clean upstream structural block, then layer Story UI
+          # controls on top. This removes the duplicate child/Stack produced by merge.
+          p = "lib/features/home/widgets/chat_input_bar.dart"
+          current = read(p)
+          master = subprocess.check_output(
+              ["git", "show", "origin/master:" + p], text=True
+          )
+          start_marker = "                  // Main input container with iOS-like frosted glass effect\n"
+          end_marker = "                  if (_imageModeActive)\n"
+          cs = current.index(start_marker)
+          ce = current.index(end_marker, cs)
+          ms = master.index(start_marker)
+          me = master.index(end_marker, ms)
+          segment = master[ms:me]
+
+          column_marker = "                        child: Column(\n                          children: [\n"
+          story_header = """                        child: Column(
+                            children: [
+                              if (widget.hasQueuedInput && !showVoiceShell) ...[
+                                _QueuedInputBanner(
+                                  label: widget.queuedInputs.length > 1
+                                      ? '${AppLocalizations.of(context)!.chatInputBarQueuedPending} · ${widget.queuedInputs.length}'
+                                      : AppLocalizations.of(
+                                          context,
+                                        )!.chatInputBarQueuedPending,
+                                  previewText: widget.queuedPreviewText,
+                                  cancelLabel: AppLocalizations.of(
+                                    context,
+                                  )!.chatInputBarQueuedCancel,
+                                  onCancel: widget.onCancelQueuedInput,
+                                  onManage: widget.queuedInputs.isEmpty
+                                      ? null
+                                      : () => unawaited(_showQueueManager()),
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                              ],
+                              if (showVoiceShell)
+                                _buildComposerVoiceShell(
+                                  context,
+                                  theme,
+                                  selectedAsrService,
+                                ),
+                              if (showGenerationDraftActions && !showVoiceShell)
+                                Padding(
+                                  key: const ValueKey(
+                                    'composer-generation-actions',
+                                  ),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    AppSpacing.xs,
+                                    0,
+                                    AppSpacing.xs,
+                                    AppSpacing.xs,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      _CompactActionPill(
+                                        label:
+                                            Localizations.localeOf(
+                                                  context,
+                                                ).languageCode ==
+                                                'zh'
+                                            ? '加入队列'
+                                            : 'Queue',
+                                        icon: Lucide.ListOrdered,
+                                        onTap: _handleSend,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      _CompactActionPill(
+                                        label:
+                                            Localizations.localeOf(
+                                                  context,
+                                                ).languageCode ==
+                                                'zh'
+                                            ? '立即引导'
+                                            : 'Guide',
+                                        icon: Lucide.MessageCirclePlus,
+                                        onTap: widget.onGuide == null
+                                            ? null
+                                            : _handleGuide,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+          """
+          if column_marker not in segment:
+              raise SystemExit("chat_input_bar.dart: upstream column marker missing")
+          segment = segment.replace(column_marker, story_header, 1)
+          segment = segment.replace(
+              "                          if (hasDocs || hasImages)\n"
+              "                            _buildInlineAttachmentPreviews(context, isDark),\n"
+              "                          // Input field with expand/collapse button\n"
+              "                          Stack(\n",
+              "                          if ((hasDocs || hasImages) && !showVoiceShell)\n"
+              "                            _buildInlineAttachmentPreviews(context, isDark),\n"
+              "                          // Input field with expand/collapse button\n"
+              "                          if (!showVoiceShell)\n"
+              "                            Stack(\n",
+              1,
+          )
+          current = current[:cs] + segment + current[ce:]
+          write(p, current)
+
+          # ---- Restore Story storage-count localization key removed by ARB conflict.
+          arb_values = {
+              "lib/l10n/app_en.arb": ('"settingsPageCalculating": "Calculating…",',
+                  '"settingsPageCalculating": "Calculating…",\n'
+                  '  "settingsPageFilesCount": "{count} files · {size}",\n'
+                  '  "@settingsPageFilesCount": {\n'
+                  '    "placeholders": {\n'
+                  '      "count": {"type": "int"},\n'
+                  '      "size": {"type": "String"}\n'
+                  '    }\n'
+                  '  },'),
+              "lib/l10n/app_zh.arb": ('"settingsPageCalculating": "统计中…",',
+                  '"settingsPageCalculating": "统计中…",\n'
+                  '  "settingsPageFilesCount": "共 {count} 个文件 · {size}",'),
+              "lib/l10n/app_zh_Hans.arb": ('"settingsPageCalculating": "统计中…",',
+                  '"settingsPageCalculating": "统计中…",\n'
+                  '  "settingsPageFilesCount": "共 {count} 个文件 · {size}",'),
+              "lib/l10n/app_zh_Hant.arb": ('"settingsPageCalculating": "統計中…",',
+                  '"settingsPageCalculating": "統計中…",\n'
+                  '  "settingsPageFilesCount": "共 {count} 個檔案 · {size}",'),
+          }
+          for path, (old, new) in arb_values.items():
+              text = read(path)
+              if '"settingsPageFilesCount"' not in text:
+                  if old not in text:
+                      raise SystemExit(f"{path}: localization anchor missing")
+                  write(path, text.replace(old, new, 1))
+
+          print("Story compatibility integration applied successfully")
           PY
 
       - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Regenerate localization outputs
+      - name: Regenerate localization
         run: flutter gen-l10n
 
-      - name: Commit merged candidate
+      - name: Format integration files
+        shell: bash
+        run: |
+          dart format             lib/core/providers/tts_provider.dart             lib/features/chat/widgets/bottom_tools_sheet.dart             lib/features/home/controllers/home_page_controller.dart             lib/features/home/pages/home_mobile_layout.dart             lib/features/home/pages/home_page.dart             lib/features/home/services/message_generation_service.dart             lib/features/home/widgets/chat_input_bar.dart             lib/features/home/widgets/chat_input_section.dart
+
+      - name: Commit optimized candidate
         shell: bash
         run: |
           set -euo pipefail
           git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "fix(sync): reconcile dependencies and generated localization"
-          fi
-          git push origin HEAD:refs/heads/sync/upstream-native-candidate-v2-20260920 --force
+          git commit -m "fix(sync): integrate Story Runtime with latest upstream"
+          git push origin HEAD:refs/heads/sync/upstream-native-optimized-20260920 --force
 
-      - name: Analyze merged tree
+      - name: Analyze
         run: dart analyze --fatal-infos lib test integration_test
 
       - name: Story focused tests
         shell: bash
         run: |
           set -euo pipefail
-          flutter test --concurrency=1 \
-            test/story_runtime_foundation_test.dart \
-            test/story_runtime_state_test.dart \
-            test/story_runtime_machine_test.dart \
-            test/story_runtime_controller_test.dart \
-            test/story_runtime_assembler_test.dart \
-            test/story_response_parser_test.dart \
-            test/story_prompt_compiler_test.dart \
-            test/story_worldline_memory_test.dart \
-            test/story_world_tree_models_test.dart \
-            test/story_skill_system_test.dart
+          flutter test --concurrency=1             test/story_runtime_foundation_test.dart             test/story_runtime_state_test.dart             test/story_runtime_machine_test.dart             test/story_runtime_controller_test.dart             test/story_runtime_assembler_test.dart             test/story_response_parser_test.dart             test/story_prompt_compiler_test.dart             test/story_worldline_memory_test.dart             test/story_world_tree_models_test.dart             test/story_skill_system_test.dart             test/core/services/tts/local_tts_test.dart             test/features/home/widgets/chat_input_bar_queue_test.dart
