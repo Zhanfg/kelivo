@@ -180,11 +180,9 @@ jobs:
           p = "test/features/chat/widgets/bottom_tools_sheet_test.dart"
           s = read(p)
           if "mobile tools expose the Story 2x2 primary actions" not in s:
-              old_sig = """  Future<AppLocalizations> pumpSheet(
-            WidgetTester tester, {
-            Conversation? conversation,
-          }) async {
-          """
+              sig_start = s.index("  Future<AppLocalizations> pumpSheet(")
+              sig_end_marker = "  }) async {\n"
+              sig_end = s.index(sig_end_marker, sig_start) + len(sig_end_marker)
               new_sig = """  Future<AppLocalizations> pumpSheet(
             WidgetTester tester, {
             Conversation? conversation,
@@ -198,31 +196,24 @@ jobs:
             VoidCallback? onQuickPhrase,
           }) async {
           """
-              if old_sig not in s:
-                  raise SystemExit("bottom_tools_sheet_test: pumpSheet signature missing")
-              s = s.replace(old_sig, new_sig, 1)
+              s = s[:sig_start] + new_sig + s[sig_end:]
 
-              old_ctor = """              body: BottomToolsSheet(
-                        assistantId: assistantId,
-                        conversationId: conversation?.id,
-                      ),
-          """
-              new_ctor = """              body: BottomToolsSheet(
-                        assistantId: assistantId,
-                        conversationId: conversation?.id,
-                        storyConversationId: storyConversationId,
-                        onPhotos: onPhotos,
-                        onCamera: onCamera,
-                        onUpload: onUpload,
-                        onDrawing: onDrawing,
-                        onSearch: onSearch,
-                        onMcp: onMcp,
-                        onQuickPhrase: onQuickPhrase,
-                      ),
-          """
-              if old_ctor not in s:
-                  raise SystemExit("bottom_tools_sheet_test: BottomToolsSheet harness missing")
-              s = s.replace(old_ctor, new_ctor, 1)
+              ctor_start = s.index("body: BottomToolsSheet(", sig_start)
+              conv = s.index("conversationId: conversation?.id,", ctor_start)
+              conv_end = s.index("\n", conv) + 1
+              conv_line_start = line_start(s, conv)
+              indent = s[conv_line_start:conv]
+              extra_args = (
+                  indent + "storyConversationId: storyConversationId,\n"
+                  + indent + "onPhotos: onPhotos,\n"
+                  + indent + "onCamera: onCamera,\n"
+                  + indent + "onUpload: onUpload,\n"
+                  + indent + "onDrawing: onDrawing,\n"
+                  + indent + "onSearch: onSearch,\n"
+                  + indent + "onMcp: onMcp,\n"
+                  + indent + "onQuickPhrase: onQuickPhrase,\n"
+              )
+              s = s[:conv_end] + extra_args + s[conv_end:]
 
               test_anchor = "  testWidgets('keeps session skills and drops the workspace block',"
               pos = s.index(test_anchor)
