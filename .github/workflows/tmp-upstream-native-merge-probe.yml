@@ -18,6 +18,13 @@ jobs:
           ref: backup/story-runtime-pre-upstream-20260920
           fetch-depth: 0
 
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+
       - name: Merge upstream with Story conflict preference
         shell: bash
         run: |
