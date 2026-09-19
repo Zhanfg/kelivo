@@ -2,10 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/openai_compatible_presets.dart';
+import 'package:Kelivo/core/services/api/chat_api_helpers.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_protocol_compat.dart';
 
 ProviderConfig _cfg({
   required String baseUrl,
+  String apiKey = 'k',
   bool useResponseApi = false,
   Map<String, dynamic> modelOverrides = const {},
 }) {
@@ -13,7 +15,7 @@ ProviderConfig _cfg({
     id: 'test',
     enabled: true,
     name: 'test',
-    apiKey: 'k',
+    apiKey: apiKey,
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
     useResponseApi: useResponseApi,
@@ -213,6 +215,20 @@ void main() {
         'free-model',
       ),
       OpenAIWireProtocol.chatCompletions,
+    );
+  });
+
+  test('omits Authorization when API key is empty', () {
+    final cfg = _cfg(baseUrl: 'http://127.0.0.1:8765/v1', apiKey: '');
+    expect(bearerAuthHeadersForRequest(cfg, 'free-model'), isEmpty);
+
+    final keyed = _cfg(
+      baseUrl: 'https://example.com/v1',
+      apiKey: 'test-key',
+    );
+    expect(
+      bearerAuthHeadersForRequest(keyed, 'model'),
+      {'Authorization': 'Bearer test-key'},
     );
   });
 
