@@ -198,14 +198,49 @@ class ChatApiService {
         config = config.copyWith(providerType: ProviderKind.claude);
       }
       final options = retryOverride ?? AutoRetryConfig.current;
+      var kind = ProviderConfig.classify(
+        config.id,
+        explicitType: config.providerType,
+      );
+      if (kind == ProviderKind.openai) {
+        final upstreamModelId = apiModelId(config, modelId);
+        final protocol = resolveOpenAIWireProtocol(
+          config,
+          modelId,
+          upstreamModelId: upstreamModelId,
+        );
+        switch (protocol) {
+          case OpenAIWireProtocol.responses:
+            config = config.copyWith(
+              providerType: ProviderKind.openai,
+              useResponseApi: true,
+            );
+            kind = ProviderKind.openai;
+          case OpenAIWireProtocol.chatCompletions:
+            config = config.copyWith(
+              providerType: ProviderKind.openai,
+              useResponseApi: false,
+            );
+            kind = ProviderKind.openai;
+          case OpenAIWireProtocol.anthropicMessages:
+            config = config.copyWith(
+              providerType: ProviderKind.claude,
+              useResponseApi: false,
+            );
+            kind = ProviderKind.claude;
+          case OpenAIWireProtocol.googleGenerativeLanguage:
+            config = config.copyWith(
+              providerType: ProviderKind.google,
+              useResponseApi: false,
+              vertexAI: false,
+            );
+            kind = ProviderKind.google;
+        }
+      }
       final sessionHeaders = providerSessionHeaders(
         config,
         conversationId: conversationId,
         extraHeaders: extraHeaders,
-      );
-      final kind = ProviderConfig.classify(
-        config.id,
-        explicitType: config.providerType,
       );
       final useOpenAIImagesApi =
           kind == ProviderKind.openai &&
