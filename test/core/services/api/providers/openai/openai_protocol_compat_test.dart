@@ -191,10 +191,7 @@ void main() {
   });
 
   test('provider Responses switch still force-enables Responses', () {
-    final cfg = _cfg(
-      baseUrl: 'https://example.com/v1',
-      useResponseApi: true,
-    );
+    final cfg = _cfg(baseUrl: 'https://example.com/v1', useResponseApi: true);
     expect(
       resolveOpenAIWireProtocol(cfg, 'custom-model'),
       OpenAIWireProtocol.responses,
@@ -222,14 +219,10 @@ void main() {
     final cfg = _cfg(baseUrl: 'http://127.0.0.1:8765/v1', apiKey: '');
     expect(bearerAuthHeadersForRequest(cfg, 'free-model'), isEmpty);
 
-    final keyed = _cfg(
-      baseUrl: 'https://example.com/v1',
-      apiKey: 'test-key',
-    );
-    expect(
-      bearerAuthHeadersForRequest(keyed, 'model'),
-      {'Authorization': 'Bearer test-key'},
-    );
+    final keyed = _cfg(baseUrl: 'https://example.com/v1', apiKey: 'test-key');
+    expect(bearerAuthHeadersForRequest(keyed, 'model'), {
+      'Authorization': 'Bearer test-key',
+    });
   });
 
   group('provider presets', () {

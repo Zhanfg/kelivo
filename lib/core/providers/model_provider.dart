@@ -486,10 +486,7 @@ class ProviderManager {
             'anthropic') {
       cfg = cfg.copyWith(providerType: ProviderKind.claude);
     }
-    var kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
+    var kind = ProviderConfig.classify(cfg.id, explicitType: cfg.providerType);
     if (kind == ProviderKind.openai) {
       final ov = _modelOverride(cfg, modelId);
       var upstreamId = modelId;
@@ -761,7 +758,8 @@ class ProviderManager {
         } else {
           if (effectiveKey.isNotEmpty) {
             headers['x-goog-api-key'] = effectiveKey;
-            if (Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() == 'opencode.ai') {
+            if (Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ==
+                'opencode.ai') {
               headers['Authorization'] = 'Bearer $effectiveKey';
             }
           }
