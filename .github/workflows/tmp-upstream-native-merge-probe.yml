@@ -65,16 +65,7 @@ jobs:
           p=Path("lib/icons/lucide_adapter.dart")
           s=p.read_text()
           marker="\n}"
-          aliases="""
-
-  // Story Runtime aliases intentionally resolve to Kelivo's native icon set.
-  static const IconData CircleCheck = CheckCircle;
-  static const IconData HardDriveDownload = Download;
-  static const IconData CircleOff = XCircle;
-  static const IconData Users = User;
-  static const IconData Cpu = Activity;
-  static const IconData Cloud = Network;
-"""
+          aliases = (\n            "\\n\\n  // Story Runtime aliases intentionally resolve to Kelivo's native icon set.\\n"\n            "  static const IconData CircleCheck = CheckCircle;\\n"\n            "  static const IconData HardDriveDownload = Download;\\n"\n            "  static const IconData CircleOff = XCircle;\\n"\n            "  static const IconData Users = User;\\n"\n            "  static const IconData Cpu = Activity;\\n"\n            "  static const IconData Cloud = Network;\\n"\n          )
           if "static const IconData CircleCheck = CheckCircle;" not in s:
               s=s.rsplit(marker,1)[0]+aliases+marker
           p.write_text(s)
