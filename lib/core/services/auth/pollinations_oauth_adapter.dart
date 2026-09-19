@@ -145,6 +145,30 @@ class PollinationsOAuthAdapter extends ProviderOAuthAdapter {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> models(
+    OAuthWire wire,
+    ProviderOAuthCredentials credentials,
+  ) async {
+    final rows = await super.models(wire, credentials);
+    return [
+      for (final row in rows)
+        if (_isTextModel(row)) row,
+    ];
+  }
+
+  bool _isTextModel(Map<String, dynamic> row) {
+    final category = oauthString(row['category'])?.toLowerCase();
+    if (category != null && category != 'text') return false;
+    final output = row['output_modalities'];
+    if (output is List &&
+        output.isNotEmpty &&
+        !output.map((value) => value.toString().toLowerCase()).contains('text')) {
+      return false;
+    }
+    return true;
+  }
+
+  @override
   Future<ProviderOAuthCredentials> refresh(
     OAuthWire wire,
     ProviderOAuthCredentials stored,
