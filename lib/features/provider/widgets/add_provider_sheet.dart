@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/api/openai_compatible_presets.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../l10n/app_localizations.dart';
@@ -166,10 +167,43 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     );
   }
 
+  void _applyOpenAIPreset(OpenAICompatiblePreset preset) {
+    setState(() {
+      _openaiName.text = preset.name;
+      _openaiBase.text = preset.baseUrl;
+      _openaiPath.text = preset.chatPath;
+      _openaiUseResponse = preset.useResponseApi;
+      final suggestedKey = preset.suggestedApiKey;
+      if (suggestedKey != null && _openaiKey.text.trim().isEmpty) {
+        _openaiKey.text = suggestedKey;
+      }
+    });
+  }
+
   Widget _openaiForm(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          'Presets',
+          style: TextStyle(
+            fontSize: 13,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            for (final preset in OpenAICompatiblePresets.all)
+              ActionChip(
+                label: Text(preset.label),
+                onPressed: () => _applyOpenAIPreset(preset),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
         SectionCard(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           dividers: true,
