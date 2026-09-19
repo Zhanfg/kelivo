@@ -32,6 +32,7 @@ Map<String, String>? providerSessionHeaders(
   if (host != 'opencode.ai') return extraHeaders;
   final id = conversationId?.trim() ?? '';
   return {
+    'User-Agent': 'Kelivo/1.0',
     'x-opencode-session': id.isEmpty ? const Uuid().v4() : id,
     ...?extraHeaders,
   };
