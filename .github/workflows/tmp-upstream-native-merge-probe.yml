@@ -1,4 +1,4 @@
-name: Upstream Native Merge Probe
+name: Upstream Native Merge Candidate
 
 on:
   push:
@@ -6,56 +6,61 @@ on:
       - probe/upstream-native-merge-20260920
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  probe:
+  merge:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout story branch
+      - name: Checkout original Story head
         uses: actions/checkout@v4
         with:
+          ref: backup/story-runtime-pre-upstream-20260920
           fetch-depth: 0
 
-      - name: Merge and collect conflicts
+      - name: Merge upstream with Story conflict preference
         shell: bash
         run: |
-          git config user.name "Kelivo Merge Probe"
+          set -euo pipefail
+          git config user.name "Kelivo Upstream Sync"
           git config user.email "actions@users.noreply.github.com"
-          set +e
-          git fetch origin master
-          git merge --no-commit --no-ff origin/master
-          rc=$?
-          set -e
-          echo "MERGE_RC=$rc" >> "$GITHUB_ENV"
+          git fetch origin master sync/upstream-20260920
+          git merge --no-ff -X ours origin/master -m "merge: sync upstream master into story runtime"
 
-          rm -rf conflict_bundle
-          mkdir -p conflict_bundle/{merged,base,ours,theirs}
-          git diff --name-only --diff-filter=U > conflict_bundle/conflicts.txt || true
+          # Reuse the two already-reviewed hand-merged infrastructure files.
+          git checkout origin/sync/upstream-20260920 -- \
+            .github/workflows/pr-check.yml \
+            android/app/build.gradle.kts
 
-          while IFS= read -r p; do
-            [ -n "$p" ] || continue
-            mkdir -p "conflict_bundle/merged/$(dirname "$p")"
-            mkdir -p "conflict_bundle/base/$(dirname "$p")"
-            mkdir -p "conflict_bundle/ours/$(dirname "$p")"
-            mkdir -p "conflict_bundle/theirs/$(dirname "$p")"
+          # Preserve both dependency additions and both asset families.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("pubspec.yaml")
+          s=p.read_text()
+          if "  hashlib: ^2.4.2" not in s:
+              s=s.replace("  cryptography: ^2.9.0\n", "  cryptography: ^2.9.0\n  hashlib: ^2.4.2\n")
+          skill="    - assets/skills/skill-creator/\n"
+          if skill not in s:
+              anchor="    - assets/story_skills/github-story-serialization/SKILL.md\n"
+              s=s.replace(anchor, anchor+skill)
+          p.write_text(s)
+          PY
 
-            cp "$p" "conflict_bundle/merged/$p" 2>/dev/null || true
-            git show ":1:$p" > "conflict_bundle/base/$p" 2>/dev/null || true
-            git show ":2:$p" > "conflict_bundle/ours/$p" 2>/dev/null || true
-            git show ":3:$p" > "conflict_bundle/theirs/$p" 2>/dev/null || true
-          done < conflict_bundle/conflicts.txt
+      - name: Resolve dependencies
+        run: flutter pub get
 
-          echo "=== CONFLICT FILES ==="
-          cat conflict_bundle/conflicts.txt || true
+      - name: Regenerate localization outputs
+        run: flutter gen-l10n
 
-      - name: Upload conflict bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: upstream-merge-conflicts
-          path: conflict_bundle
-          if-no-files-found: error
-
-      - name: Finish probe
+      - name: Commit generated/fixup changes
         shell: bash
-        run: exit "$MERGE_RC"
+        run: |
+          set -euo pipefail
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(sync): reconcile upstream dependencies and generated localization"
+          fi
+          git push origin HEAD:refs/heads/sync/upstream-native-candidate-20260920 --force
+
+      - name: Analyze merged tree
+        run: dart analyze --fatal-infos lib test integration_test
