@@ -993,6 +993,7 @@ class _HomePageState extends State<HomePage>
         providerName: modelInfo.providerName,
         modelDisplay: modelInfo.modelDisplay,
         cs: cs,
+        agentMode: agentMode,
       );
     }
 
@@ -1002,6 +1003,7 @@ class _HomePageState extends State<HomePage>
       providerName: modelInfo.providerName,
       modelDisplay: modelInfo.modelDisplay,
       cs: cs,
+      agentMode: agentMode,
     );
   }
 
@@ -1011,6 +1013,7 @@ class _HomePageState extends State<HomePage>
     required String? providerName,
     required String? modelDisplay,
     required ColorScheme cs,
+    required bool agentMode,
   }) {
     final allSelected = _controller.allSelectableMessagesSelected;
 
@@ -1140,6 +1143,7 @@ class _HomePageState extends State<HomePage>
     required String? providerName,
     required String? modelDisplay,
     required ColorScheme cs,
+    required bool agentMode,
   }) {
     _controller.initDesktopUi();
 
@@ -1191,7 +1195,7 @@ class _HomePageState extends State<HomePage>
       onRightSidebarWidthChanged: _controller.updateRightSidebarWidth,
       onRightSidebarWidthChangeEnd: _controller.saveRightSidebarWidth,
       buildAssistantBackground: _buildAssistantBackground,
-      appBarOverride: _controller.selecting
+      appBarOverride: !agentMode && _controller.selecting
           ? ChatSelectionAppBar(
               selectedCount: _controller.selectedCount,
               allSelected: allSelected,
