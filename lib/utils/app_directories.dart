@@ -72,6 +72,34 @@ class AppDirectories {
   static Future<Directory> getEnvironmentDirectory() =>
       _ensureSubdir('environment');
 
+  /// Durable Agent state root. Runtime processes must never treat this as tmp.
+  static Future<Directory> getAgentDirectory() => _ensureSubdir('agent');
+
+  /// Persistent Agent execution environments.
+  static Future<Directory> getAgentEnvironmentsDirectory() =>
+      _ensurePath('agent/environments');
+
+  /// Persistent task-owned state. Project files still live in workspaces.
+  static Future<Directory> getAgentTasksDirectory() =>
+      _ensurePath('agent/tasks');
+
+  /// User-visible outputs produced by Agent tasks.
+  static Future<Directory> getAgentArtifactsDirectory() =>
+      _ensurePath('agent/artifacts');
+
+  /// Shared content-addressed package/download cache for Agent environments.
+  static Future<Directory> getAgentPackageStoreDirectory() =>
+      _ensurePath('agent/package-store');
+
+  static Future<Directory> agentEnvironmentDir(String environmentId) =>
+      _ensurePath('agent/environments/$environmentId');
+
+  static Future<Directory> agentTaskDir(String taskId) =>
+      _ensurePath('agent/tasks/$taskId');
+
+  static Future<Directory> agentTaskArtifactsDir(String taskId) =>
+      _ensurePath('agent/artifacts/$taskId');
+
   /// Files root for a managed workspace: `<appData>/workspaces/<id>/files`.
   static Future<Directory> workspaceFilesDir(String workspaceId) {
     return _ensurePath('workspaces/$workspaceId/files');
