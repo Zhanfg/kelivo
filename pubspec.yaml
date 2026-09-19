@@ -184,6 +184,11 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - assets/story_skills/lieflat-less-ai-tone/SKILL.md
+    - assets/story_skills/lieflat-less-ai-tone/LICENSE
+    - assets/story_skills/lieflat-less-ai-tone/prompts/10_kelivo_human_writing_core.md
+    - assets/story_skills/visual-taste-basics/SKILL.md
+    - assets/story_skills/github-story-serialization/SKILL.md
     - assets/icons/
     - assets/app_icon.png
     - assets/app_icon.ico
