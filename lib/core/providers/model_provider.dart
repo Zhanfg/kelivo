@@ -8,6 +8,7 @@ import 'settings_provider.dart';
 import '../services/network/dio_http_client.dart';
 import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
+import '../services/api/providers/openai/openai_protocol_compat.dart';
 import '../services/model_override_payload_parser.dart';
 import '../services/custom_request_merger.dart';
 import 'package:Kelivo/secrets/fallback.dart';
@@ -498,10 +499,6 @@ class ProviderManager {
         final base = cfg.baseUrl.endsWith('/')
             ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
             : cfg.baseUrl;
-        final path = (cfg.useResponseApi == true)
-            ? '/responses'
-            : (cfg.chatPath ?? '/chat/completions');
-        final url = Uri.parse('$base$path');
         final ov = _modelOverride(cfg, modelId);
         String upstreamId = modelId;
         try {
@@ -510,7 +507,16 @@ class ProviderManager {
               .trim();
           if (raw != null && raw.isNotEmpty) upstreamId = raw;
         } catch (_) {}
-        final Map<String, dynamic> body = cfg.useResponseApi == true
+        final useResponsesApi = shouldUseOpenAIResponsesApi(
+          cfg,
+          modelId,
+          upstreamModelId: upstreamId,
+        );
+        final path = useResponsesApi
+            ? '/responses'
+            : (cfg.chatPath ?? '/chat/completions');
+        final url = Uri.parse('$base$path');
+        final Map<String, dynamic> body = useResponsesApi
             ? <String, dynamic>{
                 'model': upstreamId,
                 'input': [
