@@ -18,83 +18,79 @@ String jwt(Map<String, dynamic> data) =>
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test(
-    'FreeBuff browser login exchanges transaction for API key',
-    () {
-      fakeAsync((async) {
-        SharedPreferences.setMockInitialValues({});
-        var statusPolls = 0;
-        ProviderOAuthCredentials? result;
-        OAuthLoginPrompt? prompt;
-        final wire = OAuthWire(
-          MockClient((request) async {
-            if (request.url.path == '/api/auth/start') {
-              expect(request.method, 'POST');
-              expect(
-                jsonDecode(request.body)['fingerprintId'],
-                startsWith('codebuff-cli-'),
-              );
-              return http.Response(
-                jsonEncode({
-                  'loginUrl': 'https://freebuff.com/login?auth_code=TEST',
-                  'fingerprintHash': 'hash',
-                  'expiresAt': DateTime.now()
-                      .add(const Duration(minutes: 5))
-                      .millisecondsSinceEpoch,
-                }),
-                200,
-                headers: {'set-cookie': 'freebuff_login=tx-cookie; Path=/; HttpOnly'},
-              );
-            }
-            if (request.url.path == '/api/auth/status') {
-              expect(request.headers['Cookie'], 'freebuff_login=tx-cookie');
-              statusPolls++;
-              if (statusPolls == 1) return response({'pending': true});
-              return response({
-                'pending': false,
-                'transactionId': 'transaction-12345678901234567890',
-              });
-            }
-            if (request.url.path == '/api/auth/register') {
-              expect(request.headers['Cookie'], 'freebuff_login=tx-cookie');
-              expect(
-                jsonDecode(request.body)['transactionId'],
-                'transaction-12345678901234567890',
-              );
-              return response({
-                'apiKey': 'sk-fb-test-key',
-                'user': {
-                  'id': 'freebuff-user',
-                  'email': 'person@example.com',
-                },
-              });
-            }
-            fail('unexpected request: ${request.method} ${request.url}');
-          }),
-        );
+  test('FreeBuff browser login exchanges transaction for API key', () {
+    fakeAsync((async) {
+      SharedPreferences.setMockInitialValues({});
+      var statusPolls = 0;
+      ProviderOAuthCredentials? result;
+      OAuthLoginPrompt? prompt;
+      final wire = OAuthWire(
+        MockClient((request) async {
+          if (request.url.path == '/api/auth/start') {
+            expect(request.method, 'POST');
+            expect(
+              jsonDecode(request.body)['fingerprintId'],
+              startsWith('codebuff-cli-'),
+            );
+            return http.Response(
+              jsonEncode({
+                'loginUrl': 'https://freebuff.com/login?auth_code=TEST',
+                'fingerprintHash': 'hash',
+                'expiresAt': DateTime.now()
+                    .add(const Duration(minutes: 5))
+                    .millisecondsSinceEpoch,
+              }),
+              200,
+              headers: {
+                'set-cookie': 'freebuff_login=tx-cookie; Path=/; HttpOnly',
+              },
+            );
+          }
+          if (request.url.path == '/api/auth/status') {
+            expect(request.headers['Cookie'], 'freebuff_login=tx-cookie');
+            statusPolls++;
+            if (statusPolls == 1) return response({'pending': true});
+            return response({
+              'pending': false,
+              'transactionId': 'transaction-12345678901234567890',
+            });
+          }
+          if (request.url.path == '/api/auth/register') {
+            expect(request.headers['Cookie'], 'freebuff_login=tx-cookie');
+            expect(
+              jsonDecode(request.body)['transactionId'],
+              'transaction-12345678901234567890',
+            );
+            return response({
+              'apiKey': 'sk-fb-test-key',
+              'user': {'id': 'freebuff-user', 'email': 'person@example.com'},
+            });
+          }
+          fail('unexpected request: ${request.method} ${request.url}');
+        }),
+      );
 
-        FreeBuffOAuthAdapter()
-            .login(wire, OAuthCancellation(), (value) async => prompt = value)
-            .then((value) => result = value);
-        async.flushMicrotasks();
+      FreeBuffOAuthAdapter()
+          .login(wire, OAuthCancellation(), (value) async => prompt = value)
+          .then((value) => result = value);
+      async.flushMicrotasks();
 
-        expect(prompt?.url.host, 'freebuff.com');
-        expect(result, isNull);
+      expect(prompt?.url.host, 'freebuff.com');
+      expect(result, isNull);
 
-        async.elapse(const Duration(seconds: 3));
-        expect(statusPolls, 1);
-        async.elapse(const Duration(seconds: 3));
-        async.flushMicrotasks();
+      async.elapse(const Duration(seconds: 3));
+      expect(statusPolls, 1);
+      async.elapse(const Duration(seconds: 3));
+      async.flushMicrotasks();
 
-        expect(result?.accessToken, 'sk-fb-test-key');
-        expect(result?.refreshToken, 'sk-fb-test-key');
-        expect(result?.accountId, 'freebuff-user');
-        expect(result?.email, 'person@example.com');
-        expect(result?.plan, 'FreeBuff');
-        expect(result?.deviceId, startsWith('codebuff-cli-'));
-      });
-    },
-  );
+      expect(result?.accessToken, 'sk-fb-test-key');
+      expect(result?.refreshToken, 'sk-fb-test-key');
+      expect(result?.accountId, 'freebuff-user');
+      expect(result?.email, 'person@example.com');
+      expect(result?.plan, 'FreeBuff');
+      expect(result?.deviceId, startsWith('codebuff-cli-'));
+    });
+  });
 
   test('FreeBuff refresh validates key and logout revokes it', () async {
     final requests = <http.Request>[];
@@ -130,7 +126,10 @@ void main() {
     expect(models.single['id'], 'freebuff/deepseek/deepseek-v4-flash');
     await adapter.logout(wire, refreshed);
     expect(requests.where((r) => r.url.path == '/v1/models'), hasLength(2));
-    expect(requests.where((r) => r.url.path == '/api/auth/revoke'), hasLength(1));
+    expect(
+      requests.where((r) => r.url.path == '/api/auth/revoke'),
+      hasLength(1),
+    );
   });
 
   test(
