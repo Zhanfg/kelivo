@@ -220,9 +220,7 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
       if (!mounted) return;
       setState(() => _future = _load());
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(zh ? '角色名称已修正。' : 'Character name updated.'),
-        ),
+        SnackBar(content: Text(zh ? '角色名称已修正。' : 'Character name updated.')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -244,7 +242,6 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
