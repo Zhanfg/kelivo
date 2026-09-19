@@ -54,7 +54,9 @@ OpenAIWireProtocol resolveOpenAIWireProtocol(
   final uri = Uri.tryParse(config.baseUrl.trim());
   final host = uri?.host.toLowerCase() ?? '';
   final path = (uri?.path ?? '').replaceAll(RegExp(r'/+$'), '').toLowerCase();
-  final effectiveModel = (upstreamModelId ?? modelId).trim().toLowerCase();
+  final effectiveModel = _normalizeOpenCodeModelId(
+    (upstreamModelId ?? modelId).trim().toLowerCase(),
+  );
 
   if (host != 'opencode.ai') return OpenAIWireProtocol.chatCompletions;
 
@@ -66,6 +68,13 @@ OpenAIWireProtocol resolveOpenAIWireProtocol(
   }
 
   return OpenAIWireProtocol.chatCompletions;
+}
+
+String _normalizeOpenCodeModelId(String modelId) {
+  return modelId.replaceFirst(
+    RegExp(r'^(?:opencode-go|opencode-zen|opencode|zen)/'),
+    '',
+  );
 }
 
 OpenAIWireProtocol _openCodeGoProtocol(String modelId) {
