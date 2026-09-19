@@ -82,6 +82,17 @@ jobs:
                   + indent + "const SizedBox(height: 12),\n"
               )
               s = s[:insert] + row + s[insert:]
+          # Remove the legacy second Learning/Clear block retained from the
+          # pre-upstream Story sheet. The upstream section above is the single
+          # authoritative session-skills/prompt/clear surface.
+          legacy = "if (storyConversationId == null) ...["
+          if legacy in s:
+              start_token = s.index(legacy)
+              start = line_start(s, start_token)
+              indent = s[start:start_token]
+              end_token = indent + "],\n"
+              end = s.index(end_token, start_token) + len(end_token)
+              s = s[:start] + s[end:]
           write(p, s)
 
           # Home tools: connect Draw, and pass a Story-scoped conversation ID
