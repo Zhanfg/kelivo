@@ -216,18 +216,21 @@ class ChatApiService {
               useResponseApi: true,
             );
             kind = ProviderKind.openai;
+            break;
           case OpenAIWireProtocol.chatCompletions:
             config = config.copyWith(
               providerType: ProviderKind.openai,
               useResponseApi: false,
             );
             kind = ProviderKind.openai;
+            break;
           case OpenAIWireProtocol.anthropicMessages:
             config = config.copyWith(
               providerType: ProviderKind.claude,
               useResponseApi: false,
             );
             kind = ProviderKind.claude;
+            break;
           case OpenAIWireProtocol.googleGenerativeLanguage:
             config = config.copyWith(
               providerType: ProviderKind.google,
@@ -235,6 +238,7 @@ class ChatApiService {
               vertexAI: false,
             );
             kind = ProviderKind.google;
+            break;
         }
       }
       final sessionHeaders = providerSessionHeaders(
