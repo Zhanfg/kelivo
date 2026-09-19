@@ -83,6 +83,9 @@ import 'core/services/logging/flutter_logger.dart';
 import 'core/services/storage/storage_usage_service.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
+import 'features/agent/providers/agent_task_provider.dart';
+import 'features/agent/services/agent_context_bridge.dart';
+import 'features/agent/services/agent_task_journal.dart';
 import 'utils/app_directories.dart';
 import 'utils/platform_utils.dart';
 import 'utils/sandbox_path_resolver.dart';
@@ -744,6 +747,12 @@ class MyApp extends StatelessWidget {
         Provider<ExtensionEntityStore>.value(
           value: databaseLease.extensionEntityStore,
         ),
+        ChangeNotifierProvider(
+          create: (ctx) => AgentTaskProvider(
+            store: ctx.read<ExtensionEntityStore>(),
+          ),
+        ),
+        Provider<AgentTaskJournal>(create: (_) => AgentTaskJournal()),
         if (WorkspaceChannel.isSupportedPlatform)
           ChangeNotifierProvider(
             lazy: false,
@@ -792,6 +801,13 @@ class MyApp extends StatelessWidget {
             workspaceRuntime: ctx.read<WorkspaceRuntimeProvider>(),
             environment: ctx.read<EnvironmentProvider>(),
             workspaces: ctx.read<WorkspaceProvider>(),
+          ),
+        ),
+        Provider<AgentContextBridge>(
+          create: (ctx) => AgentContextBridge(
+            memory: ctx.read<MemoryProviderV2>(),
+            skills: ctx.read<SkillsService>(),
+            mcp: ctx.read<McpProvider>(),
           ),
         ),
         ProxyProvider<_WorkspaceStackHolder, EnvironmentManager?>(
