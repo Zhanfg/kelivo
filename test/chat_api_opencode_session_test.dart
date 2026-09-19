@@ -56,7 +56,7 @@ const _reply = {
 };
 
 void main() {
-  test('automatic session header is limited to the official host', () {
+  test('automatic OpenCode compatibility headers are official-host only', () {
     for (final host in [
       'example.com',
       'opencode.ai.example.com',
@@ -67,13 +67,33 @@ void main() {
         isNull,
       );
     }
+
     final headers = providerSessionHeaders(
       _config(host: 'OPENCODE.AI'),
       conversationId: 'chat',
     );
     expect(headers, isNotNull);
-    expect(headers!['x-opencode-session'], 'chat');
-    expect(headers['User-Agent'], 'Kelivo/1.0');
+    expect(headers!['User-Agent'], 'opencode/1.18.31');
+    expect(headers['x-opencode-session'], 'chat');
+    expect(headers['x-opencode-client'], 'cli');
+    expect(headers['x-opencode-project'], 'global');
+    expect(headers['x-opencode-request'], matches(RegExp(r'^msg_[0-9a-f-]{36}$')));
+  });
+
+  test('custom headers can override OpenCode compatibility defaults', () {
+    final headers = providerSessionHeaders(
+      _config(),
+      conversationId: 'chat',
+      extraHeaders: const {
+        'User-Agent': 'opencode/custom',
+        'x-opencode-client': 'desktop',
+        'x-opencode-project': 'project-1',
+      },
+    );
+    expect(headers!['User-Agent'], 'opencode/custom');
+    expect(headers['x-opencode-client'], 'desktop');
+    expect(headers['x-opencode-project'], 'project-1');
+    expect(headers['x-opencode-session'], 'chat');
   });
 
   for (final route in [
@@ -85,11 +105,19 @@ void main() {
       '${route.path} uses stable conversation IDs and separate task IDs',
       () async {
         final headers = <String?>[];
+        final requestIds = <String?>[];
+        final userAgents = <String?>[];
+        final clients = <String?>[];
+        final projects = <String?>[];
         final paths = <String>[];
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         addTearDown(() => server.close(force: true));
         server.listen((request) async {
           headers.add(request.headers.value('x-opencode-session'));
+          requestIds.add(request.headers.value('x-opencode-request'));
+          userAgents.add(request.headers.value('user-agent'));
+          clients.add(request.headers.value('x-opencode-client'));
+          projects.add(request.headers.value('x-opencode-project'));
           paths.add(request.uri.path);
           await request.drain<void>();
           request.response.headers.contentType = ContentType.json;
@@ -126,6 +154,11 @@ void main() {
         expect(headers[4], matches(uuid));
         expect(headers[3], isNot(headers[4]));
         expect(headers.last, 'manual');
+        expect(requestIds, everyElement(matches(RegExp(r'^msg_[0-9a-f-]{36}$'))));
+        expect(requestIds.toSet(), hasLength(requestIds.length));
+        expect(userAgents, everyElement('opencode/1.18.31'));
+        expect(clients, everyElement('cli'));
+        expect(projects, everyElement('global'));
         expect(paths, everyElement('/zen/go/v1/${route.path}'));
       },
     );
@@ -136,11 +169,13 @@ void main() {
       'stream tool follow-up and retry reuse session $conversationId',
       () async {
         final headers = <String?>[];
+        final requestIds = <String?>[];
         var toolCalls = 0;
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         addTearDown(() => server.close(force: true));
         server.listen((request) async {
           headers.add(request.headers.value('x-opencode-session'));
+          requestIds.add(request.headers.value('x-opencode-request'));
           await request.drain<void>();
           // Retry both the initial model round and the tool follow-up round.
           if (headers.length == 1 || headers.length == 3) {
@@ -221,6 +256,8 @@ void main() {
         expect(headers, hasLength(4));
         expect(headers.first, isNotEmpty);
         expect(headers, everyElement(conversationId ?? headers.first));
+        expect(requestIds.first, isNotEmpty);
+        expect(requestIds, everyElement(requestIds.first));
         expect(toolCalls, 1);
         expect(chunks.whereType<TextDelta>().map((e) => e.text).join(), 'ok');
       },
