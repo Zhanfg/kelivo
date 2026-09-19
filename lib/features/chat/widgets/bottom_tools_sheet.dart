@@ -77,7 +77,7 @@ class BottomToolsSheet extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final bg = context.overlaySurface;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
-    final storyConversationId = this.storyConversationId ?? conversationId;
+    final storyConversationId = this.storyConversationId;
 
     void openStoryPage(Widget page) {
       final navigator = Navigator.of(context, rootNavigator: true);
@@ -217,6 +217,26 @@ class BottomToolsSheet extends StatelessWidget {
                           icon: Lucide.Camera,
                           label: l10n.bottomToolsSheetCamera,
                           onTap: onCamera,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        roundedAction(
+                          icon: Lucide.Paperclip,
+                          label: l10n.bottomToolsSheetUpload,
+                          onTap: onUpload,
+                        ),
+                        const SizedBox(width: 12),
+                        roundedAction(
+                          icon: Lucide.Brush,
+                          label:
+                              Localizations.localeOf(context).languageCode ==
+                                  'zh'
+                              ? '绘画'
+                              : 'Draw',
+                          onTap: onDrawing,
                         ),
                       ],
                     ),

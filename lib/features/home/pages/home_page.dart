@@ -2045,12 +2045,19 @@ class _HomePageState extends State<HomePage>
                   Navigator.of(ctx).maybePop();
                   _controller.onPickFiles();
                 },
+                onDrawing: () {
+                  Navigator.of(ctx).maybePop();
+                  _startDrawingPrompt();
+                },
                 onClear: () async {
                   await Navigator.of(ctx).maybePop();
                   _showContextManagementSheet();
                 },
                 assistantId: assistantId,
                 conversationId: _controller.currentConversation?.id,
+                storyConversationId: storyMode
+                    ? _controller.currentConversation?.id
+                    : null,
                 onClose: () => Navigator.of(ctx).maybePop(),
               ),
             );

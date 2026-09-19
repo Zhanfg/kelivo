@@ -2397,11 +2397,6 @@ class DataSync {
     return Directory(p.join(appData.path, name));
   }
 
-  Future<Directory> _getStorySkillsDir() async {
-    final root = await AppDirectories.getAppDataDirectory();
-    return Directory(p.join(root.path, 'story_skills'));
-  }
-
   Future<void> _copyRestoredFile(File source, File target) async {
     await target.parent.create(recursive: true);
     await source.copy(target.path);
