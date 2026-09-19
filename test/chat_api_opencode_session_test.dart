@@ -67,13 +67,13 @@ void main() {
         isNull,
       );
     }
-    expect(
-      providerSessionHeaders(
-        _config(host: 'OPENCODE.AI'),
-        conversationId: 'chat',
-      ),
-      {'x-opencode-session': 'chat'},
+    final headers = providerSessionHeaders(
+      _config(host: 'OPENCODE.AI'),
+      conversationId: 'chat',
     );
+    expect(headers, isNotNull);
+    expect(headers!['x-opencode-session'], 'chat');
+    expect(headers['User-Agent'], 'Kelivo/1.0');
   });
 
   for (final route in [
