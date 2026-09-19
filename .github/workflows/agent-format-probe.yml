@@ -1,0 +1,32 @@
+name: Agent format probe
+
+on:
+  push:
+    branches:
+      - feat/agent-runtime-foundation
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+      - name: Show exact dart format patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            lib/features/agent/services/agent_task_journal.dart
+            lib/features/agent/ui/agent_mode_page.dart
+            lib/features/home/pages/home_mobile_layout.dart
+            lib/features/home/widgets/workspace_mode_selector.dart
+            lib/main.dart
+            test/features/agent/providers/agent_task_provider_test.dart
+            test/features/agent/services/agent_task_journal_test.dart
+          )
+          dart format "${files[@]}"
+          git diff -- "${files[@]}"
