@@ -64,6 +64,7 @@ void main() {
         'avatars': RestorePreviousAssetRootState.missing,
         'fonts': RestorePreviousAssetRootState.directory,
         'skills': RestorePreviousAssetRootState.missing,
+        'story_skills': RestorePreviousAssetRootState.missing,
         'workspaces': RestorePreviousAssetRootState.missing,
         'sessions': RestorePreviousAssetRootState.missing,
       });
