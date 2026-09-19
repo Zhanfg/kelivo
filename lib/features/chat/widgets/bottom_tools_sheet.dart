@@ -332,14 +332,6 @@ class BottomToolsSheet extends StatelessWidget {
                           onLongPress: onManageQuickPhrases,
                         ),
                     ],
-                    if (storyConversationId == null) ...[
-                      const SizedBox(height: 12),
-                      _LearningAndClearSection(
-                        clearLabel: clearLabel,
-                        onClear: onClear,
-                        assistantId: assistantId,
-                      ),
-                    ],
                   ],
                 ),
               ),
