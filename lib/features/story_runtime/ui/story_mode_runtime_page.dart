@@ -11,6 +11,7 @@ import '../orchestration/story_mode_transition_service.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
 import 'story_conversation_mode_control.dart';
+import 'story_continuity_page.dart';
 import 'story_native_settings_widgets.dart';
 
 /// Product-facing Story behavior settings.
@@ -233,6 +234,24 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                         },
                         onSelected: _busy ? null : _setAgencyMode,
                       ),
+                    StoryNativeRow(
+                      title: tr('连续性与分支', 'Continuity & branches'),
+                      subtitle: tr(
+                        '管理 World Tree、主线、归档分支、检查点和分支专属记忆。',
+                        'Manage World Tree branches, mainline, checkpoints and worldline-scoped memory.',
+                      ),
+                      icon: Lucide.GitFork,
+                      enabled: !_busy && selectedId != null,
+                      onTap: selectedId == null
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => StoryContinuityPage(
+                                  conversationId: selectedId,
+                                ),
+                              ),
+                            ),
+                    ),
                   ],
                 ),
                 if (_busy) ...[
