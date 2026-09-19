@@ -815,6 +815,7 @@ final class BusinessSettingsRouter {
           'kimi',
           'claude',
           'freebuff',
+          'pollinations',
         }.contains(oauthProvider)) {
       throw const FormatException('Invalid OAuth provider');
     }
