@@ -34,23 +34,22 @@ jobs:
           def write(path, text):
               Path(path).write_text(text)
 
-          # data_sync: story_skills is now handled by the unified asset-root
-          # path; remove the obsolete private helper.
+          def line_start(text, pos):
+              return text.rfind("\n", 0, pos) + 1
+
+          # Remove obsolete private helper. story_skills is covered by the
+          # unified asset-root handling after the upstream merge.
           p = "lib/core/services/backup/data_sync.dart"
           s = read(p)
-          dead = """  Future<Directory> _getStorySkillsDir() async {
-            final root = await AppDirectories.getAppDataDirectory();
-            return Directory(p.join(root.path, 'story_skills'));
-          }
-
-          """
-          if dead in s:
-              s = s.replace(dead, "", 1)
+          marker = "  Future<Directory> _getStorySkillsDir() async {"
+          if marker in s:
+              start = s.index(marker)
+              end = s.index("  Future<void> _copyRestoredFile", start)
+              s = s[:start] + s[end:]
           write(p, s)
 
-          # Bottom tools: do not infer Story mode merely from a normal
-          # conversation ID. Restore the Upload/Draw row lost during upstream
-          # structural merge.
+          # Bottom tools: a normal conversation ID must not imply Story mode.
+          # Restore Upload/Draw controls before the existing learning section.
           p = "lib/features/chat/widgets/bottom_tools_sheet.dart"
           s = read(p)
           s = s.replace(
@@ -58,77 +57,67 @@ jobs:
               "    final storyConversationId = this.storyConversationId;\n",
               1,
           )
-          anchor = """                    const SizedBox(height: 12),
-                    _LearningAndClearSection(
-          """
-          row = """                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        roundedAction(
-                          icon: Lucide.Paperclip,
-                          label: l10n.bottomToolsSheetUpload,
-                          onTap: onUpload,
-                        ),
-                        const SizedBox(width: 12),
-                        roundedAction(
-                          icon: Lucide.Brush,
-                          label:
-                              Localizations.localeOf(context).languageCode == 'zh'
-                              ? '绘画'
-                              : 'Draw',
-                          onTap: onDrawing,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _LearningAndClearSection(
-          """
           if "label: l10n.bottomToolsSheetUpload" not in s:
-              if anchor not in s:
-                  raise SystemExit("bottom_tools_sheet: upload/draw insertion anchor missing")
-              s = s.replace(anchor, row, 1)
+              target = s.index("_LearningAndClearSection(")
+              insert = line_start(s, target)
+              indent = s[insert:target]
+              row = (
+                  indent + "Row(\n"
+                  + indent + "  children: [\n"
+                  + indent + "    roundedAction(\n"
+                  + indent + "      icon: Lucide.Paperclip,\n"
+                  + indent + "      label: l10n.bottomToolsSheetUpload,\n"
+                  + indent + "      onTap: onUpload,\n"
+                  + indent + "    ),\n"
+                  + indent + "    const SizedBox(width: 12),\n"
+                  + indent + "    roundedAction(\n"
+                  + indent + "      icon: Lucide.Brush,\n"
+                  + indent + "      label: Localizations.localeOf(context).languageCode == 'zh'\n"
+                  + indent + "          ? '绘画'\n"
+                  + indent + "          : 'Draw',\n"
+                  + indent + "      onTap: onDrawing,\n"
+                  + indent + "    ),\n"
+                  + indent + "  ],\n"
+                  + indent + "),\n"
+                  + indent + "const SizedBox(height: 12),\n"
+              )
+              s = s[:insert] + row + s[insert:]
           write(p, s)
 
-          # Home tools: route Story-only actions explicitly, and connect the
-          # drawing action rather than leaving the helper dead.
+          # Home tools: connect Draw, and pass a Story-scoped conversation ID
+          # only when the Story workspace is active.
           p = "lib/features/home/pages/home_page.dart"
           s = read(p)
-          old = """                onUpload: () {
-                  Navigator.of(ctx).maybePop();
-                  _controller.onPickFiles();
-                },
-                onClear: () async {
-          """
-          new = """                onUpload: () {
-                  Navigator.of(ctx).maybePop();
-                  _controller.onPickFiles();
-                },
-                onDrawing: () {
-                  Navigator.of(ctx).maybePop();
-                  _startDrawingPrompt();
-                },
-                onClear: () async {
-          """
-          if "onDrawing: () {" not in s:
-              if old not in s:
-                  raise SystemExit("home_page: drawing callback anchor missing")
-              s = s.replace(old, new, 1)
+          bt = s.index("child: BottomToolsSheet(")
 
-          old = """                assistantId: assistantId,
-                conversationId: _controller.currentConversation?.id,
-                onClose: () => Navigator.of(ctx).maybePop(),
-          """
-          new = """                assistantId: assistantId,
-                conversationId: _controller.currentConversation?.id,
-                storyConversationId: storyMode
-                    ? _controller.currentConversation?.id
-                    : null,
-                onClose: () => Navigator.of(ctx).maybePop(),
-          """
-          if "storyConversationId: storyMode" not in s:
-              if old not in s:
-                  raise SystemExit("home_page: story conversation anchor missing")
-              s = s.replace(old, new, 1)
+          if "onDrawing: () {" not in s[bt:]:
+              upload = s.index("onUpload: () {", bt)
+              on_clear = s.index("onClear: () async {", upload)
+              insert = line_start(s, on_clear)
+              indent = s[insert:on_clear]
+              drawing = (
+                  indent + "onDrawing: () {\n"
+                  + indent + "  Navigator.of(ctx).maybePop();\n"
+                  + indent + "  _startDrawingPrompt();\n"
+                  + indent + "},\n"
+              )
+              s = s[:insert] + drawing + s[insert:]
+
+          bt = s.index("child: BottomToolsSheet(")
+          if "storyConversationId: storyMode" not in s[bt:]:
+              conv = s.index(
+                  "conversationId: _controller.currentConversation?.id,",
+                  bt,
+              )
+              conv_end = s.index("\n", conv) + 1
+              indent_start = line_start(s, conv)
+              indent = s[indent_start:conv]
+              story = (
+                  indent + "storyConversationId: storyMode\n"
+                  + indent + "    ? _controller.currentConversation?.id\n"
+                  + indent + "    : null,\n"
+              )
+              s = s[:conv_end] + story + s[conv_end:]
           write(p, s)
 
           print("Final cleanup applied")
@@ -148,8 +137,7 @@ jobs:
         run: flutter gen-l10n
 
       - name: Format cleanup files
-        run: |
-          dart format             lib/core/services/backup/data_sync.dart             lib/features/chat/widgets/bottom_tools_sheet.dart             lib/features/home/pages/home_page.dart
+        run: dart format lib/core/services/backup/data_sync.dart lib/features/chat/widgets/bottom_tools_sheet.dart lib/features/home/pages/home_page.dart
 
       - name: Commit clean candidate
         shell: bash
@@ -164,6 +152,4 @@ jobs:
 
       - name: Story focused tests
         shell: bash
-        run: |
-          set -euo pipefail
-          flutter test --concurrency=1             test/story_runtime_foundation_test.dart             test/story_runtime_state_test.dart             test/story_runtime_machine_test.dart             test/story_runtime_controller_test.dart             test/story_runtime_assembler_test.dart             test/story_response_parser_test.dart             test/story_prompt_compiler_test.dart             test/story_worldline_memory_test.dart             test/story_world_tree_models_test.dart             test/story_skill_system_test.dart             test/core/services/tts/local_tts_test.dart             test/features/home/widgets/chat_input_bar_queue_test.dart             test/features/home/widgets/chat_input_bar_mobile_composer_test.dart
+        run: flutter test --concurrency=1 test/story_runtime_foundation_test.dart test/story_runtime_state_test.dart test/story_runtime_machine_test.dart test/story_runtime_controller_test.dart test/story_runtime_assembler_test.dart test/story_response_parser_test.dart test/story_prompt_compiler_test.dart test/story_worldline_memory_test.dart test/story_world_tree_models_test.dart test/story_skill_system_test.dart test/core/services/tts/local_tts_test.dart test/features/home/widgets/chat_input_bar_queue_test.dart test/features/home/widgets/chat_input_bar_mobile_composer_test.dart
