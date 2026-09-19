@@ -20,6 +20,8 @@ jobs:
       - name: Probe native merge
         shell: bash
         run: |
+          git config user.name "Kelivo Merge Probe"
+          git config user.email "actions@users.noreply.github.com"
           set +e
           git fetch origin master
           git merge --no-commit --no-ff origin/master
