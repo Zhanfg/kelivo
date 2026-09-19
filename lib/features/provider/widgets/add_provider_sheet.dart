@@ -370,7 +370,6 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
       final base = _openaiBase.text.trim().isEmpty
           ? 'https://api.openai.com/v1'
           : _openaiBase.text.trim();
-      final promo = base.toLowerCase().contains('aihubmix.com');
       final cfg = ProviderConfig(
         id: keyName,
         enabled: _openaiEnabled,
@@ -391,7 +390,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         proxyPort: '8080',
         proxyUsername: '',
         proxyPassword: '',
-        aihubmixAppCodeEnabled: promo,
+        aihubmixAppCodeEnabled: false,
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
