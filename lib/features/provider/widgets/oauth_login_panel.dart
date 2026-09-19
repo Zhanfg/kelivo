@@ -401,7 +401,7 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
                               OAuthProvider.grok => 'xAI',
                               OAuthProvider.kimi => 'Kimi Code',
                               OAuthProvider.claude => 'Pro / Max',
-                              OAuthProvider.freebuff => 'FreeBuff OAuth',
+                              OAuthProvider.freebuff => 'via open.freebuff.app',
                             },
                             style: TextStyle(
                               fontSize: 12,
