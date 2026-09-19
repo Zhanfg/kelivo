@@ -167,6 +167,36 @@ jobs:
               s = s.replace(memory_marker, memory_marker + story_rows, 1)
           write(p, s)
 
+          # Keep explicit restore-plan test fixtures complete after adding the
+          # Story asset root. Dynamic rootNames users update automatically.
+          p = "test/core/services/backup/restore_previous_builder_test.dart"
+          s = read(p)
+          marker = "        'skills': RestorePreviousAssetRootState.missing,\n"
+          if "'story_skills': RestorePreviousAssetRootState.missing," not in s:
+              if marker not in s:
+                  raise SystemExit("restore_previous_builder_test: skills fixture missing")
+              s = s.replace(
+                  marker,
+                  marker + "        'story_skills': RestorePreviousAssetRootState.missing,\n",
+                  1,
+              )
+          write(p, s)
+
+          p = "test/core/services/backup/restore_previous_plan_test.dart"
+          s = read(p)
+          if "'story_skills': RestorePreviousAssetRootState." not in s:
+              s = s.replace(
+                  "'skills': RestorePreviousAssetRootState.missing,",
+                  "'skills': RestorePreviousAssetRootState.missing,\n"
+                  "            'story_skills': RestorePreviousAssetRootState.missing,",
+              )
+              s = s.replace(
+                  "'skills': RestorePreviousAssetRootState.directory,",
+                  "'skills': RestorePreviousAssetRootState.directory,\n"
+                  "            'story_skills': RestorePreviousAssetRootState.directory,",
+              )
+          write(p, s)
+
           print("Audited Story unions applied")
           PY
 
@@ -185,7 +215,9 @@ jobs:
 
       - name: Format audited files
         run: |
-          dart format             lib/core/services/backup/data_sync.dart             lib/core/services/backup/restore_bundle_staging.dart             lib/core/services/backup/restore_previous_plan.dart             lib/features/home/services/built_in_tool_names.dart             lib/features/settings/pages/settings_page.dart
+          dart format             lib/core/services/backup/data_sync.dart             lib/core/services/backup/restore_bundle_staging.dart             lib/core/services/backup/restore_previous_plan.dart             lib/features/home/services/built_in_tool_names.dart             lib/features/settings/pages/settings_page.dart \
+            test/core/services/backup/restore_previous_builder_test.dart \
+            test/core/services/backup/restore_previous_plan_test.dart
 
       - name: Commit audited candidate
         shell: bash
