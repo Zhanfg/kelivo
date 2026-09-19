@@ -111,43 +111,43 @@ jobs:
                   raise SystemExit("settings_page: quick phrase row not found")
               insert = line_start(s, quick_row)
               indent = s[insert:quick_row]
-              rows = f"""{{indent}}_iosNavRow(
-          {{indent}}  context,
-          {{indent}}  icon: Lucide.BookOpenText,
-          {{indent}}  label: referenceTextsLabel,
-          {{indent}}  onTap: () {{
-          {{indent}}    Navigator.of(context).push(
-          {{indent}}      MaterialPageRoute(
-          {{indent}}        builder: (_) => const StoryReferenceLibraryPage(),
-          {{indent}}      ),
-          {{indent}}    );
-          {{indent}}  }},
-          {{indent}}),
-          {{indent}}_iosDivider(context),
-          {{indent}}_iosNavRow(
-          {{indent}}  context,
-          {{indent}}  icon: Lucide.Shapes,
-          {{indent}}  label: storySkillsLabel,
-          {{indent}}  onTap: () {{
-          {{indent}}    Navigator.of(context).push(
-          {{indent}}      MaterialPageRoute(
-          {{indent}}        builder: (_) => const StorySkillManagerPage(),
-          {{indent}}      ),
-          {{indent}}    );
-          {{indent}}  }},
-          {{indent}}),
-          {{indent}}_iosDivider(context),
-          {{indent}}_iosNavRow(
-          {{indent}}  context,
-          {{indent}}  icon: Lucide.Compass,
-          {{indent}}  label: storyModeLabel,
-          {{indent}}  onTap: () {{
-          {{indent}}    Navigator.of(context).push(
-          {{indent}}      MaterialPageRoute(builder: (_) => const StoryStudioPage()),
-          {{indent}}    );
-          {{indent}}  }},
-          {{indent}}),
-          {{indent}}_iosDivider(context),
+              rows = f"""{indent}_iosNavRow(
+          {indent}  context,
+          {indent}  icon: Lucide.BookOpenText,
+          {indent}  label: referenceTextsLabel,
+          {indent}  onTap: () {{
+          {indent}    Navigator.of(context).push(
+          {indent}      MaterialPageRoute(
+          {indent}        builder: (_) => const StoryReferenceLibraryPage(),
+          {indent}      ),
+          {indent}    );
+          {indent}  }},
+          {indent}),
+          {indent}_iosDivider(context),
+          {indent}_iosNavRow(
+          {indent}  context,
+          {indent}  icon: Lucide.Shapes,
+          {indent}  label: storySkillsLabel,
+          {indent}  onTap: () {{
+          {indent}    Navigator.of(context).push(
+          {indent}      MaterialPageRoute(
+          {indent}        builder: (_) => const StorySkillManagerPage(),
+          {indent}      ),
+          {indent}    );
+          {indent}  }},
+          {indent}),
+          {indent}_iosDivider(context),
+          {indent}_iosNavRow(
+          {indent}  context,
+          {indent}  icon: Lucide.Compass,
+          {indent}  label: storyModeLabel,
+          {indent}  onTap: () {{
+          {indent}    Navigator.of(context).push(
+          {indent}      MaterialPageRoute(builder: (_) => const StoryStudioPage()),
+          {indent}    );
+          {indent}  }},
+          {indent}),
+          {indent}_iosDivider(context),
           """
               s = s[:insert] + rows + s[insert:]
           write(p, s)
