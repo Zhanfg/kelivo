@@ -86,6 +86,7 @@ import 'features/home/services/tool_approval_service.dart';
 import 'features/agent/providers/agent_task_provider.dart';
 import 'features/agent/services/agent_context_bridge.dart';
 import 'features/agent/services/agent_task_journal.dart';
+import 'features/home/providers/workspace_mode_provider.dart';
 import 'utils/app_directories.dart';
 import 'utils/platform_utils.dart';
 import 'utils/sandbox_path_resolver.dart';
@@ -684,6 +685,11 @@ class MyApp extends StatelessWidget {
           value: databaseLease.businessRepository,
         ),
         Provider<BusinessPreferences>.value(value: businessPreferences),
+        ChangeNotifierProvider(
+          create: (_) => WorkspaceModeProvider(
+            preferences: businessPreferences,
+          ),
+        ),
         ChangeNotifierProvider(
           create: (_) => UserProvider(preferences: businessPreferences),
         ),
