@@ -201,7 +201,7 @@ void main() {
   test('generic and FreeBuff-compatible gateways default to chat', () {
     expect(
       resolveOpenAIWireProtocol(
-        _cfg(baseUrl: 'http://127.0.0.1:8765/v1'),
+        _cfg(baseUrl: 'http://127.0.0.1:23333/v1'),
         'freebuff-bridge',
       ),
       OpenAIWireProtocol.chatCompletions,
@@ -216,7 +216,7 @@ void main() {
   });
 
   test('omits Authorization when API key is empty', () {
-    final cfg = _cfg(baseUrl: 'http://127.0.0.1:8765/v1', apiKey: '');
+    final cfg = _cfg(baseUrl: 'http://127.0.0.1:23333/v1', apiKey: '');
     expect(bearerAuthHeadersForRequest(cfg, 'free-model'), isEmpty);
 
     final keyed = _cfg(baseUrl: 'https://example.com/v1', apiKey: 'test-key');
@@ -237,7 +237,7 @@ void main() {
     test('FreeBuff bridge preset matches the local bridge default', () {
       expect(
         OpenAICompatiblePresets.freeBuffBridge.baseUrl,
-        'http://127.0.0.1:8765/v1',
+        'http://127.0.0.1:23333/v1',
       );
       expect(
         OpenAICompatiblePresets.freeBuffBridge.chatPath,
