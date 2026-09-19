@@ -1547,10 +1547,10 @@ class SettingsProvider extends ChangeNotifier {
     }
     if (_providerConfigs.isEmpty) {
       // Seed only useful, non-promotional defaults on first launch. Kilo Free
-      // works anonymously; SiliconFlow remains an official provider entry.
+      // works anonymously. Other official providers remain available in the
+      // catalogue, but none are promoted by being silently pre-created.
       // Legacy relay/partner providers are not recreated automatically.
       ensureProviderConfig('Kilo Free', defaultName: 'Kilo Free');
-      ensureProviderConfig('SiliconFlow', defaultName: 'SiliconFlow');
       final seededConfigs = _providerConfigs.map(
         (key, config) => MapEntry(key, config.toJson()),
       );
@@ -6645,9 +6645,7 @@ class ProviderConfig {
             claudePromptCachingEnabled: false,
           );
         }
-        // Special-case SiliconFlow: prefill two partnered models
-        if (lowerKey.contains('silicon')) {
-          return ProviderConfig(
+        return ProviderConfig(
             id: key,
             enabled: defaultEnabled(key),
             name: displayName ?? key,
