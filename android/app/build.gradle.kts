@@ -42,20 +42,15 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // MOSS and sherpa Android are pinned to the same ONNX Runtime version.
+            // Package a single shared runtime to avoid duplicate native-library merge failures.
+            pickFirsts += setOf("**/libonnxruntime.so")
         }
     }
 
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.isIncludeAndroidResources = true
-    }
-
-    packaging {
-        jniLibs {
-            // MOSS and sherpa Android are pinned to the same ONNX Runtime version.
-            // Package a single shared runtime to avoid duplicate native-library merge failures.
-            pickFirsts += setOf("**/libonnxruntime.so")
-        }
     }
 
     val keystorePropertiesFile = rootProject.file("key.properties")
