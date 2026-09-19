@@ -120,7 +120,10 @@ void main() {
         OpenAICompatiblePresets.freeBuffBridge.baseUrl,
         'http://127.0.0.1:47821/v1',
       );
-      expect(OpenAICompatiblePresets.freeBuffBridge.chatPath, '/chat/completions');
+      expect(
+        OpenAICompatiblePresets.freeBuffBridge.chatPath,
+        '/chat/completions',
+      );
       expect(OpenAICompatiblePresets.freeBuffBridge.suggestedApiKey, 'sk-local');
     });
   });
