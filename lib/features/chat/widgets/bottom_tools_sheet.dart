@@ -303,8 +303,8 @@ class BottomToolsSheet extends StatelessWidget {
                         icon: Lucide.Shapes,
                         label:
                             Localizations.localeOf(context).languageCode == 'zh'
-                            ? '技能'
-                            : 'Skills',
+                            ? '故事技能'
+                            : 'Story Skills',
                         onTap: () =>
                             openStoryPage(const StorySkillManagerPage()),
                       ),
