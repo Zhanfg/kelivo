@@ -33,6 +33,7 @@ class BrandAssets {
   // Keep order-specific matching using a list of entries.
   static final List<MapEntry<RegExp, String>> _mapping =
       <MapEntry<RegExp, String>>[
+        MapEntry(RegExp(r'freebuff|codebuff'), 'freebuff.svg'),
         MapEntry(RegExp(r'openai'), 'openai.svg'),
         MapEntry(
           RegExp(r'^azure(?: (?:tts|speech(?: services?)?))?$'),
