@@ -229,11 +229,15 @@ Stream<StreamChunk> sendClaudeStream(
       );
 
   // Headers (constant across rounds)
+  final apiKey = effectiveApiKey(config);
+  final isOpenCodeGateway =
+      Uri.tryParse(config.baseUrl)?.host.toLowerCase() == 'opencode.ai';
   final baseHeaders = customHeaders(
     config,
     modelId,
     baseHeaders: <String, String>{
-      'x-api-key': effectiveApiKey(config),
+      'x-api-key': apiKey,
+      if (isOpenCodeGateway) 'Authorization': 'Bearer $apiKey',
       'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json',
       'Accept': stream ? 'text/event-stream' : 'application/json',
