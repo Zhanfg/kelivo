@@ -27,6 +27,7 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           def read(path):
               return Path(path).read_text()
@@ -34,168 +35,145 @@ jobs:
           def write(path, text):
               Path(path).write_text(text)
 
-          def add_after_once(path, anchor, addition, guard=None):
-              s = read(path)
-              if guard and guard in s:
-                  return
-              if s.count(anchor) != 1:
-                  raise SystemExit(f"{path}: anchor count {s.count(anchor)} for {anchor!r}")
-              write(path, s.replace(anchor, anchor + addition, 1))
+          def line_start(text, pos):
+              return text.rfind("\n", 0, pos) + 1
 
-          # Story-installed skill packages live under appData/story_skills.
-          # Register that root in all three pieces of the new upstream backup
-          # architecture so pack, manifest validation, staging, cutover and
-          # restore-previous rollback all agree on the same root set.
+          def add_asset_root(path):
+              s = read(path)
+              if "'story_skills'," in s:
+                  return
+              anchor = "    'skills',\n"
+              if anchor not in s:
+                  raise SystemExit(f"{path}: skills root anchor missing")
+              write(path, s.replace(anchor, anchor + "    'story_skills',\n", 1))
+
           for p in [
               "lib/core/services/backup/data_sync.dart",
               "lib/core/services/backup/restore_bundle_staging.dart",
               "lib/core/services/backup/restore_previous_plan.dart",
           ]:
-              add_after_once(
-                  p,
-                  "    'skills',\n",
-                  "    'story_skills',\n",
-                  guard="'story_skills',",
-              )
+              add_asset_root(p)
 
-          # Built-in tool reservation is a union: upstream Workspace tools and
-          # Story serialization tools are both client-owned names.
+          # Reserve both upstream Workspace tool names and Story-owned
+          # serialization tool names.
           p = "lib/features/home/services/built_in_tool_names.dart"
           s = read(p)
           story_import = "import '../../story_runtime/serialization/story_serialization_tools.dart';\n"
           if story_import not in s:
               anchor = "import '../../../core/services/workspace/workspace_tools_service.dart';\n"
               if anchor not in s:
-                  raise SystemExit("built_in_tool_names: workspace import anchor missing")
+                  raise SystemExit("built_in_tool_names: workspace import missing")
               s = s.replace(anchor, anchor + story_import, 1)
           if "...StorySerializationTools.names," not in s:
               anchor = "    ...WorkspaceToolsService.toolNames,\n"
               if anchor not in s:
-                  raise SystemExit("built_in_tool_names: workspace names anchor missing")
-              s = s.replace(
-                  anchor,
-                  anchor + "    ...StorySerializationTools.names,\n",
-                  1,
-              )
+                  raise SystemExit("built_in_tool_names: workspace names missing")
+              s = s.replace(anchor, anchor + "    ...StorySerializationTools.names,\n", 1)
           write(p, s)
 
-          # Keep the upstream SettingsPage as the primary screen, but add the
-          # Story-native entries that the pre-sync wrapper exposed.
+          # Add Story-native entries to the new upstream SettingsPage instead
+          # of reverting to the old wrapper/copy.
           p = "lib/features/settings/pages/settings_page.dart"
           s = read(p)
+          base_import = "import '../../world_book/pages/world_book_page.dart';\n"
+          if base_import not in s:
+              raise SystemExit("settings_page: world-book import missing")
           imports = [
               "import '../../story_runtime/ui/story_reference_library_page.dart';\n",
               "import '../../story_runtime/ui/story_skill_manager_page.dart';\n",
               "import '../../story_runtime/ui/story_studio_page.dart';\n",
           ]
-          anchor = "import '../../world_book/pages/world_book_page.dart';\n"
-          if anchor not in s:
-              raise SystemExit("settings_page: import anchor missing")
+          insert_after = base_import
           for imp in imports:
               if imp not in s:
-                  s = s.replace(anchor, anchor + imp, 1)
-                  anchor = imp
+                  s = s.replace(insert_after, insert_after + imp, 1)
+              insert_after = imp
 
-          label_anchor = "    final settings = context.watch<SettingsProvider>();\n"
           if "final storyModeLabel =" not in s:
-              if label_anchor not in s:
-                  raise SystemExit("settings_page: label anchor missing")
-              labels = """    final languageCode = Localizations.localeOf(context).languageCode;
-              final referenceTextsLabel = languageCode == 'zh'
-                  ? '参考文本'
-                  : 'Reference Texts';
-              const storySkillsLabel = 'Story Skills';
-              final storyModeLabel = languageCode == 'zh' ? '故事模式' : 'Story Mode';
-          """
-              s = s.replace(label_anchor, label_anchor + labels, 1)
+              anchor = "    final settings = context.watch<SettingsProvider>();\n"
+              if anchor not in s:
+                  raise SystemExit("settings_page: settings provider anchor missing")
+              labels = (
+                  "    final languageCode = Localizations.localeOf(context).languageCode;\n"
+                  "    final referenceTextsLabel = languageCode == 'zh'\n"
+                  "        ? '参考文本'\n"
+                  "        : 'Reference Texts';\n"
+                  "    final storySkillsLabel = languageCode == 'zh' ? '故事技能' : 'Story Skills';\n"
+                  "    final storyModeLabel = languageCode == 'zh' ? '故事模式' : 'Story Mode';\n"
+              )
+              s = s.replace(anchor, anchor + labels, 1)
 
           if "StoryReferenceLibraryPage()" not in s:
-              memory_marker = """              _iosNavRow(
-                context,
-                icon: Lucide.Brain,
-                label: l10n.settingsPageMemory,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const MemorySettingsPage(),
-                    ),
-                  );
-                },
-              ),
-              _iosDivider(context),
+              memory = s.index("label: l10n.settingsPageMemory,")
+              quick = s.index("label: l10n.settingsPageQuickPhrase,", memory)
+              quick_row = s.rfind("_iosNavRow(", memory, quick)
+              if quick_row < 0:
+                  raise SystemExit("settings_page: quick phrase row not found")
+              insert = line_start(s, quick_row)
+              indent = s[insert:quick_row]
+              rows = f"""{{indent}}_iosNavRow(
+          {{indent}}  context,
+          {{indent}}  icon: Lucide.BookOpenText,
+          {{indent}}  label: referenceTextsLabel,
+          {{indent}}  onTap: () {{
+          {{indent}}    Navigator.of(context).push(
+          {{indent}}      MaterialPageRoute(
+          {{indent}}        builder: (_) => const StoryReferenceLibraryPage(),
+          {{indent}}      ),
+          {{indent}}    );
+          {{indent}}  }},
+          {{indent}}),
+          {{indent}}_iosDivider(context),
+          {{indent}}_iosNavRow(
+          {{indent}}  context,
+          {{indent}}  icon: Lucide.Shapes,
+          {{indent}}  label: storySkillsLabel,
+          {{indent}}  onTap: () {{
+          {{indent}}    Navigator.of(context).push(
+          {{indent}}      MaterialPageRoute(
+          {{indent}}        builder: (_) => const StorySkillManagerPage(),
+          {{indent}}      ),
+          {{indent}}    );
+          {{indent}}  }},
+          {{indent}}),
+          {{indent}}_iosDivider(context),
+          {{indent}}_iosNavRow(
+          {{indent}}  context,
+          {{indent}}  icon: Lucide.Compass,
+          {{indent}}  label: storyModeLabel,
+          {{indent}}  onTap: () {{
+          {{indent}}    Navigator.of(context).push(
+          {{indent}}      MaterialPageRoute(builder: (_) => const StoryStudioPage()),
+          {{indent}}    );
+          {{indent}}  }},
+          {{indent}}),
+          {{indent}}_iosDivider(context),
           """
-              if memory_marker not in s:
-                  raise SystemExit("settings_page: memory row anchor missing")
-              story_rows = """              _iosNavRow(
-                context,
-                icon: Lucide.BookOpenText,
-                label: referenceTextsLabel,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const StoryReferenceLibraryPage(),
-                    ),
-                  );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Shapes,
-                label: storySkillsLabel,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const StorySkillManagerPage(),
-                    ),
-                  );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Compass,
-                label: storyModeLabel,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const StoryStudioPage()),
-                  );
-                },
-              ),
-              _iosDivider(context),
-          """
-              s = s.replace(memory_marker, memory_marker + story_rows, 1)
+              s = s[:insert] + rows + s[insert:]
           write(p, s)
 
-          # Keep explicit restore-plan test fixtures complete after adding the
-          # Story asset root. Dynamic rootNames users update automatically.
-          p = "test/core/services/backup/restore_previous_builder_test.dart"
-          s = read(p)
-          marker = "        'skills': RestorePreviousAssetRootState.missing,\n"
-          if "'story_skills': RestorePreviousAssetRootState.missing," not in s:
-              if marker not in s:
-                  raise SystemExit("restore_previous_builder_test: skills fixture missing")
-              s = s.replace(
-                  marker,
-                  marker + "        'story_skills': RestorePreviousAssetRootState.missing,\n",
-                  1,
-              )
-          write(p, s)
-
-          p = "test/core/services/backup/restore_previous_plan_test.dart"
-          s = read(p)
-          if "'story_skills': RestorePreviousAssetRootState." not in s:
-              s = s.replace(
-                  "'skills': RestorePreviousAssetRootState.missing,",
-                  "'skills': RestorePreviousAssetRootState.missing,\n"
-                  "            'story_skills': RestorePreviousAssetRootState.missing,",
-              )
-              s = s.replace(
-                  "'skills': RestorePreviousAssetRootState.directory,",
-                  "'skills': RestorePreviousAssetRootState.directory,\n"
-                  "            'story_skills': RestorePreviousAssetRootState.directory,",
-              )
-          write(p, s)
+          # Explicit root-state fixtures must remain complete after extending
+          # RestorePreviousAssetsPlan.rootNames.
+          for p in [
+              "test/core/services/backup/restore_previous_builder_test.dart",
+              "test/core/services/backup/restore_previous_plan_test.dart",
+          ]:
+              s = read(p)
+              if "'story_skills': RestorePreviousAssetRootState." not in s:
+                  pattern = re.compile(
+                      r"^(\s*)'skills': (RestorePreviousAssetRootState\.[a-z]+),$",
+                      re.MULTILINE,
+                  )
+                  def repl(match):
+                      indent, state = match.groups()
+                      return (
+                          f"{indent}'skills': {state},\n"
+                          f"{indent}'story_skills': {state},"
+                      )
+                  s, count = pattern.subn(repl, s)
+                  if count == 0:
+                      raise SystemExit(f"{p}: no explicit skills root fixture found")
+                  write(p, s)
 
           print("Audited Story unions applied")
           PY
@@ -215,9 +193,7 @@ jobs:
 
       - name: Format audited files
         run: |
-          dart format             lib/core/services/backup/data_sync.dart             lib/core/services/backup/restore_bundle_staging.dart             lib/core/services/backup/restore_previous_plan.dart             lib/features/home/services/built_in_tool_names.dart             lib/features/settings/pages/settings_page.dart \
-            test/core/services/backup/restore_previous_builder_test.dart \
-            test/core/services/backup/restore_previous_plan_test.dart
+          dart format             lib/core/services/backup/data_sync.dart             lib/core/services/backup/restore_bundle_staging.dart             lib/core/services/backup/restore_previous_plan.dart             lib/features/home/services/built_in_tool_names.dart             lib/features/settings/pages/settings_page.dart             test/core/services/backup/restore_previous_builder_test.dart             test/core/services/backup/restore_previous_plan_test.dart
 
       - name: Commit audited candidate
         shell: bash
@@ -227,6 +203,8 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "fix(sync): preserve Story backup tools and settings"
             git push origin HEAD:refs/heads/sync/upstream-native-final-20260920 --force
+          else
+            echo "Audited candidate already up to date."
           fi
 
       - name: Analyze
