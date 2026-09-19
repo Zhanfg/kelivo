@@ -3,7 +3,6 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
-import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/chat/widgets/timeline_projection.dart';
@@ -16,7 +15,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Widget _buildHarness({required Widget child}) {
+Widget _buildHarness({
+  required Widget child,
+  Brightness brightness = Brightness.light,
+}) {
   SharedPreferences.setMockInitialValues(const {});
   return MultiProvider(
     providers: [
@@ -31,6 +33,7 @@ Widget _buildHarness({required Widget child}) {
       ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
     ],
     child: MaterialApp(
+      theme: ThemeData(brightness: brightness),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(body: child),
@@ -49,6 +52,86 @@ void expectAbove(WidgetTester tester, Finder upper, Finder lower) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'second thought starts collapsed and toggles independently in $brightness',
+      (tester) async {
+        tester.view.physicalSize = const Size(1170, 2400);
+        tester.view.devicePixelRatio = 3;
+        addTearDown(tester.view.reset);
+        late StateSetter rebuild;
+        var firstExpanded = false;
+        var reply = 'FINAL_REPLY';
+        await tester.pumpWidget(
+          _buildHarness(
+            brightness: brightness,
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                rebuild = setState;
+                return SingleChildScrollView(
+                  child: ChatMessageWidget(
+                    message: ChatMessage(
+                      id: 'background-tool-reasoning',
+                      role: 'assistant',
+                      conversationId: 'c1',
+                      parts: [
+                        const ReasoningPart('FIRST_THOUGHT'),
+                        const ToolCallPart(
+                          '{"id":"search-1","name":"search","arguments":{},"content":"Found it"}',
+                        ),
+                        const ReasoningPart('SECOND_THOUGHT'),
+                        TextPart(reply),
+                      ],
+                    ),
+                    showModelIcon: false,
+                    reasoningSegments: [
+                      ReasoningSegment(
+                        text: 'FIRST_THOUGHT',
+                        expanded: firstExpanded,
+                        loading: false,
+                        onToggle: () =>
+                            setState(() => firstExpanded = !firstExpanded),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('FIRST_THOUGHT'), findsNothing);
+        expect(find.text('SECOND_THOUGHT'), findsNothing);
+        final thoughts = find.text('Deep Thinking');
+        expect(thoughts, findsNWidgets(2));
+        final before = tester.getTopLeft(find.text('FINAL_REPLY')).dy;
+        await tester.tap(thoughts.last);
+        await tester.pumpAndSettle();
+        expect(find.text('SECOND_THOUGHT'), findsOneWidget);
+        expect(
+          tester.getTopLeft(find.text('FINAL_REPLY')).dy,
+          greaterThan(before),
+        );
+        // A parent update must not undo the second segment's local toggle.
+        rebuild(() => reply = 'UPDATED_REPLY');
+        await tester.pumpAndSettle();
+        expect(find.text('SECOND_THOUGHT'), findsOneWidget);
+        await tester.tap(thoughts.last);
+        await tester.pumpAndSettle();
+        expect(find.text('SECOND_THOUGHT'), findsNothing);
+        expect(tester.getTopLeft(find.text('UPDATED_REPLY')).dy, before);
+        await tester.tap(thoughts.first);
+        await tester.pumpAndSettle();
+        expect(find.text('FIRST_THOUGHT'), findsOneWidget);
+        expect(find.text('SECOND_THOUGHT'), findsNothing);
+        await tester.tap(thoughts.last);
+        await tester.pumpAndSettle();
+        expect(find.text('SECOND_THOUGHT'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('historical contentSplits still render reasoning then text', (
     tester,
@@ -214,6 +297,9 @@ void main() {
       ),
     );
     await tester.pump();
+    expect(find.text('plan'), findsNothing);
+    await tester.tap(find.text('Deep Thinking'));
+    await tester.pumpAndSettle();
 
     expectAbove(
       tester,
@@ -287,6 +373,9 @@ void main() {
       ),
     );
     await tester.pump();
+    expect(find.text('THINK_PLAN'), findsNothing);
+    await tester.tap(find.text('Deep Thinking'));
+    await tester.pumpAndSettle();
 
     expectAbove(
       tester,
@@ -505,6 +594,7 @@ void main() {
       required List<int> reasoning,
       required List<int> tools,
     }) async {
+      await tester.pumpWidget(const SizedBox());
       await tester.pumpWidget(
         _buildHarness(
           child: ChatMessageWidget(
@@ -526,6 +616,9 @@ void main() {
         ),
       );
       await tester.pump();
+      expect(find.text('THINK_PLAN'), findsNothing);
+      await tester.tap(find.text('Deep Thinking'));
+      await tester.pumpAndSettle();
       expectAbove(
         tester,
         find.textContaining('THINK_PLAN'),
@@ -555,7 +648,6 @@ void main() {
   ) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     final writer = StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settings,
       getCurrentConversationId: () => 'c1',
@@ -581,7 +673,6 @@ void main() {
 
     for (final json in [persisted, staleEmptySplits]) {
       final reader = StreamController(
-        chatService: ChatService(),
         onStateChanged: () {},
         getSettingsProvider: () => settings,
         getCurrentConversationId: () => 'c1',
@@ -597,7 +688,6 @@ void main() {
       reader.restoreMessageUiState(
         message,
         getToolEventsFromDb: (_) => const [],
-        getGeminiThoughtSigFromDb: (_) => null,
       );
       expect(reader.getContentSplitData(message.id), isNull);
 
@@ -654,6 +744,9 @@ void main() {
       ),
     );
     await tester.pump();
+    expect(find.textContaining('first thought'), findsNothing);
+    await tester.tap(find.text('Deep Thinking'));
+    await tester.pumpAndSettle();
 
     expect(find.textContaining('first thought'), findsWidgets);
     expect(find.textContaining('second thought'), findsWidgets);
@@ -681,6 +774,9 @@ void main() {
         ),
       );
       await tester.pump();
+      expect(find.textContaining('think'), findsNothing);
+      await tester.tap(find.text('Deep Thinking'));
+      await tester.pumpAndSettle();
 
       expect(find.textContaining('think'), findsWidgets);
       expect(find.textContaining('before'), findsWidgets);

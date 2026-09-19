@@ -16,12 +16,31 @@ Future<SettingsProvider> _settings({required bool fitContent}) async {
   final harness = await createBusinessTestHarness(
     initial: {
       'display_chat_message_background_style_v1': 'solid',
-      'display_assistant_bubble_fit_content_v1': fitContent,
+      if (fitContent) 'display_assistant_bubble_fit_content_v1': true,
     },
   );
   final settings = SettingsProvider(harness.preferences);
   await settings.loaded;
   return settings;
+}
+
+Widget _harness(SettingsProvider settings, Widget child) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+      ChangeNotifierProvider(
+        create: (_) =>
+            TtsProvider(preferences: createBusinessTestPreferences()),
+      ),
+      ChangeNotifierProvider(create: (_) => ToolApprovalService()),
+      ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
+    ],
+    child: MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(body: SingleChildScrollView(child: child)),
+    ),
+  );
 }
 
 Future<double> _bubbleWidth(
@@ -37,27 +56,9 @@ Future<double> _bubbleWidth(
     isStreaming: waiting,
   );
   await tester.pumpWidget(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-        ChangeNotifierProvider(
-          create: (_) =>
-              TtsProvider(preferences: createBusinessTestPreferences()),
-        ),
-        ChangeNotifierProvider<ToolApprovalService>.value(
-          value: ToolApprovalService(),
-        ),
-        ChangeNotifierProvider<AskUserInteractionService>.value(
-          value: AskUserInteractionService(),
-        ),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: ChatMessageWidget(message: message, showModelIcon: false),
-        ),
-      ),
+    _harness(
+      settings,
+      ChatMessageWidget(message: message, showModelIcon: false),
     ),
   );
   if (waiting) {
@@ -78,62 +79,73 @@ Future<double> _bubbleWidth(
 }
 
 void main() {
-  test('assistant bubbles default to fit-content', () async {
-    final harness = await createBusinessTestHarness();
-    final settings = SettingsProvider(harness.preferences);
-    await settings.loaded;
-    expect(settings.assistantBubbleFitContent, isTrue);
-  });
+  for (final fitContent in [false, true]) {
+    for (final entry in {
+      'short': 'OK',
+      'paragraphs': 'First paragraph.\n\nSecond paragraph.',
+      'wrapped': 'Long text that wraps across lines. ' * 30,
+    }.entries) {
+      testWidgets(
+        '${entry.key} bubble keeps its size through streaming (fitContent=$fitContent)',
+        (tester) async {
+          final settings = await _settings(fitContent: fitContent);
+          final streaming = ValueNotifier(false);
+          final identity = ValueNotifier(0);
+          addTearDown(streaming.dispose);
+          addTearDown(identity.dispose);
+          await tester.pumpWidget(
+            _harness(
+              settings,
+              ListenableBuilder(
+                listenable: Listenable.merge([streaming, identity]),
+                builder: (_, _) => ChatMessageWidget(
+                  key: ValueKey(identity.value),
+                  message: ChatMessage(
+                    id: 'streaming-fit-content',
+                    role: 'assistant',
+                    content: entry.value,
+                    conversationId: 'conversation-fit-content',
+                    isStreaming: streaming.value,
+                  ),
+                  showModelIcon: false,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final content = find.byKey(
+            const ValueKey('assistant_streaming-fit-content'),
+          );
+          final completedSize = tester.getSize(content);
+          void expectCompletedSize() {
+            final size = tester.getSize(content);
+            // Separate paragraphs can omit the trailing letter spacing of
+            // an inline newline; allow that subpixel difference only.
+            expect(size.width, closeTo(completedSize.width, 0.1));
+            expect(size.height, closeTo(completedSize.height, 0.1));
+          }
 
-  testWidgets('assistant bubble stays fit-content when legacy setting is off', (
+          // Start a new widget so it takes the streaming path from frame one.
+          identity.value++;
+          streaming.value = true;
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 300));
+          expectCompletedSize();
+
+          streaming.value = false;
+          await tester.pumpAndSettle();
+          expectCompletedSize();
+        },
+      );
+    }
+  }
+
+  testWidgets('fit-content option shrinks the assistant bubble to its text', (
     tester,
   ) async {
     final spanning = await _bubbleWidth(tester, fitContent: false);
     final hugging = await _bubbleWidth(tester, fitContent: true);
-    expect(hugging, spanning);
-  });
-
-  testWidgets('assistant default style paints a short left bubble', (
-    tester,
-  ) async {
-    final harness = await createBusinessTestHarness();
-    final settings = SettingsProvider(harness.preferences);
-    await settings.loaded;
-    final message = ChatMessage(
-      role: 'assistant',
-      content: 'OK',
-      conversationId: 'conversation-default-bubble',
-    );
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-          ChangeNotifierProvider(
-            create: (_) =>
-                TtsProvider(preferences: createBusinessTestPreferences()),
-          ),
-          ChangeNotifierProvider<ToolApprovalService>.value(
-            value: ToolApprovalService(),
-          ),
-          ChangeNotifierProvider<AskUserInteractionService>.value(
-            value: AskUserInteractionService(),
-          ),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: ChatMessageWidget(message: message, showModelIcon: false),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final text = find.byKey(ValueKey('assistant_${message.id}'));
-    final bubble = find.ancestor(of: text, matching: find.byType(DecoratedBox));
-    expect(bubble, findsWidgets);
-    expect(tester.getSize(text).width, lessThan(120));
+    expect(hugging, lessThan(spanning));
   });
 
   testWidgets('waiting bubble hugs the indicator too', (tester) async {
@@ -143,6 +155,6 @@ void main() {
       waiting: true,
     );
     final hugging = await _bubbleWidth(tester, fitContent: true, waiting: true);
-    expect(hugging, spanning);
+    expect(hugging, lessThan(spanning));
   });
 }

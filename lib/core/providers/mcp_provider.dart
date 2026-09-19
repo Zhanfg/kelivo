@@ -1,14 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../database/business_preferences.dart';
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import '../services/mcp/mcp_oauth_service.dart';
 import '../services/mcp/stdio_command_resolver.dart';
+import '../services/mcp/workspace_stdio_transport.dart';
+import '../services/mcp/workspace_stdio_command.dart';
+import '../services/workspace/workspace_runtime.dart';
+import '../models/environment_state.dart';
+import '../models/workspace.dart';
+import 'environment_provider.dart';
+import 'workspace_provider.dart';
 import 'package:uuid/uuid.dart';
 
-/// Transport type: SSE, Streamable HTTP, and STDIO (desktop-only).
+/// Transport type: SSE, Streamable HTTP, and STDIO (host desktop or mobile workspace environment).
 enum McpTransportType { sse, http, stdio, inmemory }
 
 /// Connection status for an MCP server.
@@ -29,13 +37,20 @@ class _Cooldown {
 }
 
 class _DetachedConnection {
-  const _DetachedConnection({this.activeConnect, this.client});
+  const _DetachedConnection({
+    this.activeConnect,
+    this.client,
+    this.initializingTransport,
+  });
 
   final Future<bool>? activeConnect;
   final mcp.Client? client;
+  final WorkspaceStdioTransport? initializingTransport;
 }
 
 class _ServerConnection {
+  Workspace? workspace;
+  WorkspaceStdioTransport? initializingTransport;
   mcp.Client? client;
   Future<bool>? connectFuture;
   Future<bool>? authorizationFuture;
@@ -43,7 +58,7 @@ class _ServerConnection {
   McpStatus status = McpStatus.idle;
   String? error;
   _Cooldown? cooldown;
-  Future<void>? refreshFuture;
+  Future<bool>? refreshFuture;
   Future<McpOAuthState?>? oauthRefreshFuture;
   Future<mcp.Client?>? oauthRecoveryFuture;
   List<String> oauthChallenges = const [];
@@ -159,11 +174,12 @@ class McpServerConfig {
   final Map<String, String> headers; // custom HTTP headers
   final McpOAuthState? oauth;
   final McpOAuthClientRegistration? oauthClient;
-  // For STDIO (desktop-only)
+  // For STDIO (host desktop or mobile workspace environment)
   final String? command;
   final List<String> args;
   final Map<String, String> env;
   final String? workingDirectory;
+  final String? workspaceId;
 
   McpServerConfig({
     required this.id,
@@ -179,6 +195,7 @@ class McpServerConfig {
     this.args = const [],
     this.env = const {},
     this.workingDirectory,
+    this.workspaceId,
   });
 
   McpServerConfig copyWith({
@@ -196,6 +213,8 @@ class McpServerConfig {
     Map<String, String>? env,
     String? workingDirectory,
     bool clearWorkingDirectory = false,
+    String? workspaceId,
+    bool clearWorkspace = false,
     bool clearOAuth = false,
     bool clearOAuthClient = false,
   }) => McpServerConfig(
@@ -214,6 +233,7 @@ class McpServerConfig {
     workingDirectory: clearWorkingDirectory
         ? null
         : (workingDirectory ?? this.workingDirectory),
+    workspaceId: clearWorkspace ? null : (workspaceId ?? this.workspaceId),
   );
 
   Map<String, dynamic> toJson() => {
@@ -241,6 +261,8 @@ class McpServerConfig {
     if (transport == McpTransportType.stdio) 'env': env,
     if (transport == McpTransportType.stdio && workingDirectory != null)
       'workingDirectory': workingDirectory,
+    if (transport == McpTransportType.stdio && workspaceId != null)
+      'workspaceId': workspaceId,
   };
 
   factory McpServerConfig.fromJson(Map<String, dynamic> json) {
@@ -276,6 +298,7 @@ class McpServerConfig {
             ? envAny.map((k, v) => MapEntry(k.toString(), v.toString()))
             : const <String, String>{},
         workingDirectory: (json['workingDirectory'] as String?)?.trim(),
+        workspaceId: (json['workspaceId'] as String?)?.trim(),
       );
     } else if (t == McpTransportType.inmemory) {
       return McpServerConfig(
@@ -332,6 +355,7 @@ class McpProvider extends ChangeNotifier {
   );
 
   final BusinessPreferences preferences;
+  late final Future<void> loaded;
   final McpOAuthService _oauthService;
   final bool _ownsOAuthService;
   final Map<String, _ServerConnection> _connections = {};
@@ -342,13 +366,85 @@ class McpProvider extends ChangeNotifier {
   final McpStdioCommandResolver _stdioCommandResolver =
       McpStdioCommandResolver();
 
-  McpProvider({required this.preferences, McpOAuthService? oauthService})
-    : _oauthService = oauthService ?? McpOAuthService(),
-      _ownsOAuthService = oauthService == null {
-    unawaited(_serializeServerMutation(_load));
+  final WorkspaceRuntimeProvider? workspaceRuntime;
+  final EnvironmentProvider? environment;
+  final WorkspaceProvider? workspaces;
+  bool _stdioWasAvailable = false;
+
+  bool get supportsStdioWorkspaceBinding =>
+      !kIsWeb && !_isDesktopPlatform() && workspaces != null;
+
+  void _onWorkspacesChanged() {
+    if (_disposed || !supportsStdioWorkspaceBinding) return;
+    for (final server in _servers) {
+      if (server.transport != McpTransportType.stdio ||
+          server.workspaceId == null) {
+        continue;
+      }
+      final state = _connections[server.id];
+      if (state == null) continue;
+      final workspace = workspaces!.byId(server.workspaceId!);
+      final previous = state.workspace;
+      if (workspace?.id == previous?.id &&
+          workspace?.kind == previous?.kind &&
+          workspace?.hostPath == previous?.hostPath) {
+        continue;
+      }
+      state.workspace = workspace;
+      if (server.enabled && supportsStdio) {
+        unawaited(reconnect(server.id));
+      }
+    }
   }
 
-  List<McpServerConfig> get servers => List.unmodifiable(_servers);
+  bool get supportsStdio =>
+      _isDesktopPlatform() ||
+      (!kIsWeb &&
+          workspaceRuntime?.runtime is WorkspaceStdioRuntime &&
+          workspaceRuntime?.lastStatus?.ready == true &&
+          environment?.state.phase == EnvironmentPhase.ready);
+
+  void _onEnvironmentChanged() {
+    if (_disposed) return;
+    final available = supportsStdio;
+    if (available != _stdioWasAvailable) {
+      _stdioWasAvailable = available;
+      for (final server in _servers.where(
+        (s) => s.transport == McpTransportType.stdio,
+      )) {
+        if (available && server.enabled) {
+          // A previous initialization may still be settling after disconnect.
+          // Wait for it before starting a connection in the new environment.
+          unawaited(reconnect(server.id));
+        } else if (!available) {
+          unawaited(disconnect(server.id));
+        }
+      }
+    }
+    _notify();
+  }
+
+  McpProvider({
+    required this.preferences,
+    McpOAuthService? oauthService,
+    this.workspaceRuntime,
+    this.environment,
+    this.workspaces,
+  }) : _oauthService = oauthService ?? McpOAuthService(),
+       _ownsOAuthService = oauthService == null {
+    _stdioWasAvailable = supportsStdio;
+    workspaceRuntime?.addListener(_onEnvironmentChanged);
+    environment?.addListener(_onEnvironmentChanged);
+    workspaces?.addListener(_onWorkspacesChanged);
+    loaded = _serializeServerMutation(_load);
+    unawaited(loaded);
+  }
+
+  List<McpServerConfig> get servers => List.unmodifiable(
+    _servers.where(
+      (s) => s.transport != McpTransportType.stdio || supportsStdio,
+    ),
+  );
   McpStatus statusFor(String id) => _connections[id]?.status ?? McpStatus.idle;
   String? errorFor(String id) => _connections[id]?.error;
   bool get hasAnyEnabled => _servers.any((s) => s.enabled);
@@ -459,61 +555,59 @@ class McpProvider extends ChangeNotifier {
   ///   }
   /// }
   String exportServersAsUiJson() {
-    // On mobile, skip stdio entries in exported JSON.
-    final isDesktop = _isDesktopPlatform();
     final map = <String, dynamic>{
       'mcpServers': {
         for (final s in _servers)
-          if (s.transport != McpTransportType.stdio || isDesktop)
-            s.id: {
-              'name': s.name,
-              if (s.transport == McpTransportType.http)
-                'type': 'streamableHttp',
-              if (s.transport == McpTransportType.sse) 'type': 'sse',
-              if (s.transport == McpTransportType.inmemory) 'type': 'inmemory',
-              'description': '',
-              'isActive': s.enabled,
-              if (s.transport != McpTransportType.stdio &&
-                  s.transport != McpTransportType.inmemory)
-                'baseUrl': s.url,
-              if (s.transport != McpTransportType.stdio &&
-                  s.transport != McpTransportType.inmemory &&
-                  s.headers.isNotEmpty)
-                'headers': s.headers,
-              if (s.transport != McpTransportType.stdio &&
-                  s.transport != McpTransportType.inmemory &&
-                  s.oauthClient != null)
-                'oauthClient': {
-                  'clientId': s.oauthClient!.clientId,
-                  'tokenEndpointAuthMethod':
-                      s.oauthClient!.tokenEndpointAuthMethod,
-                  'registrationSource': s.oauthClient!.registrationSource.name,
-                  if (s.oauthClient!.authorizationServer != null)
-                    'authorizationServer': s.oauthClient!.authorizationServer,
-                },
-              // For stdio, include an optional type for compatibility
-              if (s.transport == McpTransportType.stdio) 'type': 'stdio',
-              // Include command/args/env
-              if (s.transport == McpTransportType.stdio &&
-                  (s.command ?? '').isNotEmpty)
-                'command': s.command,
-              if (s.transport == McpTransportType.stdio && s.args.isNotEmpty)
-                'args': s.args,
-              if (s.transport == McpTransportType.stdio && s.env.isNotEmpty)
-                'env': s.env,
-              if (s.transport == McpTransportType.stdio)
-                ...() {
-                  final reg =
-                      s.env['NPM_CONFIG_REGISTRY'] ??
-                      s.env['npm_config_registry'];
-                  return reg != null && reg.isNotEmpty
-                      ? {'registryUrl': reg}
-                      : <String, dynamic>{};
-                }(),
-              if (s.transport == McpTransportType.stdio &&
-                  (s.workingDirectory ?? '').isNotEmpty)
-                'workingDirectory': s.workingDirectory,
-            },
+          s.id: {
+            'name': s.name,
+            if (s.transport == McpTransportType.http) 'type': 'streamableHttp',
+            if (s.transport == McpTransportType.sse) 'type': 'sse',
+            if (s.transport == McpTransportType.inmemory) 'type': 'inmemory',
+            'description': '',
+            'isActive': s.enabled,
+            if (s.transport != McpTransportType.stdio &&
+                s.transport != McpTransportType.inmemory)
+              'baseUrl': s.url,
+            if (s.transport != McpTransportType.stdio &&
+                s.transport != McpTransportType.inmemory &&
+                s.headers.isNotEmpty)
+              'headers': s.headers,
+            if (s.transport != McpTransportType.stdio &&
+                s.transport != McpTransportType.inmemory &&
+                s.oauthClient != null)
+              'oauthClient': {
+                'clientId': s.oauthClient!.clientId,
+                'tokenEndpointAuthMethod':
+                    s.oauthClient!.tokenEndpointAuthMethod,
+                'registrationSource': s.oauthClient!.registrationSource.name,
+                if (s.oauthClient!.authorizationServer != null)
+                  'authorizationServer': s.oauthClient!.authorizationServer,
+              },
+            // For stdio, include an optional type for compatibility
+            if (s.transport == McpTransportType.stdio) 'type': 'stdio',
+            // Include command/args/env
+            if (s.transport == McpTransportType.stdio &&
+                (s.command ?? '').isNotEmpty)
+              'command': s.command,
+            if (s.transport == McpTransportType.stdio && s.args.isNotEmpty)
+              'args': s.args,
+            if (s.transport == McpTransportType.stdio && s.env.isNotEmpty)
+              'env': s.env,
+            if (s.transport == McpTransportType.stdio)
+              ...() {
+                final reg =
+                    s.env['NPM_CONFIG_REGISTRY'] ??
+                    s.env['npm_config_registry'];
+                return reg != null && reg.isNotEmpty
+                    ? {'registryUrl': reg}
+                    : <String, dynamic>{};
+              }(),
+            if (s.transport == McpTransportType.stdio &&
+                (s.workingDirectory ?? '').isNotEmpty)
+              'workingDirectory': s.workingDirectory,
+            if (s.transport == McpTransportType.stdio && s.workspaceId != null)
+              'workspaceId': s.workspaceId,
+          },
       },
     };
     return const JsonEncoder.withIndent('  ').convert(map);
@@ -543,7 +637,6 @@ class McpProvider extends ChangeNotifier {
       }
 
       if (serversFromMap != null) {
-        final isDesktop = _isDesktopPlatform();
         bool builtinSeen = false;
         bool builtinEnabled = true;
         serversFromMap.forEach((id, cfgAny) {
@@ -562,10 +655,6 @@ class McpProvider extends ChangeNotifier {
               cfg.containsKey('env') ||
               (cfg['type']?.toString().toLowerCase() == 'stdio');
           if (hasStdioShape) {
-            if (!isDesktop) {
-              // Mobile: skip stdio entries entirely
-              return;
-            }
             final enabled = (cfg['isActive'] as bool?) ?? true;
             final name = (cfg['name'] as String?)?.trim();
             final cmd = (cfg['command'] as String?)?.trim();
@@ -598,6 +687,7 @@ class McpProvider extends ChangeNotifier {
                     : const <String>[],
                 env: env,
                 workingDirectory: (wd != null && wd.isNotEmpty) ? wd : null,
+                workspaceId: (cfg['workspaceId'] as String?)?.trim(),
               ),
             );
             return;
@@ -778,6 +868,28 @@ class McpProvider extends ChangeNotifier {
     }
   }
 
+  /// Adds a validated import in one write, preserving existing connections.
+  Future<void> importServers(List<McpServerConfig> imported) async {
+    if (imported.isEmpty) return;
+    await _serializeServerMutation(() async {
+      final ids = _servers.map((server) => server.id).toSet();
+      for (final server in imported) {
+        if (!ids.add(server.id)) {
+          throw const FormatException('Duplicate MCP server ID');
+        }
+      }
+      await _persistServers([..._servers, ...imported]);
+      _servers = [..._servers, ...imported];
+      for (final server in imported) {
+        _connections[server.id] = _ServerConnection();
+      }
+      _notify();
+    });
+    for (final server in imported.where((server) => server.enabled)) {
+      unawaited(connect(server.id));
+    }
+  }
+
   McpServerConfig? getById(String id) {
     for (final s in _servers) {
       if (s.id == id) return s;
@@ -797,6 +909,7 @@ class McpProvider extends ChangeNotifier {
     List<String> args = const <String>[],
     Map<String, String> env = const <String, String>{},
     String? workingDirectory,
+    String? workspaceId,
   }) async {
     final id = const Uuid().v4();
     final cfg = McpServerConfig(
@@ -814,6 +927,7 @@ class McpProvider extends ChangeNotifier {
       workingDirectory: (workingDirectory?.trim().isNotEmpty ?? false)
           ? workingDirectory!.trim()
           : null,
+      workspaceId: workspaceId,
     );
     await _serializeServerMutation(() async {
       final next = <McpServerConfig>[..._servers, cfg];
@@ -1233,6 +1347,9 @@ class McpProvider extends ChangeNotifier {
     if (server == null || !server.enabled || _disposed) {
       return Future<bool>.value(false);
     }
+    if (server.transport == McpTransportType.stdio && !supportsStdio) {
+      return Future<bool>.value(false);
+    }
     final state = _connections.putIfAbsent(id, _ServerConnection.new);
     final active = state.connectFuture;
     if (active != null) return active;
@@ -1304,6 +1421,7 @@ class McpProvider extends ChangeNotifier {
     bool retryUnauthorized = true,
   }) async {
     mcp.Client? client;
+    WorkspaceStdioTransport? workspaceTransport;
     final startedAt = DateTime.now();
     try {
       server = await _withFreshOAuth(server, state);
@@ -1319,11 +1437,72 @@ class McpProvider extends ChangeNotifier {
         requestTimeout: _requestTimeout,
       ).copyWith(maxRetries: 1);
 
+      if (server.transport == McpTransportType.stdio &&
+          server.workspaceId != null &&
+          !supportsStdioWorkspaceBinding) {
+        throw StateError(
+          'Workspace binding requires the mobile Linux environment. '
+          'Unbind the workspace to run this server on desktop.',
+        );
+      }
+
       if (server.transport == McpTransportType.inmemory) {
         client = mcp.McpClient.createClient(clientConfig);
         await client.connect(
           KelivoInMemoryClientTransport(KelivoFetchMcpServerEngine()),
         );
+      } else if (server.transport == McpTransportType.stdio &&
+          !_isDesktopPlatform()) {
+        final runtime = workspaceRuntime?.runtime;
+        if (!supportsStdio || runtime is! WorkspaceStdioRuntime) {
+          throw StateError('Workspace environment is not ready');
+        }
+        final config = await environment!.loadExecutionConfig();
+        final mounts = await _stdioWorkspaceMounts(server, state);
+        final cwd =
+            server.workingDirectory ??
+            (server.workspaceId == null ? '/root' : '/workspace');
+        await requireWorkspaceStdioCommand(
+          runtime: runtime,
+          command: server.command ?? '',
+          cwd: cwd,
+          mounts: mounts,
+          environment: {...config.variables, ...server.env},
+          timeout: _requestTimeout,
+          isCancelled: () =>
+              _disposed || state.generation != generation || !supportsStdio,
+        );
+        final transport = await WorkspaceStdioTransport.start(
+          runtime: runtime,
+          command: server.command ?? '',
+          arguments: server.args,
+          cwd: cwd,
+          mounts: mounts,
+          environment: {...config.variables, ...server.env},
+          startupTimeout: _requestTimeout,
+          isCancelled: () => _disposed || state.generation != generation,
+        );
+        workspaceTransport = transport;
+        if (_disposed || state.generation != generation) {
+          transport.close();
+          await transport.onClose;
+          return false;
+        }
+        // Keep the process cancellable while initialize installs dependencies
+        // or waits for the server; state.client is assigned only on success.
+        state.initializingTransport = transport;
+        client = mcp.McpClient.createClient(clientConfig);
+        // Package launchers can install dependencies before initialize is
+        // answered. Keep this separate from the user's tool-call timeout.
+        const installTimeout = Duration(minutes: 2);
+        client.setRequestTimeout(
+          _requestTimeout > installTimeout ? _requestTimeout : installTimeout,
+        );
+        try {
+          await client.connect(transport);
+        } finally {
+          client.setRequestTimeout(_requestTimeout);
+        }
       } else {
         final transportConfig = await _transportConfig(server);
         final result = await mcp.McpClient.createAndConnect(
@@ -1350,7 +1529,13 @@ class McpProvider extends ChangeNotifier {
       state.error = null;
       _finishScopeUpgrade(state, 'connect');
       _clearCooldownAfterSuccess(state, startedAt);
-      _attachClient(id, state, connectedClient, generation);
+      _attachClient(
+        id,
+        state,
+        connectedClient,
+        generation,
+        workspaceTransport: workspaceTransport,
+      );
       _notify();
       return true;
     } catch (error) {
@@ -1391,9 +1576,16 @@ class McpProvider extends ChangeNotifier {
         _enterCooldown(state, effectiveError.retryAfter);
       }
       state.status = McpStatus.error;
-      state.error = effectiveError.toString();
+      state.error =
+          workspaceTransport?.describeError(effectiveError) ??
+          effectiveError.toString();
       _notify();
       return false;
+    } finally {
+      if (workspaceTransport != null &&
+          identical(state.initializingTransport, workspaceTransport)) {
+        state.initializingTransport = null;
+      }
     }
   }
 
@@ -1662,8 +1854,9 @@ class McpProvider extends ChangeNotifier {
     String id,
     _ServerConnection state,
     mcp.Client client,
-    int generation,
-  ) {
+    int generation, {
+    WorkspaceStdioTransport? workspaceTransport,
+  }) {
     client.onDisconnect.listen((_) {
       if (_disposed ||
           state.generation != generation ||
@@ -1671,8 +1864,11 @@ class McpProvider extends ChangeNotifier {
         return;
       }
       state.client = null;
-      state.status = McpStatus.idle;
-      state.error = null;
+      final failed = workspaceTransport?.failed == true;
+      state.status = failed ? McpStatus.error : McpStatus.idle;
+      state.error = failed
+          ? workspaceTransport!.describeError('STDIO transport disconnected')
+          : null;
       _notify();
     });
     client.onError.listen((error) {
@@ -1782,6 +1978,9 @@ class McpProvider extends ChangeNotifier {
     state.generation++;
     final active = state.connectFuture;
     final client = state.client;
+    final initializingTransport = state.initializingTransport;
+    state.initializingTransport = null;
+    initializingTransport?.close();
     state.authorizationFuture = null;
     state.client = null;
     state.status = McpStatus.idle;
@@ -1792,13 +1991,18 @@ class McpProvider extends ChangeNotifier {
     state.sessionRecoveryFuture = null;
     _notify();
 
-    return _DetachedConnection(activeConnect: active, client: client);
+    return _DetachedConnection(
+      activeConnect: active,
+      client: client,
+      initializingTransport: initializingTransport,
+    );
   }
 
   Future<void> _finishDisconnect(
     _DetachedConnection detached, {
     required bool terminateSession,
   }) async {
+    await detached.initializingTransport?.onClose;
     final active = detached.activeConnect;
     if (active != null) {
       try {
@@ -2171,9 +2375,11 @@ class McpProvider extends ChangeNotifier {
     return const [];
   }
 
-  Future<void> refreshTools(String id) {
+  /// Returns whether discovery completed successfully and updated the cache.
+  /// A successful discovery may return an empty tool list.
+  Future<bool> refreshTools(String id) {
     final state = _connections[id];
-    if (state?.client == null || _disposed) return Future<void>.value();
+    if (state?.client == null || _disposed) return Future<bool>.value(false);
     state!.refreshDirty = true;
     final active = state.refreshFuture;
     if (active != null) return active;
@@ -2189,7 +2395,7 @@ class McpProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> _drainToolRefresh(String id, _ServerConnection state) async {
+  Future<bool> _drainToolRefresh(String id, _ServerConnection state) async {
     var sessionRecoveries = 0;
     while (state.refreshDirty && !_disposed) {
       state.refreshDirty = false;
@@ -2206,8 +2412,9 @@ class McpProvider extends ChangeNotifier {
         state.refreshDirty = true;
         continue;
       }
-      if (outcome != _ToolRefreshOutcome.success) return;
+      if (outcome != _ToolRefreshOutcome.success) return false;
     }
+    return !_disposed && isConnected(id);
   }
 
   Future<_ToolRefreshOutcome> _refreshToolsOnce(
@@ -2653,7 +2860,7 @@ class McpProvider extends ChangeNotifier {
 
   List<McpToolConfig> getEnabledToolsForServers(Set<String> serverIds) {
     final tools = <McpToolConfig>[];
-    for (final s in _servers.where((s) => serverIds.contains(s.id))) {
+    for (final s in servers.where((s) => serverIds.contains(s.id))) {
       if (!s.enabled) continue;
       tools.addAll(s.tools.where((t) => t.enabled));
     }
@@ -2664,14 +2871,42 @@ class McpProvider extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    workspaceRuntime?.removeListener(_onEnvironmentChanged);
+    environment?.removeListener(_onEnvironmentChanged);
+    workspaces?.removeListener(_onWorkspacesChanged);
     for (final state in _connections.values) {
       state.generation++;
+      state.initializingTransport?.close();
+      state.initializingTransport = null;
       state.client?.dispose();
       state.client = null;
     }
     _connections.clear();
     if (_ownsOAuthService) _oauthService.dispose();
     super.dispose();
+  }
+
+  Future<List<Mount>> _stdioWorkspaceMounts(
+    McpServerConfig server,
+    _ServerConnection state,
+  ) async {
+    final workspaceId = server.workspaceId;
+    if (workspaceId == null) return const [];
+    final provider = workspaces!;
+    await provider.loaded;
+    final workspace = provider.byId(workspaceId);
+    state.workspace = workspace;
+    if (workspace == null) {
+      throw StateError(
+        'Bound workspace not found. Select another workspace or unbind it '
+        'in the MCP server settings.',
+      );
+    }
+    final root = await provider.hostRootFor(workspace);
+    if (!await Directory(root).exists()) {
+      throw StateError('Bound workspace folder is unavailable: $root');
+    }
+    return [Mount(host: root, guest: '/workspace')];
   }
 
   bool _isDesktopPlatform() {

@@ -81,10 +81,12 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
   TokenUsage? get usage {
     if (_round == null) return initialUsage;
-    return (initialUsage ?? const TokenUsage()).accumulate(_round!);
+    return (initialUsage ?? const TokenUsage()).merge(_round!);
   }
 
   String? finishReason;
+  bool _hasSeenPart = false;
+  bool _stopAfterPart = false;
   bool retryMalformedResponse = false;
   bool streamComplete = false;
 
@@ -123,6 +125,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
   bool get canFinishNow =>
       finishReason != null &&
+      (finishReason != 'STOP' || _stopAfterPart) &&
       !retryMalformedResponse &&
       functionCalls.isEmpty &&
       (!expectImage || receivedImage);
@@ -279,6 +282,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
       for (final p in parts) {
         if (p is! Map) continue;
+        _hasSeenPart = true;
         _parsePart(
           p,
           chunks,
@@ -288,7 +292,13 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       }
 
       final fr = cand['finishReason'];
-      if (fr is String && fr.isNotEmpty) finishReason = fr;
+      if (fr is String && fr.isNotEmpty) {
+        finishReason = fr;
+        // Some proxies send empty STOP frames before any parts. Only a new
+        // STOP received with or after a part may finish the stream; later
+        // parts must not make an earlier empty STOP eligible retroactively.
+        if (fr == 'STOP') _stopAfterPart = _hasSeenPart;
+      }
 
       final gm = cand['groundingMetadata'] ?? obj['groundingMetadata'];
       final cite = _parseCitations(gm);
@@ -338,14 +348,25 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       roundModelParts.add(rawPart);
     }
 
+    final inline = p['inlineData'] ?? p['inline_data'];
+    final hasFile = p['fileData'] is Map || p['file_data'] is Map;
+    // Gemini 3 hangs the turn's signature on a trailing part whose text is
+    // empty, so the guard requires the `text` key rather than a body — that
+    // also keeps out the `toolCall` / `toolResponse` parts a built-in tool
+    // round returns first, whose own signatures are rejected on a text part.
+    // One text signature is kept per turn — the first; a response has not been
+    // seen to carry two.
     if (persistThoughtSigs &&
         !thought &&
+        p.containsKey('text') &&
+        fc == null &&
+        inline is! Map &&
+        !hasFile &&
         partThoughtSigKey != null &&
-        partThoughtSigVal != null) {
-      if (t.isNotEmpty && textThoughtSigKey == null) {
-        textThoughtSigKey = partThoughtSigKey;
-        textThoughtSigVal = partThoughtSigVal;
-      }
+        partThoughtSigVal != null &&
+        textThoughtSigKey == null) {
+      textThoughtSigKey = partThoughtSigKey;
+      textThoughtSigVal = partThoughtSigVal;
     }
 
     if (t.isNotEmpty) {
@@ -358,7 +379,6 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       }
     }
 
-    final inline = p['inlineData'] ?? p['inline_data'];
     if (inline is Map) {
       final mime = (inline['mimeType'] ?? inline['mime_type'] ?? 'image/png')
           .toString();

@@ -160,7 +160,7 @@ void main() {
   });
 
   test(
-    'three tool-call rounds keep summed usage and do not double-count repeats',
+    'three tool-call rounds keep the latest usage and do not double-count repeats',
     () async {
       const snapshots = [
         TokenUsage(promptTokens: 100, completionTokens: 20, totalTokens: 120),
@@ -309,18 +309,18 @@ void main() {
       final streamResult = streamed.whereType<ToolCallResult>().single;
       expect(streamResult.output, markdown);
       expect(streamResult.output, isNot(contains('"kelivo"')));
-      expect(
-        mcpResultImageUris(readMcpResultMetadata(streamResult.metadata)),
-        ['https://cdn.example.com/a.png', 'https://cdn.example.com/b.png'],
-      );
+      expect(mcpResultImageUris(readMcpResultMetadata(streamResult.metadata)), [
+        'https://cdn.example.com/a.png',
+        'https://cdn.example.com/b.png',
+      ]);
       expect(streamResult.metadata!['anthropic'], 'keep');
 
       expect(appended, isNotNull);
       expect(appended!.content, markdown);
-      expect(
-        mcpResultImageUris(readMcpResultMetadata(appended!.metadata)),
-        ['https://cdn.example.com/a.png', 'https://cdn.example.com/b.png'],
-      );
+      expect(mcpResultImageUris(readMcpResultMetadata(appended!.metadata)), [
+        'https://cdn.example.com/a.png',
+        'https://cdn.example.com/b.png',
+      ]);
     },
   );
 }

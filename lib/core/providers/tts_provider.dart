@@ -9,9 +9,11 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../shared/widgets/markdown_line_lexer.dart';
 import '../database/business_preferences.dart';
 import '../services/tts/local_tts.dart';
 import '../services/tts/network_tts.dart';
+import '../services/mobile_background.dart';
 import '../services/tts/tts_playback_models.dart';
 import '../services/tts/tts_text_chunker.dart';
 
@@ -53,7 +55,8 @@ class TtsProvider extends ChangeNotifier {
   static const Duration _seekStep = Duration(seconds: 15);
 
   final BusinessPreferences preferences;
-  final LocalTtsBackend _localBackend;
+  final MobileBackgroundCoordinator _background;
+  bool _previewPlaying = false;
   late FlutterTts _tts;
   final AudioPlayer _player = AudioPlayer();
 
@@ -101,8 +104,28 @@ class TtsProvider extends ChangeNotifier {
   StreamSubscription<Duration>? _playerDurationSub;
   StreamSubscription<PlayerState>? _playerStateSub;
 
+  bool get _backgroundSpeechAllowed =>
+      _background.platform != TargetPlatform.iOS ||
+      (!_background.hasCaptureAudio &&
+          (_background.isForeground ||
+              _background.settings.backgroundSpeechEnabled));
+
+  Future<void> _claimSpeechAudio() async {
+    await _background.setAudioOwner('speechBuffering', true);
+    await _background.setAudioOwner('speech', true);
+  }
+
+  void _releaseSpeechWork() {
+    _releaseSpeechAudio();
+    unawaited(_background.setAudioOwner('speechBuffering', false));
+  }
+
+  void _releaseSpeechAudio() {
+    unawaited(_background.setAudioOwner('speech', false));
+  }
+
   bool get isAvailable => _initialized;
-  bool get isSpeaking => _isSpeaking;
+  bool get isSpeaking => _isSpeaking || _previewPlaying;
   bool get isPaused => _isPaused;
   bool get usingNetwork => _usingNetwork;
   bool get usingLocal => _usingLocal;
@@ -119,8 +142,10 @@ class TtsProvider extends ChangeNotifier {
   bool get canSaveNetworkAudio =>
       _lastReplayNetworkService != null && _chunks.isNotEmpty;
 
-  TtsProvider({required this.preferences, LocalTtsBackend? localBackend})
-    : _localBackend = localBackend ?? MossLocalTtsBackend() {
+  TtsProvider({
+    required this.preferences,
+    MobileBackgroundCoordinator? background,
+  }) : _background = background ?? MobileBackgroundCoordinator.instance {
     _init();
   }
 
@@ -223,7 +248,15 @@ class TtsProvider extends ChangeNotifier {
       _updatePositionFromCurrentChunk();
     });
     _playerStateSub = _player.onPlayerStateChanged.listen((state) {
-      if (!_usesAudioPlayer) return;
+      if (state != PlayerState.playing) {
+        if (_usingNetwork) {
+          _releaseSpeechAudio();
+        } else {
+          _previewPlaying = false;
+          _releaseSpeechWork();
+        }
+      }
+      if (!_usingNetwork) return;
       switch (state) {
         case PlayerState.playing:
           _isSpeaking = true;
@@ -424,57 +457,29 @@ class TtsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> speak(String text, {bool flush = true}) async {
+  /// With [waitForCompletion] false, returns after old-player cleanup and the
+  /// native buffering lease are complete. Generation may then end safely;
+  /// neither a network response nor the spoken audio blocks that handoff.
+  Future<void> speak(
+    String text, {
+    bool flush = true,
+    bool waitForCompletion = true,
+  }) async {
     if (!_initialized) return;
     final selected = await _getSelectedNetworkService();
-    final cloudAvailable = selected != null && selected.enabled;
-    var localInstalled = false;
-    var localReady = false;
-    try {
-      localInstalled = await _localBackend.isInstalled();
-      if (localInstalled) {
-        localReady = await _localBackend.isReady();
-      }
-    } catch (_) {
-      localReady = false;
+    if (selected != null && selected.enabled) {
+      return _speakQueued(
+        text,
+        networkService: selected,
+        flush: flush,
+        waitForCompletion: waitForCompletion,
+      );
     }
-    final choice = resolveTtsBackend(
-      mode: _backendMode,
-      localInstalled: localInstalled,
-      localReady: localReady,
-      cloudAvailable: cloudAvailable,
+    return _speakQueued(
+      text,
+      flush: flush,
+      waitForCompletion: waitForCompletion,
     );
-    switch (choice) {
-      case TtsBackendChoice.local:
-        return _speakQueued(text, localBackend: _localBackend, flush: flush);
-      case TtsBackendChoice.cloud:
-        return _speakQueued(text, networkService: selected, flush: flush);
-      case TtsBackendChoice.system:
-        return _speakQueued(text, flush: flush);
-      case TtsBackendChoice.unavailable:
-        _setRoutingError(
-          localInstalled
-              ? 'Local TTS model is installed but the local runtime is unavailable.'
-              : _backendMode == TtsBackendMode.cloudOnly
-              ? 'No enabled cloud TTS service is selected.'
-              : 'Local TTS is unavailable.',
-        );
-        return;
-    }
-  }
-
-  void _setRoutingError(String message) {
-    _error = message;
-    _isSpeaking = false;
-    _isPaused = false;
-    _usingNetwork = false;
-    _usingLocal = false;
-    _playbackState = _playbackState.copyWith(
-      status: TtsPlaybackStatus.error,
-      errorMessage: message,
-      usingNetwork: false,
-    );
-    notifyListeners();
   }
 
   Future<void> speakSystem(String text, {bool flush = true}) async {
@@ -496,6 +501,7 @@ class TtsProvider extends ChangeNotifier {
     LocalTtsBackend? localBackend,
     bool flush = true,
     bool reuseResolvedNetworkAudio = false,
+    bool waitForCompletion = true,
   }) async {
     assert(networkService == null || localBackend == null);
     final content = _stripMarkdown(text).trim();
@@ -506,6 +512,7 @@ class TtsProvider extends ChangeNotifier {
     _lastReplayUsedLocal = localBackend != null;
 
     final session = ++_sessionId;
+    _previewPlaying = false;
     _usingNetwork = networkService != null;
     _usingLocal = localBackend != null;
     _networkCache.clear();
@@ -545,39 +552,84 @@ class TtsProvider extends ChangeNotifier {
     );
     notifyListeners();
 
-    if (_usingLocal) {
-      unawaited(_runLocalQueue(session, localBackend!));
-    } else if (_usingNetwork) {
-      unawaited(_runNetworkQueue(session, networkService!));
+    if (!_backgroundSpeechAllowed) {
+      _isPaused = true;
+      _updatePlaybackState(status: TtsPlaybackStatus.paused);
     } else {
-      await _ensureBound();
-      await _speakCurrentSystemChunk(session);
+      await _background.setAudioOwner('speechBuffering', true);
     }
-    return playbackFuture;
+    if (_usingNetwork) {
+      unawaited(_runNetworkQueue(session, networkService!));
+    } else if (!_isPaused) {
+      final playback = _ensureBound().then(
+        (_) => _speakCurrentSystemChunk(session),
+      );
+      if (waitForCompletion) {
+        await playback;
+      } else {
+        unawaited(
+          playback.catchError((Object error) {
+            if (session != _sessionId) return;
+            _error = error.toString();
+            _finishPlayback(status: TtsPlaybackStatus.error, error: _error);
+          }),
+        );
+      }
+    }
+    if (waitForCompletion) return playbackFuture;
   }
 
   Future<void> pause() async {
-    if (!_initialized || !_isSpeaking || _isPaused) return;
-    if (_usesAudioPlayer) {
-      await _player.pause();
-      _isPaused = true;
-      _updatePlaybackState(status: TtsPlaybackStatus.paused);
+    if (_previewPlaying) {
+      _previewPlaying = false;
+      try {
+        await _player.pause();
+      } finally {
+        _releaseSpeechWork();
+      }
       return;
     }
-    await _ensureBound();
-    try {
-      await _tts.pause();
-    } catch (_) {}
+    if (!_initialized || !_isSpeaking || _isPaused) return;
+    // Mark immediately so a pending network result cannot start during pause.
     _isPaused = true;
-    _updatePlaybackState(status: TtsPlaybackStatus.paused);
+    try {
+      if (_usingNetwork) {
+        await _player.pause();
+      } else {
+        await _ensureBound();
+        try {
+          await _tts.pause();
+        } catch (_) {}
+      }
+    } finally {
+      // Audio services can disappear during a call/route change. Even when
+      // the player rejects pause, it must not retain the silent-audio lease.
+      _isPaused = true;
+      _updatePlaybackState(status: TtsPlaybackStatus.paused);
+    }
   }
 
   Future<void> resume() async {
     if (!_initialized || !_isPaused) return;
-    if (_usesAudioPlayer) {
-      await _player.resume();
+    if (!_backgroundSpeechAllowed) return;
+    if (_usingNetwork) {
+      final session = _sessionId;
+      final hasSource = _networkChunkCompleter != null;
+      if (hasSource) {
+        await _claimSpeechAudio();
+      } else {
+        // The network queue claims audible playback when the source is ready.
+        // Buffering alone must let native silent-audio keepalive continue.
+        await _background.setAudioOwner('speechBuffering', true);
+      }
+      if (session != _sessionId || !_backgroundSpeechAllowed) return;
+      if (hasSource) await _player.resume();
       _isPaused = false;
-      _updatePlaybackState(status: TtsPlaybackStatus.playing);
+      _updatePlaybackState(
+        status: hasSource
+            ? TtsPlaybackStatus.playing
+            : TtsPlaybackStatus.buffering,
+      );
       return;
     }
     _isPaused = false;
@@ -697,7 +749,9 @@ class TtsProvider extends ChangeNotifier {
       try {
         await _player.stop();
       } catch (_) {}
-      await _playAudioBytes(res.bytes, mime: res.mime);
+      if (_backgroundSpeechAllowed) {
+        await _playAudioBytes(res.bytes, mime: res.mime);
+      }
       return null;
     } catch (e) {
       return e.toString();
@@ -787,13 +841,26 @@ class TtsProvider extends ChangeNotifier {
           status: TtsPlaybackStatus.buffering,
           currentChunkIndex: chunkIndex,
         );
+        _releaseSpeechAudio();
         final result = await _networkResultFor(service, session, chunkIndex);
+        if (!_backgroundSpeechAllowed && session == _sessionId) {
+          _isPaused = true;
+          _updatePlaybackState(status: TtsPlaybackStatus.paused);
+        }
+        while (_isPaused && session == _sessionId) {
+          await Future<void>.delayed(const Duration(milliseconds: 80));
+        }
         if (session != _sessionId) break;
         _resolvedNetworkChunks[chunkIndex] = result;
         if (_currentChunkIndex != chunkIndex) continue;
         final seekOffset = _pendingNetworkSeekOffset;
         _pendingNetworkSeekOffset = Duration.zero;
-        await _playNetworkResult(result, seekOffset: seekOffset);
+        final played = await _playNetworkResult(
+          result,
+          session: session,
+          seekOffset: seekOffset,
+        );
+        if (!played) continue;
         if (session != _sessionId) break;
         final wasInterruptedForSeek = _networkSeekInterruptedChunk;
         _networkSeekInterruptedChunk = false;
@@ -840,8 +907,9 @@ class TtsProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> _playNetworkResult(
+  Future<bool> _playNetworkResult(
     NetworkTtsResult result, {
+    required int session,
     Duration seekOffset = Duration.zero,
   }) async {
     await _player.stop();
@@ -855,6 +923,19 @@ class TtsProvider extends ChangeNotifier {
     final f = io.File(path);
     await f.writeAsBytes(result.bytes, flush: true);
 
+    if (session != _sessionId) return false;
+    if (_isPaused || !_backgroundSpeechAllowed) {
+      _isPaused = true;
+      _updatePlaybackState(status: TtsPlaybackStatus.paused);
+      return false;
+    }
+    await _claimSpeechAudio();
+    if (session != _sessionId) return false;
+    if (_isPaused || !_backgroundSpeechAllowed) {
+      _isPaused = true;
+      _updatePlaybackState(status: TtsPlaybackStatus.paused);
+      return false;
+    }
     final chunkCompleter = Completer<void>();
     _networkChunkCompleter = chunkCompleter;
     await _player.play(DeviceFileSource(path));
@@ -867,10 +948,12 @@ class TtsProvider extends ChangeNotifier {
       } catch (_) {}
     }
     await chunkCompleter.future;
+    return true;
   }
 
   Future<void> _speakCurrentSystemChunk(int session) async {
-    if (session != _sessionId || _currentChunkIndex >= _chunks.length) {
+    if (session != _sessionId) return;
+    if (_currentChunkIndex >= _chunks.length) {
       _finishPlayback(status: TtsPlaybackStatus.ended);
       return;
     }
@@ -881,7 +964,7 @@ class TtsProvider extends ChangeNotifier {
       status: TtsPlaybackStatus.buffering,
       currentChunkIndex: _currentChunkIndex,
     );
-    final ok = await _trySpeak(chunk.text);
+    final ok = await _trySpeak(chunk.text, session);
     if (!ok && session == _sessionId) {
       _error = 'TTS speak failed';
       _finishPlayback(status: TtsPlaybackStatus.error, error: _error);
@@ -907,20 +990,42 @@ class TtsProvider extends ChangeNotifier {
       return;
     }
     final text = chunk.text.substring(charOffset);
-    final ok = await _trySpeak(text);
+    final ok = await _trySpeak(text, session);
     if (!ok && session == _sessionId) {
       _error = 'TTS speak failed';
       _finishPlayback(status: TtsPlaybackStatus.error, error: _error);
     }
   }
 
-  Future<bool> _trySpeak(String text) async {
+  Future<bool> _trySpeak(String text, int session) async {
+    if (session != _sessionId) return true;
+    if (_isPaused || !_backgroundSpeechAllowed) {
+      _isPaused = true;
+      _updatePlaybackState(status: TtsPlaybackStatus.paused);
+      return true;
+    }
+    await _claimSpeechAudio();
+    if (io.Platform.isIOS) {
+      await _tts.autoStopSharedSession(false);
+      await _tts.setIosAudioCategory(
+        IosTextToSpeechAudioCategory.playback,
+        [IosTextToSpeechAudioCategoryOptions.mixWithOthers],
+        IosTextToSpeechAudioMode.spokenAudio,
+      );
+      await _tts.setSharedInstance(true);
+    }
     await _ensureBound();
     try {
       await _tts.setSpeechRate(
         TtsPlaybackSpeed.toSystemRate(_playbackState.speed),
       );
     } catch (_) {}
+    if (session != _sessionId) return true;
+    if (_isPaused || !_backgroundSpeechAllowed) {
+      _isPaused = true;
+      _updatePlaybackState(status: TtsPlaybackStatus.paused);
+      return true;
+    }
     dynamic res;
     try {
       res = await _tts.speak(text, focus: true);
@@ -1009,6 +1114,7 @@ class TtsProvider extends ChangeNotifier {
     int? currentChunkIndex,
     bool clearError = false,
   }) {
+    if (status == TtsPlaybackStatus.paused) _releaseSpeechWork();
     _playbackState = _playbackState.copyWith(
       status: status,
       position: position,
@@ -1047,6 +1153,7 @@ class TtsProvider extends ChangeNotifier {
   }
 
   void _finishPlayback({required TtsPlaybackStatus status, String? error}) {
+    _releaseSpeechWork();
     _isSpeaking = false;
     _isPaused = false;
     _usingNetwork = false;
@@ -1078,6 +1185,8 @@ class TtsProvider extends ChangeNotifier {
   }
 
   void _stopInternal({bool updateState = false}) {
+    _previewPlaying = false;
+    _releaseSpeechWork();
     _chunks.clear();
     _networkCache.clear();
     _resolvedNetworkChunks.clear();
@@ -1129,9 +1238,7 @@ class TtsProvider extends ChangeNotifier {
   }
 
   static String _stripMarkdown(String input) {
-    var s = input;
-    s = s.replaceAll(RegExp(r'```[\s\S]*?```', multiLine: true), ' ');
-    s = s.replaceAll(RegExp(r'`[^`]*`'), ' ');
+    var s = markdownRemoveCode(input);
     s = s.replaceAllMapped(
       RegExp(r'\[([^\]]+)\]\([^\)]+\)'),
       (m) => m.group(1) ?? '',
@@ -1145,6 +1252,7 @@ class TtsProvider extends ChangeNotifier {
   }
 
   Future<void> _playAudioBytes(Uint8List bytes, {String? mime}) async {
+    final session = _sessionId;
     try {
       await _player.stop();
       await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -1158,8 +1266,17 @@ class TtsProvider extends ChangeNotifier {
       );
       final f = io.File(path);
       await f.writeAsBytes(bytes, flush: true);
+      if (session != _sessionId || !_backgroundSpeechAllowed) return;
+      await _claimSpeechAudio();
+      if (session != _sessionId || !_backgroundSpeechAllowed) {
+        _releaseSpeechWork();
+        return;
+      }
+      _previewPlaying = true;
       await _player.play(DeviceFileSource(path));
     } catch (e) {
+      _releaseSpeechWork();
+      _previewPlaying = false;
       _error = e.toString();
       _isSpeaking = false;
       notifyListeners();

@@ -1,3 +1,5 @@
+import 'oauth_login_panel.dart';
+import '../pages/oauth_provider_detail_page.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -12,13 +14,13 @@ import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 Future<String?> showAddProviderSheet(BuildContext context) async {
-  final cs = Theme.of(context).colorScheme;
   return showModalBottomSheet<String?>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -34,7 +36,7 @@ class _AddProviderSheet extends StatefulWidget {
 
 class _AddProviderSheetState extends State<_AddProviderSheet>
     with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 3, vsync: this);
+  late final TabController _tab = TabController(length: 4, vsync: this);
 
   @override
   void initState() {
@@ -164,42 +166,13 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     );
   }
 
-  Widget _iosCard({required List<Widget> children}) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          children: [
-            for (int i = 0; i < children.length; i++) ...[
-              if (i > 0)
-                Divider(
-                  height: 10,
-                  thickness: 0.6,
-                  color: cs.outlineVariant.withValues(alpha: 0.18),
-                ),
-              children[i],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _openaiForm(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _iosCard(
+        SectionCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          dividers: true,
           children: [
             _switchRow(
               label: l10n.addProviderSheetEnabledLabel,
@@ -237,7 +210,9 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _iosCard(
+        SectionCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          dividers: true,
           children: [
             _switchRow(
               label: l10n.addProviderSheetEnabledLabel,
@@ -296,7 +271,9 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _iosCard(
+        SectionCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          dividers: true,
           children: [
             _switchRow(
               label: l10n.addProviderSheetEnabledLabel,
@@ -517,7 +494,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _SegTabBar(
                   controller: _tab,
-                  tabs: const ['OpenAI', 'Google', 'Claude'],
+                  tabs: ['OpenAI', 'Google', 'Claude', l10n.oauthAccountsTab],
                 ),
               ),
               const SizedBox(height: 12),
@@ -536,6 +513,11 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                               if (idx == 0) _openaiForm(l10n),
                               if (idx == 1) _googleForm(l10n),
                               if (idx == 2) _claudeForm(l10n),
+                              if (idx == 3)
+                                OAuthLoginPanel(
+                                  onViewDetails: (id) =>
+                                      showOAuthProviderDetails(context, id),
+                                ),
                             ],
                           );
                         },
@@ -545,20 +527,21 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: IosTileButton(
-                    icon: Lucide.Plus,
-                    label: l10n.addProviderSheetAddButton,
-                    backgroundColor: cs.primary,
-                    // No need to set foreground/border; component tints background lightly,
-                    // uses theme color for text, and draws a subtle same-hue border.
-                    onTap: _onAdd,
+              if (_tab.index < 3)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: IosTileButton(
+                      icon: Lucide.Plus,
+                      label: l10n.addProviderSheetAddButton,
+                      backgroundColor: cs.primary,
+                      // No need to set foreground/border; component tints background lightly,
+                      // uses theme color for text, and draws a subtle same-hue border.
+                      onTap: _onAdd,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -661,7 +644,7 @@ class _SegTabBar extends StatelessWidget {
     const double outerHeight = 44;
     const double innerPadding = 4;
     const double gap = 6;
-    const double minSegWidth = 88;
+    const double minSegWidth = 76;
     final double pillRadius = 18;
     final double innerRadius = ((pillRadius - innerPadding).clamp(
       0.0,
