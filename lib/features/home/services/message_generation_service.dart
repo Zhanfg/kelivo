@@ -9,6 +9,7 @@ import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/providers/workspace_provider.dart';

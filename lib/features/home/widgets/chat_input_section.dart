@@ -218,6 +218,16 @@ class ChatInputSection extends StatelessWidget {
       mediaController: mediaController,
       asrProvider: asr,
       onConfigureReasoning: onConfigureReasoning,
+      onReasoningBudgetChanged: onReasoningBudgetChanged,
+      onComposerModelChanged: onComposerModelChanged,
+      currentModelProvider: pk,
+      currentModelId: mid,
+      supportsXhighReasoning: pk != null && mid != null
+          ? settings.supportsXhighReasoning(pk, mid)
+          : false,
+      supportsMaxReasoning: pk != null && mid != null
+          ? settings.supportsMaxReasoning(pk, mid)
+          : false,
       reasoningActive: isReasoningEnabled(
         (context.watch<AssistantProvider>().currentAssistant?.thinkingBudget) ??
             settings.thinkingBudget,
@@ -233,11 +243,18 @@ class ChatInputSection extends StatelessWidget {
           : false,
       onOpenSearch: onOpenSearch,
       onSend: onSend,
+      onGuide: onGuide,
       loading: isLoading,
+      generationPaused: isGenerationPaused,
+      onToggleGenerationPaused: onToggleGenerationPaused,
       sendButtonTooltip: sendButtonTooltip,
       hasQueuedInput: hasQueuedInput,
       queuedPreviewText: queuedPreviewText,
+      queuedInputs: queuedInputs,
       onCancelQueuedInput: onCancelQueuedInput,
+      onRemoveQueuedInput: onRemoveQueuedInput,
+      onClearQueuedInputs: onClearQueuedInputs,
+      onReorderQueuedInput: onReorderQueuedInput,
       showToolsButton: _shouldShowToolsButton(pk, mid),
       toolsActive: _isToolsActive(context, a, workspaceBound),
       showQuickPhraseButton: _hasQuickPhrases(context, a),
@@ -272,6 +289,7 @@ class ChatInputSection extends StatelessWidget {
       backgroundImageActive: backgroundImageActive,
       inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
+      storyMode: storyMode,
     );
 
     if (!showEnvChip || !workspaceBound) return bar;
