@@ -19,8 +19,7 @@ class FreeBuffOAuthAdapter extends ProviderOAuthAdapter {
   }) async {
     cancellation.check();
 
-    final fingerprint =
-        'codebuff-cli-${const Uuid().v4().replaceAll('-', '').substring(0, 12)}';
+    final fingerprint = await _fingerprint();
     final start = await wire.request(
       '$_authBase/api/auth/start',
       json: {'fingerprintId': fingerprint},
@@ -39,7 +38,7 @@ class FreeBuffOAuthAdapter extends ProviderOAuthAdapter {
         cookie == null ||
         uri == null ||
         uri.scheme != 'https' ||
-        !(uri.host == 'freebuff.com' || uri.host.endsWith('.freebuff.com'))) {
+        !_isAllowedLoginHost(uri.host)) {
       throw ProviderOAuthException(
         ProviderOAuthFailure.invalidResponse,
         statusCode: start.status,
@@ -179,6 +178,27 @@ class FreeBuffOAuthAdapter extends ProviderOAuthAdapter {
     } catch (_) {
       // Local logout must still succeed if remote revocation is unavailable.
     }
+  }
+
+  Future<String> _fingerprint() async {
+    const key = 'oauth_freebuff_fingerprint_v1';
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString(key)?.trim();
+    if (existing != null && existing.startsWith('codebuff-cli-')) {
+      return existing;
+    }
+    final generated =
+        'codebuff-cli-${const Uuid().v4().replaceAll('-', '').substring(0, 12)}';
+    await prefs.setString(key, generated);
+    return generated;
+  }
+
+  bool _isAllowedLoginHost(String host) {
+    final value = host.trim().toLowerCase();
+    return value == 'freebuff.com' ||
+        value.endsWith('.freebuff.com') ||
+        value == 'codebuff.com' ||
+        value.endsWith('.codebuff.com');
   }
 
   String? _loginCookie(String? raw) {
