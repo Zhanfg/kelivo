@@ -69,6 +69,15 @@ String apiKeyForRequest(ProviderConfig cfg, String modelId) {
   return orig;
 }
 
+Map<String, String> bearerAuthHeadersForRequest(
+  ProviderConfig cfg,
+  String modelId,
+) {
+  final key = apiKeyForRequest(cfg, modelId).trim();
+  if (key.isEmpty) return const <String, String>{};
+  return <String, String>{'Authorization': 'Bearer $key'};
+}
+
 String effectiveApiKey(ProviderConfig cfg) {
   try {
     if (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) {
