@@ -478,105 +478,126 @@ jobs:
           write(p, s)
 
           # ---- Chat input: use clean upstream structural block, then layer Story UI
-          # controls on top. This removes the duplicate child/Stack produced by merge.
+          # controls on top. Locate semantically so upstream indentation changes
+          # do not break the sync patch.
           p = "lib/features/home/widgets/chat_input_bar.dart"
           current = read(p)
           master = subprocess.check_output(
               ["git", "show", "origin/master:" + p], text=True
           )
-          start_marker = "                  // Main input container with iOS-like frosted glass effect\n"
-          end_marker = "                  if (_imageModeActive)\n"
-          cs = current.index(start_marker)
-          ce = current.index(end_marker, cs)
-          ms = master.index(start_marker)
-          me = master.index(end_marker, ms)
+
+          start_token = "// Main input container with iOS-like frosted glass effect"
+          end_token = "if (_imageModeActive)"
+
+          def line_start(text, pos):
+              return text.rfind("\n", 0, pos) + 1
+
+          current_start_token = current.index(start_token)
+          current_end_token = current.index(end_token, current_start_token)
+          cs = line_start(current, current_start_token)
+          ce = line_start(current, current_end_token)
+
+          master_start_token = master.index(start_token)
+          master_end_token = master.index(end_token, master_start_token)
+          ms = line_start(master, master_start_token)
+          me = line_start(master, master_end_token)
           segment = master[ms:me]
 
-          column_marker = "                        child: Column(\n                          children: [\n"
-          story_header = """                        child: Column(
-                            children: [
-                              if (widget.hasQueuedInput && !showVoiceShell) ...[
-                                _QueuedInputBanner(
-                                  label: widget.queuedInputs.length > 1
-                                      ? '${AppLocalizations.of(context)!.chatInputBarQueuedPending} · ${widget.queuedInputs.length}'
-                                      : AppLocalizations.of(
-                                          context,
-                                        )!.chatInputBarQueuedPending,
-                                  previewText: widget.queuedPreviewText,
-                                  cancelLabel: AppLocalizations.of(
-                                    context,
-                                  )!.chatInputBarQueuedCancel,
-                                  onCancel: widget.onCancelQueuedInput,
-                                  onManage: widget.queuedInputs.isEmpty
-                                      ? null
-                                      : () => unawaited(_showQueueManager()),
-                                ),
-                                const SizedBox(height: AppSpacing.xs),
-                              ],
-                              if (showVoiceShell)
-                                _buildComposerVoiceShell(
-                                  context,
-                                  theme,
-                                  selectedAsrService,
-                                ),
-                              if (showGenerationDraftActions && !showVoiceShell)
-                                Padding(
-                                  key: const ValueKey(
-                                    'composer-generation-actions',
-                                  ),
-                                  padding: const EdgeInsets.fromLTRB(
-                                    AppSpacing.xs,
-                                    0,
-                                    AppSpacing.xs,
-                                    AppSpacing.xs,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      _CompactActionPill(
-                                        label:
-                                            Localizations.localeOf(
-                                                  context,
-                                                ).languageCode ==
-                                                'zh'
-                                            ? '加入队列'
-                                            : 'Queue',
-                                        icon: Lucide.ListOrdered,
-                                        onTap: _handleSend,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      _CompactActionPill(
-                                        label:
-                                            Localizations.localeOf(
-                                                  context,
-                                                ).languageCode ==
-                                                'zh'
-                                            ? '立即引导'
-                                            : 'Guide',
-                                        icon: Lucide.MessageCirclePlus,
-                                        onTap: widget.onGuide == null
-                                            ? null
-                                            : _handleGuide,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+          # Add Story queue / voice / Guide controls at the top of the upstream
+          # input container's main Column without replacing upstream share UI.
+          column_pos = segment.index("child: Column(")
+          children_pos = segment.index("children: [", column_pos)
+          insert_pos = segment.index("\n", children_pos) + 1
+          story_header = """                  if (widget.hasQueuedInput && !showVoiceShell) ...[
+                    _QueuedInputBanner(
+                      label: widget.queuedInputs.length > 1
+                          ? '${AppLocalizations.of(context)!.chatInputBarQueuedPending} · ${widget.queuedInputs.length}'
+                          : AppLocalizations.of(
+                              context,
+                            )!.chatInputBarQueuedPending,
+                      previewText: widget.queuedPreviewText,
+                      cancelLabel: AppLocalizations.of(
+                        context,
+                      )!.chatInputBarQueuedCancel,
+                      onCancel: widget.onCancelQueuedInput,
+                      onManage: widget.queuedInputs.isEmpty
+                          ? null
+                          : () => unawaited(_showQueueManager()),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                  ],
+                  if (showVoiceShell)
+                    _buildComposerVoiceShell(
+                      context,
+                      theme,
+                      selectedAsrService,
+                    ),
+                  if (showGenerationDraftActions && !showVoiceShell)
+                    Padding(
+                      key: const ValueKey(
+                        'composer-generation-actions',
+                      ),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.xs,
+                        0,
+                        AppSpacing.xs,
+                        AppSpacing.xs,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          _CompactActionPill(
+                            label:
+                                Localizations.localeOf(
+                                      context,
+                                    ).languageCode ==
+                                    'zh'
+                                ? '加入队列'
+                                : 'Queue',
+                            icon: Lucide.ListOrdered,
+                            onTap: _handleSend,
+                          ),
+                          const SizedBox(width: 6),
+                          _CompactActionPill(
+                            label:
+                                Localizations.localeOf(
+                                      context,
+                                    ).languageCode ==
+                                    'zh'
+                                ? '立即引导'
+                                : 'Guide',
+                            icon: Lucide.MessageCirclePlus,
+                            onTap: widget.onGuide == null
+                                ? null
+                                : _handleGuide,
+                          ),
+                        ],
+                      ),
+                    ),
           """
-          if column_marker not in segment:
-              raise SystemExit("chat_input_bar.dart: upstream column marker missing")
-          segment = segment.replace(column_marker, story_header, 1)
+          segment = segment[:insert_pos] + story_header + segment[insert_pos:]
+
+          # Hide normal attachments and text editor while the Story voice shell
+          # is active, matching the pre-upstream Story composer behavior.
           segment = segment.replace(
-              "                          if (hasDocs || hasImages)\n"
-              "                            _buildInlineAttachmentPreviews(context, isDark),\n"
-              "                          // Input field with expand/collapse button\n"
-              "                          Stack(\n",
-              "                          if ((hasDocs || hasImages) && !showVoiceShell)\n"
-              "                            _buildInlineAttachmentPreviews(context, isDark),\n"
-              "                          // Input field with expand/collapse button\n"
-              "                          if (!showVoiceShell)\n"
-              "                            Stack(\n",
+              "if (hasDocs || hasImages)",
+              "if ((hasDocs || hasImages) && !showVoiceShell)",
               1,
           )
+          input_comment = "// Input field with expand/collapse button"
+          comment_pos = segment.index(input_comment)
+          stack_pos = segment.index("Stack(", comment_pos)
+          stack_line = line_start(segment, stack_pos)
+          stack_indent = segment[stack_line:stack_pos]
+          segment = (
+              segment[:stack_line]
+              + stack_indent
+              + "if (!showVoiceShell)\n"
+              + stack_indent
+              + "  "
+              + segment[stack_line:]
+          )
+
           current = current[:cs] + segment + current[ce:]
           write(p, current)
 
