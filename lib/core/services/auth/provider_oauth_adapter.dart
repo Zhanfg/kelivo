@@ -14,6 +14,7 @@ import 'oauth_pkce.dart';
 import 'claude_oauth_request.dart';
 
 part 'claude_oauth_adapter.dart';
+part 'freebuff_oauth_adapter.dart';
 
 const codexClientVersion = '0.153.0';
 
@@ -192,6 +193,7 @@ abstract class ProviderOAuthAdapter {
         OAuthProvider.grok => GrokOAuthAdapter(),
         OAuthProvider.kimi => KimiOAuthAdapter(),
         OAuthProvider.claude => ClaudeOAuthAdapter(),
+        OAuthProvider.freebuff => FreeBuffOAuthAdapter(),
       };
 
   Map<String, String> headers(ProviderOAuthCredentials credentials) => {
@@ -247,6 +249,11 @@ abstract class ProviderOAuthAdapter {
   }
 
   Map<String, String> tokenHeaders(String? deviceId) => const {};
+
+  Future<void> logout(
+    OAuthWire wire,
+    ProviderOAuthCredentials credentials,
+  ) async {}
 
   ProviderOAuthCredentials credentials(
     Map<String, dynamic> data, {
