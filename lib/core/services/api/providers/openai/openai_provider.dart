@@ -638,7 +638,7 @@ Stream<StreamChunk> sendOpenAIStream(
     config,
     modelId,
     baseHeaders: <String, String>{
-      'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
+      ...bearerAuthHeadersForRequest(config, modelId),
       'Content-Type': 'application/json',
       'Accept': stream ? 'text/event-stream' : 'application/json',
     },
