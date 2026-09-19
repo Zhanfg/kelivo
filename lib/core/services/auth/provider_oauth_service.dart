@@ -196,6 +196,19 @@ class ProviderOAuthService extends ChangeNotifier {
     if (config == null || !config.isOAuth) return;
     _login?.cancel();
     _usage.remove(_sessionKey(config));
+    final credentials = config.oauthCredentials;
+    if (credentials != null) {
+      final client = _clientFactory(config);
+      try {
+        await ProviderOAuthAdapter.forProvider(
+          config.oauthProvider!,
+        ).logout(OAuthWire(client), credentials);
+      } catch (_) {
+        // Remote revocation is best-effort; always allow local sign-out.
+      } finally {
+        client.close();
+      }
+    }
     await _settings!.setProviderConfig(
       id,
       config.copyWith(oauthCredentials: null),
