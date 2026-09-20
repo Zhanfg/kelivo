@@ -173,6 +173,157 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
     });
   }
 
+  Future<void> _renameWorldline(StoryWorldline line) async {
+    final chatService = context.read<ChatService>();
+    final current = _conversationLabel(line.conversationId);
+    final controller = TextEditingController(text: current);
+    final nextTitle = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(tr('重命名分支', 'Rename branch')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 80,
+          decoration: InputDecoration(
+            labelText: tr('分支名称', 'Branch name'),
+          ),
+          onSubmitted: (value) {
+            final title = value.trim();
+            if (title.isNotEmpty) Navigator.of(context).pop(title);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(tr('取消', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () {
+              final title = controller.text.trim();
+              if (title.isNotEmpty) Navigator.of(context).pop(title);
+            },
+            child: Text(tr('保存', 'Save')),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (nextTitle == null || nextTitle == current) return;
+    await _run(() => chatService.renameConversation(line.conversationId, nextTitle));
+  }
+
+  Future<void> _createCheckpoint() async {
+    final tree = _tree;
+    final worldlineId = _selectedWorldlineId;
+    final messageId = tree?.currentMessageId;
+    if (tree == null ||
+        worldlineId == null ||
+        messageId == null ||
+        worldlineId != tree.headWorldlineId) {
+      return;
+    }
+
+    final controller = TextEditingController();
+    final label = await showDialog<String?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(tr('创建检查点', 'Create checkpoint')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 60,
+          decoration: InputDecoration(
+            labelText: tr('名称（可选）', 'Name (optional)'),
+            hintText: tr('例如：进入第二章前', 'Example: Before chapter two'),
+          ),
+          onSubmitted: (_) => Navigator.of(context).pop(controller.text.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(tr('取消', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: Text(tr('创建', 'Create')),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (label == null) return;
+
+    await _run(() async {
+      await _coordinator.createCheckpoint(
+        worldTreeId: tree.worldTreeId,
+        worldlineId: worldlineId,
+        messageId: messageId,
+        nodeId: tree.currentNodeId,
+        label: label.trim().isEmpty ? null : label.trim(),
+      );
+    });
+  }
+
+  Future<void> _rewindFromCheckpoint(StoryWorldCheckpoint checkpoint) async {
+    final tree = _tree;
+    if (tree == null || _busy) return;
+    final source = tree.worldlineById(checkpoint.worldlineId);
+    if (source == null || source.status == StoryWorldlineStatus.archived) return;
+
+    final sourceTitle = _conversationLabel(source.conversationId);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(tr('从检查点创建新分支？', 'Create branch from checkpoint?')),
+        content: Text(
+          tr(
+            '会复制该检查点之前的聊天历史并创建新的世界线。原分支不会被删除或改写。',
+            'Kelivo will copy chat history through this checkpoint into a new worldline. The original branch is never deleted or rewritten.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(tr('取消', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(tr('创建分支', 'Create branch')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final chatService = context.read<ChatService>();
+    await _run(() async {
+      final forked = await chatService.forkConversationAtRevision(
+        sourceConversationId: source.conversationId,
+        sourceRevisionId: checkpoint.messageId,
+        title: '$sourceTitle · ${tr('分支', 'Branch')}',
+      );
+      try {
+        await chatService.renameConversation(
+          forked.id,
+          '$sourceTitle · ${tr('回退', 'Rewind')}',
+        );
+        final next = await _coordinator.rewindFromCheckpoint(
+          worldTreeId: tree.worldTreeId,
+          checkpointId: checkpoint.id,
+          childConversationId: forked.id,
+        );
+        final child = next.worldlineForConversation(forked.id);
+        if (child != null && mounted) {
+          setState(() => _selectedWorldlineId = child.id);
+        }
+      } catch (_) {
+        await chatService.deleteConversation(forked.id);
+        rethrow;
+      }
+    });
+  }
+
   Future<void> _addManualMemory() async {
     final tree = _tree;
     final worldlineId = _selectedWorldlineId;
@@ -416,6 +567,8 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
                           onSelected: (value) {
                             if (value == 'open') {
                               _switchWorldline(line);
+                            } else if (value == 'rename') {
+                              _renameWorldline(line);
                             } else if (value == 'mainline') {
                               _setMainline(line);
                             } else if (value == 'archive') {
@@ -423,6 +576,10 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
                             }
                           },
                           itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: 'rename',
+                              child: Text(tr('重命名', 'Rename')),
+                            ),
                             if (line.status != StoryWorldlineStatus.archived &&
                                 line.id != tree.headWorldlineId)
                               PopupMenuItem(
@@ -453,10 +610,22 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
                 StoryNativeSection(
                   title: tr('检查点', 'Checkpoints'),
                   footer: tr(
-                    '当前仅展示稳定检查点；下一步会在这里开放安全的回退/重放操作。',
-                    'Stable checkpoints are visible here. Safe rewind/replay controls will be added here next.',
+                    '检查点用于安全分支：原历史始终保留，回退会创建新的聊天与世界线。',
+                    'Checkpoints create safe branches: original history is preserved and rewind creates a new chat/worldline.',
                   ),
                   children: [
+                    StoryNativeRow(
+                      title: tr('创建当前检查点', 'Create checkpoint here'),
+                      subtitle: tr(
+                        '保存当前主线位置，稍后可以从这里安全分支。',
+                        'Save the current head position so you can branch from it later.',
+                      ),
+                      icon: Lucide.Bookmark,
+                      enabled: !_busy &&
+                          selectedWorldlineId == tree.headWorldlineId &&
+                          tree.currentMessageId != null,
+                      onTap: _createCheckpoint,
+                    ),
                     if (tree.checkpoints.isEmpty)
                       StoryNativeRow(
                         title: tr('暂无检查点', 'No checkpoints yet'),
@@ -478,7 +647,17 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
                           subtitle:
                               '${tr('消息', 'Message')} ${_short(checkpoint.messageId)} · ${_short(checkpoint.worldlineId)}',
                           icon: Lucide.History,
-                          enabled: false,
+                          enabled: !_busy,
+                          trailing: IconButton(
+                            tooltip: tr('从这里创建新分支', 'Branch from here'),
+                            onPressed: _busy
+                                ? null
+                                : () => _rewindFromCheckpoint(checkpoint),
+                            icon: const Icon(Lucide.GitFork, size: 18),
+                          ),
+                          onTap: _busy
+                              ? null
+                              : () => _rewindFromCheckpoint(checkpoint),
                         ),
                   ],
                 ),
