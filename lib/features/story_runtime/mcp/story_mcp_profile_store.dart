@@ -43,6 +43,20 @@ final class StoryMcpProfileStore extends JsonBlobStore<StoryMcpProfile> {
       await writeAll(next);
     });
   }
+
+  Future<bool> remove(String id) {
+    return runExclusive(() async {
+      final normalized = id.trim();
+      if (normalized.isEmpty) return false;
+      final items = await readAll();
+      final next = items
+          .where((item) => item.id != normalized)
+          .toList(growable: false);
+      if (next.length == items.length) return false;
+      await writeAll(next);
+      return true;
+    });
+  }
 }
 
 final class StoryMcpProfileSelectionStore
@@ -100,6 +114,28 @@ final class StoryMcpProfileSelectionStore
       if (!replaced) next.add(nextSelection);
       next.sort((a, b) => a.conversationId.compareTo(b.conversationId));
       await writeAll(next);
+    });
+  }
+
+  Future<int> clearProfileReferences(String profileId) {
+    return runExclusive(() async {
+      final normalized = profileId.trim();
+      if (normalized.isEmpty) return 0;
+      final items = await readAll();
+      var cleared = 0;
+      final next = <StoryMcpProfileSelection>[
+        for (final item in items)
+          if (item.profileId == normalized) ...[
+            StoryMcpProfileSelection(conversationId: item.conversationId),
+          ] else ...[
+            item,
+          ],
+      ];
+      for (final item in items) {
+        if (item.profileId == normalized) cleared++;
+      }
+      if (cleared > 0) await writeAll(next);
+      return cleared;
     });
   }
 }
