@@ -63,7 +63,7 @@ class PiBinaryInstaller {
     final asset = PiDistribution.forLinuxArch(environment.state.arch);
     if (asset == null) {
       throw StateError(
-        'pi_unsupported_arch:' + (environment.state.arch ?? 'unknown'),
+        'pi_unsupported_arch:${environment.state.arch ?? 'unknown'}',
       );
     }
 
@@ -71,7 +71,7 @@ class PiBinaryInstaller {
       environmentId,
     );
     final installDir = Directory(
-      p.join(environmentDir.path, 'pi', 'v' + asset.version),
+      p.join(environmentDir.path, 'pi', 'v${asset.version}'),
     );
     final executable = File(
       p.join(installDir.path, asset.executableRelativePath),
@@ -88,7 +88,7 @@ class PiBinaryInstaller {
 
     final packageStore = await AppDirectories.getAgentPackageStoreDirectory();
     final packageDir = Directory(
-      p.join(packageStore.path, 'pi', 'v' + asset.version),
+      p.join(packageStore.path, 'pi', 'v${asset.version}'),
     );
     await packageDir.create(recursive: true);
     final archive = File(p.join(packageDir.path, asset.archiveFileName));
@@ -97,10 +97,7 @@ class PiBinaryInstaller {
     final piRoot = Directory(p.join(environmentDir.path, 'pi'));
     await piRoot.create(recursive: true);
     final stagingName =
-        '.staging-v' +
-        asset.version +
-        '-' +
-        const Uuid().v4().replaceAll('-', '');
+        '.staging-v${asset.version}-${const Uuid().v4().replaceAll('-', '')}';
     final stagingDir = Directory(p.join(piRoot.path, stagingName));
     if (await stagingDir.exists()) {
       await stagingDir.delete(recursive: true);
@@ -204,7 +201,7 @@ class PiBinaryInstaller {
       await archive.delete();
     }
 
-    final part = File(archive.path + '.part');
+    final part = File('${archive.path}.part');
     if (await part.exists()) await part.delete();
     await part.parent.create(recursive: true);
 
@@ -215,7 +212,7 @@ class PiBinaryInstaller {
     if (response.statusCode != 200) {
       await response.stream.drain<void>();
       throw HttpException(
-        'Pi download HTTP ' + response.statusCode.toString(),
+        'Pi download HTTP ${response.statusCode}',
         uri: asset.uri,
       );
     }
@@ -252,6 +249,7 @@ class PiBinaryInstaller {
 
   static String _quote(String value) {
     if (value.contains('\u0000')) throw ArgumentError('NUL in shell argument');
-    return "'" + value.replaceAll("'", "'\\''") + "'";
+    final escaped = value.replaceAll("'", "'\\''");
+    return "'$escaped'";
   }
 }
