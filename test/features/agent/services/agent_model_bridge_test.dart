@@ -22,7 +22,9 @@ void main() {
     final client = HttpClient();
 
     try {
-      final request = await client.getUrl(Uri.parse('${endpoint.baseUrl}/models'));
+      final request = await client.getUrl(
+        Uri.parse('${endpoint.baseUrl}/models'),
+      );
       final response = await request.close();
       expect(response.statusCode, HttpStatus.unauthorized);
     } finally {
@@ -47,11 +49,7 @@ void main() {
         yield const TextDelta(id: 'text-1', text: 'hello ');
         yield const TextDelta(id: 'text-1', text: 'world');
         yield const Usage(
-          TokenUsage(
-            promptTokens: 10,
-            completionTokens: 2,
-            totalTokens: 12,
-          ),
+          TokenUsage(promptTokens: 10, completionTokens: 2, totalTokens: 12),
         );
         yield const Finish(finishReason: 'stop');
       },
