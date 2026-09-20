@@ -14,12 +14,10 @@ final class StoryMcpProfileResolver {
   StoryMcpExposurePolicy resolveAutomaticStory({
     StoryResolvedSkillCapabilities? skills,
   }) {
-    final allowedTools = <String>{
-      ...?skills?.toolIds,
-    }..removeWhere((item) => item.trim().isEmpty);
-    final allowedServers = <String>{
-      ...?skills?.mcpServerIds,
-    }..removeWhere((item) => item.trim().isEmpty);
+    final allowedTools = <String>{...?skills?.toolIds}
+      ..removeWhere((item) => item.trim().isEmpty);
+    final allowedServers = <String>{...?skills?.mcpServerIds}
+      ..removeWhere((item) => item.trim().isEmpty);
 
     return StoryMcpExposurePolicy(
       profileId: automaticStoryProfileId,

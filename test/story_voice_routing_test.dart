@@ -105,39 +105,42 @@ void main() {
     expect(a.cacheIdentity, isNot(b.cacheIdentity));
   });
 
-  test('MiMo chunk context uses adjacent chunks and never repeats current text', () {
-    final service = MimoTtsOptions(
-      id: 'mimo-main',
-      enabled: true,
-      name: 'MiMo',
-      apiKey: 'secret',
-      baseUrl: 'https://example.invalid/v1',
-      model: 'mimo-v2.5-tts',
-      voice: 'voice-a',
-      instruction: 'Quiet and precise.',
-    );
-    const outer = StoryVoiceContextWindow(
-      previous: '上一条消息。',
-      current: '整条当前消息。',
-      next: '下一条消息。',
-      sceneHint: 'dark corridor',
-    );
-    final window = StoryVoiceContextCompiler.forChunk(
-      chunks: const ['第一段。', '第二段。', '第三段。'],
-      index: 1,
-      outerContext: outer,
-    );
-    final routed = const StoryVoiceResolver().withMimoContext(
-      service: service,
-      context: window,
-    );
+  test(
+    'MiMo chunk context uses adjacent chunks and never repeats current text',
+    () {
+      final service = MimoTtsOptions(
+        id: 'mimo-main',
+        enabled: true,
+        name: 'MiMo',
+        apiKey: 'secret',
+        baseUrl: 'https://example.invalid/v1',
+        model: 'mimo-v2.5-tts',
+        voice: 'voice-a',
+        instruction: 'Quiet and precise.',
+      );
+      const outer = StoryVoiceContextWindow(
+        previous: '上一条消息。',
+        current: '整条当前消息。',
+        next: '下一条消息。',
+        sceneHint: 'dark corridor',
+      );
+      final window = StoryVoiceContextCompiler.forChunk(
+        chunks: const ['第一段。', '第二段。', '第三段。'],
+        index: 1,
+        outerContext: outer,
+      );
+      final routed = const StoryVoiceResolver().withMimoContext(
+        service: service,
+        context: window,
+      );
 
-    expect(routed.instruction, contains('第一段。'));
-    expect(routed.instruction, contains('第三段。'));
-    expect(routed.instruction, contains('dark corridor'));
-    expect(routed.instruction, isNot(contains('第二段。')));
-    expect(routed.instruction, isNot(contains('整条当前消息。')));
-  });
+      expect(routed.instruction, contains('第一段。'));
+      expect(routed.instruction, contains('第三段。'));
+      expect(routed.instruction, contains('dark corridor'));
+      expect(routed.instruction, isNot(contains('第二段。')));
+      expect(routed.instruction, isNot(contains('整条当前消息。')));
+    },
+  );
 
   test('non-MiMo Story voice ignores contextual prompt augmentation', () {
     final base = StepTtsOptions(

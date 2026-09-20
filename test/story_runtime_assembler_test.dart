@@ -47,44 +47,47 @@ void main() {
       },
     );
 
-    test('default-enabled built-in Skill activates without persisted binding', () async {
-      const defaultSkill = StorySkillManifest(
-        id: 'story.default',
-        name: 'Default',
-        version: '1',
-        instructions: ['Default Story behavior.'],
-        activationModes: {StorySkillActivationMode.always},
-        metadata: {'defaultEnabled': true},
-      );
-      final assembler = StoryRuntimeAssembler(
-        sessionRepository: _SessionRepo(
-          const StoryRuntimeSessionState(
-            conversationId: 'conv-1',
-            enabled: true,
+    test(
+      'default-enabled built-in Skill activates without persisted binding',
+      () async {
+        const defaultSkill = StorySkillManifest(
+          id: 'story.default',
+          name: 'Default',
+          version: '1',
+          instructions: ['Default Story behavior.'],
+          activationModes: {StorySkillActivationMode.always},
+          metadata: {'defaultEnabled': true},
+        );
+        final assembler = StoryRuntimeAssembler(
+          sessionRepository: _SessionRepo(
+            const StoryRuntimeSessionState(
+              conversationId: 'conv-1',
+              enabled: true,
+            ),
           ),
-        ),
-        skillBindingRepository: const _BindingRepo([]),
-        loadSkillManifests: () async => const [defaultSkill],
-        referenceProfileRepository: const _ProfileRepo([]),
-        referenceSelectionRepository: const _SelectionRepo([]),
-        resolveHostCapabilities: (skills, session) async =>
-            const StoryHostCapabilityResolution(),
-      );
+          skillBindingRepository: const _BindingRepo([]),
+          loadSkillManifests: () async => const [defaultSkill],
+          referenceProfileRepository: const _ProfileRepo([]),
+          referenceSelectionRepository: const _SelectionRepo([]),
+          resolveHostCapabilities: (skills, session) async =>
+              const StoryHostCapabilityResolution(),
+        );
 
-      final result = await assembler.assemble(
-        const StoryRuntimeAssemblyRequest(
-          conversationId: 'conv-1',
-          assistantId: 'assistant-1',
-          storyCoreInstructions: 'Story core.',
-        ),
-      );
+        final result = await assembler.assemble(
+          const StoryRuntimeAssemblyRequest(
+            conversationId: 'conv-1',
+            assistantId: 'assistant-1',
+            storyCoreInstructions: 'Story core.',
+          ),
+        );
 
-      expect(result, isNotNull);
-      expect(result!.skills.activeSkills.map((skill) => skill.id), [
-        'story.default',
-      ]);
-      expect(result.prompt.providerText, contains('Default Story behavior.'));
-    });
+        expect(result, isNotNull);
+        expect(result!.skills.activeSkills.map((skill) => skill.id), [
+          'story.default',
+        ]);
+        expect(result.prompt.providerText, contains('Default Story behavior.'));
+      },
+    );
 
     test(
       'ordinary Story turn omits serial Skill until SERIAL_DUE fires',

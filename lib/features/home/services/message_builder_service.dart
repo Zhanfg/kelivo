@@ -1929,9 +1929,9 @@ class MessageBuilderService {
 
       final activeSet = <String>{
         ...activeBookIds,
-        ...additionalActiveBookIds.map((id) => id.trim()).where(
-          (id) => id.isNotEmpty,
-        ),
+        ...additionalActiveBookIds
+            .map((id) => id.trim())
+            .where((id) => id.isNotEmpty),
       };
       final books = all
           .where((b) => b.enabled && activeSet.contains(b.id))

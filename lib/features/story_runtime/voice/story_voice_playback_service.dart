@@ -84,10 +84,7 @@ final class StoryVoicePlaybackService {
                 index: index,
                 outerContext: context,
               );
-              return resolver.withMimoContext(
-                service: base,
-                context: window,
-              );
+              return resolver.withMimoContext(service: base, context: window);
             }
           : null,
     );

@@ -185,9 +185,7 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
           controller: controller,
           autofocus: true,
           maxLength: 80,
-          decoration: InputDecoration(
-            labelText: tr('分支名称', 'Branch name'),
-          ),
+          decoration: InputDecoration(labelText: tr('分支名称', 'Branch name')),
           onSubmitted: (value) {
             final title = value.trim();
             if (title.isNotEmpty) Navigator.of(context).pop(title);
@@ -210,7 +208,9 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
     );
     controller.dispose();
     if (nextTitle == null || nextTitle == current) return;
-    await _run(() => chatService.renameConversation(line.conversationId, nextTitle));
+    await _run(
+      () => chatService.renameConversation(line.conversationId, nextTitle),
+    );
   }
 
   Future<void> _createCheckpoint() async {
@@ -269,7 +269,8 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
     final tree = _tree;
     if (tree == null || _busy) return;
     final source = tree.worldlineById(checkpoint.worldlineId);
-    if (source == null || source.status == StoryWorldlineStatus.archived) return;
+    if (source == null || source.status == StoryWorldlineStatus.archived)
+      return;
 
     final sourceTitle = _conversationLabel(source.conversationId);
     final confirmed = await showDialog<bool>(
@@ -621,7 +622,8 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
                         'Save the current head position so you can branch from it later.',
                       ),
                       icon: Lucide.Bookmark,
-                      enabled: !_busy &&
+                      enabled:
+                          !_busy &&
                           selectedWorldlineId == tree.headWorldlineId &&
                           tree.currentMessageId != null,
                       onTap: _createCheckpoint,
