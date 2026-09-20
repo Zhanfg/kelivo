@@ -33,6 +33,8 @@ class BrandAssets {
   // Keep order-specific matching using a list of entries.
   static final List<MapEntry<RegExp, String>> _mapping =
       <MapEntry<RegExp, String>>[
+        MapEntry(RegExp(r'freebuff|codebuff'), 'freebuff.svg'),
+        MapEntry(RegExp(r'pollinations'), 'pollinations.svg'),
         MapEntry(RegExp(r'openai'), 'openai.svg'),
         MapEntry(
           RegExp(r'^azure(?: (?:tts|speech(?: services?)?))?$'),
@@ -123,6 +125,11 @@ class BrandAssets {
       id: 'openrouter',
       label: 'OpenRouter',
       asset: 'assets/icons/openrouter.svg',
+    ),
+    BrandIconOption(
+      id: 'pollinations',
+      label: 'Pollinations',
+      asset: 'assets/icons/pollinations.svg',
     ),
     BrandIconOption(
       id: 'zhipu',
@@ -375,6 +382,7 @@ class BrandAssets {
     'grok.svg',
     'xai.svg',
     'openrouter.svg',
+    'pollinations.svg',
     'ollama.svg',
     'github.svg',
     'linkup.svg',

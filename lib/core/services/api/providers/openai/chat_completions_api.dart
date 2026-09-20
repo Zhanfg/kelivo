@@ -865,7 +865,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
           config,
           modelId,
           baseHeaders: <String, String>{
-            'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
+            ...bearerAuthHeadersForRequest(config, modelId),
             'Content-Type': 'application/json',
             'Accept': 'text/event-stream',
           },
@@ -987,7 +987,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
           config,
           modelId,
           baseHeaders: <String, String>{
-            'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
+            ...bearerAuthHeadersForRequest(config, modelId),
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },

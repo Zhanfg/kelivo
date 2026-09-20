@@ -42,6 +42,22 @@ class ProviderOAuthService extends ChangeNotifier {
 
   ProviderConfig? _current(String id) => _settings?.providerConfigs[id];
 
+  Future<String> _freeBuffFingerprint() {
+    final settings = _settings;
+    if (settings == null) {
+      throw StateError('OAuth settings are unavailable');
+    }
+    return settings.getOrCreateFreeBuffFingerprint();
+  }
+
+  ProviderOAuthAdapter _adapter(OAuthProvider provider) =>
+      ProviderOAuthAdapter.forProvider(
+        provider,
+        freeBuffFingerprint: provider == OAuthProvider.freebuff
+            ? _freeBuffFingerprint
+            : null,
+      );
+
   ProviderConfig _requireCurrentSession(ProviderConfig original) {
     final current = _current(original.id);
     if (current == null ||
@@ -142,7 +158,7 @@ class ProviderOAuthService extends ChangeNotifier {
         (Uri uri) => launchUrl(uri, mode: LaunchMode.externalApplication);
     try {
       final credentials = await Future.any<ProviderOAuthCredentials>([
-        ProviderOAuthAdapter.forProvider(provider).login(
+        _adapter(provider).login(
           OAuthWire(client),
           cancellation,
           (prompt) async {
@@ -196,6 +212,19 @@ class ProviderOAuthService extends ChangeNotifier {
     if (config == null || !config.isOAuth) return;
     _login?.cancel();
     _usage.remove(_sessionKey(config));
+    final credentials = config.oauthCredentials;
+    if (credentials != null) {
+      final client = _clientFactory(config);
+      try {
+        await _adapter(
+          config.oauthProvider!,
+        ).logout(OAuthWire(client), credentials);
+      } catch (_) {
+        // Remote revocation is best-effort; always allow local sign-out.
+      } finally {
+        client.close();
+      }
+    }
     await _settings!.setProviderConfig(
       id,
       config.copyWith(oauthCredentials: null),
@@ -221,6 +250,8 @@ class ProviderOAuthService extends ChangeNotifier {
           DateTime.now(),
           leeway: current.oauthProvider == OAuthProvider.claude
               ? const Duration(minutes: 5)
+              : current.oauthProvider == OAuthProvider.pollinations
+              ? Duration.zero
               : const Duration(minutes: 1),
         )) {
       return _forRequest(current);
@@ -253,7 +284,7 @@ class ProviderOAuthService extends ChangeNotifier {
     final settings = _settings!;
     final client = _clientFactory(original);
     try {
-      final refreshed = await ProviderOAuthAdapter.forProvider(
+      final refreshed = await _adapter(
         original.oauthProvider!,
       ).refresh(OAuthWire(client), original.oauthCredentials!);
       final current = _current(original.id);
@@ -341,7 +372,7 @@ class ProviderOAuthService extends ChangeNotifier {
   Future<List<ModelInfo>> models(ProviderConfig original) => _authenticated(
     original,
     (wire, config) async {
-      final rows = await ProviderOAuthAdapter.forProvider(
+      final rows = await _adapter(
         config.oauthProvider!,
       ).models(wire, config.oauthCredentials!);
       final ids = <String>{};
@@ -450,9 +481,8 @@ class ProviderOAuthService extends ChangeNotifier {
     if (_usageRequests[key] case final pending?) return pending;
     final request = _authenticated(
       original,
-      (wire, config) => ProviderOAuthAdapter.forProvider(
-        config.oauthProvider!,
-      ).usage(wire, config.oauthCredentials!),
+      (wire, config) =>
+          _adapter(config.oauthProvider!).usage(wire, config.oauthCredentials!),
     );
     _usageRequests[key] = request;
     try {
@@ -546,9 +576,9 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
             ..followRedirects = false
             ..headers.addAll(request.headers)
             ..bodyBytes = body;
-      final authHeaders = ProviderOAuthAdapter.forProvider(
-        config.oauthProvider!,
-      ).headers(config.oauthCredentials!);
+      final authHeaders = service
+          ._adapter(config.oauthProvider!)
+          .headers(config.oauthCredentials!);
       final existingBeta = result.headers['anthropic-beta'];
       final existingContentType = result.headers['content-type'];
       for (final name in authHeaders.keys) {
@@ -643,18 +673,27 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
     }
 
     var response = await inner.send(build());
-    if (response.statusCode != 401) return response;
+    final authRejected =
+        response.statusCode == 401 ||
+        (config.oauthProvider == OAuthProvider.freebuff &&
+            response.statusCode == 403);
+    if (!authRejected) return response;
     await response.stream.drain<void>();
     _checkSession();
     config = await service.resolve(config, force: true);
     response = await inner.send(build());
-    if (response.statusCode == 401) {
+    final retryAuthRejected =
+        response.statusCode == 401 ||
+        (config.oauthProvider == OAuthProvider.freebuff &&
+            response.statusCode == 403);
+    if (retryAuthRejected) {
+      final statusCode = response.statusCode;
       await response.stream.drain<void>();
       await service.markLoginRequired(config);
       throw ProviderOAuthException(
         ProviderOAuthFailure.loginRequired,
         providerId: config.id,
-        statusCode: 401,
+        statusCode: statusCode,
       );
     }
     return response;

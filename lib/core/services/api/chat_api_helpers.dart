@@ -2,7 +2,6 @@ import '../../models/provider_oauth.dart';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:Kelivo/secrets/fallback.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
@@ -39,8 +38,6 @@ Future<String> decodeUtf8Stream(
   return utf8.decode(await stream.toBytes(), allowMalformed: allowMalformed);
 }
 
-const String _aihubmixAppCode = 'ZKRT3588';
-
 /// Resolve the upstream/vendor model id for a given logical model key.
 /// When per-instance overrides specify `apiModelId`, that value is used for
 /// outbound HTTP requests and vendor-specific heuristics. Otherwise the
@@ -54,19 +51,16 @@ String apiModelId(ProviderConfig cfg, String modelId) {
 }
 
 String apiKeyForRequest(ProviderConfig cfg, String modelId) {
-  final orig = effectiveApiKey(cfg).trim();
-  if (orig.isNotEmpty) return orig;
-  if ((cfg.id) == 'SiliconFlow') {
-    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
-    if (!host.contains('siliconflow')) return orig;
-    final m = apiModelId(cfg, modelId).toLowerCase();
-    final allowed = m == 'thudm/glm-4-9b-0414' || m == 'qwen/qwen3-8b';
-    final fallback = siliconflowFallbackKey.trim();
-    if (allowed && fallback.isNotEmpty) {
-      return fallback;
-    }
-  }
-  return orig;
+  return effectiveApiKey(cfg).trim();
+}
+
+Map<String, String> bearerAuthHeadersForRequest(
+  ProviderConfig cfg,
+  String modelId,
+) {
+  final key = apiKeyForRequest(cfg, modelId).trim();
+  if (key.isEmpty) return const <String, String>{};
+  return <String, String>{'Authorization': 'Bearer $key'};
 }
 
 String effectiveApiKey(ProviderConfig cfg) {
@@ -101,10 +95,6 @@ Map<String, String> customHeaders(
 }) {
   final ov = _modelOverride(cfg, modelId);
   final automatic = <String, String>{...providerDefaultHeaders(cfg)};
-  // AIhubmix promo header (opt-in per-provider)
-  if (_isAihubmix(cfg) && cfg.aihubmixAppCodeEnabled == true) {
-    automatic.putIfAbsent('APP-Code', () => _aihubmixAppCode);
-  }
   return CustomRequestMerger.mergeHeaders(
     base: baseHeaders,
     assistant: assistantHeaders,
@@ -127,11 +117,6 @@ Map<String, dynamic> customBody(
     providerRows: cfg.customBody,
     model: ModelOverridePayloadParser.customBody(ov),
   );
-}
-
-bool _isAihubmix(ProviderConfig cfg) {
-  final base = cfg.baseUrl.toLowerCase();
-  return base.contains('aihubmix.com');
 }
 
 // Resolve effective model info by respecting per-model overrides; fallback to inference

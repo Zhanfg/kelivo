@@ -14,6 +14,8 @@ import 'oauth_pkce.dart';
 import 'claude_oauth_request.dart';
 
 part 'claude_oauth_adapter.dart';
+part 'freebuff_oauth_adapter.dart';
+part 'pollinations_oauth_adapter.dart';
 
 const codexClientVersion = '0.153.0';
 
@@ -186,13 +188,19 @@ abstract class ProviderOAuthAdapter {
   OAuthProvider get provider;
   Duration get tokenRequestTimeout => const Duration(seconds: 30);
 
-  static ProviderOAuthAdapter forProvider(OAuthProvider provider) =>
-      switch (provider) {
-        OAuthProvider.chatgpt => ChatGptOAuthAdapter(),
-        OAuthProvider.grok => GrokOAuthAdapter(),
-        OAuthProvider.kimi => KimiOAuthAdapter(),
-        OAuthProvider.claude => ClaudeOAuthAdapter(),
-      };
+  static ProviderOAuthAdapter forProvider(
+    OAuthProvider provider, {
+    Future<String> Function()? freeBuffFingerprint,
+  }) => switch (provider) {
+    OAuthProvider.chatgpt => ChatGptOAuthAdapter(),
+    OAuthProvider.grok => GrokOAuthAdapter(),
+    OAuthProvider.kimi => KimiOAuthAdapter(),
+    OAuthProvider.claude => ClaudeOAuthAdapter(),
+    OAuthProvider.freebuff => FreeBuffOAuthAdapter(
+      fingerprintProvider: freeBuffFingerprint,
+    ),
+    OAuthProvider.pollinations => PollinationsOAuthAdapter(),
+  };
 
   Map<String, String> headers(ProviderOAuthCredentials credentials) => {
     'Authorization': 'Bearer ${credentials.accessToken}',
@@ -247,6 +255,11 @@ abstract class ProviderOAuthAdapter {
   }
 
   Map<String, String> tokenHeaders(String? deviceId) => const {};
+
+  Future<void> logout(
+    OAuthWire wire,
+    ProviderOAuthCredentials credentials,
+  ) async {}
 
   ProviderOAuthCredentials credentials(
     Map<String, dynamic> data, {

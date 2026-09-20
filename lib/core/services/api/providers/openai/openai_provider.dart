@@ -21,6 +21,7 @@ import '../../stream/stream_chunk_ids.dart';
 import 'chat_completions_api.dart';
 import 'chat_completions_decoder.dart';
 import 'openai_vendor_compat.dart';
+import 'openai_protocol_compat.dart';
 import 'responses_api.dart';
 import 'responses_decoder.dart';
 
@@ -117,6 +118,16 @@ Stream<StreamChunk> sendOpenAIStream(
   StreamRoundRunner? retryRound,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
+  final useResponsesApi = shouldUseOpenAIResponsesApi(
+    config,
+    modelId,
+    upstreamModelId: upstreamModelId,
+  );
+  // Normalize the provider config for the rest of this request so every
+  // payload builder / decoder follows the same per-model protocol decision.
+  if (config.useResponseApi != useResponsesApi) {
+    config = config.copyWith(useResponseApi: useResponsesApi);
+  }
   // Utility calls (title / summary generation) only want search injected.
   final Iterable<String>? configuredBuiltInTools = builtInSearchOnly
       ? builtInTools(
@@ -627,7 +638,7 @@ Stream<StreamChunk> sendOpenAIStream(
     config,
     modelId,
     baseHeaders: <String, String>{
-      'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
+      ...bearerAuthHeadersForRequest(config, modelId),
       'Content-Type': 'application/json',
       'Accept': stream ? 'text/event-stream' : 'application/json',
     },
