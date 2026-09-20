@@ -25,6 +25,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Kelivo currently ships only English and Chinese app localizations.
+        // Keep transitive Android libraries from packaging unused locale
+        // resources for languages the app cannot select.
+        resourceConfigurations += listOf("en", "zh")
         // Flutter controls APK ABI filtering, including --split-per-abi.
         externalNativeBuild {
             cmake {
