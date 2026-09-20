@@ -71,10 +71,25 @@ final class StoryVoicePlaybackService {
       intent: intent,
       context: context,
     );
+    final service = request.service;
     await ttsProvider.speakWithNetworkService(
-      request.service,
+      service,
       text,
       flush: flush,
+      chunkServiceResolver: service is MimoTtsOptions
+          ? (base, chunks, index) {
+              if (base is! MimoTtsOptions) return base;
+              final window = StoryVoiceContextCompiler.forChunk(
+                chunks: [for (final chunk in chunks) chunk.text],
+                index: index,
+                outerContext: context,
+              );
+              return resolver.withMimoContext(
+                service: base,
+                context: window,
+              );
+            }
+          : null,
     );
     return request;
   }
