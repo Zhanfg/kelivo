@@ -13,6 +13,7 @@ set -euo pipefail
 
 : "${SHARD:?SHARD is required}"
 : "${SHARD_COUNT:?SHARD_COUNT is required}"
+TEST_CONCURRENCY="${TEST_CONCURRENCY:-2}"
 
 mapfile -t all_files < <(find test -type f -name '*_test.dart' | sort)
 
@@ -39,7 +40,7 @@ echo "Shard ${SHARD}/${SHARD_COUNT}: ${#selected[@]} of ${#all_files[@]} test fi
 printf '  %s\n' "${selected[@]}"
 
 set +e
-flutter test --concurrency=1 --reporter expanded "${selected[@]}" 2>&1 | tee /tmp/shard.log
+flutter test --concurrency="$TEST_CONCURRENCY" --reporter expanded "${selected[@]}" 2>&1 | tee /tmp/shard.log
 status=${PIPESTATUS[0]}
 set -e
 
