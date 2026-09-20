@@ -96,20 +96,22 @@ flutter {
     source = "../.."
 }
 
-val requiredProotLibs = listOf(
-    "armeabi-v7a/libproot_exec.so",
-    "armeabi-v7a/libproot_loader.so",
-    "armeabi-v7a/libtalloc.so",
-    "armeabi-v7a/libandroid-shmem.so",
-    "arm64-v8a/libproot_exec.so",
-    "arm64-v8a/libproot_loader.so",
-    "arm64-v8a/libtalloc.so",
-    "arm64-v8a/libandroid-shmem.so",
-    "x86_64/libproot_exec.so",
-    "x86_64/libproot_loader.so",
-    "x86_64/libtalloc.so",
-    "x86_64/libandroid-shmem.so",
-)
+val supportedProotAbis = listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+val requestedProotAbis = System.getenv("KELIVO_ANDROID_ABIS")
+    ?.split(",")
+    ?.map { it.trim() }
+    ?.filter { it in supportedProotAbis }
+    ?.takeIf { it.isNotEmpty() }
+    ?: supportedProotAbis
+
+val requiredProotLibs = requestedProotAbis.flatMap { abi ->
+    listOf(
+        abi + "/libproot_exec.so",
+        abi + "/libproot_loader.so",
+        abi + "/libtalloc.so",
+        abi + "/libandroid-shmem.so",
+    )
+}
 
 tasks.register<Exec>("fetchProot") {
     val repoRoot = rootProject.projectDir.parentFile
