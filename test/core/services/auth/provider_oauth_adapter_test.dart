@@ -68,9 +68,11 @@ void main() {
         }),
       );
 
-      FreeBuffOAuthAdapter(
+      final adapter = FreeBuffOAuthAdapter(
         fingerprintProvider: () async => 'codebuff-cli-test-install',
-      ).login(wire, OAuthCancellation(), (value) async => prompt = value)
+      );
+      adapter
+          .login(wire, OAuthCancellation(), (value) async => prompt = value)
           .then((value) => result = value);
       async.flushMicrotasks();
 
