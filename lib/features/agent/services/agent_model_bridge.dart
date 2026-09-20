@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../../../core/models/assistant.dart';
@@ -89,6 +90,36 @@ class AgentModelBridge {
     return AgentModelBridgeEndpoint(
       baseUrl: 'http://127.0.0.1:${server.port}/v1',
       token: token,
+    );
+  }
+
+  Future<void> writePiConfig({
+    required Directory taskDirectory,
+    required AgentModelBridgeEndpoint endpoint,
+  }) async {
+    final configDir = Directory(p.join(taskDirectory.path, 'pi-config'));
+    await configDir.create(recursive: true);
+    final modelsFile = File(p.join(configDir.path, 'models.json'));
+    await modelsFile.writeAsString(
+      const JsonEncoder.withIndent('  ').convert(
+        <String, dynamic>{
+          'providers': <String, dynamic>{
+            'kelivo': <String, dynamic>{
+              'baseUrl': endpoint.baseUrl,
+              'api': 'openai-completions',
+              'apiKey': endpoint.token,
+              'authHeader': true,
+              'models': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 'current',
+                  'name': 'KELIVO Current Model',
+                },
+              ],
+            },
+          },
+        },
+      ),
+      flush: true,
     );
   }
 
