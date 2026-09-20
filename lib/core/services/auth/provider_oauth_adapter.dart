@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -189,15 +188,19 @@ abstract class ProviderOAuthAdapter {
   OAuthProvider get provider;
   Duration get tokenRequestTimeout => const Duration(seconds: 30);
 
-  static ProviderOAuthAdapter forProvider(OAuthProvider provider) =>
-      switch (provider) {
-        OAuthProvider.chatgpt => ChatGptOAuthAdapter(),
-        OAuthProvider.grok => GrokOAuthAdapter(),
-        OAuthProvider.kimi => KimiOAuthAdapter(),
-        OAuthProvider.claude => ClaudeOAuthAdapter(),
-        OAuthProvider.freebuff => FreeBuffOAuthAdapter(),
-        OAuthProvider.pollinations => PollinationsOAuthAdapter(),
-      };
+  static ProviderOAuthAdapter forProvider(
+    OAuthProvider provider, {
+    Future<String> Function()? freeBuffFingerprint,
+  }) => switch (provider) {
+    OAuthProvider.chatgpt => ChatGptOAuthAdapter(),
+    OAuthProvider.grok => GrokOAuthAdapter(),
+    OAuthProvider.kimi => KimiOAuthAdapter(),
+    OAuthProvider.claude => ClaudeOAuthAdapter(),
+    OAuthProvider.freebuff => FreeBuffOAuthAdapter(
+      fingerprintProvider: freeBuffFingerprint,
+    ),
+    OAuthProvider.pollinations => PollinationsOAuthAdapter(),
+  };
 
   Map<String, String> headers(ProviderOAuthCredentials credentials) => {
     'Authorization': 'Bearer ${credentials.accessToken}',
