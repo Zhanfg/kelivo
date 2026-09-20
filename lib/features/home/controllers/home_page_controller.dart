@@ -1843,6 +1843,17 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
+  Future<void> _commitStoryFinalizedAssistant(ChatMessage message) async {
+    try {
+      final preferences = _context.read<BusinessPreferences>();
+      await StoryNativeLifecycleBridge(
+        preferences,
+      ).commitFinalizedAssistant(message);
+    } catch (error) {
+      debugPrint('Story finalize bridge failed: $error');
+    }
+  }
+
   Future<void> _handleAssistantMessageFinished(ChatMessage message) async {
     if (!_context.mounted || message.role != 'assistant') return;
     unawaited(_commitStoryFinalizedAssistant(message));
@@ -1889,8 +1900,34 @@ class HomePageController extends ChangeNotifier {
       mode: sp.ttsTextSelectionMode,
     );
     if (text.trim().isEmpty) return;
-    // Automatic narration acknowledges preparation, so ChatActions can release
-    // generation resources while the independent speech session keeps running.
+
+    try {
+      final preferences = _context.read<BusinessPreferences>();
+      final bridge = StoryNativeLifecycleBridge(preferences);
+      final narrator = await bridge.resolveNarratorAssignment(message);
+      if (narrator != null) {
+        final voiceContext = await bridge.resolveNarratorContext(message);
+        final playback =
+            StoryVoicePlaybackService(
+              preferences: preferences,
+              ttsProvider: tts,
+            ).speakAssignment(
+              assignment: narrator,
+              text: text,
+              context: voiceContext,
+            );
+        if (autoPlay) {
+          unawaited(playback);
+        } else {
+          await playback;
+        }
+        return;
+      }
+    } catch (error) {
+      debugPrint('Story narrator playback failed: $error');
+    }
+
+    // Preserve upstream background-generation handoff behavior.
     await tts.speak(text, waitForCompletion: !autoPlay);
   }
 

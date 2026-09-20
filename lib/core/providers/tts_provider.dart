@@ -56,6 +56,7 @@ class TtsProvider extends ChangeNotifier {
 
   final BusinessPreferences preferences;
   final MobileBackgroundCoordinator _background;
+  final LocalTtsBackend _localBackend;
   bool _previewPlaying = false;
   late FlutterTts _tts;
   final AudioPlayer _player = AudioPlayer();
@@ -145,7 +146,9 @@ class TtsProvider extends ChangeNotifier {
   TtsProvider({
     required this.preferences,
     MobileBackgroundCoordinator? background,
-  }) : _background = background ?? MobileBackgroundCoordinator.instance {
+    LocalTtsBackend? localBackend,
+  }) : _background = background ?? MobileBackgroundCoordinator.instance,
+       _localBackend = localBackend ?? MossLocalTtsBackend() {
     _init();
   }
 
@@ -249,14 +252,14 @@ class TtsProvider extends ChangeNotifier {
     });
     _playerStateSub = _player.onPlayerStateChanged.listen((state) {
       if (state != PlayerState.playing) {
-        if (_usingNetwork) {
+        if (_usesAudioPlayer) {
           _releaseSpeechAudio();
         } else {
           _previewPlaying = false;
           _releaseSpeechWork();
         }
       }
-      if (!_usingNetwork) return;
+      if (!_usesAudioPlayer) return;
       switch (state) {
         case PlayerState.playing:
           _isSpeaking = true;
@@ -457,9 +460,9 @@ class TtsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// With [waitForCompletion] false, returns after old-player cleanup and the
-  /// native buffering lease are complete. Generation may then end safely;
-  /// neither a network response nor the spoken audio blocks that handoff.
+  /// With [waitForCompletion] false, returns after old-player cleanup and
+  /// native buffering setup is complete. Local, cloud and system playback
+  /// then continue independently of generation finalization.
   Future<void> speak(
     String text, {
     bool flush = true,
@@ -467,19 +470,69 @@ class TtsProvider extends ChangeNotifier {
   }) async {
     if (!_initialized) return;
     final selected = await _getSelectedNetworkService();
-    if (selected != null && selected.enabled) {
-      return _speakQueued(
-        text,
-        networkService: selected,
-        flush: flush,
-        waitForCompletion: waitForCompletion,
-      );
+    final cloudAvailable = selected != null && selected.enabled;
+    var localInstalled = false;
+    var localReady = false;
+    try {
+      localInstalled = await _localBackend.isInstalled();
+      if (localInstalled) {
+        localReady = await _localBackend.isReady();
+      }
+    } catch (_) {
+      localReady = false;
     }
-    return _speakQueued(
-      text,
-      flush: flush,
-      waitForCompletion: waitForCompletion,
+
+    final choice = resolveTtsBackend(
+      mode: _backendMode,
+      localInstalled: localInstalled,
+      localReady: localReady,
+      cloudAvailable: cloudAvailable,
     );
+    switch (choice) {
+      case TtsBackendChoice.local:
+        return _speakQueued(
+          text,
+          localBackend: _localBackend,
+          flush: flush,
+          waitForCompletion: waitForCompletion,
+        );
+      case TtsBackendChoice.cloud:
+        return _speakQueued(
+          text,
+          networkService: selected,
+          flush: flush,
+          waitForCompletion: waitForCompletion,
+        );
+      case TtsBackendChoice.system:
+        return _speakQueued(
+          text,
+          flush: flush,
+          waitForCompletion: waitForCompletion,
+        );
+      case TtsBackendChoice.unavailable:
+        _setRoutingError(
+          localInstalled
+              ? 'Local TTS model is installed but the local runtime is unavailable.'
+              : _backendMode == TtsBackendMode.cloudOnly
+              ? 'No enabled cloud TTS service is selected.'
+              : 'Local TTS is unavailable.',
+        );
+        return;
+    }
+  }
+
+  void _setRoutingError(String message) {
+    _error = message;
+    _isSpeaking = false;
+    _isPaused = false;
+    _usingNetwork = false;
+    _usingLocal = false;
+    _playbackState = _playbackState.copyWith(
+      status: TtsPlaybackStatus.error,
+      errorMessage: message,
+      usingNetwork: false,
+    );
+    notifyListeners();
   }
 
   Future<void> speakSystem(String text, {bool flush = true}) async {
@@ -558,7 +611,9 @@ class TtsProvider extends ChangeNotifier {
     } else {
       await _background.setAudioOwner('speechBuffering', true);
     }
-    if (_usingNetwork) {
+    if (_usingLocal) {
+      unawaited(_runLocalQueue(session, localBackend!));
+    } else if (_usingNetwork) {
       unawaited(_runNetworkQueue(session, networkService!));
     } else if (!_isPaused) {
       final playback = _ensureBound().then(
@@ -593,7 +648,7 @@ class TtsProvider extends ChangeNotifier {
     // Mark immediately so a pending network result cannot start during pause.
     _isPaused = true;
     try {
-      if (_usingNetwork) {
+      if (_usesAudioPlayer) {
         await _player.pause();
       } else {
         await _ensureBound();
@@ -612,7 +667,7 @@ class TtsProvider extends ChangeNotifier {
   Future<void> resume() async {
     if (!_initialized || !_isPaused) return;
     if (!_backgroundSpeechAllowed) return;
-    if (_usingNetwork) {
+    if (_usesAudioPlayer) {
       final session = _sessionId;
       final hasSource = _networkChunkCompleter != null;
       if (hasSource) {
@@ -810,6 +865,7 @@ class TtsProvider extends ChangeNotifier {
     }
     await _player.stop();
     await Future<void>.delayed(const Duration(milliseconds: 20));
+    await _claimSpeechAudio();
     _currentChunkDuration = result.duration;
 
     final chunkCompleter = Completer<void>();

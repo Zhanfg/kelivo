@@ -48,6 +48,8 @@ import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../../chat/widgets/chat_assistant_background.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
+import '../../story_runtime/ui/story_conversation_mode_control.dart';
+import '../../story_runtime/ui/story_narrative_view.dart';
 import '../../provider/pages/providers_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
@@ -1623,6 +1625,8 @@ class _HomePageState extends State<HomePage>
           );
         }
       },
+      onReasoningBudgetChanged: _setComposerReasoningBudget,
+      onComposerModelChanged: _setComposerModel,
       onSend: (text) async {
         final result = await _controller.sendMessage(text);
         if (!mounted) return result;
@@ -1632,10 +1636,15 @@ class _HomePageState extends State<HomePage>
         }
         return result;
       },
+      onGuide: _controller.guideMessage,
       onStop: _controller.cancelStreaming,
       hasQueuedInput: _controller.currentQueuedInput != null,
       queuedPreviewText: _controller.currentQueuedInput?.input.text,
+      queuedInputs: _controller.currentQueuedInputs,
       onCancelQueuedInput: _controller.cancelQueuedMessage,
+      onRemoveQueuedInput: _controller.removeQueuedMessageAt,
+      onClearQueuedInputs: _controller.clearQueuedMessages,
+      onReorderQueuedInput: _controller.reorderQueuedMessage,
       onQuickPhrase: _showQuickPhraseMenu,
       onLongPressQuickPhrase: () {
         Navigator.of(
@@ -1656,6 +1665,7 @@ class _HomePageState extends State<HomePage>
       onClearContext: _controller.clearContext,
       onCompressContext: _handleDesktopCompressContext,
       backgroundImageActive: _assistantBackgroundActive(context),
+      storyMode: isStoryWorkspaceSelected(context.read<BusinessPreferences>()),
     );
   }
 
