@@ -9,6 +9,7 @@ import '../../../core/models/memory_entry.dart';
 import '../../../core/services/memory/memory_repository.dart';
 import '../cache/story_prompt_cache_plan.dart';
 import '../context/story_context_resource_compiler.dart';
+import '../context/story_context_resources.dart';
 import '../context/story_context_resource_store.dart';
 import '../mcp/story_mcp_profile.dart';
 import '../mcp/story_mcp_profile_resolver.dart';
@@ -49,6 +50,7 @@ final class StoryRuntimePromptResult {
     required this.allowedMcpServerIds,
     required this.includeAssistantMcpDefaults,
     required this.requireMcpApproval,
+    required this.regexRules,
     this.sceneId,
     this.sceneRevision = 0,
   });
@@ -69,6 +71,7 @@ final class StoryRuntimePromptResult {
   final Set<String> allowedMcpServerIds;
   final bool includeAssistantMcpDefaults;
   final bool requireMcpApproval;
+  final List<StoryRegexRule> regexRules;
   final String? sceneId;
   final int sceneRevision;
 }
@@ -209,9 +212,14 @@ final class StoryRuntimePromptService {
       final contextResources = await _contextResourceStore.readOrDefault(
         conversation.id,
       );
+      final transformedUserTurn = _contextCompiler.applyRegex(
+        _latestUserTurnText(messages),
+        target: StoryRegexTarget.userInput,
+        rules: contextResources.regexRules,
+      );
       final compiledContext = _contextCompiler.compile(
         resources: contextResources,
-        turnText: _latestUserTurnText(messages),
+        turnText: transformedUserTurn,
         worldlineId: worldline.id,
       );
 
@@ -337,6 +345,7 @@ final class StoryRuntimePromptService {
         includeAssistantMcpDefaults:
             mcpExposure?.includeAssistantDefaults ?? true,
         requireMcpApproval: mcpExposure?.requireApproval ?? false,
+        regexRules: compiledContext.regexRules,
         sceneId: scene.sceneId,
         sceneRevision: scene.revision,
       );
