@@ -31,6 +31,7 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
 
   Future<_CharacterPageData> _load() async {
     final preferences = context.read<BusinessPreferences>();
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
     final scene = await StorySceneRuntimeStore(
       preferences,
     ).readOrDefault(widget.conversationId);
@@ -43,7 +44,6 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
             preferences,
           ).readOrDefault(tree.worldTreeId);
 
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     final ids = <String>{
       ...scene.participantCharacterIds,
       ...?routing?.assignments.map((item) => item.characterId),
@@ -118,6 +118,7 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
 
   Future<void> _editCharacterName(_CharacterView character) async {
     final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final preferences = context.read<BusinessPreferences>();
     final controller = TextEditingController(text: character.displayName);
     final name = await showDialog<String>(
       context: context,
@@ -157,7 +158,6 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
     if (name == null || name == character.displayName) return;
 
     try {
-      final preferences = context.read<BusinessPreferences>();
       final sceneStore = StorySceneRuntimeStore(preferences);
       final scene = await sceneStore.readOrDefault(widget.conversationId);
       final continuity = Map<String, Object?>.from(scene.continuityState);
