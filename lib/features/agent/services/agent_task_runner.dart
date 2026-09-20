@@ -9,6 +9,7 @@ import '../../../core/services/workspace/workspace_runtime.dart';
 import '../../../utils/app_directories.dart';
 import '../../home/utils/model_display_helper.dart';
 import '../models/agent_task.dart';
+import '../providers/agent_interaction_broker.dart';
 import '../providers/agent_task_provider.dart';
 import 'agent_context_materializer.dart';
 import 'agent_model_bridge.dart';
@@ -20,6 +21,7 @@ class AgentTaskRunner {
   AgentTaskRunner({
     required this.tasks,
     required this.journal,
+    required this.interactions,
     required this.workspaces,
     required this.assistants,
     required this.chat,
@@ -34,6 +36,7 @@ class AgentTaskRunner {
 
   final AgentTaskProvider tasks;
   final AgentTaskJournal journal;
+  final AgentInteractionBroker interactions;
   final WorkspaceProvider workspaces;
   final AssistantProvider assistants;
   final ChatService chat;
@@ -241,6 +244,7 @@ class AgentTaskRunner {
         );
       }
     } finally {
+      interactions.cancelForTask(taskId);
       await subscription?.cancel();
       if (session != null) {
         await session.close();
@@ -254,6 +258,7 @@ class AgentTaskRunner {
   Future<void> cancel(String taskId) async {
     await recovery;
     _cancelled.add(taskId);
+    interactions.cancelForTask(taskId);
     final session = _sessions[taskId];
     if (session != null) {
       await session.abort();
@@ -335,18 +340,15 @@ class AgentTaskRunner {
       payload: <String, dynamic>{'method': method},
     );
 
-    final id = event['id']?.toString();
-    if (id != null && id.isNotEmpty) {
-      await session.respondToExtensionUi(<String, dynamic>{
-        'type': 'extension_ui_response',
-        'id': id,
-        'cancelled': true,
-      });
-    }
+    final response = await interactions.request(taskId, event);
+    await session.respondToExtensionUi(response);
     await journal.append(
       taskId,
       AgentTaskEventKind.approvalResolved,
-      payload: const <String, dynamic>{'cancelled': true},
+      payload: <String, dynamic>{
+        'method': method,
+        'cancelled': response['cancelled'] == true,
+      },
     );
     await tasks.setPhase(
       taskId,
