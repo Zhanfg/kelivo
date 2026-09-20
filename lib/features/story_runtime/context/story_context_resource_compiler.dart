@@ -137,12 +137,12 @@ int _compareDataBankEntries(StoryDataBankEntry a, StoryDataBankEntry b) {
 
 String _personaText(StoryPersona persona) {
   final buffer = StringBuffer('[STORY_PERSONA]\n');
-  buffer.writeln('name=' + persona.name);
+  buffer.writeln('name=${persona.name}');
   if (persona.description.isNotEmpty) {
-    buffer.writeln('description=' + persona.description);
+    buffer.writeln('description=${persona.description}');
   }
   if (persona.instructions.isNotEmpty) {
-    buffer.writeln('instructions=' + persona.instructions);
+    buffer.writeln('instructions=${persona.instructions}');
   }
   buffer.write('[/STORY_PERSONA]');
   return buffer.toString();
@@ -151,7 +151,7 @@ String _personaText(StoryPersona persona) {
 String _dataBankText(List<StoryDataBankEntry> entries) {
   final buffer = StringBuffer('[STORY_DATA_BANK]\n');
   for (final entry in entries) {
-    buffer.writeln('## ' + entry.title);
+    buffer.writeln('## ${entry.title}');
     buffer.writeln(entry.content.trim());
   }
   buffer.write('[/STORY_DATA_BANK]');
