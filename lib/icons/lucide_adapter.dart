@@ -256,5 +256,4 @@ class Lucide {
   static const IconData Users = User;
   static const IconData Cpu = Activity;
   static const IconData Cloud = Network;
-
 }
