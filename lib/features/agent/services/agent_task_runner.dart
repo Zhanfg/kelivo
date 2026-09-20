@@ -111,7 +111,7 @@ class AgentTaskRunner {
         taskId: task.id,
         assistantId: task.assistantId,
         skillIds: assistant?.skillIds.toSet(),
-        mcpServerIds: conversation?.mcpServerIds.toSet(),
+        mcpServerIds: conversation?.mcpServerIds?.toSet(),
       );
 
       await settings.loaded;
