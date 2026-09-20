@@ -546,7 +546,7 @@ class _TaskCard extends StatelessWidget {
               task.phase == AgentTaskPhase.completed
                   ? Lucide.CheckCircle
                   : task.phase == AgentTaskPhase.failed
-                  ? Lucide.CircleAlert
+                  ? Lucide.TriangleAlert
                   : Lucide.Bot,
               size: 17,
               color: cs.primary,
