@@ -41,6 +41,8 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.assistantPickerCloseTick,
     required this.loadingConversationIds,
     required this.title,
+    this.titleOverride,
+    this.showChatActions = true,
     required this.providerName,
     required this.modelDisplay,
     required this.tabletSidebarOpen,
@@ -75,6 +77,8 @@ class HomeDesktopScaffold extends StatelessWidget {
   final ValueNotifier<int> assistantPickerCloseTick;
   final Set<String> loadingConversationIds;
   final String title;
+  final Widget? titleOverride;
+  final bool showChatActions;
   final String? providerName;
   final String? modelDisplay;
   final bool tabletSidebarOpen;
@@ -373,7 +377,7 @@ class HomeDesktopScaffold extends StatelessWidget {
         onTap: onToggleSidebar,
       ),
       titleSpacing: 2,
-      title: _buildTitle(context, cs),
+      title: titleOverride ?? _buildTitle(context, cs),
       actions: _buildActions(
         context,
         topicsOnRight,
@@ -646,35 +650,37 @@ class HomeDesktopScaffold extends StatelessWidget {
           icon: Lucide.panelRight,
           onTap: onToggleRightSidebar,
         ),
-      const StoryConversationModeAction(),
-      const SizedBox(width: 2),
-      IosIconButton(
-        size: 20,
-        padding: const EdgeInsets.all(8),
-        minSize: 40,
-        semanticLabel: canToggleTemporaryConversation
-            ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
-            : AppLocalizations.of(context)!.titleForLocale,
-        icon: canToggleTemporaryConversation && !temporaryConversationEnabled
-            ? Lucide.MessageCircleDashed
-            : Lucide.MessageCirclePlus,
-        builder: canToggleTemporaryConversation && temporaryConversationEnabled
-            ? (color) => SvgPicture.asset(
-                'assets/icons/temporary_chat_checked.svg',
-                width: 20,
-                height: 20,
-                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-              )
-            : null,
-        onTap: () async {
-          if (canToggleTemporaryConversation) {
-            await onToggleTemporaryConversation();
-          } else {
-            await onCreateNewConversation();
-          }
-        },
-      ),
-      const SizedBox(width: 6),
+      if (showChatActions) ...[
+        const StoryConversationModeAction(),
+        const SizedBox(width: 2),
+        IosIconButton(
+          size: 20,
+          padding: const EdgeInsets.all(8),
+          minSize: 40,
+          semanticLabel: canToggleTemporaryConversation
+              ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
+              : AppLocalizations.of(context)!.titleForLocale,
+          icon: canToggleTemporaryConversation && !temporaryConversationEnabled
+              ? Lucide.MessageCircleDashed
+              : Lucide.MessageCirclePlus,
+          builder: canToggleTemporaryConversation && temporaryConversationEnabled
+              ? (color) => SvgPicture.asset(
+                  'assets/icons/temporary_chat_checked.svg',
+                  width: 20,
+                  height: 20,
+                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                )
+              : null,
+          onTap: () async {
+            if (canToggleTemporaryConversation) {
+              await onToggleTemporaryConversation();
+            } else {
+              await onCreateNewConversation();
+            }
+          },
+        ),
+        const SizedBox(width: 6),
+      ],
     ];
   }
 }
