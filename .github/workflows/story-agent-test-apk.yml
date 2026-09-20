@@ -150,7 +150,7 @@ jobs:
           unzip -l "$out" \
             | awk 'NF == 4 && $1 ~ /^[0-9]+$/ {print $1, $4}' \
             | sort -nr \
-            | head -n 40 \
+            | sed -n '1,40p' \
             > dist/APK_TOP40.txt
 
       - name: Upload APK
