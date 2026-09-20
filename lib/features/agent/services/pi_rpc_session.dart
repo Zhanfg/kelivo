@@ -8,10 +8,9 @@ import '../../../core/services/workspace/workspace_runtime.dart';
 
 class PiRpcSession {
   PiRpcSession._({
-    required WorkspaceStdioRuntime runtime,
-    required String runId,
-  }) : _runtime = runtime,
-       _runId = runId;
+    required this._runtime,
+    required this._runId,
+  });
 
   final WorkspaceStdioRuntime _runtime;
   final String _runId;
@@ -78,10 +77,7 @@ class PiRpcSession {
       ...extraArgs,
     ];
     final launch =
-        'mkdir -p ' +
-        _quote(sessionDir) +
-        '; exec ' +
-        arguments.map(_quote).join(' ');
+        'mkdir -p ${_quote(sessionDir)}; exec ${arguments.map(_quote).join(' ')}';
 
     session._runtimeEvents = runtime
         .run(
@@ -243,7 +239,7 @@ class PiRpcSession {
   }
 
   void _recordStderr(List<int> bytes) {
-    final next = _stderrTail + utf8.decode(bytes, allowMalformed: true);
+    final next = '$_stderrTail${utf8.decode(bytes, allowMalformed: true)}';
     _stderrTail = next.length <= _stderrLimit
         ? next
         : next.substring(next.length - _stderrLimit);
@@ -251,10 +247,10 @@ class PiRpcSession {
 
   String _exitDescription() {
     final suffix = _stderrTail.trim();
-    final base =
-        'Pi RPC exited' +
-        (_exitCode == null ? '' : ' with code ' + _exitCode.toString());
-    return suffix.isEmpty ? base : base + ': ' + suffix;
+    final base = _exitCode == null
+        ? 'Pi RPC exited'
+        : 'Pi RPC exited with code $_exitCode';
+    return suffix.isEmpty ? base : '$base: $suffix';
   }
 
   void _fail(Object error, [StackTrace? stack]) {
@@ -314,6 +310,7 @@ class PiRpcSession {
 
   static String _quote(String value) {
     if (value.contains('\u0000')) throw ArgumentError('NUL in shell argument');
-    return "'" + value.replaceAll("'", "'\\''") + "'";
+    final escaped = value.replaceAll("'", "'\\''");
+    return "'$escaped'";
   }
 }
