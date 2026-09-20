@@ -703,6 +703,9 @@ Stream<StreamChunk> sendGoogleStream(
       final apiKey = effectiveApiKey(config);
       if (apiKey.isNotEmpty) {
         requestHeaders['x-goog-api-key'] = apiKey;
+        if (Uri.tryParse(config.baseUrl)?.host.toLowerCase() == 'opencode.ai') {
+          requestHeaders['Authorization'] = 'Bearer $apiKey';
+        }
       }
     }
     final headers = customHeaders(
@@ -1259,6 +1262,10 @@ Stream<StreamChunk> sendGoogleStream(
         final apiKey = effectiveApiKey(config);
         if (apiKey.isNotEmpty) {
           requestHeaders['x-goog-api-key'] = apiKey;
+          if (Uri.tryParse(config.baseUrl)?.host.toLowerCase() ==
+              'opencode.ai') {
+            requestHeaders['Authorization'] = 'Bearer $apiKey';
+          }
         }
       }
       final headers = customHeaders(

@@ -10,13 +10,13 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider reasoning support', () {
-    test('default Claude and OpenRouter presets do not add latest models', () {
+    test('default Claude stays empty while OpenRouter exposes free router', () {
       final claude = ProviderConfig.defaultsFor('Claude');
       final openRouter = ProviderConfig.defaultsFor('OpenRouter');
 
       expect(claude.models, isEmpty);
       expect(claude.modelOverrides, isEmpty);
-      expect(openRouter.models, isEmpty);
+      expect(openRouter.models, const ['openrouter/free']);
       expect(openRouter.modelOverrides, isEmpty);
     });
 

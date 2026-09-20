@@ -52,6 +52,56 @@ void main() {
   });
   tearDown(() => settings.dispose());
 
+  test('FreeBuff 403 refreshes credentials and retries once', () async {
+    var refreshCalls = 0;
+    final service = ProviderOAuthService(
+      clientFactory: (_) => MockClient((request) async {
+        refreshCalls++;
+        expect(request.url.toString(), 'https://open.freebuff.app/v1/models');
+        expect(request.headers['Authorization'], 'Bearer access');
+        return jsonResponse({
+          'data': [
+            {'id': 'freebuff/deepseek/deepseek-v4-flash'},
+          ],
+        });
+      }),
+    )..bind(settings);
+
+    final original = config(
+      provider: OAuthProvider.freebuff,
+      expired: false,
+    ).copyWith(useResponseApi: false);
+    await settings.setProviderConfig(original.id, original);
+
+    var sends = 0;
+    final client = service.authenticatedClient(
+      MockClient((request) async {
+        sends++;
+        expect(request.headers['Authorization'], 'Bearer access');
+        if (sends == 1) return http.Response('', 403);
+        return jsonResponse({
+          'data': [
+            {'id': 'freebuff/deepseek/deepseek-v4-flash'},
+          ],
+        });
+      }),
+      original,
+    );
+
+    final request = http.Request(
+      'GET',
+      Uri.parse('https://open.freebuff.app/v1/models'),
+    );
+    final response = await client.send(request);
+    expect(response.statusCode, 200);
+    expect(sends, 2);
+    expect(refreshCalls, 1);
+    expect(
+      settings.providerConfigs['account']!.oauthCredentials!.requiresLogin,
+      isFalse,
+    );
+  });
+
   test(
     'concurrent refresh is coalesced, preserves edits, and persists token rotation',
     () async {

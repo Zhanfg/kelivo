@@ -1,12 +1,26 @@
-name: Flutter Multi-Platform Build Stable 3.44
-
-env:
-  FLUTTER_VERSION: '3.44.9'  # 当前 stable 3.44.9 / Dart 3.12.x
+name: Flutter Multi-Platform Build
 
 on:
   # 手动触发
   workflow_dispatch:
     inputs:
+      # 选择 Flutter 工具链（原先每个版本一个工作流文件，现在只需要填参数）
+      flutter_channel:
+        description: 'Flutter channel'
+        required: false
+        default: 'stable'
+        type: choice
+        options:
+          - stable
+          - beta
+          - master
+
+      flutter_version:
+        description: 'Flutter 版本（留空则使用该 channel 的最新版）'
+        required: false
+        default: '3.44.9'
+        type: string
+
       # 选择构建的平台
       build_android:
         description: '构建 Android'
@@ -83,8 +97,8 @@ jobs:
       - name: 🐦 安装 Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
+          channel: ${{ inputs.flutter_channel }}
+          flutter-version: ${{ inputs.flutter_version }}
           cache: true
 
       - name: 📝 Inject fallback
@@ -169,8 +183,8 @@ jobs:
       - name: 🐦 安装 Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
+          channel: ${{ inputs.flutter_channel }}
+          flutter-version: ${{ inputs.flutter_version }}
           cache: true
 
       - name: 🔧 关闭 Swift Package Manager
@@ -245,8 +259,8 @@ jobs:
       - name: 🐦 安装 Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
+          channel: ${{ inputs.flutter_channel }}
+          flutter-version: ${{ inputs.flutter_version }}
           cache: true
 
       - name: 🔧 关闭 Swift Package Manager
@@ -319,8 +333,8 @@ jobs:
       - name: 🐦 安装 Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
+          channel: ${{ inputs.flutter_channel }}
+          flutter-version: ${{ inputs.flutter_version }}
           cache: true
 
       - name: 📝 Inject fallback
@@ -486,8 +500,8 @@ jobs:
       - name: 🐦 安装 Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
+          channel: ${{ inputs.flutter_channel }}
+          flutter-version: ${{ inputs.flutter_version }}
           cache: true
 
       - name: 📝 Inject fallback

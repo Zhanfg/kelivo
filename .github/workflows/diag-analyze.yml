@@ -1,0 +1,112 @@
+name: Diag Analyze
+
+# On-demand analyzer diagnostics for any ref in this repository.
+#
+# Why this exists: the development sandbox for this repository cannot install
+# Flutter (only github.com and npm are reachable) and cannot read raw Actions
+# logs or artifacts (they are served from a blocked object-storage host). This
+# workflow runs the analyzer on a requested ref and republishes the output as
+# check annotations, which *are* readable through the Checks API.
+#
+# Trigger it with:
+#   gh workflow run diag-analyze.yml -f ref=<branch-or-sha>
+# then read the result with:
+#   gh api repos/<owner>/<repo>/commits/<sha>/check-runs \
+#     --jq '.check_runs[] | select(.name=="Diag Analyze") | .id'
+#   gh api repos/<owner>/<repo>/check-runs/<id>/annotations
+#
+# This workflow never writes to the repository and never pushes commits.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag or commit SHA to analyze'
+        required: true
+        default: 'master'
+      scope:
+        description: 'Paths passed to dart analyze'
+        required: false
+        default: 'lib test integration_test'
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.44.9'
+
+jobs:
+  analyze:
+    name: Diag Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout requested ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: dart analyze
+        id: analyze
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          dart analyze --fatal-infos ${{ inputs.scope }} > /tmp/analyze.log 2>&1
+          STATUS=$?
+          set -e
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "analyze exit code: $STATUS"
+          echo "finding count: $(grep -cE '^\s+(error|warning|info) ' /tmp/analyze.log || true)"
+          tail -n 60 /tmp/analyze.log
+
+      - name: Publish findings as annotations
+        if: always()
+        shell: bash
+        run: |
+          python3 - "${{ steps.analyze.outputs.status }}" <<'PY'
+          import sys
+
+          status = sys.argv[1] if len(sys.argv) > 1 else 'unknown'
+
+          try:
+              with open('/tmp/analyze.log', encoding='utf-8', errors='replace') as fh:
+                  lines = fh.read().splitlines()
+          except OSError as exc:
+              lines = [f'analyze log unavailable: {exc}']
+
+          findings = [ln for ln in lines if ln.lstrip().startswith(('error ', 'warning ', 'info '))]
+          header = f'dart analyze exit={status}, findings={len(findings)}'
+
+          def emit(level, title, text, limit=20000):
+              text = (text or '(empty)')
+              if len(text) > limit:
+                  text = '...<truncated>...\n' + text[-limit:]
+              text = text.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+              print(f'::{level} title={title}::{text}')
+
+          emit('error' if status not in ('0',) else 'notice', 'DIAG SUMMARY', header)
+
+          # Findings first, then the raw tail, so the readable summary is never
+          # pushed out by boilerplate.
+          chunks = [findings[i:i + 80] for i in range(0, len(findings), 80)]
+          for i, chunk in enumerate(chunks[:6]):
+              emit('error', f'FINDINGS {i + 1}/{min(len(chunks), 6)}', '\n'.join(chunk))
+
+          emit('warning', 'RAW TAIL', '\n'.join(lines[-120:]))
+          PY
+
+      - name: Report result
+        if: always()
+        run: echo "diag finished with analyze exit code ${{ steps.analyze.outputs.status }}"

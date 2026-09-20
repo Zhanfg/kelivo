@@ -74,20 +74,19 @@ class SettingsProvider extends ChangeNotifier {
   static const String _providerUngroupedPositionKey =
       'provider_ungrouped_position_v1'; // display index among groups
   static const String providerUngroupedGroupKey = '__ungrouped__';
+  // Keep first-party / broadly useful providers in the default catalogue.
+  // Legacy relay/partner entries remain loadable from persisted configs, but
+  // are intentionally not promoted to every new user.
   static const List<String> _builtInProviderKeysInOrder = [
+    'Kilo Free',
     'OpenAI',
-    'SiliconFlow',
     'Gemini',
+    'Claude',
     'OpenRouter',
-    'KelivoIN',
-    'Tensdaq',
+    'SiliconFlow',
     'DeepSeek',
-    'AIhubmix',
-    '随想AI中转站',
-    'MaruCode',
     'Aliyun',
     'Zhipu AI',
-    'Claude',
     'Grok',
     'ByteDance',
   ];
@@ -560,6 +559,22 @@ class SettingsProvider extends ChangeNotifier {
     if (existed != null) return existed;
     // Return a non-persisted, default-constructed config for read-only scenarios.
     return ProviderConfig.defaultsFor(key, displayName: defaultName);
+  }
+
+  /// Local-only installation identity used by FreeBuff's hosted device flow.
+  /// It deliberately lives in SettingsProvider because business-domain code
+  /// outside the frozen storage allowlist must not access SharedPreferences.
+  Future<String> getOrCreateFreeBuffFingerprint() async {
+    const key = 'oauth_freebuff_fingerprint_v1';
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString(key)?.trim();
+    if (existing != null && existing.startsWith('codebuff-cli-')) {
+      return existing;
+    }
+    final generated =
+        'codebuff-cli-${const Uuid().v4().replaceAll('-', '').substring(0, 12)}';
+    await prefs.setString(key, generated);
+    return generated;
   }
 
   String resolveOpenAIUpstreamModelId(String providerKey, String modelId) {
@@ -1547,12 +1562,11 @@ class SettingsProvider extends ChangeNotifier {
       } catch (_) {}
     }
     if (_providerConfigs.isEmpty) {
-      // Seed a couple of sensible defaults on first launch, but do not recreate
-      // providers implicitly during later reads (e.g., when switching chats).
-      ensureProviderConfig('KelivoIN', defaultName: 'KelivoIN');
-      ensureProviderConfig('Tensdaq', defaultName: 'Tensdaq');
-      ensureProviderConfig('SiliconFlow', defaultName: 'SiliconFlow');
-      ensureProviderConfig('AIhubmix', defaultName: 'AIhubmix');
+      // Seed only useful, non-promotional defaults on first launch. Kilo Free
+      // works anonymously. Other official providers remain available in the
+      // catalogue, but none are promoted by being silently pre-created.
+      // Legacy relay/partner providers are not recreated automatically.
+      ensureProviderConfig('Kilo Free', defaultName: 'Kilo Free');
       final seededConfigs = _providerConfigs.map(
         (key, config) => MapEntry(key, config.toJson()),
       );
@@ -6436,6 +6450,8 @@ class ProviderConfig {
     final k = key.toLowerCase();
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
     if (k.contains('kelivoin')) return 'https://text.pollinations.ai/openai';
+    if (k.contains('kilo')) return 'https://api.kilo.ai/api/gateway';
+    if (k.contains('pollinations')) return 'https://gen.pollinations.ai/v1';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
     if (k.contains('随想')) return 'https://sui-xiang.com/v1';
@@ -6471,12 +6487,11 @@ class ProviderConfig {
   static ProviderConfig defaultsFor(String key, {String? displayName}) {
     bool defaultEnabled(String k) {
       final s = k.toLowerCase();
-      if (s.contains('tensdaq')) return true;
+      if (s.contains('kilo')) return true;
       if (s.contains('openai')) return true;
       if (s.contains('gemini') || s.contains('google')) return true;
       if (s.contains('silicon')) return true;
       if (s.contains('openrouter')) return true;
-      if (s.contains('kelivoin')) return true;
       return false; // others disabled by default
     }
 
@@ -6536,6 +6551,64 @@ class ProviderConfig {
           claudePromptCachingEnabled: false,
         );
       case ProviderKind.openai:
+        // Kilo's Auto Free route is intentionally keyless and is the primary
+        // zero-configuration provider seeded for new installs.
+        if (lowerKey.contains('kilo')) {
+          return ProviderConfig(
+            id: key,
+            enabled: defaultEnabled(key),
+            name: displayName ?? key,
+            apiKey: '',
+            baseUrl: _defaultBase(key),
+            providerType: ProviderKind.openai,
+            chatPath: '/chat/completions',
+            useResponseApi: false,
+            models: const ['kilo-auto/free'],
+            modelOverrides: const {},
+            proxyEnabled: false,
+            proxyHost: '',
+            proxyPort: '8080',
+            proxyUsername: '',
+            proxyPassword: '',
+            multiKeyEnabled: false,
+            apiKeys: const [],
+            keyManagement: const KeyManagementConfig(),
+            aihubmixAppCodeEnabled: false,
+            balanceEnabled: false,
+            balanceApiPath: '/credits',
+            balanceResultPath: 'data.total_usage',
+            claudePromptCachingEnabled: false,
+          );
+        }
+        // Give the official OpenRouter entry a useful free router out of the
+        // box; users still provide their own OpenRouter account key.
+        if (lowerKey.contains('openrouter')) {
+          return ProviderConfig(
+            id: key,
+            enabled: defaultEnabled(key),
+            name: displayName ?? key,
+            apiKey: '',
+            baseUrl: _defaultBase(key),
+            providerType: ProviderKind.openai,
+            chatPath: '/chat/completions',
+            useResponseApi: false,
+            models: const ['openrouter/free'],
+            modelOverrides: const {},
+            proxyEnabled: false,
+            proxyHost: '',
+            proxyPort: '8080',
+            proxyUsername: '',
+            proxyPassword: '',
+            multiKeyEnabled: false,
+            apiKeys: const [],
+            keyManagement: const KeyManagementConfig(),
+            aihubmixAppCodeEnabled: false,
+            balanceEnabled: _defaultBalanceEnabled(key),
+            balanceApiPath: _defaultBalanceApiPath(key),
+            balanceResultPath: _defaultBalanceResultPath(key),
+            claudePromptCachingEnabled: false,
+          );
+        }
         // Special-case KelivoIN default models and overrides
         if (lowerKey.contains('kelivoin')) {
           return ProviderConfig(
@@ -6588,47 +6661,6 @@ class ProviderConfig {
             claudePromptCachingEnabled: false,
           );
         }
-        // Special-case SiliconFlow: prefill two partnered models
-        if (lowerKey.contains('silicon')) {
-          return ProviderConfig(
-            id: key,
-            enabled: defaultEnabled(key),
-            name: displayName ?? key,
-            apiKey: '',
-            baseUrl: _defaultBase(key),
-            providerType: ProviderKind.openai,
-            chatPath: '/chat/completions',
-            useResponseApi: false,
-            models: const ['THUDM/GLM-4-9B-0414', 'Qwen/Qwen3-8B'],
-            modelOverrides: const {
-              'THUDM/GLM-4-9B-0414': {
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['tool'],
-              },
-              'Qwen/Qwen3-8B': {
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['tool', 'reasoning'],
-              },
-            },
-            proxyEnabled: false,
-            proxyHost: '',
-            proxyPort: '8080',
-            proxyUsername: '',
-            proxyPassword: '',
-            multiKeyEnabled: false,
-            apiKeys: const [],
-            keyManagement: const KeyManagementConfig(),
-            aihubmixAppCodeEnabled: false,
-            balanceEnabled: _defaultBalanceEnabled(key),
-            balanceApiPath: _defaultBalanceApiPath(key),
-            balanceResultPath: _defaultBalanceResultPath(key),
-            claudePromptCachingEnabled: false,
-          );
-        }
         return ProviderConfig(
           id: key,
           enabled: defaultEnabled(key),
@@ -6648,7 +6680,7 @@ class ProviderConfig {
           multiKeyEnabled: false,
           apiKeys: const [],
           keyManagement: const KeyManagementConfig(),
-          aihubmixAppCodeEnabled: lowerKey.contains('aihubmix'),
+          aihubmixAppCodeEnabled: false,
           balanceEnabled: _defaultBalanceEnabled(key),
           balanceApiPath: _defaultBalanceApiPath(key),
           balanceResultPath: _defaultBalanceResultPath(key),

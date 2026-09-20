@@ -809,7 +809,14 @@ final class BusinessSettingsRouter {
   ) {
     final oauthProvider = payload['oauthProvider'];
     if (oauthProvider != null &&
-        !{'chatgpt', 'grok', 'kimi', 'claude'}.contains(oauthProvider)) {
+        !{
+          'chatgpt',
+          'grok',
+          'kimi',
+          'claude',
+          'freebuff',
+          'pollinations',
+        }.contains(oauthProvider)) {
       throw const FormatException('Invalid OAuth provider');
     }
     final credentials = payload['oauthCredentials'];
