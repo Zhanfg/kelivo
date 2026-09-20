@@ -1,0 +1,48 @@
+name: Temporary Dart format fix
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.9
+          cache: true
+      - run: flutter pub get
+      - name: Format exact CI offenders
+        run: |
+          dart format \
+            lib/features/home/services/message_builder_service.dart \
+            lib/features/story_runtime/mcp/story_mcp_profile_resolver.dart \
+            lib/features/story_runtime/ui/story_continuity_page.dart \
+            lib/features/story_runtime/voice/story_voice_playback_service.dart \
+            test/story_mcp_profile_test.dart \
+            test/story_runtime_assembler_test.dart \
+            test/story_voice_routing_test.dart
+      - name: Commit formatter output
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            lib/features/home/services/message_builder_service.dart \
+            lib/features/story_runtime/mcp/story_mcp_profile_resolver.dart \
+            lib/features/story_runtime/ui/story_continuity_page.dart \
+            lib/features/story_runtime/voice/story_voice_playback_service.dart \
+            test/story_mcp_profile_test.dart \
+            test/story_runtime_assembler_test.dart \
+            test/story_voice_routing_test.dart
+          git commit -m "style(story): apply Dart formatter"
+          git push origin HEAD:${{ github.ref_name }}
