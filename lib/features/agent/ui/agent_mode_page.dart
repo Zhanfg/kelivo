@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -13,6 +15,7 @@ import '../../../theme/app_font_weights.dart';
 import '../models/agent_task.dart';
 import '../providers/agent_task_provider.dart';
 import '../services/agent_context_bridge.dart';
+import '../services/agent_task_runner.dart';
 
 class AgentModePage extends StatefulWidget {
   const AgentModePage({super.key});
@@ -60,6 +63,7 @@ class _AgentModePageState extends State<AgentModePage> {
       );
 
       if (!mounted) return;
+      unawaited(context.read<AgentTaskRunner>().run(task.id));
       _taskController.clear();
       _taskFocus.requestFocus();
       ScaffoldMessenger.of(context).showSnackBar(
