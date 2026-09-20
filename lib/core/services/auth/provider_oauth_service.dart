@@ -42,6 +42,22 @@ class ProviderOAuthService extends ChangeNotifier {
 
   ProviderConfig? _current(String id) => _settings?.providerConfigs[id];
 
+  Future<String> _freeBuffFingerprint() {
+    final settings = _settings;
+    if (settings == null) {
+      throw StateError('OAuth settings are unavailable');
+    }
+    return settings.getOrCreateFreeBuffFingerprint();
+  }
+
+  ProviderOAuthAdapter _adapter(OAuthProvider provider) =>
+      ProviderOAuthAdapter.forProvider(
+        provider,
+        freeBuffFingerprint: provider == OAuthProvider.freebuff
+            ? _freeBuffFingerprint
+            : null,
+      );
+
   ProviderConfig _requireCurrentSession(ProviderConfig original) {
     final current = _current(original.id);
     if (current == null ||
@@ -142,7 +158,7 @@ class ProviderOAuthService extends ChangeNotifier {
         (Uri uri) => launchUrl(uri, mode: LaunchMode.externalApplication);
     try {
       final credentials = await Future.any<ProviderOAuthCredentials>([
-        ProviderOAuthAdapter.forProvider(provider).login(
+        _adapter(provider).login(
           OAuthWire(client),
           cancellation,
           (prompt) async {
@@ -200,9 +216,7 @@ class ProviderOAuthService extends ChangeNotifier {
     if (credentials != null) {
       final client = _clientFactory(config);
       try {
-        await ProviderOAuthAdapter.forProvider(
-          config.oauthProvider!,
-        ).logout(OAuthWire(client), credentials);
+        await _adapter(config.oauthProvider!).logout(OAuthWire(client), credentials);
       } catch (_) {
         // Remote revocation is best-effort; always allow local sign-out.
       } finally {
@@ -268,9 +282,7 @@ class ProviderOAuthService extends ChangeNotifier {
     final settings = _settings!;
     final client = _clientFactory(original);
     try {
-      final refreshed = await ProviderOAuthAdapter.forProvider(
-        original.oauthProvider!,
-      ).refresh(OAuthWire(client), original.oauthCredentials!);
+      final refreshed = await _adapter(original.oauthProvider!).refresh(OAuthWire(client), original.oauthCredentials!);
       final current = _current(original.id);
       if (!identical(settings, _settings) ||
           current?.oauthCredentials?.sessionId !=
@@ -356,9 +368,7 @@ class ProviderOAuthService extends ChangeNotifier {
   Future<List<ModelInfo>> models(ProviderConfig original) => _authenticated(
     original,
     (wire, config) async {
-      final rows = await ProviderOAuthAdapter.forProvider(
-        config.oauthProvider!,
-      ).models(wire, config.oauthCredentials!);
+      final rows = await _adapter(config.oauthProvider!).models(wire, config.oauthCredentials!);
       final ids = <String>{};
       return [
         for (final row in rows)
@@ -465,9 +475,7 @@ class ProviderOAuthService extends ChangeNotifier {
     if (_usageRequests[key] case final pending?) return pending;
     final request = _authenticated(
       original,
-      (wire, config) => ProviderOAuthAdapter.forProvider(
-        config.oauthProvider!,
-      ).usage(wire, config.oauthCredentials!),
+      (wire, config) => _adapter(config.oauthProvider!).usage(wire, config.oauthCredentials!),
     );
     _usageRequests[key] = request;
     try {
@@ -561,9 +569,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
             ..followRedirects = false
             ..headers.addAll(request.headers)
             ..bodyBytes = body;
-      final authHeaders = ProviderOAuthAdapter.forProvider(
-        config.oauthProvider!,
-      ).headers(config.oauthCredentials!);
+      final authHeaders = _adapter(config.oauthProvider!).headers(config.oauthCredentials!);
       final existingBeta = result.headers['anthropic-beta'];
       final existingContentType = result.headers['content-type'];
       for (final name in authHeaders.keys) {
