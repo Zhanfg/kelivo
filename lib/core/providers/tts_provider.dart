@@ -17,6 +17,13 @@ import '../services/mobile_background.dart';
 import '../services/tts/tts_playback_models.dart';
 import '../services/tts/tts_text_chunker.dart';
 
+typedef NetworkTtsChunkServiceResolver =
+    TtsServiceOptions Function(
+      TtsServiceOptions service,
+      List<TtsTextChunk> chunks,
+      int index,
+    );
+
 String ttsAudioFileExtensionForMime(String? mime) {
   switch ((mime ?? '').toLowerCase()) {
     case 'audio/mpeg':
@@ -81,6 +88,8 @@ class TtsProvider extends ChangeNotifier {
   String? _error;
   String? _lastReplayContent;
   TtsServiceOptions? _lastReplayNetworkService;
+  NetworkTtsChunkServiceResolver? _lastReplayNetworkChunkServiceResolver;
+  NetworkTtsChunkServiceResolver? _networkChunkServiceResolver;
   bool _lastReplayUsedLocal = false;
 
   // Settings
@@ -544,8 +553,14 @@ class TtsProvider extends ChangeNotifier {
     TtsServiceOptions service,
     String text, {
     bool flush = true,
+    NetworkTtsChunkServiceResolver? chunkServiceResolver,
   }) async {
-    await _speakQueued(text, networkService: service, flush: flush);
+    await _speakQueued(
+      text,
+      networkService: service,
+      flush: flush,
+      networkChunkServiceResolver: chunkServiceResolver,
+    );
   }
 
   Future<void> _speakQueued(
@@ -555,6 +570,7 @@ class TtsProvider extends ChangeNotifier {
     bool flush = true,
     bool reuseResolvedNetworkAudio = false,
     bool waitForCompletion = true,
+    NetworkTtsChunkServiceResolver? networkChunkServiceResolver,
   }) async {
     assert(networkService == null || localBackend == null);
     final content = _stripMarkdown(text).trim();
@@ -562,6 +578,8 @@ class TtsProvider extends ChangeNotifier {
     if (flush) await _stopPlaybackEngines();
     _lastReplayContent = content;
     _lastReplayNetworkService = networkService;
+    _lastReplayNetworkChunkServiceResolver = networkChunkServiceResolver;
+    _networkChunkServiceResolver = networkChunkServiceResolver;
     _lastReplayUsedLocal = localBackend != null;
 
     final session = ++_sessionId;
@@ -723,6 +741,7 @@ class TtsProvider extends ChangeNotifier {
           _cacheNetworkAudioForReplay &&
           networkService != null &&
           _hasCompleteResolvedNetworkAudio(),
+      networkChunkServiceResolver: _lastReplayNetworkChunkServiceResolver,
     );
   }
 
@@ -955,8 +974,12 @@ class TtsProvider extends ChangeNotifier {
     return _networkCache.putIfAbsent(index, () {
       final resolved = _resolvedNetworkChunks[index];
       if (resolved != null) return Future<NetworkTtsResult>.value(resolved);
+      final resolver = _networkChunkServiceResolver;
+      final effectiveService = resolver == null
+          ? service
+          : resolver(service, List<TtsTextChunk>.unmodifiable(_chunks), index);
       return NetworkTtsService.synthesize(
-        options: service,
+        options: effectiveService,
         text: _chunks[index].text,
         cancelled: () => session != _sessionId,
       );
@@ -1258,6 +1281,8 @@ class TtsProvider extends ChangeNotifier {
     _usingLocal = false;
     _lastReplayContent = null;
     _lastReplayNetworkService = null;
+    _lastReplayNetworkChunkServiceResolver = null;
+    _networkChunkServiceResolver = null;
     _lastReplayUsedLocal = false;
     _timeline = TtsPlaybackTimeline(const <TtsTextChunk>[]);
     _playbackState = TtsPlaybackState(speed: _playbackState.speed);
