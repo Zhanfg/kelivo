@@ -123,8 +123,7 @@ jobs:
             --no-pub \
             --target-platform android-arm64 \
             --split-per-abi \
-            --split-debug-info=build/symbols/android \
-            --analyze-size
+            --split-debug-info=build/symbols/android
 
       - name: Package APK
         shell: bash
