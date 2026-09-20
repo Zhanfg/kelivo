@@ -41,6 +41,7 @@ final class StoryRuntimePromptResult {
     required this.memoryVersion,
     required this.visibleStoryMemoryCount,
     required this.activeSkillIds,
+    required this.activeWorldBookIds,
     required this.mcpProfileId,
     required this.allowedMcpToolNames,
     required this.allowedMcpServerIds,
@@ -60,6 +61,7 @@ final class StoryRuntimePromptResult {
   final int memoryVersion;
   final int visibleStoryMemoryCount;
   final Set<String> activeSkillIds;
+  final Set<String> activeWorldBookIds;
   final String? mcpProfileId;
   final Set<String> allowedMcpToolNames;
   final Set<String> allowedMcpServerIds;
@@ -311,6 +313,7 @@ final class StoryRuntimePromptService {
         memoryVersion: tree.memoryVersion,
         visibleStoryMemoryCount: storyScopedMemory.length,
         activeSkillIds: Set.unmodifiable(resolvedSkillIds),
+        activeWorldBookIds: Set.unmodifiable(assembly.skills.worldBookIds),
         mcpProfileId: mcpExposure?.profileId,
         allowedMcpToolNames: mcpExposure?.allowedToolNames ?? const <String>{},
         allowedMcpServerIds: mcpExposure?.allowedServerIds ?? const <String>{},
