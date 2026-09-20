@@ -839,6 +839,7 @@ class MyApp extends StatelessWidget {
             assistants: ctx.read<AssistantProvider>(),
             chat: ctx.read<ChatService>(),
             contextMaterializer: ctx.read<AgentContextMaterializer>(),
+            settings: ctx.read<SettingsProvider>(),
             runtimeProvider: ctx.read<WorkspaceRuntimeProvider>(),
             environment: ctx.read<EnvironmentProvider>(),
             piInstaller: ctx.read<PiBinaryInstaller>(),
