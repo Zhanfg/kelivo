@@ -141,6 +141,7 @@ class AgentModelBridge {
   }
 
   Future<void> _handle(HttpRequest request, String token) async {
+    var streamingResponse = false;
     try {
       if (!_authorized(request, token)) {
         await _json(
@@ -216,12 +217,13 @@ class AgentModelBridge {
       );
 
       if (body['stream'] == true) {
+        streamingResponse = true;
         await _streamCompletion(request.response, modelRequest);
       } else {
         await _complete(request.response, modelRequest);
       }
     } catch (error) {
-      if (request.response.headersSent) {
+      if (streamingResponse) {
         try {
           request.response.write(
             'data: ' +
