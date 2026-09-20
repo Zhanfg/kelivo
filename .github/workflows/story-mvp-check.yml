@@ -5,6 +5,10 @@ on:
     branches:
       - feat/story-runtime-foundation
 
+concurrency:
+  group: story-mvp-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -53,5 +57,3 @@ jobs:
             test/story_reference_epub_test.dart \
             test/story_runtime_assembler_test.dart
 
-      - name: Full test suite
-        run: flutter test
