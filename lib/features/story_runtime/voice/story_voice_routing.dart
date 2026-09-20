@@ -181,7 +181,9 @@ final class StoryVoiceResolver {
       persona: assignment.personaDescription,
       intent: intent,
     );
-    final contextInstruction = StoryVoiceContextCompiler.instruction(context);
+    final contextInstruction = service is MimoTtsOptions
+        ? StoryVoiceContextCompiler.instruction(context)
+        : '';
     final instruction = _mergeInstructions(
       deliveryInstruction,
       contextInstruction,
@@ -189,7 +191,7 @@ final class StoryVoiceResolver {
     final routed = _routeService(
       service,
       assignment: assignment,
-      instruction: instruction,
+      instruction: deliveryInstruction,
     );
     final modelIdentity = switch (routed) {
       MimoTtsOptions() => routed.model,
@@ -211,6 +213,26 @@ final class StoryVoiceResolver {
         deliveryInstruction: deliveryInstruction,
         context: context,
       ),
+    );
+  }
+
+  MimoTtsOptions withMimoContext({
+    required MimoTtsOptions service,
+    StoryVoiceContextWindow? context,
+  }) {
+    final contextInstruction = StoryVoiceContextCompiler.instruction(context);
+    if (contextInstruction.isEmpty) return service;
+    return MimoTtsOptions(
+      id: service.id,
+      enabled: service.enabled,
+      name: service.name,
+      apiKey: service.apiKey,
+      baseUrl: service.baseUrl,
+      model: service.model,
+      voice: service.voice,
+      instruction: _mergeInstructions(service.instruction, contextInstruction),
+      stream: service.stream,
+      optimizeTextPreview: service.optimizeTextPreview,
     );
   }
 
