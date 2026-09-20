@@ -69,7 +69,8 @@ jobs:
             --no-pub \
             --target-platform android-arm64 \
             --split-per-abi \
-            --split-debug-info=build/symbols/android
+            --split-debug-info=build/symbols/android \
+            --analyze-size
 
       - name: Report size
         shell: bash
