@@ -58,7 +58,8 @@ class AgentInteractionBroker extends ChangeNotifier {
     final methodName = event['method']?.toString() ?? '';
     final method = AgentInteractionMethod.values.firstWhere(
       (candidate) => candidate.name == methodName,
-      orElse: () => throw StateError('unsupported_agent_interaction:$methodName'),
+      orElse: () =>
+          throw StateError('unsupported_agent_interaction:$methodName'),
     );
     if (id.isEmpty) throw StateError('agent_interaction_missing_id');
 
