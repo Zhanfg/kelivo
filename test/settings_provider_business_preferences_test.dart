@@ -105,7 +105,19 @@ void main() {
         'Grok',
         'ByteDance',
       ];
-      const migratedOrder = <String>[...legacyOrder, '随想AI中转站', 'MaruCode'];
+      const migratedOrder = <String>[
+        'Gemini',
+        'OpenAI',
+        'SiliconFlow',
+        'OpenRouter',
+        'DeepSeek',
+        'Aliyun',
+        'Zhipu AI',
+        'Claude',
+        'Grok',
+        'ByteDance',
+        'Kilo Free',
+      ];
       await repository.replaceSnapshot(
         BusinessSettingsRouter.normalizeAndRoute({
           'providers_order_v1': legacyOrder,
@@ -116,15 +128,15 @@ void main() {
       await settings.loaded;
       expect(settings.providersOrder, migratedOrder);
 
-      final suixiang = settings.getProviderConfig('随想AI中转站');
-      expect(suixiang.enabled, isFalse);
-      expect(suixiang.providerType, ProviderKind.openai);
-      expect(suixiang.baseUrl, 'https://sui-xiang.com/v1');
-
-      final maruCode = settings.getProviderConfig('MaruCode');
-      expect(maruCode.enabled, isFalse);
-      expect(maruCode.providerType, ProviderKind.openai);
-      expect(maruCode.baseUrl, 'https://api.muteki.site/v1');
+      for (final removed in [
+        'KelivoIN',
+        'Tensdaq',
+        'AIhubmix',
+        '随想AI中转站',
+        'MaruCode',
+      ]) {
+        expect(settings.providersOrder, isNot(contains(removed)));
+      }
 
       final reloaded = SettingsProvider(BusinessPreferences(repository));
       await reloaded.loaded;
