@@ -194,7 +194,7 @@ class PiRpcSession {
   }
 
   Future<void> _write(Map<String, dynamic> message) {
-    final bytes = Uint8List.fromList(utf8.encode(jsonEncode(message) + '\n'));
+    final bytes = Uint8List.fromList(utf8.encode('${jsonEncode(message)}\n'));
     return _runtime.writeStdin(_runId, bytes);
   }
 
