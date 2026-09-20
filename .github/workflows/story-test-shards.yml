@@ -5,7 +5,7 @@ on:
     branches: [master]
 
 concurrency:
-  group: story-test-shards-${{ github.event.pull_request.number }}-${{ github.sha }}
+  group: story-test-shards-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 env:
@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5]
+        shard: [0, 1]
 
     steps:
       - name: Checkout
@@ -39,13 +39,12 @@ jobs:
         shell: bash
         env:
           SHARD: ${{ matrix.shard }}
-          SHARD_COUNT: '6'
+          SHARD_COUNT: '2'
         run: |
           set -euo pipefail
           mapfile -t all_files < <(
             find test -type f -name '*_test.dart' | sort \
-              | grep -v '^test/core/services/backup/backup_progress_kernel_test.dart$' \
-              | grep -v '^test/core/services/backup/restore_bundle_staging_test.dart$'
+              | grep -E '(^test/story|/story_runtime/|story_)'
           )
           selected=()
           for i in "${!all_files[@]}"; do
@@ -54,7 +53,7 @@ jobs:
             fi
           done
 
-          echo "Shard ${SHARD}/${SHARD_COUNT}: ${#selected[@]} non-baseline test files"
+          echo "Shard ${SHARD}/${SHARD_COUNT}: ${#selected[@]} Story-focused test files"
           printf '%s\n' "${selected[@]}"
 
           set +e
