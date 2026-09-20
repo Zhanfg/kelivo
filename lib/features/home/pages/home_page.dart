@@ -72,6 +72,10 @@ import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
 import '../controllers/home_page_controller.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
+import '../models/workspace_mode.dart';
+import '../providers/workspace_mode_provider.dart';
+import '../widgets/workspace_mode_selector.dart';
+import '../../agent/ui/agent_mode_page.dart';
 import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -467,6 +471,8 @@ class _CompressModelPickerRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final agentMode =
+        context.watch<WorkspaceModeProvider>().mode == WorkspaceMode.agent;
     final resolved = resolveCompressContextModel(
       compressProvider: settings.compressModelProvider,
       compressModelId: settings.compressModelId,
@@ -996,6 +1002,7 @@ class _HomePageState extends State<HomePage>
         providerName: modelInfo.providerName,
         modelDisplay: modelInfo.modelDisplay,
         cs: cs,
+        agentMode: agentMode,
       );
     }
 
@@ -1005,6 +1012,7 @@ class _HomePageState extends State<HomePage>
       providerName: modelInfo.providerName,
       modelDisplay: modelInfo.modelDisplay,
       cs: cs,
+      agentMode: agentMode,
     );
   }
 
@@ -1014,6 +1022,7 @@ class _HomePageState extends State<HomePage>
     required String? providerName,
     required String? modelDisplay,
     required ColorScheme cs,
+    required bool agentMode,
   }) {
     final allSelected = _controller.allSelectableMessagesSelected;
 
@@ -1023,6 +1032,8 @@ class _HomePageState extends State<HomePage>
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
+      titleOverride: const WorkspaceModeTitle(),
+      showChatActions: !agentMode,
       providerName: providerName,
       modelDisplay: modelDisplay,
       onToggleDrawer: () => _drawerController.toggle(),
@@ -1060,7 +1071,7 @@ class _HomePageState extends State<HomePage>
           _controller.exitGlobalSearchMode(clearQuery: true),
       onOpenGlobalSearchResult: (convId, msgId) => _controller
           .openGlobalSearchResult(conversationId: convId, messageId: msgId),
-      appBarOverride: _controller.selecting
+      appBarOverride: !agentMode && _controller.selecting
           ? ChatSelectionAppBar(
               selectedCount: _controller.selectedCount,
               allSelected: allSelected,
@@ -1073,7 +1084,9 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
-      body: _wrapWithDropTarget(_buildMobileBody(context, cs)),
+      body: agentMode
+          ? const AgentModePage()
+          : _wrapWithDropTarget(_buildMobileBody(context, cs)),
     );
   }
 
@@ -1154,6 +1167,7 @@ class _HomePageState extends State<HomePage>
     required String? providerName,
     required String? modelDisplay,
     required ColorScheme cs,
+    required bool agentMode,
   }) {
     _controller.initDesktopUi();
 
@@ -1164,6 +1178,8 @@ class _HomePageState extends State<HomePage>
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
+      titleOverride: const WorkspaceModeTitle(),
+      showChatActions: !agentMode,
       providerName: providerName,
       modelDisplay: modelDisplay,
       tabletSidebarOpen: _controller.tabletSidebarOpen,
@@ -1203,7 +1219,7 @@ class _HomePageState extends State<HomePage>
       onRightSidebarWidthChanged: _controller.updateRightSidebarWidth,
       onRightSidebarWidthChangeEnd: _controller.saveRightSidebarWidth,
       buildAssistantBackground: _buildAssistantBackground,
-      appBarOverride: _controller.selecting
+      appBarOverride: !agentMode && _controller.selecting
           ? ChatSelectionAppBar(
               selectedCount: _controller.selectedCount,
               allSelected: allSelected,
@@ -1216,7 +1232,9 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
-      body: _wrapWithDropTarget(_buildTabletBody(context, cs)),
+      body: agentMode
+          ? const AgentModePage()
+          : _wrapWithDropTarget(_buildTabletBody(context, cs)),
     );
   }
 
