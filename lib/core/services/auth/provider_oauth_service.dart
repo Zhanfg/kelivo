@@ -576,9 +576,9 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
             ..followRedirects = false
             ..headers.addAll(request.headers)
             ..bodyBytes = body;
-      final authHeaders = _adapter(
-        config.oauthProvider!,
-      ).headers(config.oauthCredentials!);
+      final authHeaders = service
+          ._adapter(config.oauthProvider!)
+          .headers(config.oauthCredentials!);
       final existingBeta = result.headers['anthropic-beta'];
       final existingContentType = result.headers['content-type'];
       for (final name in authHeaders.keys) {
