@@ -35,6 +35,12 @@ jobs:
           flutter-version: ${{ inputs.flutter_version }}
           cache: true
 
+      - name: Cache arm64 PRoot JNI
+        uses: actions/cache@v4
+        with:
+          path: android/app/src/main/jniLibs/arm64-v8a
+          key: ${{ runner.os }}-proot-jni-arm64-${{ hashFiles('tool/fetch_proot.sh', 'tool/proot_checksums.txt') }}
+
       - name: Inject fallback
         shell: bash
         run: |
@@ -47,6 +53,8 @@ jobs:
         run: flutter pub get
 
       - name: Build arm64 APK
+        env:
+          KELIVO_ANDROID_ABIS: arm64-v8a
         run: |
           flutter build apk \
             --release \
