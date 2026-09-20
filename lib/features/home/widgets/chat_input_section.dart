@@ -257,7 +257,7 @@ class ChatInputSection extends StatelessWidget {
       onReorderQueuedInput: onReorderQueuedInput,
       showToolsButton: _shouldShowToolsButton(pk, mid),
       toolsActive: _isToolsActive(context, a, workspaceBound),
-      showQuickPhraseButton: _hasQuickPhrases(context, a),
+      showQuickPhraseButton: storyMode || _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
       // OCR button: show on desktop for mobile layout, always check settings for tablet layout
