@@ -820,9 +820,8 @@ class MyApp extends StatelessWidget {
           ),
         ),
         Provider<AgentContextMaterializer>(
-          create: (ctx) => AgentContextMaterializer(
-            bridge: ctx.read<AgentContextBridge>(),
-          ),
+          create: (ctx) =>
+              AgentContextMaterializer(bridge: ctx.read<AgentContextBridge>()),
         ),
         Provider<PiBinaryInstaller>(
           create: (ctx) => PiBinaryInstaller(

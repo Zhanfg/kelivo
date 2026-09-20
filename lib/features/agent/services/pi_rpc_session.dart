@@ -7,10 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
 
 class PiRpcSession {
-  PiRpcSession._({
-    required this._runtime,
-    required this._runId,
-  });
+  PiRpcSession._({required this._runtime, required this._runId});
 
   final WorkspaceStdioRuntime _runtime;
   final String _runId;

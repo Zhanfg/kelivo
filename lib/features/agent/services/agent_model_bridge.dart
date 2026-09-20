@@ -41,10 +41,7 @@ class AgentModelRequest {
 }
 
 class AgentModelBridgeEndpoint {
-  const AgentModelBridgeEndpoint({
-    required this.baseUrl,
-    required this.token,
-  });
+  const AgentModelBridgeEndpoint({required this.baseUrl, required this.token});
 
   final String baseUrl;
   final String token;
@@ -101,24 +98,22 @@ class AgentModelBridge {
     await configDir.create(recursive: true);
     final modelsFile = File(p.join(configDir.path, 'models.json'));
     await modelsFile.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(
-        <String, dynamic>{
-          'providers': <String, dynamic>{
-            'kelivo': <String, dynamic>{
-              'baseUrl': endpoint.baseUrl,
-              'api': 'openai-completions',
-              'apiKey': endpoint.token,
-              'authHeader': true,
-              'models': <Map<String, dynamic>>[
-                <String, dynamic>{
-                  'id': 'current',
-                  'name': 'KELIVO Current Model',
-                },
-              ],
-            },
+      const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
+        'providers': <String, dynamic>{
+          'kelivo': <String, dynamic>{
+            'baseUrl': endpoint.baseUrl,
+            'api': 'openai-completions',
+            'apiKey': endpoint.token,
+            'authHeader': true,
+            'models': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 'current',
+                'name': 'KELIVO Current Model',
+              },
+            ],
           },
         },
-      ),
+      }),
       flush: true,
     );
   }
@@ -159,34 +154,26 @@ class AgentModelBridge {
 
       final path = request.uri.path;
       if (request.method == 'GET' && path == '/v1/models') {
-        await _json(
-          request.response,
-          HttpStatus.ok,
-          <String, dynamic>{
-            'object': 'list',
-            'data': <Map<String, dynamic>>[
-              <String, dynamic>{
-                'id': 'current',
-                'object': 'model',
-                'owned_by': 'kelivo',
-              },
-            ],
-          },
-        );
+        await _json(request.response, HttpStatus.ok, <String, dynamic>{
+          'object': 'list',
+          'data': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 'current',
+              'object': 'model',
+              'owned_by': 'kelivo',
+            },
+          ],
+        });
         return;
       }
 
       if (request.method != 'POST' || path != '/v1/chat/completions') {
-        await _json(
-          request.response,
-          HttpStatus.notFound,
-          <String, dynamic>{
-            'error': <String, dynamic>{
-              'message': 'Not found',
-              'type': 'invalid_request_error',
-            },
+        await _json(request.response, HttpStatus.notFound, <String, dynamic>{
+          'error': <String, dynamic>{
+            'message': 'Not found',
+            'type': 'invalid_request_error',
           },
-        );
+        });
         return;
       }
 
@@ -207,8 +194,7 @@ class AgentModelBridge {
         requestId: requestId,
         conversationId: conversationId,
         thinkingBudget: assistant?.thinkingBudget,
-        temperature:
-            assistant?.temperature ?? _double(body['temperature']),
+        temperature: assistant?.temperature ?? _double(body['temperature']),
         topP: assistant?.topP ?? _double(body['top_p']),
         maxTokens:
             assistant?.maxTokens ??
@@ -259,11 +245,7 @@ class AgentModelBridge {
   ) async {
     response.statusCode = HttpStatus.ok;
     response.headers
-      ..contentType = ContentType(
-        'text',
-        'event-stream',
-        charset: 'utf-8',
-      )
+      ..contentType = ContentType('text', 'event-stream', charset: 'utf-8')
       ..set(HttpHeaders.cacheControlHeader, 'no-cache')
       ..set(HttpHeaders.connectionHeader, 'keep-alive');
 
@@ -443,26 +425,22 @@ class AgentModelBridge {
         ],
     };
 
-    await _json(
-      response,
-      HttpStatus.ok,
-      <String, dynamic>{
-        'id': 'chatcmpl-${const Uuid().v4().replaceAll('-', '')}',
-        'object': 'chat.completion',
-        'created': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        'model': 'current',
-        'choices': <Map<String, dynamic>>[
-          <String, dynamic>{
-            'index': 0,
-            'message': message,
-            'finish_reason':
-                finishReason ??
-                _finishReason(null, hasToolCalls: toolCalls.isNotEmpty),
-          },
-        ],
-        if (usage != null) 'usage': _usage(usage!),
-      },
-    );
+    await _json(response, HttpStatus.ok, <String, dynamic>{
+      'id': 'chatcmpl-${const Uuid().v4().replaceAll('-', '')}',
+      'object': 'chat.completion',
+      'created': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'model': 'current',
+      'choices': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'index': 0,
+          'message': message,
+          'finish_reason':
+              finishReason ??
+              _finishReason(null, hasToolCalls: toolCalls.isNotEmpty),
+        },
+      ],
+      if (usage != null) 'usage': _usage(usage!),
+    });
   }
 
   static Stream<StreamChunk> _defaultStream(AgentModelRequest request) {
@@ -520,10 +498,7 @@ class AgentModelBridge {
     };
   }
 
-  static String _finishReason(
-    String? value, {
-    required bool hasToolCalls,
-  }) {
+  static String _finishReason(String? value, {required bool hasToolCalls}) {
     if (hasToolCalls) return 'tool_calls';
     final normalized = value?.trim().toLowerCase();
     return switch (normalized) {
@@ -535,7 +510,9 @@ class AgentModelBridge {
   }
 
   static bool _authorized(HttpRequest request, String token) {
-    final authorization = request.headers.value(HttpHeaders.authorizationHeader);
+    final authorization = request.headers.value(
+      HttpHeaders.authorizationHeader,
+    );
     return authorization == 'Bearer $token';
   }
 

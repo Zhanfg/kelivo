@@ -157,12 +157,7 @@ class AgentTaskRunner {
           for (final skill in materializedContext.skillMounts)
             skill.guestDirectory,
         ],
-        extraArgs: const <String>[
-          '--provider',
-          'kelivo',
-          '--model',
-          'current',
-        ],
+        extraArgs: const <String>['--provider', 'kelivo', '--model', 'current'],
         mounts: mounts,
         environment: <String, String>{
           ...execution.variables,

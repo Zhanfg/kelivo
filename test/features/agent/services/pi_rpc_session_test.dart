@@ -74,7 +74,8 @@ void main() {
   });
 }
 
-class _FakeStdioRuntime extends WorkspaceRuntime implements WorkspaceStdioRuntime {
+class _FakeStdioRuntime extends WorkspaceRuntime
+    implements WorkspaceStdioRuntime {
   final StreamController<CommandEvent> _events =
       StreamController<CommandEvent>.broadcast();
 
