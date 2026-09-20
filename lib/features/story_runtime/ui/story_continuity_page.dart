@@ -269,8 +269,9 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
     final tree = _tree;
     if (tree == null || _busy) return;
     final source = tree.worldlineById(checkpoint.worldlineId);
-    if (source == null || source.status == StoryWorldlineStatus.archived)
+    if (source == null || source.status == StoryWorldlineStatus.archived) {
       return;
+    }
 
     final sourceTitle = _conversationLabel(source.conversationId);
     final confirmed = await showDialog<bool>(
@@ -295,7 +296,7 @@ class _StoryContinuityPageState extends State<StoryContinuityPage> {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
 
     final chatService = context.read<ChatService>();
     await _run(() async {
