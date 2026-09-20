@@ -110,8 +110,8 @@ class AgentTaskRunner {
       final materializedContext = await contextMaterializer.materialize(
         taskId: task.id,
         assistantId: task.assistantId,
-        skillIds: assistant?.skillIds.toSet(),
-        mcpServerIds: conversation?.mcpServerIds?.toSet(),
+        skillIds: assistant?.skillIds?.toSet(),
+        mcpServerIds: conversation?.mcpServerIds.toSet(),
       );
 
       await settings.loaded;
