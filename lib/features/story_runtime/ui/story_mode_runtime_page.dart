@@ -12,6 +12,7 @@ import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
 import 'story_conversation_mode_control.dart';
 import 'story_continuity_page.dart';
+import 'story_mcp_profile_page.dart';
 import 'story_native_settings_widgets.dart';
 
 /// Product-facing Story behavior settings.
@@ -247,6 +248,24 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                           : () => Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => StoryContinuityPage(
+                                  conversationId: selectedId,
+                                ),
+                              ),
+                            ),
+                    ),
+                    StoryNativeRow(
+                      title: 'Story MCP Profiles',
+                      subtitle: tr(
+                        '为当前故事收窄模型可见的 MCP 服务器与工具路由。',
+                        'Narrow model-visible MCP servers and tool routes for this story.',
+                      ),
+                      icon: Lucide.Globe,
+                      enabled: !_busy && selectedId != null,
+                      onTap: selectedId == null
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => StoryMcpProfilePage(
                                   conversationId: selectedId,
                                 ),
                               ),
