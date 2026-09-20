@@ -86,6 +86,8 @@ import 'features/home/services/tool_approval_service.dart';
 import 'features/agent/providers/agent_task_provider.dart';
 import 'features/agent/services/agent_context_bridge.dart';
 import 'features/agent/services/agent_task_journal.dart';
+import 'features/agent/services/pi_binary_installer.dart';
+import 'features/agent/services/agent_task_runner.dart';
 import 'features/home/providers/workspace_mode_provider.dart';
 import 'utils/app_directories.dart';
 import 'utils/platform_utils.dart';
@@ -814,6 +816,23 @@ class MyApp extends StatelessWidget {
             memory: ctx.read<MemoryProviderV2>(),
             skills: ctx.read<SkillsService>(),
             mcp: ctx.read<McpProvider>(),
+          ),
+        ),
+        Provider<PiBinaryInstaller>(
+          create: (ctx) => PiBinaryInstaller(
+            runtimeProvider: ctx.read<WorkspaceRuntimeProvider>(),
+            environment: ctx.read<EnvironmentProvider>(),
+          ),
+        ),
+        Provider<AgentTaskRunner>(
+          lazy: false,
+          create: (ctx) => AgentTaskRunner(
+            tasks: ctx.read<AgentTaskProvider>(),
+            journal: ctx.read<AgentTaskJournal>(),
+            workspaces: ctx.read<WorkspaceProvider>(),
+            runtimeProvider: ctx.read<WorkspaceRuntimeProvider>(),
+            environment: ctx.read<EnvironmentProvider>(),
+            piInstaller: ctx.read<PiBinaryInstaller>(),
           ),
         ),
         ProxyProvider<_WorkspaceStackHolder, EnvironmentManager?>(
