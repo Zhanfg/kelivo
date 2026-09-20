@@ -12,6 +12,8 @@ on:
       - "android/**"
       - "tool/**"
       - "pubspec.yaml"
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 concurrency:
