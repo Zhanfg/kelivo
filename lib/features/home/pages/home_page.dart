@@ -49,6 +49,7 @@ import '../../chat/widgets/chat_assistant_background.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../story_runtime/ui/story_conversation_mode_control.dart';
+import '../../story_runtime/context/story_context_resource_store.dart';
 import '../../story_runtime/ui/story_narrative_view.dart';
 import '../../provider/pages/providers_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
@@ -2160,7 +2161,36 @@ class _HomePageState extends State<HomePage>
         ? quickPhraseProvider.getForAssistant(assistant.id)
         : <QuickPhrase>[];
 
-    final allAvailable = [...globalPhrases, ...assistantPhrases];
+    final storyPhrases = <QuickPhrase>[];
+    final conversationId = _controller.currentConversation?.id;
+    final preferences = context.read<BusinessPreferences>();
+    if (conversationId != null && isStoryWorkspaceSelected(preferences)) {
+      final resources = await StoryContextResourceStore(
+        preferences,
+      ).readOrDefault(conversationId);
+      final replies = resources.quickReplies.where((item) => item.enabled).toList()
+        ..sort((a, b) {
+          final order = a.order.compareTo(b.order);
+          return order != 0 ? order : a.id.compareTo(b.id);
+        });
+      storyPhrases.addAll(
+        replies.map(
+          (reply) => QuickPhrase(
+            id: 'story-quick:' + reply.id,
+            title: reply.label,
+            content: reply.submitText,
+            isGlobal: false,
+            assistantId: assistant?.id,
+          ),
+        ),
+      );
+    }
+
+    final allAvailable = [
+      ...storyPhrases,
+      ...globalPhrases,
+      ...assistantPhrases,
+    ];
     if (allAvailable.isEmpty) return;
 
     final RenderBox? inputBox =
@@ -2189,7 +2219,11 @@ class _HomePageState extends State<HomePage>
     }
 
     if (selected != null && mounted) {
-      await _controller.handleQuickPhraseSelection(selected);
+      if (selected.id.startsWith('story-quick:')) {
+        await _controller.sendSuggestion(selected.content);
+      } else {
+        await _controller.handleQuickPhraseSelection(selected);
+      }
     }
   }
 
