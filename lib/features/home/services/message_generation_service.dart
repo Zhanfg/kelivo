@@ -306,6 +306,8 @@ class MessageGenerationService {
         messages,
         versionSelections,
       ),
+      additionalActiveBookIds:
+          storyRuntime?.activeWorldBookIds ?? const <String>{},
     );
 
     WorkspaceToolContext? workspaceContext;
