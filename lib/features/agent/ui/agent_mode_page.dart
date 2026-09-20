@@ -508,6 +508,19 @@ class _TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final status = _phaseLabel(task.phase, zh);
+    final active = {
+      AgentTaskPhase.preparing,
+      AgentTaskPhase.running,
+      AgentTaskPhase.waitingApproval,
+      AgentTaskPhase.verifying,
+      AgentTaskPhase.recovering,
+    }.contains(task.phase);
+    final resumable = {
+      AgentTaskPhase.queued,
+      AgentTaskPhase.paused,
+      AgentTaskPhase.failed,
+      AgentTaskPhase.interrupted,
+    }.contains(task.phase);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -530,7 +543,11 @@ class _TaskCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              task.phase.isTerminal ? Lucide.CheckCircle : Lucide.Bot,
+              task.phase == AgentTaskPhase.completed
+                  ? Lucide.CheckCircle
+                  : task.phase == AgentTaskPhase.failed
+                  ? Lucide.CircleAlert
+                  : Lucide.Bot,
               size: 17,
               color: cs.primary,
             ),
@@ -558,6 +575,45 @@ class _TaskCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       color: cs.onSurface.withValues(alpha: 0.52),
+                    ),
+                  ),
+                ],
+                if ((task.lastError ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    task.lastError!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: cs.error.withValues(alpha: 0.82),
+                    ),
+                  ),
+                ],
+                if (active || resumable) ...[
+                  const SizedBox(height: 9),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        final runner = context.read<AgentTaskRunner>();
+                        if (active) {
+                          unawaited(runner.cancel(task.id));
+                        } else {
+                          unawaited(runner.run(task.id));
+                        }
+                      },
+                      icon: Icon(
+                        active ? Lucide.X : Lucide.RotateCcw,
+                        size: 14,
+                      ),
+                      label: Text(
+                        active
+                            ? (zh ? '取消' : 'Cancel')
+                            : task.phase == AgentTaskPhase.queued
+                            ? (zh ? '开始' : 'Start')
+                            : (zh ? '继续' : 'Resume'),
+                      ),
                     ),
                   ),
                 ],
@@ -599,3 +655,4 @@ class _TaskCard extends StatelessWidget {
     AgentTaskPhase.recovering => zh ? '恢复中' : 'Recovering',
   };
 }
+
