@@ -213,22 +213,19 @@ final class StoryRuntimePromptService {
         referenceProfileRepository: _referenceProfileStore,
         referenceSelectionRepository: _referenceSelectionStore,
         resolveHostCapabilities: (skills, _) async {
-          if (selectedMcpProfile == null) {
-            return const StoryHostCapabilityResolution(
-              summary:
-                  'No Story MCP profile is selected; Kelivo Assistant tool exposure remains unchanged.',
-            );
-          }
-          mcpExposure = _mcpResolver.resolve(
-            profile: selectedMcpProfile,
-            skills: skills,
-          );
+          mcpExposure = selectedMcpProfile == null
+              ? _mcpResolver.resolveAutomaticStory(skills: skills)
+              : _mcpResolver.resolve(
+                  profile: selectedMcpProfile,
+                  skills: skills,
+                );
           final toolIds = mcpExposure!.allowedToolNames.toList()..sort();
           return StoryHostCapabilityResolution(
             toolIds: toolIds,
             mcpProfileId: mcpExposure!.profileId,
-            summary:
-                'Story MCP profile ${mcpExposure!.profileId} narrows model-visible native MCP routes; execution and approval remain in Kelivo.',
+            summary: selectedMcpProfile == null
+                ? 'Automatic Story MCP policy exposes only capabilities declared by active Skills; Assistant defaults stay hidden.'
+                : 'Story MCP profile ${mcpExposure!.profileId} narrows model-visible native MCP routes; execution and approval remain in Kelivo.',
           );
         },
       );
