@@ -8,9 +8,12 @@ on:
     branches: [master]
 
 jobs:
+  # Name is kept byte-identical to the previous single job so existing branch
+  # protection rules keep matching.
   checks:
     name: Analyze / Test / L10n / Format
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -81,5 +84,35 @@ jobs:
       - name: dart analyze (root package only)
         run: dart analyze --fatal-infos lib test integration_test
 
-      - name: flutter test
-        run: flutter test
+  # The suite used to run as a single serial `flutter test` over ~650 files,
+  # which is why failing runs took so long to report. Sharding by test file
+  # keeps isolate isolation and cuts the feedback loop by roughly the shard
+  # count.
+  tests:
+    name: Flutter tests / shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Run shard
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARD_COUNT: '4'
+        run: bash .github/scripts/run_test_shard.sh
