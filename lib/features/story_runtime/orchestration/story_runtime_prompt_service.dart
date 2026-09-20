@@ -8,6 +8,8 @@ import '../../../core/models/conversation.dart';
 import '../../../core/models/memory_entry.dart';
 import '../../../core/services/memory/memory_repository.dart';
 import '../cache/story_prompt_cache_plan.dart';
+import '../context/story_context_resource_compiler.dart';
+import '../context/story_context_resource_store.dart';
 import '../mcp/story_mcp_profile.dart';
 import '../mcp/story_mcp_profile_resolver.dart';
 import '../mcp/story_mcp_profile_store.dart';
@@ -83,6 +85,7 @@ final class StoryRuntimePromptService {
       _sceneStore = StorySceneRuntimeStore(preferences),
       _worldTreeStore = StoryWorldTreeStore(preferences),
       _worldlineMemoryStore = StoryWorldlineMemoryStore(preferences),
+      _contextResourceStore = StoryContextResourceStore(preferences),
       _executionStore = StoryRuntimeExecutionStore(preferences),
       _memoryRepository = MemoryRepository(preferences),
       _skillBindingStore = StorySkillBindingStore(preferences),
@@ -99,6 +102,7 @@ final class StoryRuntimePromptService {
   final StorySceneRuntimeStore _sceneStore;
   final StoryWorldTreeStore _worldTreeStore;
   final StoryWorldlineMemoryStore _worldlineMemoryStore;
+  final StoryContextResourceStore _contextResourceStore;
   final StoryRuntimeExecutionStore _executionStore;
   final MemoryRepository _memoryRepository;
   final StorySkillBindingStore _skillBindingStore;
@@ -111,6 +115,8 @@ final class StoryRuntimePromptService {
 
   static const StoryWorldlineMemoryResolver _memoryResolver =
       StoryWorldlineMemoryResolver();
+  static const StoryContextResourceCompiler _contextCompiler =
+      StoryContextResourceCompiler();
   static const StoryMcpProfileResolver _mcpResolver = StoryMcpProfileResolver();
 
   Future<StoryRuntimePromptResult?> build({
@@ -200,6 +206,15 @@ final class StoryRuntimePromptService {
           .where((item) => item.sourceWorldlineId != null)
           .toList(growable: false);
 
+      final contextResources = await _contextResourceStore.readOrDefault(
+        conversation.id,
+      );
+      final compiledContext = _contextCompiler.compile(
+        resources: contextResources,
+        turnText: _latestUserTurnText(messages),
+        worldlineId: worldline.id,
+      );
+
       final mcpSelection = await _mcpSelectionStore.readForConversation(
         conversation.id,
       );
@@ -239,6 +254,7 @@ final class StoryRuntimePromptService {
           sceneBaseline: _sceneBaseline(scene),
           manualEnabledSkillIds: scene.activeSkillIds.toSet(),
           additionalStable: <StoryPromptContribution>[
+            ...compiledContext.stableContributions,
             StoryPromptContribution(
               id: 'story.worldline.ancestry',
               stability: StoryPromptStability.epochStable,
@@ -247,6 +263,7 @@ final class StoryRuntimePromptService {
             ),
           ],
           volatile: <StoryPromptContribution>[
+            ...compiledContext.volatileContributions,
             StoryPromptContribution(
               id: 'story.worldline.cursor',
               stability: StoryPromptStability.volatile,
@@ -327,6 +344,16 @@ final class StoryRuntimePromptService {
       await machine.fail(conversationId: conversation.id, error: error);
       rethrow;
     }
+  }
+
+  String _latestUserTurnText(List<ChatMessage> messages) {
+    for (var index = messages.length - 1; index >= 0; index--) {
+      final message = messages[index];
+      if (message.role != 'user') continue;
+      final text = message.content.trim();
+      if (text.isNotEmpty) return text;
+    }
+    return '';
   }
 
   Future<void> _beginAssembly(
