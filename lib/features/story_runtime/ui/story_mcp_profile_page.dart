@@ -330,7 +330,7 @@ class _StoryMcpProfilePageState extends State<StoryMcpProfilePage> {
                       StoryNativeRow(
                         title: profile.name,
                         subtitle: _profileSubtitle(profile),
-                        icon: Lucide.Server,
+                        icon: Lucide.Globe,
                         trailing: _selectedProfileId == profile.id
                             ? const Icon(Lucide.Check)
                             : null,
