@@ -1,9 +1,7 @@
 name: Story MVP Check
 
 on:
-  push:
-    branches:
-      - feat/story-runtime-foundation
+  workflow_dispatch:
 
 concurrency:
   group: story-mvp-${{ github.ref }}
