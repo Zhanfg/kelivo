@@ -43,6 +43,9 @@ class PiRpcSession {
     required String cwd,
     required String sessionDir,
     required String sessionName,
+    String? appendSystemPrompt,
+    List<String> skills = const <String>[],
+    List<String> extraArgs = const <String>[],
     List<Mount> mounts = const <Mount>[],
     Map<String, String> environment = const <String, String>{},
     Duration startupTimeout = const Duration(seconds: 20),
@@ -58,19 +61,27 @@ class PiRpcSession {
           },
         );
 
+    final arguments = <String>[
+      executable,
+      '--mode',
+      'rpc',
+      '--session-dir',
+      sessionDir,
+      '--name',
+      sessionName,
+      '--no-approve',
+      if (appendSystemPrompt != null && appendSystemPrompt.isNotEmpty) ...[
+        '--append-system-prompt',
+        appendSystemPrompt,
+      ],
+      for (final skill in skills) ...['--skill', skill],
+      ...extraArgs,
+    ];
     final launch =
         'mkdir -p ' +
         _quote(sessionDir) +
         '; exec ' +
-        <String>[
-          executable,
-          '--mode',
-          'rpc',
-          '--session-dir',
-          sessionDir,
-          '--name',
-          sessionName,
-        ].map(_quote).join(' ');
+        arguments.map(_quote).join(' ');
 
     session._runtimeEvents = runtime
         .run(
