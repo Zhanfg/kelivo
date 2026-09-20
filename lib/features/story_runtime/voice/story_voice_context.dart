@@ -34,26 +34,37 @@ final class StoryVoiceContextCompiler {
   static String instruction(StoryVoiceContextWindow? window) {
     if (window == null || window.isEmpty) return '';
     final parts = <String>[];
-    final previous = _bounded(window.previous, 600);
-    final current = _bounded(window.current, 1200);
-    final next = _bounded(window.next, 600);
-    final scene = _bounded(window.sceneHint, 400);
+    final previous = _bounded(window.previous, 220);
+    final next = _bounded(window.next, 140);
+    final scene = _bounded(window.sceneHint, 220);
     if (scene != null) parts.add('Scene context: $scene');
     if (previous != null) {
       parts.add('Previous spoken context (do not repeat): $previous');
     }
-    if (current != null) {
-      parts.add(
-        'Current full utterance for delivery context (speak only the supplied synthesis text): $current',
-      );
-    }
     if (next != null) {
       parts.add('Following context (do not speak yet): $next');
     }
+    if (parts.isEmpty) return '';
     parts.add(
-      'Use the surrounding context only to keep emotion, cadence and continuity natural. Never speak the context labels or repeat neighboring text.',
+      'Use this hidden surrounding context only for emotion, cadence and continuity. Speak only the supplied synthesis text; never read or repeat the context.',
     );
     return parts.join(' ');
+  }
+
+  static StoryVoiceContextWindow forChunk({
+    required List<String> chunks,
+    required int index,
+    StoryVoiceContextWindow? outerContext,
+  }) {
+    if (index < 0 || index >= chunks.length) {
+      throw RangeError.index(index, chunks, 'index');
+    }
+    return StoryVoiceContextWindow(
+      previous: index > 0 ? chunks[index - 1] : outerContext?.previous,
+      current: chunks[index],
+      next: index + 1 < chunks.length ? chunks[index + 1] : outerContext?.next,
+      sceneHint: outerContext?.sceneHint,
+    );
   }
 
   static String cacheIdentity({
