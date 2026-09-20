@@ -6,6 +6,7 @@ import '../reference/story_reference_profile_compiler.dart';
 import '../reference/story_reference_selection_store.dart';
 import '../reference/story_reference_store.dart';
 import '../skills/story_skill_binding_store.dart';
+import '../skills/story_skill_activation_policy.dart';
 import '../skills/story_skill_models.dart';
 import '../skills/story_skill_resolver.dart';
 import '../state/story_runtime_state.dart';
@@ -142,9 +143,14 @@ final class StoryRuntimeAssembler {
 
     final manifests = await manifestsFuture;
     final bindings = await bindingsFuture;
-    final skills = skillResolver.resolve(
+    final effectiveBindings = StorySkillActivationPolicy.effectiveBindings(
       manifests: manifests,
       bindings: bindings,
+      assistantId: assistantId,
+    );
+    final skills = skillResolver.resolve(
+      manifests: manifests,
+      bindings: effectiveBindings,
       context: StorySkillActivationContext(
         assistantId: assistantId,
         sceneTags: request.sceneTags,
