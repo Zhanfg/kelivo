@@ -1,7 +1,11 @@
 part of 'provider_oauth_adapter.dart';
 
 class FreeBuffOAuthAdapter extends ProviderOAuthAdapter {
+  FreeBuffOAuthAdapter({Future<String> Function()? fingerprintProvider})
+    : _fingerprintProvider = fingerprintProvider;
+
   static const _authBase = 'https://open.freebuff.app';
+  final Future<String> Function()? _fingerprintProvider;
 
   @override
   OAuthProvider get provider => OAuthProvider.freebuff;
@@ -181,16 +185,11 @@ class FreeBuffOAuthAdapter extends ProviderOAuthAdapter {
   }
 
   Future<String> _fingerprint() async {
-    const key = 'oauth_freebuff_fingerprint_v1';
-    final prefs = await SharedPreferences.getInstance();
-    final existing = prefs.getString(key)?.trim();
-    if (existing != null && existing.startsWith('codebuff-cli-')) {
-      return existing;
+    final persisted = await _fingerprintProvider?.call();
+    if (persisted != null && persisted.startsWith('codebuff-cli-')) {
+      return persisted;
     }
-    final generated =
-        'codebuff-cli-${const Uuid().v4().replaceAll('-', '').substring(0, 12)}';
-    await prefs.setString(key, generated);
-    return generated;
+    return 'codebuff-cli-${const Uuid().v4().replaceAll('-', '').substring(0, 12)}';
   }
 
   bool _isAllowedLoginHost(String host) {
