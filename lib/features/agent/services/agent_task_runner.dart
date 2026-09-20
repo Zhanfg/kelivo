@@ -389,9 +389,7 @@ extension on PiRpcSession {
   String _exitDescriptionForRunner() {
     final code = exitCode;
     final stderr = stderrTail.trim();
-    final base = code == null
-        ? 'pi_rpc_closed'
-        : 'pi_rpc_exit_' + code.toString();
-    return stderr.isEmpty ? base : base + ':' + stderr;
+    final base = code == null ? 'pi_rpc_closed' : 'pi_rpc_exit_$code';
+    return stderr.isEmpty ? base : '$base:$stderr';
   }
 }
