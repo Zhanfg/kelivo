@@ -209,9 +209,9 @@ class PiBinaryInstaller {
     await part.parent.create(recursive: true);
 
     final request = http.Request('GET', asset.uri);
-    final response = await _client.send(request).timeout(
-      const Duration(seconds: 30),
-    );
+    final response = await _client
+        .send(request)
+        .timeout(const Duration(seconds: 30));
     if (response.statusCode != 200) {
       await response.stream.drain<void>();
       throw HttpException(

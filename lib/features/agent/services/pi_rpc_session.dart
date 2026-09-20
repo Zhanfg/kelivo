@@ -177,10 +177,9 @@ class PiRpcSession {
   Future<void> abort() async {
     if (_closing) return;
     try {
-      await send(
-        const <String, dynamic>{'type': 'abort'},
-        timeout: const Duration(seconds: 10),
-      );
+      await send(const <String, dynamic>{
+        'type': 'abort',
+      }, timeout: const Duration(seconds: 10));
     } catch (_) {
       // Process cancellation below remains authoritative.
     }
@@ -191,9 +190,7 @@ class PiRpcSession {
   }
 
   Future<void> _write(Map<String, dynamic> message) {
-    final bytes = Uint8List.fromList(
-      utf8.encode(jsonEncode(message) + '\n'),
-    );
+    final bytes = Uint8List.fromList(utf8.encode(jsonEncode(message) + '\n'));
     return _runtime.writeStdin(_runId, bytes);
   }
 
@@ -243,7 +240,8 @@ class PiRpcSession {
 
   String _exitDescription() {
     final suffix = _stderrTail.trim();
-    final base = 'Pi RPC exited' +
+    final base =
+        'Pi RPC exited' +
         (_exitCode == null ? '' : ' with code ' + _exitCode.toString());
     return suffix.isEmpty ? base : base + ': ' + suffix;
   }

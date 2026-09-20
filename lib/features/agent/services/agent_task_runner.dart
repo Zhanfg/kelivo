@@ -104,12 +104,14 @@ class AgentTaskRunner {
       Future<void> eventTail = Future<void>.value();
       subscription = session.events.listen(
         (event) {
-          eventTail = eventTail.then((_) async {
-            final ended = await _handleEvent(taskId, session!, event);
-            if (ended && !agentEnd.isCompleted) agentEnd.complete();
-          }).catchError((Object error, StackTrace stack) {
-            if (!agentEnd.isCompleted) agentEnd.completeError(error, stack);
-          });
+          eventTail = eventTail
+              .then((_) async {
+                final ended = await _handleEvent(taskId, session!, event);
+                if (ended && !agentEnd.isCompleted) agentEnd.complete();
+              })
+              .catchError((Object error, StackTrace stack) {
+                if (!agentEnd.isCompleted) agentEnd.completeError(error, stack);
+              });
         },
         onError: (Object error, StackTrace stack) {
           if (!agentEnd.isCompleted) agentEnd.completeError(error, stack);
@@ -117,7 +119,9 @@ class AgentTaskRunner {
         onDone: () {
           if (!agentEnd.isCompleted && !_cancelled.contains(taskId)) {
             agentEnd.completeError(
-              StateError(session?._exitDescriptionForRunner() ?? 'pi_rpc_closed'),
+              StateError(
+                session?._exitDescriptionForRunner() ?? 'pi_rpc_closed',
+              ),
             );
           }
         },
@@ -248,10 +252,7 @@ class AgentTaskRunner {
       await journal.append(
         taskId,
         AgentTaskEventKind.note,
-        payload: <String, dynamic>{
-          'kind': 'pi_ui',
-          'method': method,
-        },
+        payload: <String, dynamic>{'kind': 'pi_ui', 'method': method},
       );
       return;
     }
@@ -316,7 +317,9 @@ extension on PiRpcSession {
   String _exitDescriptionForRunner() {
     final code = exitCode;
     final stderr = stderrTail.trim();
-    final base = code == null ? 'pi_rpc_closed' : 'pi_rpc_exit_' + code.toString();
+    final base = code == null
+        ? 'pi_rpc_closed'
+        : 'pi_rpc_exit_' + code.toString();
     return stderr.isEmpty ? base : base + ':' + stderr;
   }
 }

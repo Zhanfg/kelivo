@@ -85,11 +85,7 @@ class _FakeStdioRuntime implements WorkspaceStdioRuntime {
 
   @override
   Future<RuntimeStatus> status() async {
-    return const RuntimeStatus(
-      ready: true,
-      engine: 'fake',
-      sandboxed: true,
-    );
+    return const RuntimeStatus(ready: true, engine: 'fake', sandboxed: true);
   }
 
   @override
@@ -115,10 +111,7 @@ class _FakeStdioRuntime implements WorkspaceStdioRuntime {
 
   void emitBytes(List<int> bytes) {
     _events.add(
-      CommandOutput(
-        OutputStreamKind.stdout,
-        Uint8List.fromList(bytes),
-      ),
+      CommandOutput(OutputStreamKind.stdout, Uint8List.fromList(bytes)),
     );
   }
 
