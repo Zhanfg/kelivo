@@ -1,0 +1,151 @@
+name: Story Agent Android Test APK
+
+on:
+  push:
+    branches:
+      - test/story-agent-android-20260921
+    paths:
+      - ".github/workflows/story-agent-test-apk.yml"
+      - "lib/**"
+      - "test/**"
+      - "integration_test/**"
+      - "android/**"
+      - "tool/**"
+      - "pubspec.yaml"
+  workflow_dispatch:
+
+concurrency:
+  group: story-agent-test-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Analyze and build arm64 APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.9"
+          channel: stable
+          cache: true
+
+      - name: Cache Pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Cache arm64 PRoot JNI
+        uses: actions/cache@v4
+        with:
+          path: android/app/src/main/jniLibs/arm64-v8a
+          key: ${{ runner.os }}-proot-jni-arm64-${{ hashFiles('tool/fetch_proot.sh', 'tool/proot_checksums.txt') }}
+
+      - name: Inject fallback
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
+          EOF
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Generate l10n
+        run: |
+          flutter gen-l10n
+          git diff --exit-code -- lib/l10n
+
+      - name: Analyze
+        run: dart analyze --fatal-infos lib test integration_test
+
+      - name: Prepare installable signing
+        shell: bash
+        env:
+          SIGN_KEYSTORE_BASE64: ${{ secrets.SIGN_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${SIGN_KEYSTORE_BASE64:-}" ]; then
+            echo "$SIGN_KEYSTORE_BASE64" | base64 --decode > android/app/key.jks
+            store_password="$KEYSTORE_PASSWORD"
+            alias_name="$KEY_ALIAS"
+            key_password="$KEY_PASSWORD"
+            echo "Using repository release signing key."
+          else
+            store_password="kelivo-test"
+            alias_name="kelivo-test"
+            key_password="kelivo-test"
+            keytool -genkeypair -v \
+              -keystore android/app/key.jks \
+              -storepass "$store_password" \
+              -keypass "$key_password" \
+              -alias "$alias_name" \
+              -keyalg RSA -keysize 2048 -validity 3650 \
+              -dname "CN=Kelivo Test,O=Kelivo,C=US"
+            echo "Using ephemeral test signing key."
+          fi
+          cat > android/key.properties <<EOF
+          storeFile=key.jks
+          storePassword=$store_password
+          keyAlias=$alias_name
+          keyPassword=$key_password
+          EOF
+
+      - name: Build optimized arm64 release APK
+        env:
+          KELIVO_ANDROID_ABIS: arm64-v8a
+        run: |
+          flutter build apk \
+            --release \
+            --no-pub \
+            --target-platform android-arm64 \
+            --split-per-abi \
+            --split-debug-info=build/symbols/android \
+            --analyze-size
+
+      - name: Package APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          apk="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*arm64-v8a*release.apk' -print -quit)"
+          test -n "$apk"
+          short_sha="$(git rev-parse --short=8 HEAD)"
+          out="dist/Kelivo_Story_Agent_TEST_${short_sha}_arm64-v8a.apk"
+          cp "$apk" "$out"
+          sha256sum "$out" | tee dist/SHA256SUMS.txt
+          ls -lh "$out"
+          unzip -l "$out" \
+            | awk 'NF == 4 && $1 ~ /^[0-9]+$/ {print $1, $4}' \
+            | sort -nr \
+            | head -n 40 \
+            > dist/APK_TOP40.txt
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kelivo-Story-Agent-TEST-arm64
+          path: dist/
+          if-no-files-found: error
+          compression-level: 0
