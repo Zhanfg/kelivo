@@ -1910,6 +1910,7 @@ class MessageBuilderService {
     Conversation? conversation,
     bool conversationScoped = false,
     List<ChatMessage>? sourceMessages,
+    Iterable<String> additionalActiveBookIds = const <String>[],
   }) async {
     try {
       List<WorldBook> all = const <WorldBook>[];
@@ -1926,7 +1927,12 @@ class MessageBuilderService {
             : wb.activeBookIdsFor(assistantId);
       } catch (_) {}
 
-      final activeSet = activeBookIds.toSet();
+      final activeSet = <String>{
+        ...activeBookIds,
+        ...additionalActiveBookIds.map((id) => id.trim()).where(
+          (id) => id.isNotEmpty,
+        ),
+      };
       final books = all
           .where((b) => b.enabled && activeSet.contains(b.id))
           .toList(growable: false);
