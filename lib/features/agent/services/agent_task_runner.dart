@@ -2,13 +2,16 @@ import 'dart:async';
 
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
 import '../../../utils/app_directories.dart';
+import '../../home/utils/model_display_helper.dart';
 import '../models/agent_task.dart';
 import '../providers/agent_task_provider.dart';
 import 'agent_context_materializer.dart';
+import 'agent_model_bridge.dart';
 import 'agent_task_journal.dart';
 import 'pi_binary_installer.dart';
 import 'pi_rpc_session.dart';
@@ -21,6 +24,7 @@ class AgentTaskRunner {
     required this.assistants,
     required this.chat,
     required this.contextMaterializer,
+    required this.settings,
     required this.runtimeProvider,
     required this.environment,
     required this.piInstaller,
@@ -34,6 +38,7 @@ class AgentTaskRunner {
   final AssistantProvider assistants;
   final ChatService chat;
   final AgentContextMaterializer contextMaterializer;
+  final SettingsProvider settings;
   final WorkspaceRuntimeProvider runtimeProvider;
   final EnvironmentProvider environment;
   final PiBinaryInstaller piInstaller;
@@ -61,6 +66,7 @@ class AgentTaskRunner {
     _running.add(taskId);
     _cancelled.remove(taskId);
     PiRpcSession? session;
+    AgentModelBridge? modelBridge;
     StreamSubscription<Map<String, dynamic>>? subscription;
     Map<String, String> secretValues = const <String, String>{};
 
@@ -105,6 +111,29 @@ class AgentTaskRunner {
         mcpServerIds: conversation?.mcpServerIds.toSet(),
       );
 
+      await settings.loaded;
+      final selectedModel = resolveChatModel(
+        settings,
+        conversation: conversation,
+        assistant: assistant,
+      );
+      final providerKey = selectedModel.providerKey;
+      final modelId = selectedModel.modelId;
+      if (providerKey == null || modelId == null) {
+        throw StateError('agent_model_not_configured');
+      }
+      modelBridge = AgentModelBridge(
+        config: settings.getProviderConfig(providerKey),
+        modelId: modelId,
+        assistant: assistant,
+        conversationId: task.conversationId,
+      );
+      final modelEndpoint = await modelBridge.start();
+      await modelBridge.writePiConfig(
+        taskDirectory: taskDir,
+        endpoint: modelEndpoint,
+      );
+
       final mounts = <Mount>[
         Mount(host: workspaceRoot, guest: '/workspace'),
         Mount(host: taskDir.path, guest: '/kelivo-agent-task'),
@@ -128,8 +157,17 @@ class AgentTaskRunner {
           for (final skill in materializedContext.skillMounts)
             skill.guestDirectory,
         ],
+        extraArgs: const <String>[
+          '--provider',
+          'kelivo',
+          '--model',
+          'current',
+        ],
         mounts: mounts,
-        environment: execution.variables,
+        environment: <String, String>{
+          ...execution.variables,
+          'PI_CODING_AGENT_DIR': '/kelivo-agent-task/pi-config',
+        },
       );
       _sessions[taskId] = session;
 
@@ -212,6 +250,7 @@ class AgentTaskRunner {
       if (session != null) {
         await session.close();
       }
+      await modelBridge?.close();
       _sessions.remove(taskId);
       _running.remove(taskId);
     }
