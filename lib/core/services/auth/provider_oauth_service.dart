@@ -284,10 +284,9 @@ class ProviderOAuthService extends ChangeNotifier {
     final settings = _settings!;
     final client = _clientFactory(original);
     try {
-      final refreshed = await _adapter(original.oauthProvider!).refresh(
-        OAuthWire(client),
-        original.oauthCredentials!,
-      );
+      final refreshed = await _adapter(
+        original.oauthProvider!,
+      ).refresh(OAuthWire(client), original.oauthCredentials!);
       final current = _current(original.id);
       if (!identical(settings, _settings) ||
           current?.oauthCredentials?.sessionId !=
@@ -482,9 +481,8 @@ class ProviderOAuthService extends ChangeNotifier {
     if (_usageRequests[key] case final pending?) return pending;
     final request = _authenticated(
       original,
-      (wire, config) => _adapter(
-        config.oauthProvider!,
-      ).usage(wire, config.oauthCredentials!),
+      (wire, config) =>
+          _adapter(config.oauthProvider!).usage(wire, config.oauthCredentials!),
     );
     _usageRequests[key] = request;
     try {
