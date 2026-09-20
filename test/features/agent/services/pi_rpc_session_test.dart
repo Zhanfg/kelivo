@@ -58,7 +58,7 @@ void main() {
       'type': 'message_update',
       'text': 'A\u2028中文B',
     });
-    final bytes = utf8.encode(record + '\n');
+    final bytes = utf8.encode('$record\n');
     final split = bytes.indexOf(0xE4);
     runtime.emitBytes(bytes.sublist(0, split + 1));
     runtime.emitBytes(bytes.sublist(split + 1));
@@ -74,7 +74,7 @@ void main() {
   });
 }
 
-class _FakeStdioRuntime implements WorkspaceStdioRuntime {
+class _FakeStdioRuntime extends WorkspaceRuntime implements WorkspaceStdioRuntime {
   final StreamController<CommandEvent> _events =
       StreamController<CommandEvent>.broadcast();
 
@@ -106,7 +106,7 @@ class _FakeStdioRuntime implements WorkspaceStdioRuntime {
   }
 
   void emitJson(Map<String, dynamic> message) {
-    emitBytes(utf8.encode(jsonEncode(message) + '\n'));
+    emitBytes(utf8.encode('${jsonEncode(message)}\n'));
   }
 
   void emitBytes(List<int> bytes) {
