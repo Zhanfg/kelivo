@@ -1,0 +1,19 @@
+name: Temporary OAuth format probe
+
+on:
+  pull_request:
+
+jobs:
+  format-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+      - name: Show formatter diff
+        shell: bash
+        run: |
+          dart format lib/core/services/auth/provider_oauth_service.dart
+          git diff -- lib/core/services/auth/provider_oauth_service.dart
