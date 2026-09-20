@@ -8,7 +8,6 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 http.Response response(Object data, [int status = 200]) =>
     http.Response(jsonEncode(data), status);
@@ -20,7 +19,6 @@ void main() {
 
   test('FreeBuff browser login exchanges transaction for API key', () {
     fakeAsync((async) {
-      SharedPreferences.setMockInitialValues({});
       var statusPolls = 0;
       ProviderOAuthCredentials? result;
       OAuthLoginPrompt? prompt;
@@ -70,8 +68,9 @@ void main() {
         }),
       );
 
-      FreeBuffOAuthAdapter()
-          .login(wire, OAuthCancellation(), (value) async => prompt = value)
+      FreeBuffOAuthAdapter(
+        fingerprintProvider: () async => 'codebuff-cli-test-install',
+      ).login(wire, OAuthCancellation(), (value) async => prompt = value)
           .then((value) => result = value);
       async.flushMicrotasks();
 
@@ -88,7 +87,7 @@ void main() {
       expect(result?.accountId, 'freebuff-user');
       expect(result?.email, 'person@example.com');
       expect(result?.plan, 'FreeBuff');
-      expect(result?.deviceId, startsWith('codebuff-cli-'));
+      expect(result?.deviceId, 'codebuff-cli-test-install');
     });
   });
 
