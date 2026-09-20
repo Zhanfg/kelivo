@@ -83,6 +83,14 @@ import 'core/services/logging/flutter_logger.dart';
 import 'core/services/storage/storage_usage_service.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
+import 'features/agent/providers/agent_interaction_broker.dart';
+import 'features/agent/providers/agent_task_provider.dart';
+import 'features/agent/services/agent_context_bridge.dart';
+import 'features/agent/services/agent_context_materializer.dart';
+import 'features/agent/services/agent_task_journal.dart';
+import 'features/agent/services/pi_binary_installer.dart';
+import 'features/agent/services/agent_task_runner.dart';
+import 'features/home/providers/workspace_mode_provider.dart';
 import 'utils/app_directories.dart';
 import 'utils/platform_utils.dart';
 import 'utils/sandbox_path_resolver.dart';
@@ -682,6 +690,10 @@ class MyApp extends StatelessWidget {
         ),
         Provider<BusinessPreferences>.value(value: businessPreferences),
         ChangeNotifierProvider(
+          create: (_) =>
+              WorkspaceModeProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
           create: (_) => UserProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
@@ -744,6 +756,14 @@ class MyApp extends StatelessWidget {
         Provider<ExtensionEntityStore>.value(
           value: databaseLease.extensionEntityStore,
         ),
+        Provider<AgentTaskJournal>(create: (_) => AgentTaskJournal()),
+        ChangeNotifierProvider(create: (_) => AgentInteractionBroker()),
+        ChangeNotifierProvider(
+          create: (ctx) => AgentTaskProvider(
+            store: ctx.read<ExtensionEntityStore>(),
+            journal: ctx.read<AgentTaskJournal>(),
+          ),
+        ),
         if (WorkspaceChannel.isSupportedPlatform)
           ChangeNotifierProvider(
             lazy: false,
@@ -792,6 +812,39 @@ class MyApp extends StatelessWidget {
             workspaceRuntime: ctx.read<WorkspaceRuntimeProvider>(),
             environment: ctx.read<EnvironmentProvider>(),
             workspaces: ctx.read<WorkspaceProvider>(),
+          ),
+        ),
+        Provider<AgentContextBridge>(
+          create: (ctx) => AgentContextBridge(
+            memory: ctx.read<MemoryProviderV2>(),
+            skills: ctx.read<SkillsService>(),
+            mcp: ctx.read<McpProvider>(),
+          ),
+        ),
+        Provider<AgentContextMaterializer>(
+          create: (ctx) =>
+              AgentContextMaterializer(bridge: ctx.read<AgentContextBridge>()),
+        ),
+        Provider<PiBinaryInstaller>(
+          create: (ctx) => PiBinaryInstaller(
+            runtimeProvider: ctx.read<WorkspaceRuntimeProvider>(),
+            environment: ctx.read<EnvironmentProvider>(),
+          ),
+        ),
+        Provider<AgentTaskRunner>(
+          lazy: false,
+          create: (ctx) => AgentTaskRunner(
+            tasks: ctx.read<AgentTaskProvider>(),
+            journal: ctx.read<AgentTaskJournal>(),
+            interactions: ctx.read<AgentInteractionBroker>(),
+            workspaces: ctx.read<WorkspaceProvider>(),
+            assistants: ctx.read<AssistantProvider>(),
+            chat: ctx.read<ChatService>(),
+            contextMaterializer: ctx.read<AgentContextMaterializer>(),
+            settings: ctx.read<SettingsProvider>(),
+            runtimeProvider: ctx.read<WorkspaceRuntimeProvider>(),
+            environment: ctx.read<EnvironmentProvider>(),
+            piInstaller: ctx.read<PiBinaryInstaller>(),
           ),
         ),
         ProxyProvider<_WorkspaceStackHolder, EnvironmentManager?>(
