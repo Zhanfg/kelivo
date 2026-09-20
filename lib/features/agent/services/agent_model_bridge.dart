@@ -212,14 +212,12 @@ class AgentModelBridge {
       if (streamingResponse) {
         try {
           request.response.write(
-            'data: ' +
-                jsonEncode(<String, dynamic>{
-                  'error': <String, dynamic>{
-                    'message': error.toString(),
-                    'type': 'api_error',
-                  },
-                }) +
-                '\n\n',
+            'data: ${jsonEncode(<String, dynamic>{
+              'error': <String, dynamic>{
+                'message': error.toString(),
+                'type': 'api_error',
+              },
+            })}\n\n',
           );
           request.response.write('data: [DONE]\n\n');
           await request.response.close();
@@ -343,7 +341,7 @@ class AgentModelBridge {
             ),
           );
         case Usage():
-          usage = usage == null ? chunk.usage : usage!.merge(chunk.usage);
+          usage = usage == null ? chunk.usage : usage.merge(chunk.usage);
         case Finish():
           finishReason = _finishReason(
             chunk.finishReason,
@@ -397,7 +395,7 @@ class AgentModelBridge {
           }
           tool.arguments.write(chunk.inputDelta);
         case Usage():
-          usage = usage == null ? chunk.usage : usage!.merge(chunk.usage);
+          usage = usage == null ? chunk.usage : usage.merge(chunk.usage);
         case Finish():
           finishReason = _finishReason(
             chunk.finishReason,
@@ -439,7 +437,7 @@ class AgentModelBridge {
               _finishReason(null, hasToolCalls: toolCalls.isNotEmpty),
         },
       ],
-      if (usage != null) 'usage': _usage(usage!),
+      if (usage != null) 'usage': _usage(usage),
     });
   }
 
