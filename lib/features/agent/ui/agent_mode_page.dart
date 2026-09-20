@@ -66,8 +66,8 @@ class _AgentModePageState extends State<AgentModePage> {
         SnackBar(
           content: Text(
             _isZh(context)
-                ? '任务已加入代理队列：' + task.title
-                : 'Task queued for Agent: ' + task.title,
+                ? '任务已加入代理队列：${task.title}'
+                : 'Task queued for Agent: ${task.title}',
           ),
         ),
       );
@@ -77,8 +77,8 @@ class _AgentModePageState extends State<AgentModePage> {
         SnackBar(
           content: Text(
             _isZh(context)
-                ? '创建代理任务失败：' + error.toString()
-                : 'Failed to create Agent task: ' + error.toString(),
+                ? '创建代理任务失败：$error'
+                : 'Failed to create Agent task: $error',
           ),
         ),
       );
@@ -88,6 +88,7 @@ class _AgentModePageState extends State<AgentModePage> {
   }
 
   Future<Workspace> _resolveWorkspace() async {
+    final zh = _isZh(context);
     final chat = context.read<ChatService>();
     final workspaces = context.read<WorkspaceProvider>();
     final assistants = context.read<AssistantProvider>();
@@ -119,7 +120,7 @@ class _AgentModePageState extends State<AgentModePage> {
     }
 
     return workspaces.create(
-      name: _isZh(context) ? '代理工作区' : 'Agent Workspace',
+      name: zh ? '代理工作区' : 'Agent Workspace',
       kind: WorkspaceKind.managed,
     );
   }
@@ -128,7 +129,7 @@ class _AgentModePageState extends State<AgentModePage> {
     final firstLine = goal.split(RegExp(r'[\r\n]+')).first.trim();
     final runes = firstLine.runes.toList(growable: false);
     if (runes.length <= 40) return firstLine;
-    return String.fromCharCodes(runes.take(40)) + '…';
+    return '${String.fromCharCodes(runes.take(40))}…';
   }
 
   Future<AgentContextSnapshot> _contextSnapshot() {
@@ -310,16 +311,14 @@ class _HeroCard extends StatelessWidget {
                     );
                   }
                   final counts =
-                      data.memories.length.toString() +
-                      ' · ' +
-                      data.skills.length.toString() +
-                      ' · ' +
-                      data.mcpServers.length.toString();
+                      '${data.memories.length} · '
+                      '${data.skills.length} · '
+                      '${data.mcpServers.length}';
                   return _StatusChip(
                     icon: Lucide.workflow,
                     label: zh
-                        ? '记忆 / 技能 / MCP  ' + counts
-                        : 'Memory / Skills / MCP  ' + counts,
+                        ? '记忆 / 技能 / MCP  $counts'
+                        : 'Memory / Skills / MCP  $counts',
                   );
                 },
               ),
