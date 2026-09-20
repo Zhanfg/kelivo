@@ -17,8 +17,9 @@ Kelivo is a cross-platform LLM chat client built with Flutter, targeting iOS, An
 All three must pass before committing:
 
 ```bash
-dart format lib test                        # format changed files
-dart analyze --fatal-infos lib test         # zero warnings, zero infos
+dart format lib test integration_test       # format changed files
+dart analyze --fatal-infos \
+  lib test integration_test                 # zero warnings, zero infos
 flutter test                                # all unit tests green
 ```
 
