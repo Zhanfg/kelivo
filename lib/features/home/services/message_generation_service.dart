@@ -17,6 +17,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/logging/context_logger.dart';
+import '../../../core/services/logging/context_log_models.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
 import '../../../core/services/workspace/workspace_tools_service.dart';
@@ -24,6 +25,8 @@ import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
+import '../../story_runtime/context/story_context_resource_compiler.dart';
+import '../../story_runtime/context/story_context_resources.dart';
 import '../../story_runtime/orchestration/story_break_armor_mode.dart';
 import '../../story_runtime/orchestration/story_runtime_prompt_service.dart';
 import '../../story_runtime/serialization/story_serialization_tools.dart';
@@ -262,6 +265,26 @@ class MessageGenerationService {
           assistantId: storyAssistantId,
         );
         if (storyRuntime != null) {
+          const storyContextCompiler = StoryContextResourceCompiler();
+          for (final message in apiMessages) {
+            if ((message['role'] ?? '').toString() != 'user') continue;
+            final content = message['content'];
+            if (content is! String || content.isEmpty) continue;
+            final transformed = storyContextCompiler.applyRegex(
+              content,
+              target: StoryRegexTarget.userInput,
+              rules: storyRuntime.regexRules,
+            );
+            if (transformed == content) continue;
+            message['content'] = transformed;
+            if (ContextLogger.enabled) {
+              ContextSegmentTags.replaceWithSingle(
+                message,
+                source: ContextSource.chatHistory,
+                length: transformed.length,
+              );
+            }
+          }
           StoryBreakArmorMode(
             storyPreferences,
           ).prependToSystemPrompt(apiMessages);
