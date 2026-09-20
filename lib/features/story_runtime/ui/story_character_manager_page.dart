@@ -31,6 +31,7 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
 
   Future<_CharacterPageData> _load() async {
     final preferences = context.read<BusinessPreferences>();
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
     final scene = await StorySceneRuntimeStore(
       preferences,
     ).readOrDefault(widget.conversationId);
@@ -54,11 +55,13 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
       final assignment = _assignmentFor(routing, id);
       characters.add(
         _CharacterView(
+          characterId: id,
           displayName: _displayName(
             scene.continuityState,
             assignment,
             id,
             index,
+            zh: zh,
           ),
           voiceName: assignment?.voiceId,
         ),
@@ -85,8 +88,9 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
     Map<String, Object?> continuity,
     StoryVoiceAssignment? assignment,
     String characterId,
-    int index,
-  ) {
+    int index, {
+    required bool zh,
+  }) {
     for (final key in const ['displayName', 'name', 'label']) {
       final value = assignment?.metadata[key]?.toString().trim();
       if (value != null && value.isNotEmpty) return value;
@@ -109,7 +113,125 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
       }
     }
 
-    return '角色 ${index + 1}';
+    return zh ? '角色 ${index + 1}' : 'Character ${index + 1}';
+  }
+
+  Future<void> _editCharacterName(_CharacterView character) async {
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final preferences = context.read<BusinessPreferences>();
+    final controller = TextEditingController(text: character.displayName);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(zh ? '修正角色名称' : 'Edit character name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          decoration: InputDecoration(
+            labelText: zh ? '显示名称' : 'Display name',
+            helperText: zh
+                ? '只修正展示身份，不会改变稳定角色 ID。'
+                : 'This changes presentation only; the stable character ID is preserved.',
+          ),
+          onSubmitted: (value) {
+            final normalized = value.trim();
+            if (normalized.isNotEmpty) Navigator.of(context).pop(normalized);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(zh ? '取消' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final normalized = controller.text.trim();
+              if (normalized.isNotEmpty) Navigator.of(context).pop(normalized);
+            },
+            child: Text(zh ? '保存' : 'Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null || name == character.displayName) return;
+
+    try {
+      final sceneStore = StorySceneRuntimeStore(preferences);
+      final scene = await sceneStore.readOrDefault(widget.conversationId);
+      final continuity = Map<String, Object?>.from(scene.continuityState);
+      final rawCharacters = continuity['characters'];
+      final characters = rawCharacters is Map
+          ? Map<String, Object?>.from(rawCharacters)
+          : <String, Object?>{};
+      final rawCharacter = characters[character.characterId];
+      final characterState = rawCharacter is Map
+          ? Map<String, Object?>.from(rawCharacter)
+          : <String, Object?>{};
+      characterState['displayName'] = name;
+      characters[character.characterId] = characterState;
+      continuity['characters'] = characters;
+      await sceneStore.upsert(
+        scene.copyWith(
+          continuityState: continuity,
+          revision: scene.revision + 1,
+        ),
+      );
+
+      final tree = await StoryWorldTreeStore(
+        preferences,
+      ).readForConversation(widget.conversationId);
+      if (tree != null) {
+        final voiceStore = StoryVoiceRoutingStore(preferences);
+        final routing = await voiceStore.readOrDefault(tree.worldTreeId);
+        var changed = false;
+        final assignments = <StoryVoiceAssignment>[
+          for (final assignment in routing.assignments)
+            if (assignment.characterId == character.characterId) ...[
+              assignment.copyWith(
+                metadata: <String, Object?>{
+                  ...assignment.metadata,
+                  'displayName': name,
+                },
+                revision: assignment.revision + 1,
+              ),
+            ] else ...[
+              assignment,
+            ],
+        ];
+        for (var index = 0; index < routing.assignments.length; index++) {
+          if (!identical(assignments[index], routing.assignments[index])) {
+            changed = true;
+            break;
+          }
+        }
+        if (changed) {
+          await voiceStore.upsertState(
+            StoryVoiceRoutingState(
+              worldTreeId: routing.worldTreeId,
+              narrator: routing.narrator,
+              assignments: assignments,
+            ),
+          );
+        }
+      }
+
+      if (!mounted) return;
+      setState(() => _future = _load());
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(zh ? '角色名称已修正。' : 'Character name updated.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            zh ? '角色名称保存失败：$error' : 'Failed to save character name: $error',
+          ),
+        ),
+      );
+    }
   }
 
   void _openVoices() {
@@ -188,10 +310,20 @@ class _StoryCharacterManagerPageState extends State<StoryCharacterManagerPage> {
                             'Voice: ${character.voiceName}',
                           ),
                   ),
-                  trailing: Icon(
-                    Lucide.ChevronRight,
-                    size: 18,
-                    color: cs.onSurfaceVariant,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: tr('修正名称', 'Edit name'),
+                        onPressed: () => _editCharacterName(character),
+                        icon: const Icon(Lucide.Pencil),
+                      ),
+                      Icon(
+                        Lucide.ChevronRight,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ],
                   ),
                   onTap: _openVoices,
                 ),
@@ -211,8 +343,13 @@ class _CharacterPageData {
 }
 
 class _CharacterView {
-  const _CharacterView({required this.displayName, this.voiceName});
+  const _CharacterView({
+    required this.characterId,
+    required this.displayName,
+    this.voiceName,
+  });
 
+  final String characterId;
   final String displayName;
   final String? voiceName;
 }
