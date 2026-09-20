@@ -79,6 +79,13 @@ jobs:
       - name: Analyze
         run: dart analyze --fatal-infos lib test integration_test
 
+      - name: Preinstall Rust Android target
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup target add --toolchain stable aarch64-linux-android
+
       - name: Prepare installable signing
         shell: bash
         env:
