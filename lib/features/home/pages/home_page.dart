@@ -471,8 +471,6 @@ class _CompressModelPickerRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final assistant = context.watch<AssistantProvider>().currentAssistant;
-    final agentMode =
-        context.watch<WorkspaceModeProvider>().mode == WorkspaceMode.agent;
     final resolved = resolveCompressContextModel(
       compressProvider: settings.compressModelProvider,
       compressModelId: settings.compressModelId,
@@ -982,6 +980,8 @@ class _HomePageState extends State<HomePage>
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final agentMode =
+        context.watch<WorkspaceModeProvider>().mode == WorkspaceMode.agent;
 
     final modelInfo = getModelDisplayInfo(
       settings,
@@ -2186,6 +2186,7 @@ class _HomePageState extends State<HomePage>
       final resources = await StoryContextResourceStore(
         preferences,
       ).readOrDefault(conversationId);
+      if (!mounted) return;
       final replies =
           resources.quickReplies.where((item) => item.enabled).toList()
             ..sort((a, b) {
@@ -2195,7 +2196,7 @@ class _HomePageState extends State<HomePage>
       storyPhrases.addAll(
         replies.map(
           (reply) => QuickPhrase(
-            id: 'story-quick:' + reply.id,
+            id: 'story-quick:${reply.id}',
             title: reply.label,
             content: reply.submitText,
             isGlobal: false,
