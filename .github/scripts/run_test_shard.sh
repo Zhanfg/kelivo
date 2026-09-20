@@ -28,6 +28,13 @@ for i in "${!all_files[@]}"; do
   fi
 done
 
+if [ "${#selected[@]}" -eq 0 ]; then
+  # Guard against accidentally running the whole suite (bare `flutter test`
+  # discovers every file under test/) and against out-of-range shard numbers.
+  echo "Shard ${SHARD}/${SHARD_COUNT} has no test files; nothing to run."
+  exit 0
+fi
+
 echo "Shard ${SHARD}/${SHARD_COUNT}: ${#selected[@]} of ${#all_files[@]} test files"
 printf '  %s\n' "${selected[@]}"
 
