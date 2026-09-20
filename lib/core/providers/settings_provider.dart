@@ -561,6 +561,22 @@ class SettingsProvider extends ChangeNotifier {
     return ProviderConfig.defaultsFor(key, displayName: defaultName);
   }
 
+  /// Local-only installation identity used by FreeBuff's hosted device flow.
+  /// It deliberately lives in SettingsProvider because business-domain code
+  /// outside the frozen storage allowlist must not access SharedPreferences.
+  Future<String> getOrCreateFreeBuffFingerprint() async {
+    const key = 'oauth_freebuff_fingerprint_v1';
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString(key)?.trim();
+    if (existing != null && existing.startsWith('codebuff-cli-')) {
+      return existing;
+    }
+    final generated =
+        'codebuff-cli-${const Uuid().v4().replaceAll('-', '').substring(0, 12)}';
+    await prefs.setString(key, generated);
+    return generated;
+  }
+
   String resolveOpenAIUpstreamModelId(String providerKey, String modelId) {
     final cfg = getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
