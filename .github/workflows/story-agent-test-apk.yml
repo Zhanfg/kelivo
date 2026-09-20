@@ -72,7 +72,7 @@ jobs:
         run: flutter pub get
 
       - name: Refresh Flutter platform config
-        run: flutter build --config-only
+        run: flutter build apk --config-only --target-platform android-arm64
 
       - name: Generate l10n
         run: |
