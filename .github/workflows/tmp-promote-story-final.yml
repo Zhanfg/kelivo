@@ -12,19 +12,19 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout verified audit candidate
+      - name: Checkout verified continuity candidate
         uses: actions/checkout@v4
         with:
-          ref: feat/story-audit-improvements-20260920
+          ref: feat/story-continuity-controls-20260920
           fetch-depth: 0
 
       - name: Promote with lease
         shell: bash
         run: |
           set -euo pipefail
-          expected="9ed91c23fceefc3f589f45f06f4dc72ef0d38fc9"
+          expected="1196bc0f2bf7acfbe6962cb4e48d48e6d13b9b99"
           target="feat/story-runtime-foundation"
-          candidate="1196bc0f2bf7acfbe6962cb4e48d48e6d13b9b99"
+          candidate="1a97430590ac6e0d20cf091a7a17315678d9ce7f"
 
           git fetch origin "$target"
           actual="$(git rev-parse "origin/$target")"
