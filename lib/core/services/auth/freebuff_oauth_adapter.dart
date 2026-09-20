@@ -1,8 +1,7 @@
 part of 'provider_oauth_adapter.dart';
 
 class FreeBuffOAuthAdapter extends ProviderOAuthAdapter {
-  FreeBuffOAuthAdapter({Future<String> Function()? fingerprintProvider})
-    : this._fingerprintProvider = fingerprintProvider;
+  FreeBuffOAuthAdapter({this._fingerprintProvider});
 
   static const _authBase = 'https://open.freebuff.app';
   final Future<String> Function()? _fingerprintProvider;
