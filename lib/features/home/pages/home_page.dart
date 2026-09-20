@@ -2186,11 +2186,12 @@ class _HomePageState extends State<HomePage>
       final resources = await StoryContextResourceStore(
         preferences,
       ).readOrDefault(conversationId);
-      final replies = resources.quickReplies.where((item) => item.enabled).toList()
-        ..sort((a, b) {
-          final order = a.order.compareTo(b.order);
-          return order != 0 ? order : a.id.compareTo(b.id);
-        });
+      final replies =
+          resources.quickReplies.where((item) => item.enabled).toList()
+            ..sort((a, b) {
+              final order = a.order.compareTo(b.order);
+              return order != 0 ? order : a.id.compareTo(b.id);
+            });
       storyPhrases.addAll(
         replies.map(
           (reply) => QuickPhrase(

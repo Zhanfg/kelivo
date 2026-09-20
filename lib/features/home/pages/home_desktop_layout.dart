@@ -663,7 +663,8 @@ class HomeDesktopScaffold extends StatelessWidget {
           icon: canToggleTemporaryConversation && !temporaryConversationEnabled
               ? Lucide.MessageCircleDashed
               : Lucide.MessageCirclePlus,
-          builder: canToggleTemporaryConversation && temporaryConversationEnabled
+          builder:
+              canToggleTemporaryConversation && temporaryConversationEnabled
               ? (color) => SvgPicture.asset(
                   'assets/icons/temporary_chat_checked.svg',
                   width: 20,

@@ -9,7 +9,8 @@ abstract interface class StoryContextResourceRepository {
   Future<bool> remove(String conversationId);
 }
 
-final class StoryContextResourceStore extends JsonBlobStore<StoryContextResources>
+final class StoryContextResourceStore
+    extends JsonBlobStore<StoryContextResources>
     implements StoryContextResourceRepository {
   StoryContextResourceStore(super.preferences);
 

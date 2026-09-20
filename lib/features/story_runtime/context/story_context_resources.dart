@@ -18,20 +18,20 @@ final class StoryPersona {
   final bool enabled;
 
   factory StoryPersona.fromJson(Map<String, dynamic> json) => StoryPersona(
-        id: _requiredString(json, 'id'),
-        name: _requiredString(json, 'name'),
-        description: _string(json['description']),
-        instructions: _string(json['instructions']),
-        enabled: json['enabled'] != false,
-      );
+    id: _requiredString(json, 'id'),
+    name: _requiredString(json, 'name'),
+    description: _string(json['description']),
+    instructions: _string(json['instructions']),
+    enabled: json['enabled'] != false,
+  );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'name': name,
-        'description': description,
-        'instructions': instructions,
-        'enabled': enabled,
-      };
+    'id': id,
+    'name': name,
+    'description': description,
+    'instructions': instructions,
+    'enabled': enabled,
+  };
 }
 
 final class StoryQuickReply {
@@ -49,7 +49,8 @@ final class StoryQuickReply {
   final bool enabled;
   final int order;
 
-  factory StoryQuickReply.fromJson(Map<String, dynamic> json) => StoryQuickReply(
+  factory StoryQuickReply.fromJson(Map<String, dynamic> json) =>
+      StoryQuickReply(
         id: _requiredString(json, 'id'),
         label: _requiredString(json, 'label'),
         submitText: _requiredString(json, 'submitText'),
@@ -58,12 +59,12 @@ final class StoryQuickReply {
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'label': label,
-        'submitText': submitText,
-        'enabled': enabled,
-        'order': order,
-      };
+    'id': id,
+    'label': label,
+    'submitText': submitText,
+    'enabled': enabled,
+    'order': order,
+  };
 }
 
 final class StoryRegexRule {
@@ -92,33 +93,33 @@ final class StoryRegexRule {
   final int order;
 
   factory StoryRegexRule.fromJson(Map<String, dynamic> json) => StoryRegexRule(
-        id: _requiredString(json, 'id'),
-        name: _requiredString(json, 'name'),
-        pattern: _requiredString(json, 'pattern'),
-        replacement: _string(json['replacement']),
-        target: StoryRegexTarget.values.firstWhere(
-          (value) => value.name == _string(json['target']),
-          orElse: () => StoryRegexTarget.both,
-        ),
-        enabled: json['enabled'] != false,
-        caseSensitive: json['caseSensitive'] != false,
-        multiLine: json['multiLine'] == true,
-        dotAll: json['dotAll'] == true,
-        order: _int(json['order']),
-      );
+    id: _requiredString(json, 'id'),
+    name: _requiredString(json, 'name'),
+    pattern: _requiredString(json, 'pattern'),
+    replacement: _string(json['replacement']),
+    target: StoryRegexTarget.values.firstWhere(
+      (value) => value.name == _string(json['target']),
+      orElse: () => StoryRegexTarget.both,
+    ),
+    enabled: json['enabled'] != false,
+    caseSensitive: json['caseSensitive'] != false,
+    multiLine: json['multiLine'] == true,
+    dotAll: json['dotAll'] == true,
+    order: _int(json['order']),
+  );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'name': name,
-        'pattern': pattern,
-        'replacement': replacement,
-        'target': target.name,
-        'enabled': enabled,
-        'caseSensitive': caseSensitive,
-        'multiLine': multiLine,
-        'dotAll': dotAll,
-        'order': order,
-      };
+    'id': id,
+    'name': name,
+    'pattern': pattern,
+    'replacement': replacement,
+    'target': target.name,
+    'enabled': enabled,
+    'caseSensitive': caseSensitive,
+    'multiLine': multiLine,
+    'dotAll': dotAll,
+    'order': order,
+  };
 
   bool appliesTo(StoryRegexTarget requested) =>
       target == StoryRegexTarget.both ||
@@ -162,15 +163,15 @@ final class StoryDataBankEntry {
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'title': title,
-        'content': content,
-        'keywords': keywords,
-        'enabled': enabled,
-        'alwaysActive': alwaysActive,
-        'priority': priority,
-        'worldlineIds': worldlineIds,
-      };
+    'id': id,
+    'title': title,
+    'content': content,
+    'keywords': keywords,
+    'enabled': enabled,
+    'alwaysActive': alwaysActive,
+    'priority': priority,
+    'worldlineIds': worldlineIds,
+  };
 }
 
 final class StoryContextResources {
@@ -203,28 +204,28 @@ final class StoryContextResources {
       StoryContextResources(
         conversationId: _requiredString(json, 'conversationId'),
         activePersonaId: _nullableString(json['activePersonaId']),
-        personas: _mapList(json['personas'])
-            .map(StoryPersona.fromJson)
-            .toList(growable: false),
-        quickReplies: _mapList(json['quickReplies'])
-            .map(StoryQuickReply.fromJson)
-            .toList(growable: false),
-        regexRules: _mapList(json['regexRules'])
-            .map(StoryRegexRule.fromJson)
-            .toList(growable: false),
-        dataBankEntries: _mapList(json['dataBankEntries'])
-            .map(StoryDataBankEntry.fromJson)
-            .toList(growable: false),
+        personas: _mapList(
+          json['personas'],
+        ).map(StoryPersona.fromJson).toList(growable: false),
+        quickReplies: _mapList(
+          json['quickReplies'],
+        ).map(StoryQuickReply.fromJson).toList(growable: false),
+        regexRules: _mapList(
+          json['regexRules'],
+        ).map(StoryRegexRule.fromJson).toList(growable: false),
+        dataBankEntries: _mapList(
+          json['dataBankEntries'],
+        ).map(StoryDataBankEntry.fromJson).toList(growable: false),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'conversationId': conversationId,
-        'activePersonaId': activePersonaId,
-        'personas': personas.map((item) => item.toJson()).toList(),
-        'quickReplies': quickReplies.map((item) => item.toJson()).toList(),
-        'regexRules': regexRules.map((item) => item.toJson()).toList(),
-        'dataBankEntries': dataBankEntries.map((item) => item.toJson()).toList(),
-      };
+    'conversationId': conversationId,
+    'activePersonaId': activePersonaId,
+    'personas': personas.map((item) => item.toJson()).toList(),
+    'quickReplies': quickReplies.map((item) => item.toJson()).toList(),
+    'regexRules': regexRules.map((item) => item.toJson()).toList(),
+    'dataBankEntries': dataBankEntries.map((item) => item.toJson()).toList(),
+  };
 }
 
 final class StoryCompiledContextResources {

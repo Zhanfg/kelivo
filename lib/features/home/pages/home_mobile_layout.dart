@@ -308,42 +308,44 @@ class HomeMobileScaffold extends StatelessWidget {
       title: titleOverride ?? StoryConversationModeTitle(fallback: nativeTitle),
       actions: showChatActions
           ? [
-        const StoryConversationModeAction(),
-        IosIconButton(
-          size: 20,
-          minSize: 44,
-          onTap: onOpenMiniMap,
-          semanticLabel: AppLocalizations.of(context)!.miniMapTooltip,
-          icon: Lucide.Map,
-        ),
-        IosIconButton(
-          size: 22,
-          minSize: 44,
-          onTap: () async {
-            if (canToggleTemporaryConversation) {
-              await onToggleTemporaryConversation();
-            } else {
-              await onCreateNewConversation();
-            }
-          },
-          semanticLabel: canToggleTemporaryConversation
-              ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
-              : AppLocalizations.of(context)!.titleForLocale,
-          icon: canToggleTemporaryConversation && !temporaryConversationEnabled
-              ? Lucide.MessageCircleDashed
-              : Lucide.MessageCirclePlus,
-          builder:
-              canToggleTemporaryConversation && temporaryConversationEnabled
-              ? (color) => SvgPicture.asset(
-                  'assets/icons/temporary_chat_checked.svg',
-                  width: 22,
-                  height: 22,
-                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-                )
-              : null,
-        ),
-        const SizedBox(width: 4),
-
+              const StoryConversationModeAction(),
+              IosIconButton(
+                size: 20,
+                minSize: 44,
+                onTap: onOpenMiniMap,
+                semanticLabel: AppLocalizations.of(context)!.miniMapTooltip,
+                icon: Lucide.Map,
+              ),
+              IosIconButton(
+                size: 22,
+                minSize: 44,
+                onTap: () async {
+                  if (canToggleTemporaryConversation) {
+                    await onToggleTemporaryConversation();
+                  } else {
+                    await onCreateNewConversation();
+                  }
+                },
+                semanticLabel: canToggleTemporaryConversation
+                    ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
+                    : AppLocalizations.of(context)!.titleForLocale,
+                icon:
+                    canToggleTemporaryConversation &&
+                        !temporaryConversationEnabled
+                    ? Lucide.MessageCircleDashed
+                    : Lucide.MessageCirclePlus,
+                builder:
+                    canToggleTemporaryConversation &&
+                        temporaryConversationEnabled
+                    ? (color) => SvgPicture.asset(
+                        'assets/icons/temporary_chat_checked.svg',
+                        width: 22,
+                        height: 22,
+                        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 4),
             ]
           : const <Widget>[],
     );

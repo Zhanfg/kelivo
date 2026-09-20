@@ -148,31 +148,34 @@ void main() {
     );
   });
 
-  test('resources JSON round-trip preserves all SillyTavern-style primitives', () {
-    const source = StoryContextResources(
-      conversationId: 'conv-1',
-      activePersonaId: 'p',
-      personas: [StoryPersona(id: 'p', name: 'Persona')],
-      quickReplies: [StoryQuickReply(id: 'q', label: 'Go', submitText: 'Go')],
-      regexRules: [
-        StoryRegexRule(id: 'r', name: 'Rule', pattern: 'x', replacement: 'y'),
-      ],
-      dataBankEntries: [
-        StoryDataBankEntry(
-          id: 'd',
-          title: 'Lore',
-          content: 'Fact',
-          keywords: ['fact'],
-        ),
-      ],
-    );
+  test(
+    'resources JSON round-trip preserves all SillyTavern-style primitives',
+    () {
+      const source = StoryContextResources(
+        conversationId: 'conv-1',
+        activePersonaId: 'p',
+        personas: [StoryPersona(id: 'p', name: 'Persona')],
+        quickReplies: [StoryQuickReply(id: 'q', label: 'Go', submitText: 'Go')],
+        regexRules: [
+          StoryRegexRule(id: 'r', name: 'Rule', pattern: 'x', replacement: 'y'),
+        ],
+        dataBankEntries: [
+          StoryDataBankEntry(
+            id: 'd',
+            title: 'Lore',
+            content: 'Fact',
+            keywords: ['fact'],
+          ),
+        ],
+      );
 
-    final restored = StoryContextResources.fromJson(source.toJson());
+      final restored = StoryContextResources.fromJson(source.toJson());
 
-    expect(restored.conversationId, 'conv-1');
-    expect(restored.activePersona?.id, 'p');
-    expect(restored.quickReplies.single.submitText, 'Go');
-    expect(restored.regexRules.single.replacement, 'y');
-    expect(restored.dataBankEntries.single.keywords, ['fact']);
-  });
+      expect(restored.conversationId, 'conv-1');
+      expect(restored.activePersona?.id, 'p');
+      expect(restored.quickReplies.single.submitText, 'Go');
+      expect(restored.regexRules.single.replacement, 'y');
+      expect(restored.dataBankEntries.single.keywords, ['fact']);
+    },
+  );
 }

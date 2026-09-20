@@ -213,10 +213,7 @@ class AgentModelBridge {
         try {
           request.response.write(
             'data: ${jsonEncode(<String, dynamic>{
-              'error': <String, dynamic>{
-                'message': error.toString(),
-                'type': 'api_error',
-              },
+              'error': <String, dynamic>{'message': error.toString(), 'type': 'api_error'},
             })}\n\n',
           );
           request.response.write('data: [DONE]\n\n');

@@ -30,10 +30,11 @@ final class StoryContextResourceCompiler {
         .where((entry) => _visibleToWorldline(entry, worldlineId))
         .toList(growable: false);
 
-    final alwaysActive = visibleEntries
-        .where((entry) => entry.enabled && entry.alwaysActive)
-        .toList(growable: false)
-      ..sort(_compareDataBankEntries);
+    final alwaysActive =
+        visibleEntries
+            .where((entry) => entry.enabled && entry.alwaysActive)
+            .toList(growable: false)
+          ..sort(_compareDataBankEntries);
     if (alwaysActive.isNotEmpty) {
       stable.add(
         StoryPromptContribution(
@@ -46,19 +47,22 @@ final class StoryContextResourceCompiler {
     }
 
     final normalizedTurn = turnText.toLowerCase();
-    final keywordMatches = visibleEntries
-        .where(
-          (entry) =>
-              entry.enabled &&
-              !entry.alwaysActive &&
-              entry.keywords.isNotEmpty &&
-              entry.keywords.any(
-                (keyword) => normalizedTurn.contains(keyword.toLowerCase()),
-              ),
-        )
-        .toList(growable: false)
-      ..sort(_compareDataBankEntries);
-    final limited = keywordMatches.take(maxKeywordEntries).toList(growable: false);
+    final keywordMatches =
+        visibleEntries
+            .where(
+              (entry) =>
+                  entry.enabled &&
+                  !entry.alwaysActive &&
+                  entry.keywords.isNotEmpty &&
+                  entry.keywords.any(
+                    (keyword) => normalizedTurn.contains(keyword.toLowerCase()),
+                  ),
+            )
+            .toList(growable: false)
+          ..sort(_compareDataBankEntries);
+    final limited = keywordMatches
+        .take(maxKeywordEntries)
+        .toList(growable: false);
     if (limited.isNotEmpty) {
       volatile.add(
         StoryPromptContribution(
@@ -70,21 +74,23 @@ final class StoryContextResourceCompiler {
       );
     }
 
-    final quickReplies = resources.quickReplies
-        .where((item) => item.enabled)
-        .toList(growable: false)
-      ..sort((a, b) {
-        final order = a.order.compareTo(b.order);
-        return order != 0 ? order : a.id.compareTo(b.id);
-      });
+    final quickReplies =
+        resources.quickReplies
+            .where((item) => item.enabled)
+            .toList(growable: false)
+          ..sort((a, b) {
+            final order = a.order.compareTo(b.order);
+            return order != 0 ? order : a.id.compareTo(b.id);
+          });
 
-    final regexRules = resources.regexRules
-        .where((item) => item.enabled)
-        .toList(growable: false)
-      ..sort((a, b) {
-        final order = a.order.compareTo(b.order);
-        return order != 0 ? order : a.id.compareTo(b.id);
-      });
+    final regexRules =
+        resources.regexRules
+            .where((item) => item.enabled)
+            .toList(growable: false)
+          ..sort((a, b) {
+            final order = a.order.compareTo(b.order);
+            return order != 0 ? order : a.id.compareTo(b.id);
+          });
 
     return StoryCompiledContextResources(
       stableContributions: List.unmodifiable(stable),
@@ -124,10 +130,7 @@ bool _visibleToWorldline(StoryDataBankEntry entry, String worldlineId) {
   return entry.worldlineIds.contains(worldlineId);
 }
 
-int _compareDataBankEntries(
-  StoryDataBankEntry a,
-  StoryDataBankEntry b,
-) {
+int _compareDataBankEntries(StoryDataBankEntry a, StoryDataBankEntry b) {
   final priority = b.priority.compareTo(a.priority);
   return priority != 0 ? priority : a.id.compareTo(b.id);
 }
