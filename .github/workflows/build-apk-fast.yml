@@ -1,0 +1,67 @@
+name: Fast Android APK
+
+on:
+  push:
+    branches:
+      - feat/story-runtime-foundation
+    paths:
+      - .github/workflows/build-apk-fast.yml
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.44.9'
+
+jobs:
+  android-arm64:
+    name: Build Android arm64 APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Inject fallback stub
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '';
+          EOF
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Generate l10n
+        run: flutter gen-l10n
+
+      - name: Build arm64 release APK
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Rename APK
+        shell: bash
+        run: |
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          VERSION="$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | tr -d ' ')"
+          cp build/app/outputs/flutter-apk/app-release.apk "Kelivo_story_$VERSION_${SHORT_SHA}_arm64-v8a.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kelivo-Story-Android-arm64
+          path: Kelivo_story_*_arm64-v8a.apk
+          retention-days: 14
