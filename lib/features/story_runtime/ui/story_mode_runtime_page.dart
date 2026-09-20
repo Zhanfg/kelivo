@@ -259,7 +259,7 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                         '为当前故事收窄模型可见的 MCP 服务器与工具路由。',
                         'Narrow model-visible MCP servers and tool routes for this story.',
                       ),
-                      icon: Lucide.Server,
+                      icon: Lucide.Globe,
                       enabled: !_busy && selectedId != null,
                       onTap: selectedId == null
                           ? null
