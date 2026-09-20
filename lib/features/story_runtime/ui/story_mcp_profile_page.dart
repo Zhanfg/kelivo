@@ -10,10 +10,7 @@ import '../mcp/story_mcp_profile_store.dart';
 import 'story_native_settings_widgets.dart';
 
 class StoryMcpProfilePage extends StatefulWidget {
-  const StoryMcpProfilePage({
-    super.key,
-    required this.conversationId,
-  });
+  const StoryMcpProfilePage({super.key, required this.conversationId});
 
   final String conversationId;
 
@@ -46,8 +43,9 @@ class _StoryMcpProfilePageState extends State<StoryMcpProfilePage> {
     if (mounted) setState(() => _loading = true);
     try {
       final profiles = await _profileStore.readAll();
-      final selection =
-          await _selectionStore.readForConversation(widget.conversationId);
+      final selection = await _selectionStore.readForConversation(
+        widget.conversationId,
+      );
       if (!mounted) return;
       setState(() {
         _profiles = List.unmodifiable(profiles);
@@ -57,7 +55,9 @@ class _StoryMcpProfilePageState extends State<StoryMcpProfilePage> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
-      _show(tr('MCP Profile 加载失败：$error', 'Failed to load MCP profiles: $error'));
+      _show(
+        tr('MCP Profile 加载失败：$error', 'Failed to load MCP profiles: $error'),
+      );
     }
   }
 
@@ -76,15 +76,13 @@ class _StoryMcpProfilePageState extends State<StoryMcpProfilePage> {
 
   void _show(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _selectProfile(String? profileId) async {
-    await _run(
-      () => _selectionStore.select(widget.conversationId, profileId),
-    );
+    await _run(() => _selectionStore.select(widget.conversationId, profileId));
   }
 
   String _profileSubtitle(StoryMcpProfile profile) {
@@ -113,131 +111,128 @@ class _StoryMcpProfilePageState extends State<StoryMcpProfilePage> {
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     final nameController = TextEditingController(text: existing?.name ?? '');
     final selectedServers = <String>{...?existing?.serverIds};
-    var includeAssistantDefaults =
-        existing?.includeAssistantDefaults ?? false;
+    var includeAssistantDefaults = existing?.includeAssistantDefaults ?? false;
 
-    final result = await showDialog<
-        ({
-          String name,
-          Set<String> serverIds,
-          bool includeAssistantDefaults,
-        })>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            existing == null
-                ? tr('新建 MCP Profile', 'New MCP profile')
-                : tr('编辑 MCP Profile', 'Edit MCP profile'),
-          ),
-          content: SizedBox(
-            width: 520,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    autofocus: existing == null,
-                    decoration: InputDecoration(
-                      labelText: tr('名称', 'Name'),
-                      hintText: tr('例如：写作工具', 'Example: Writing tools'),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      tr(
-                        '保留 Assistant 原有 MCP',
-                        'Keep Assistant MCP defaults',
-                      ),
-                    ),
-                    subtitle: Text(
-                      tr(
-                        '关闭后，Story 只暴露下面勾选的服务器和已有单工具规则。',
-                        'When disabled, Story exposes only the servers selected below plus existing per-tool rules.',
-                      ),
-                    ),
-                    value: includeAssistantDefaults,
-                    onChanged: (value) {
-                      setDialogState(
-                        () => includeAssistantDefaults = value,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    tr('允许的 MCP 服务器', 'Allowed MCP servers'),
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  if (servers.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Text(
-                        tr(
-                          'Kelivo 目前没有已配置的 MCP 服务器。',
-                          'Kelivo currently has no configured MCP servers.',
+    final result =
+        await showDialog<
+          ({String name, Set<String> serverIds, bool includeAssistantDefaults})
+        >(
+          context: context,
+          builder: (context) => StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              title: Text(
+                existing == null
+                    ? tr('新建 MCP Profile', 'New MCP profile')
+                    : tr('编辑 MCP Profile', 'Edit MCP profile'),
+              ),
+              content: SizedBox(
+                width: 520,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: nameController,
+                        autofocus: existing == null,
+                        decoration: InputDecoration(
+                          labelText: tr('名称', 'Name'),
+                          hintText: tr('例如：写作工具', 'Example: Writing tools'),
                         ),
                       ),
-                    )
-                  else
-                    for (final server in servers)
-                      CheckboxListTile(
+                      const SizedBox(height: 14),
+                      SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
-                        value: selectedServers.contains(server.id),
-                        title: Text(server.name),
-                        subtitle: Text(
-                          [
-                            server.transport.name,
-                            if (!server.enabled) tr('已停用', 'Disabled'),
-                          ].join(' · '),
+                        title: Text(
+                          tr(
+                            '保留 Assistant 原有 MCP',
+                            'Keep Assistant MCP defaults',
+                          ),
                         ),
+                        subtitle: Text(
+                          tr(
+                            '关闭后，Story 只暴露下面勾选的服务器和已有单工具规则。',
+                            'When disabled, Story exposes only the servers selected below plus existing per-tool rules.',
+                          ),
+                        ),
+                        value: includeAssistantDefaults,
                         onChanged: (value) {
-                          setDialogState(() {
-                            if (value == true) {
-                              selectedServers.add(server.id);
-                            } else {
-                              selectedServers.remove(server.id);
-                            }
-                          });
+                          setDialogState(
+                            () => includeAssistantDefaults = value,
+                          );
                         },
                       ),
-                  const SizedBox(height: 10),
-                  Text(
-                    tr(
-                      'Profile 只限制模型可见路由。实际连接、工具执行与审批仍由 Kelivo 原生 MCP 系统负责。',
-                      'Profiles only narrow model-visible routes. Connection, execution and approval still use Kelivo\'s native MCP system.',
-                    ),
-                    style: Theme.of(context).textTheme.bodySmall,
+                      const SizedBox(height: 8),
+                      Text(
+                        tr('允许的 MCP 服务器', 'Allowed MCP servers'),
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 4),
+                      if (servers.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            tr(
+                              'Kelivo 目前没有已配置的 MCP 服务器。',
+                              'Kelivo currently has no configured MCP servers.',
+                            ),
+                          ),
+                        )
+                      else
+                        for (final server in servers)
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: selectedServers.contains(server.id),
+                            title: Text(server.name),
+                            subtitle: Text(
+                              [
+                                server.transport.name,
+                                if (!server.enabled) tr('已停用', 'Disabled'),
+                              ].join(' · '),
+                            ),
+                            onChanged: (value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  selectedServers.add(server.id);
+                                } else {
+                                  selectedServers.remove(server.id);
+                                }
+                              });
+                            },
+                          ),
+                      const SizedBox(height: 10),
+                      Text(
+                        tr(
+                          'Profile 只限制模型可见路由。实际连接、工具执行与审批仍由 Kelivo 原生 MCP 系统负责。',
+                          'Profiles only narrow model-visible routes. Connection, execution and approval still use Kelivo\'s native MCP system.',
+                        ),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(tr('取消', 'Cancel')),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) return;
+                    Navigator.of(context).pop((
+                      name: name,
+                      serverIds: Set<String>.from(selectedServers),
+                      includeAssistantDefaults: includeAssistantDefaults,
+                    ));
+                  },
+                  child: Text(tr('保存', 'Save')),
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(tr('取消', 'Cancel')),
-            ),
-            FilledButton(
-              onPressed: () {
-                final name = nameController.text.trim();
-                if (name.isEmpty) return;
-                Navigator.of(context).pop((
-                  name: name,
-                  serverIds: Set<String>.from(selectedServers),
-                  includeAssistantDefaults: includeAssistantDefaults,
-                ));
-              },
-              child: Text(tr('保存', 'Save')),
-            ),
-          ],
-        ),
-      ),
-    );
+        );
     nameController.dispose();
     if (result == null) return;
 
@@ -317,7 +312,10 @@ class _StoryMcpProfilePageState extends State<StoryMcpProfilePage> {
                   ),
                   children: [
                     StoryNativeRow(
-                      title: tr('不使用 Story MCP Profile', 'No Story MCP profile'),
+                      title: tr(
+                        '不使用 Story MCP Profile',
+                        'No Story MCP profile',
+                      ),
                       subtitle: tr(
                         '保持 Assistant 当前 MCP 行为。',
                         'Keep the Assistant\'s current MCP behavior.',
@@ -336,9 +334,7 @@ class _StoryMcpProfilePageState extends State<StoryMcpProfilePage> {
                         trailing: _selectedProfileId == profile.id
                             ? const Icon(Lucide.Check)
                             : null,
-                        onTap: _busy
-                            ? null
-                            : () => _selectProfile(profile.id),
+                        onTap: _busy ? null : () => _selectProfile(profile.id),
                       ),
                   ],
                 ),
