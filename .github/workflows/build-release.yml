@@ -79,6 +79,7 @@ jobs:
     if: ${{ github.event.inputs.build_android == 'true' }}
     name: 构建 Android
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions: write-all
 
     steps:
@@ -100,6 +101,14 @@ jobs:
           channel: ${{ inputs.flutter_channel }}
           flutter-version: ${{ inputs.flutter_version }}
           cache: true
+
+      - name: 🧰 缓存 Pub 包
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
 
       - name: 🧰 缓存 Android PRoot JNI
         uses: actions/cache@v4
@@ -143,12 +152,23 @@ jobs:
         run: flutter pub get
 
       - name: 🏗️ 构建 APK
+        shell: bash
         run: |
+          set -euo pipefail
+          extra_target=()
+          if [ "${{ github.event.inputs.publish_release }}" != "true" ]; then
+            extra_target=(--target-platform android-arm64)
+            export KELIVO_ANDROID_ABIS=arm64-v8a
+            echo "Non-release build: compiling arm64 only."
+          else
+            echo "Release build: compiling all configured Android ABIs."
+          fi
           flutter build apk \
             --release \
             --no-pub \
             --split-per-abi \
-            --split-debug-info=build/symbols/android
+            --split-debug-info=build/symbols/android \
+            "${extra_target[@]}"
 
       - name: 📏 输出 APK 体积
         shell: bash
