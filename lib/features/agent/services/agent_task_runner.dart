@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/workspace_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
 import '../../../utils/app_directories.dart';
 import '../models/agent_task.dart';
 import '../providers/agent_task_provider.dart';
+import 'agent_context_materializer.dart';
 import 'agent_task_journal.dart';
 import 'pi_binary_installer.dart';
 import 'pi_rpc_session.dart';
@@ -15,6 +18,9 @@ class AgentTaskRunner {
     required this.tasks,
     required this.journal,
     required this.workspaces,
+    required this.assistants,
+    required this.chat,
+    required this.contextMaterializer,
     required this.runtimeProvider,
     required this.environment,
     required this.piInstaller,
@@ -25,6 +31,9 @@ class AgentTaskRunner {
   final AgentTaskProvider tasks;
   final AgentTaskJournal journal;
   final WorkspaceProvider workspaces;
+  final AssistantProvider assistants;
+  final ChatService chat;
+  final AgentContextMaterializer contextMaterializer;
   final WorkspaceRuntimeProvider runtimeProvider;
   final EnvironmentProvider environment;
   final PiBinaryInstaller piInstaller;
@@ -83,10 +92,29 @@ class AgentTaskRunner {
       final execution = await environment.loadExecutionConfig();
       secretValues = execution.variables;
 
+      final assistant = task.assistantId == null
+          ? null
+          : assistants.getById(task.assistantId!);
+      final conversation = task.conversationId == null
+          ? null
+          : chat.getConversation(task.conversationId!);
+      final materializedContext = await contextMaterializer.materialize(
+        taskId: task.id,
+        assistantId: task.assistantId,
+        skillIds: assistant?.skillIds.toSet(),
+        mcpServerIds: conversation?.mcpServerIds.toSet(),
+      );
+
       final mounts = <Mount>[
         Mount(host: workspaceRoot, guest: '/workspace'),
         Mount(host: taskDir.path, guest: '/kelivo-agent-task'),
         installation.asMount(),
+        for (final skill in materializedContext.skillMounts)
+          Mount(
+            host: skill.hostDirectory,
+            guest: skill.guestDirectory,
+            readOnly: true,
+          ),
       ];
 
       session = await PiRpcSession.start(
@@ -95,6 +123,11 @@ class AgentTaskRunner {
         cwd: '/workspace',
         sessionDir: '/kelivo-agent-task/pi-session',
         sessionName: task.title.isEmpty ? 'KELIVO Agent' : task.title,
+        appendSystemPrompt: materializedContext.guestPromptFile,
+        skills: [
+          for (final skill in materializedContext.skillMounts)
+            skill.guestDirectory,
+        ],
         mounts: mounts,
         environment: execution.variables,
       );
