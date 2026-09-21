@@ -1128,16 +1128,20 @@ class HomeViewModel extends ChangeNotifier {
     final assistantId = ap.currentAssistantId;
     final a = ap.currentAssistant;
 
+    final title = getTitleForLocale(_contextProvider);
+    final workspaceMode =
+        _contextProvider.read<WorkspaceModeProvider?>()?.mode ??
+        WorkspaceMode.chat;
+    final businessPreferences = _contextProvider.read<BusinessPreferences>();
+
     var conversation = await _chatService.createDraftConversation(
-      title: getTitleForLocale(_contextProvider),
+      title: title,
       assistantId: assistantId,
     );
 
-    final workspaceMode =
-        _contextProvider.read<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
     if (workspaceMode == WorkspaceMode.story) {
       await StoryModeTransitionService(
-        preferences: _contextProvider.read<BusinessPreferences>(),
+        preferences: businessPreferences,
         chatService: _chatService,
       ).promoteToStory(conversation.id);
       conversation = _chatService.getConversation(conversation.id) ?? conversation;
