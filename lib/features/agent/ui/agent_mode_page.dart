@@ -316,6 +316,7 @@ class _TaskCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final status = _phaseLabel(task.phase, zh);
     final step = _friendlyStep(task.currentStep, zh);
+    final error = _friendlyError(task.lastError, zh);
     final active = {
       AgentTaskPhase.preparing,
       AgentTaskPhase.running,
@@ -386,10 +387,10 @@ class _TaskCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                if ((task.lastError ?? '').isNotEmpty) ...[
+                if (error != null) ...[
                   const SizedBox(height: 5),
                   Text(
-                    task.lastError!,
+                    error,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -456,8 +457,13 @@ class _TaskCard extends StatelessWidget {
   if (lower.contains('preparing pi') || lower.contains('runtime')) {
     return zh ? '正在准备任务' : 'Preparing task';
   }
-  if (lower.contains('pi is working') || lower.contains('tool:')) {
-    return zh ? '正在执行' : 'Working';
+  if (lower.contains('pi is working') ||
+      lower.contains('tool:') ||
+      lower.startsWith('running ')) {
+    return zh ? '正在使用工具' : 'Using tools';
+  }
+  if (lower.contains('requested user input')) {
+    return zh ? '等待你的确认' : 'Waiting for your input';
   }
   if (lower.contains('verifying pi') || lower.contains('verifying')) {
     return zh ? '正在检查结果' : 'Checking results';
@@ -466,6 +472,22 @@ class _TaskCard extends StatelessWidget {
   if (lower == 'cancelled') return zh ? '已取消' : 'Cancelled';
   if (lower == 'agent failed') return zh ? '执行失败' : 'Task failed';
   return value;
+}
+
+String? _friendlyError(String? raw, bool zh) {
+  final value = raw?.trim();
+  if (value == null || value.isEmpty) return null;
+  final lower = value.toLowerCase();
+  if (lower.contains('agent_model_not_configured')) {
+    return zh ? '尚未配置可用模型，请先选择默认模型。' : 'No model is configured. Choose a default model first.';
+  }
+  if (lower.contains('runtime') ||
+      lower.contains('rootfs') ||
+      lower.contains('proot') ||
+      lower.contains('pi_')) {
+    return zh ? '代理运行环境启动失败，可以重试或查看日志。' : 'Agent runtime could not start. Retry or check logs.';
+  }
+  return zh ? '任务执行失败，可以重试或查看日志。' : 'Task failed. Retry or check logs.';
 }
 
 String _phaseLabel(AgentTaskPhase phase, bool zh) => switch (phase) {
