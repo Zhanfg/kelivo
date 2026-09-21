@@ -6,22 +6,20 @@ import 'package:crypto/crypto.dart';
 
 import '../../../core/database/business_preferences.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/models/conversation_kind.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
 import '../state/story_scene_runtime_state.dart';
 import '../world_tree/story_world_tree_coordinator.dart';
 import '../world_tree/story_world_tree_store.dart';
 
-/// Performs the actual Chat <-> Story transition for a native Kelivo
+/// Performs the one-way Chat -> Story promotion for a native Kelivo
 /// conversation.
 ///
-/// Chat -> Story is not a cosmetic boolean toggle. It bootstraps (or resumes)
-/// a World Tree, binds the current native conversation to its worldline,
-/// synchronizes the current native message head and initializes the scene
-/// sidecar before Story Runtime is marked enabled.
-///
-/// Story -> Chat stops future Story orchestration but deliberately keeps those
-/// sidecars intact so switching back to Story resumes the same continuity.
+/// Promotion bootstraps (or resumes) World Tree/scene sidecars before committing
+/// ConversationKind.story. Story -> Chat is intentionally not a state
+/// transition: leaving the Story workspace never destroys or disables Story
+/// continuity.
 final class StoryModeTransitionService {
   StoryModeTransitionService({
     required BusinessPreferences preferences,
@@ -40,6 +38,10 @@ final class StoryModeTransitionService {
   final StoryWorldTreeStore _worldTreeStore;
   final StoryWorldTreeCoordinator _worldTreeCoordinator;
 
+  /// Compatibility entry point for older callers.
+  ///
+  /// Story promotion is one-way. Passing storyEnabled=false never demotes an
+  /// existing Story conversation; workspace navigation is handled separately.
   Future<StoryRuntimeSessionState> setMode({
     required String conversationId,
     required bool storyEnabled,
@@ -48,17 +50,25 @@ final class StoryModeTransitionService {
     if (id.isEmpty) {
       throw ArgumentError.value(conversationId, 'conversationId');
     }
-
-    final current = await _runtimeStore.readOrDefault(id);
     if (!storyEnabled) {
-      final next = current.copyWith(
-        enabled: false,
-        modeSelectionCommitted: true,
-      );
-      await _runtimeStore.upsert(next);
-      return next;
+      return _runtimeStore.readOrDefault(id);
+    }
+    return promoteToStory(id);
+  }
+
+  /// Irreversibly promotes a native Chat conversation into Story.
+  ///
+  /// Runtime sidecars are prepared first. ConversationKind.story is written
+  /// last as the commit point, so a failed bootstrap remains a recoverable Chat.
+  Future<StoryRuntimeSessionState> promoteToStory(
+    String conversationId,
+  ) async {
+    final id = conversationId.trim();
+    if (id.isEmpty) {
+      throw ArgumentError.value(conversationId, 'conversationId');
     }
 
+    final current = await _runtimeStore.readOrDefault(id);
     final conversation = _chatService.getConversation(id);
     if (conversation == null) {
       throw StateError('Cannot enter Story Mode for an unknown conversation.');
@@ -135,6 +145,14 @@ final class StoryModeTransitionService {
       sceneRevision: nextScene.revision,
     );
     await _runtimeStore.upsert(next);
+
+    // Commit point: once marked Story, the conversation never becomes Chat
+    // again. Legacy callers that "switch to Chat" only leave the Story
+    // workspace; they do not mutate this ownership.
+    await _chatService.updateConversationExtras(
+      id,
+      (extras) => conversationExtrasWithKind(extras, ConversationKind.story),
+    );
     return next;
   }
 }
