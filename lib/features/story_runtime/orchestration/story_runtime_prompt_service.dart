@@ -453,13 +453,19 @@ final class StoryRuntimePromptService {
 
   String _sceneBaseline(StorySceneRuntimeState scene) {
     final participants = scene.participantCharacterIds.join(',');
-    final relationships = scene.relationships
-        .map(
+    final activeIds = <String>{'self', ...scene.participantCharacterIds};
+    final relevantEdges = scene.relationships
+        .where(
           (edge) =>
-              '${edge.fromId}>${edge.toId}:${edge.dimensions.entries.map((entry) => '${entry.key}=${entry.value.toStringAsFixed(2)}').join(',')}',
+              activeIds.contains(edge.fromId) || activeIds.contains(edge.toId),
         )
-        .where((item) => item.isNotEmpty)
-        .join('|');
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final relationships = relevantEdges.take(24).map((edge) {
+      final axes = edge.dimensions.entries.toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+      return '${edge.fromId}>${edge.toId}:${axes.map((entry) => '${entry.key}=${entry.value.toStringAsFixed(2)}').join(',')}';
+    }).join('|');
     final choices = scene.availableChoices
         .map((choice) => '${choice.id}:${choice.label}')
         .join('|');
