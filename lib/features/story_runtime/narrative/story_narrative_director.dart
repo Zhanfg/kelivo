@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings
+
 import '../cache/story_prompt_cache_plan.dart';
 import '../state/story_scene_runtime_state.dart';
 import 'story_narrative_profile.dart';
