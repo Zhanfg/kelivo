@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/models/chat_message.dart';
 import '../../../theme/app_font_weights.dart';
+import '../parsing/story_readable_projection.dart';
 
 /// Story mode renders the existing conversation as a reading surface instead
 /// of reimplementing message persistence or generation.
@@ -22,7 +23,18 @@ class StoryNarrativeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final entries = messages
-        .where((message) => message.content.trim().isNotEmpty)
+        .map(
+          (message) => (
+            message: message,
+            content: message.role == 'user'
+                ? message.content
+                : projectStoryReadableOrOriginal(
+                    message.content,
+                    turnId: message.id,
+                  ),
+          ),
+        )
+        .where((entry) => entry.content.trim().isNotEmpty)
         .toList(growable: false);
     final cs = Theme.of(context).colorScheme;
     final zh = Localizations.localeOf(context).languageCode == 'zh';
@@ -42,7 +54,9 @@ class StoryNarrativeView extends StatelessWidget {
             empty: entries.isEmpty,
           );
         }
-        final message = entries[index - 1];
+        final entry = entries[index - 1];
+        final message = entry.message;
+        final content = entry.content;
         if (message.role == 'user') {
           return Semantics(
             label: zh ? '创作指令' : 'Writing direction',
@@ -57,7 +71,7 @@ class StoryNarrativeView extends StatelessWidget {
                   vertical: 11,
                 ),
                 child: Text(
-                  message.content,
+                  content,
                   style: TextStyle(
                     height: 1.48,
                     fontSize: 14,
@@ -69,7 +83,7 @@ class StoryNarrativeView extends StatelessWidget {
           );
         }
         return Text(
-          message.content,
+          content,
           style: TextStyle(
             height: 1.78,
             fontSize: 17,
