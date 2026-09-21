@@ -328,7 +328,7 @@ class AgentTaskRunner {
     await tasks.setPhase(
       taskId,
       AgentTaskPhase.waitingApproval,
-      currentStep: 'Pi requested user input',
+      currentStep: 'Waiting for user input',
     );
     await journal.append(
       taskId,
