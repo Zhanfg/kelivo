@@ -16,7 +16,7 @@ import 'agent_context_materializer.dart';
 import 'agent_model_bridge.dart';
 import 'agent_runtime_bootstrap.dart';
 import 'agent_task_journal.dart';
-import 'pi_binary_installer.dart';
+import 'agent_engine_installer.dart';
 import 'pi_rpc_session.dart';
 
 class AgentTaskRunner {
@@ -32,7 +32,7 @@ class AgentTaskRunner {
     required this.settings,
     required this.runtimeBootstrap,
     required this.environment,
-    required this.piInstaller,
+    required this.engineInstaller,
   }) {
     recovery = _recoverUnownedTasks();
   }
@@ -48,7 +48,7 @@ class AgentTaskRunner {
   final SettingsProvider settings;
   final AgentRuntimeBootstrap runtimeBootstrap;
   final EnvironmentProvider environment;
-  final PiBinaryInstaller piInstaller;
+  final AgentEngineInstaller engineInstaller;
 
   late final Future<void> recovery;
   final Map<String, PiRpcSession> _sessions = <String, PiRpcSession>{};
@@ -95,7 +95,7 @@ class AgentTaskRunner {
       if (workspace == null) throw StateError('agent_workspace_missing');
       final workspaceRoot = await workspaces.hostRootFor(workspace);
       final taskDir = await AppDirectories.agentTaskDir(task.id);
-      final installation = await piInstaller.ensureInstalled(
+      final installation = await engineInstaller.ensureInstalled(
         environmentId: task.environmentId,
       );
       final execution = await environment.loadExecutionConfig();
@@ -166,7 +166,7 @@ class AgentTaskRunner {
           for (final skill in materializedContext.skillMounts)
             skill.guestDirectory,
         ],
-        extraArgs: const <String>['--provider', 'kelivo', '--model', 'current'],
+        extraArgs: const <String>['--model', 'kelivo/current'],
         mounts: mounts,
         environment: <String, String>{
           ...execution.variables,
