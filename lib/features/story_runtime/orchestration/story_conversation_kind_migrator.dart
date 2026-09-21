@@ -11,6 +11,7 @@ import '../world_tree/story_world_tree_store.dart';
 /// Any conversation that owns Story sidecar state is Story forever, including
 /// legacy sessions whose old enabled flag was switched off.
 final class StoryConversationKindMigrator {
+  // ignore: prefer_initializing_formals
   StoryConversationKindMigrator({
     required BusinessPreferences preferences,
     required ChatService chatService,
