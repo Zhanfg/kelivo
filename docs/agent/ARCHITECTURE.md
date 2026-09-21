@@ -44,8 +44,9 @@ Agent mode must reuse rather than fork these systems:
 - McpProvider owns MCP configuration, OAuth state, tool metadata, and approval
   flags. Secrets are not copied into guest files.
 - WorkspaceProvider owns managed and linked workspaces.
-- EnvironmentProvider and the runtime layer own the current local execution
-  environment until multi-environment execution is introduced.
+- AgentRuntimeBootstrap owns Agent execution environments independently from the
+  user-facing Workspace/Environment feature. Generic Workspace Linux state must
+  never be a prerequisite for Agent mode.
 - The existing model/provider layer remains independent from the Agent harness.
 
 Structured task, project, process, and environment state must not be encoded as
@@ -103,10 +104,15 @@ The runtime targets capability detection rather than Android/kernel version
 branches. The baseline is Android API 26 with Linux 4.9 semantics; newer
 syscalls are accelerators, never hard requirements.
 
+The Android Agent image is Wolfi-based: glibc userspace, apk package management,
+and a minimal package set embedded into the APK. It is installed automatically
+into KELIVO-owned persistent storage; users do not select or install a Linux
+distribution for Agent mode.
+
 The long-term fast runtime should selectively translate guest namespace/path
 operations while allowing ordinary fd I/O, sockets, mmap, futex, epoll, and
 other safe hot-path syscalls to execute directly. PRoot remains a compatibility
-backend, not the performance target.
+backend, not the product identity or performance target.
 
 ## Agent harness
 
