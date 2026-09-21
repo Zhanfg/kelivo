@@ -2308,7 +2308,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   String _composerModelLabel() {
-    final raw = (widget.currentModelId ?? widget.chatModelId ?? '').trim();
+    final raw = (widget.chatModelId ?? widget.currentModelId ?? '').trim();
     if (raw.isEmpty) return 'Model';
     final slash = raw.lastIndexOf('/');
     final value = slash >= 0 && slash + 1 < raw.length
