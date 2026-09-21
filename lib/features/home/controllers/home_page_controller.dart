@@ -1041,14 +1041,22 @@ class HomePageController extends ChangeNotifier {
       );
     }
 
-    final result = await sendMessage(input);
-    if (result == ChatInputSubmissionResult.rejected) {
+    try {
+      final result = await sendMessage(input);
+      if (result == ChatInputSubmissionResult.rejected) {
+        await store.failLatestPending(
+          conversationId: conversation.id,
+          resultSummary: 'action_submission_rejected',
+        );
+      }
+      return result;
+    } catch (_) {
       await store.failLatestPending(
         conversationId: conversation.id,
-        resultSummary: 'action_submission_rejected',
+        resultSummary: 'action_submission_failed',
       );
+      rethrow;
     }
-    return result;
   }
 
   Future<ChatInputSubmissionResult> guideMessage(ChatInputData input) async {
