@@ -13,6 +13,7 @@ import '../providers/agent_interaction_broker.dart';
 import '../providers/agent_task_provider.dart';
 import 'agent_context_materializer.dart';
 import 'agent_model_bridge.dart';
+import 'agent_runtime_bootstrap.dart';
 import 'agent_task_journal.dart';
 import 'pi_binary_installer.dart';
 import 'pi_rpc_session.dart';
@@ -27,7 +28,7 @@ class AgentTaskRunner {
     required this.chat,
     required this.contextMaterializer,
     required this.settings,
-    required this.runtimeProvider,
+    required this.runtimeBootstrap,
     required this.environment,
     required this.piInstaller,
   }) {
@@ -42,7 +43,7 @@ class AgentTaskRunner {
   final ChatService chat;
   final AgentContextMaterializer contextMaterializer;
   final SettingsProvider settings;
-  final WorkspaceRuntimeProvider runtimeProvider;
+  final AgentRuntimeBootstrap runtimeBootstrap;
   final EnvironmentProvider environment;
   final PiBinaryInstaller piInstaller;
 
@@ -77,18 +78,13 @@ class AgentTaskRunner {
       await tasks.setPhase(
         taskId,
         AgentTaskPhase.preparing,
-        currentStep: 'Preparing Pi runtime',
+        currentStep: 'Preparing task',
       );
 
-      await runtimeProvider.initialization;
-      final runtime = runtimeProvider.runtime;
-      if (runtime is! WorkspaceStdioRuntime) {
-        throw StateError('agent_stdio_runtime_unavailable');
-      }
-      final status = await runtime.status();
-      if (!status.ready) {
-        throw StateError(status.reason ?? 'agent_environment_not_ready');
-      }
+      final runtimeHandle = await runtimeBootstrap.ensureReady(
+        environmentId: task.environmentId,
+      );
+      final WorkspaceStdioRuntime runtime = runtimeHandle.runtime;
 
       await workspaces.loaded;
       final workspace = workspaces.byId(task.workspaceId);
@@ -199,7 +195,7 @@ class AgentTaskRunner {
       await tasks.setPhase(
         taskId,
         AgentTaskPhase.running,
-        currentStep: 'Pi is working',
+        currentStep: 'Working',
       );
       final promptResponse = await session.prompt(task.goal);
       if (promptResponse['success'] != true) {
@@ -213,7 +209,7 @@ class AgentTaskRunner {
       await tasks.setPhase(
         taskId,
         AgentTaskPhase.verifying,
-        currentStep: 'Verifying Pi session state',
+        currentStep: 'Checking results',
       );
       await _waitUntilIdle(session);
       if (_cancelled.contains(taskId)) return;
@@ -282,7 +278,7 @@ class AgentTaskRunner {
         await tasks.setPhase(
           taskId,
           AgentTaskPhase.running,
-          currentStep: 'Pi is working',
+          currentStep: 'Working',
         );
       case 'tool_execution_start':
         final tool = event['toolName']?.toString() ?? 'tool';
@@ -353,7 +349,7 @@ class AgentTaskRunner {
     await tasks.setPhase(
       taskId,
       AgentTaskPhase.running,
-      currentStep: 'Pi is working',
+      currentStep: 'Working',
     );
   }
 
