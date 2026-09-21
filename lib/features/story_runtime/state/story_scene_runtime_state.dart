@@ -1,4 +1,5 @@
 import '../../../core/services/json_blob_store.dart';
+import '../models/story_runtime_models.dart';
 
 /// Persisted scene/runtime state for one Story conversation.
 ///
@@ -17,6 +18,8 @@ final class StorySceneRuntimeState {
     this.pov = 'self',
     this.activeSkillIds = const <String>[],
     this.openLoops = const <String>[],
+    this.relationships = const <StoryRelationshipEdge>[],
+    this.availableChoices = const <StoryChoice>[],
     this.continuityState = const <String, Object?>{},
     this.serialState = const <String, Object?>{},
     this.revision = 0,
@@ -33,6 +36,8 @@ final class StorySceneRuntimeState {
   final String pov;
   final List<String> activeSkillIds;
   final List<String> openLoops;
+  final List<StoryRelationshipEdge> relationships;
+  final List<StoryChoice> availableChoices;
   final Map<String, Object?> continuityState;
   final Map<String, Object?> serialState;
   final int revision;
@@ -47,6 +52,8 @@ final class StorySceneRuntimeState {
     String? pov,
     List<String>? activeSkillIds,
     List<String>? openLoops,
+    List<StoryRelationshipEdge>? relationships,
+    List<StoryChoice>? availableChoices,
     Map<String, Object?>? continuityState,
     Map<String, Object?>? serialState,
     int? revision,
@@ -67,6 +74,8 @@ final class StorySceneRuntimeState {
     pov: pov ?? this.pov,
     activeSkillIds: activeSkillIds ?? this.activeSkillIds,
     openLoops: openLoops ?? this.openLoops,
+    relationships: relationships ?? this.relationships,
+    availableChoices: availableChoices ?? this.availableChoices,
     continuityState: continuityState ?? this.continuityState,
     serialState: serialState ?? this.serialState,
     revision: revision ?? this.revision,
@@ -83,6 +92,8 @@ final class StorySceneRuntimeState {
     'pov': pov,
     'activeSkillIds': activeSkillIds,
     'openLoops': openLoops,
+    'relationships': relationships.map((item) => item.toJson()).toList(),
+    'availableChoices': availableChoices.map((item) => item.toJson()).toList(),
     'continuityState': continuityState,
     'serialState': serialState,
     'revision': revision,
@@ -110,6 +121,24 @@ final class StorySceneRuntimeState {
             .map((item) => item.toString().trim())
             .where((item) => item.isNotEmpty)
             .toList(growable: false),
+        relationships:
+            ((json['relationships'] as List?) ?? const <Object?>[])
+                .whereType<Map>()
+                .map(
+                  (item) => StoryRelationshipEdge.fromJson(
+                    Map<String, dynamic>.from(item),
+                  ),
+                )
+                .toList(growable: false),
+        availableChoices:
+            ((json['availableChoices'] as List?) ?? const <Object?>[])
+                .whereType<Map>()
+                .map(
+                  (item) => StoryChoice.fromJson(
+                    Map<String, dynamic>.from(item),
+                  ),
+                )
+                .toList(growable: false),
         continuityState: Map<String, Object?>.from(
           (json['continuityState'] as Map?) ?? const <String, Object?>{},
         ),
