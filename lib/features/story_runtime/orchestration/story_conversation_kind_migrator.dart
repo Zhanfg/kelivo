@@ -15,10 +15,10 @@ final class StoryConversationKindMigrator {
     required BusinessPreferences preferences,
     required ChatService chatService,
   }) => StoryConversationKindMigrator._(
-    _store: StoryRuntimeStore(preferences),
-    _sceneStore: StorySceneRuntimeStore(preferences),
-    _worldTreeStore: StoryWorldTreeStore(preferences),
-    _chatService: chatService,
+    store: StoryRuntimeStore(preferences),
+    sceneStore: StorySceneRuntimeStore(preferences),
+    worldTreeStore: StoryWorldTreeStore(preferences),
+    chatService: chatService,
   );
 
   StoryConversationKindMigrator._({
