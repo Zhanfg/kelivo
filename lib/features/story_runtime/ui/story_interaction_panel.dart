@@ -90,7 +90,6 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
       location: scene.location,
       timeLabel: scene.timeLabel,
       participantCount: scene.participantCharacterIds.length,
-      openLoops: scene.openLoops.take(3).toList(growable: false),
       choices: choiceEvent?.choices ?? const <StoryChoice>[],
       quickReplies: quickReplies.take(4).toList(growable: false),
     );
@@ -296,7 +295,6 @@ class _StoryInteractionSnapshot {
     this.location,
     this.timeLabel,
     this.participantCount = 0,
-    this.openLoops = const <String>[],
     this.choices = const <StoryChoice>[],
     this.quickReplies = const <StoryQuickReply>[],
   });
@@ -304,7 +302,6 @@ class _StoryInteractionSnapshot {
   final String? location;
   final String? timeLabel;
   final int participantCount;
-  final List<String> openLoops;
   final List<StoryChoice> choices;
   final List<StoryQuickReply> quickReplies;
 }
