@@ -18,6 +18,7 @@ import 'agent_model_bridge.dart';
 import 'agent_runtime_bootstrap.dart';
 import 'agent_task_journal.dart';
 import 'agent_engine_installer.dart';
+import 'agent_github_cli_installer.dart';
 import 'pi_rpc_session.dart';
 
 class AgentTaskRunner {
@@ -34,6 +35,7 @@ class AgentTaskRunner {
     required this.runtimeBootstrap,
     required this.environment,
     required this.engineInstaller,
+    required this.githubCliInstaller,
   }) {
     recovery = _recoverUnownedTasks();
   }
@@ -50,6 +52,7 @@ class AgentTaskRunner {
   final AgentRuntimeBootstrap runtimeBootstrap;
   final EnvironmentProvider environment;
   final AgentEngineInstaller engineInstaller;
+  final AgentGithubCliInstaller githubCliInstaller;
 
   late final Future<void> recovery;
   final Map<String, PiRpcSession> _sessions = <String, PiRpcSession>{};
@@ -97,6 +100,9 @@ class AgentTaskRunner {
       final workspaceRoot = await workspaces.hostRootFor(workspace);
       final taskDir = await AppDirectories.agentTaskDir(task.id);
       final installation = await engineInstaller.ensureInstalled(
+        environmentId: task.environmentId,
+      );
+      final githubCli = await githubCliInstaller.ensureInstalled(
         environmentId: task.environmentId,
       );
       final execution = await environment.loadExecutionConfig();
@@ -163,6 +169,7 @@ class AgentTaskRunner {
           readOnly: true,
         ),
         installation.asMount(),
+        githubCli.asMount(),
         for (final skill in materializedContext.skillMounts)
           Mount(
             host: skill.hostDirectory,
@@ -192,6 +199,8 @@ class AgentTaskRunner {
           'KELIVO_AGENT_PERMISSION_MODE': agentSettings.permissionMode.name,
           'KELIVO_AGENT_BRIDGE_KEY': modelEndpoint.token,
           'OMP_WORKTREE_DIR': '/kelivo-agent-task/worktrees',
+          'PATH':
+              '${githubCli.guestRoot}/bin:/home/kelivo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
         },
       );
       _sessions[taskId] = session;
@@ -636,7 +645,7 @@ class AgentTaskRunner {
         'isolation:',
         '  backend: rcopy',
         'github:',
-        '  enabled: false',
+        '  enabled: true',
         '',
       ].join('\n'),
       flush: true,
