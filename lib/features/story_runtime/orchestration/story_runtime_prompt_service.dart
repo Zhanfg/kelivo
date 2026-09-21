@@ -456,10 +456,7 @@ final class StoryRuntimePromptService {
     final relationships = scene.relationships
         .map(
           (edge) =>
-              '${edge.fromId}>${edge.toId}:' +
-              edge.dimensions.entries
-                  .map((entry) => '${entry.key}=${entry.value.toStringAsFixed(2)}')
-                  .join(','),
+              '${edge.fromId}>${edge.toId}:${edge.dimensions.entries.map((entry) => '${entry.key}=${entry.value.toStringAsFixed(2)}').join(',')}',
         )
         .where((item) => item.isNotEmpty)
         .join('|');
