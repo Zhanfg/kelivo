@@ -47,6 +47,16 @@ class AgentModelBridgeEndpoint {
   final String token;
 }
 
+class AgentModelBridgeConfigFiles {
+  const AgentModelBridgeConfigFiles({
+    required this.jsonFile,
+    required this.yamlFile,
+  });
+
+  final File jsonFile;
+  final File yamlFile;
+}
+
 /// Loopback-only OpenAI-compatible facade over KELIVO's existing provider
 /// stack. Pi never receives the upstream provider credential.
 class AgentModelBridge {
@@ -90,7 +100,7 @@ class AgentModelBridge {
     );
   }
 
-  Future<File> writePiConfig({
+  Future<AgentModelBridgeConfigFiles> writePiConfig({
     required Directory taskDirectory,
     required AgentModelBridgeEndpoint endpoint,
   }) async {
@@ -116,7 +126,27 @@ class AgentModelBridge {
       }),
       flush: true,
     );
-    return modelsFile;
+    final yamlFile = File(p.join(configDir.path, 'models.yml'));
+    await yamlFile.writeAsString(
+      [
+        'providers:',
+        '  kelivo:',
+        '    baseUrl: ${endpoint.baseUrl}',
+        '    api: openai-completions',
+        '    apiKey: KELIVO_AGENT_BRIDGE_KEY',
+        '    auth: apiKey',
+        '    authHeader: true',
+        '    models:',
+        '      - id: current',
+        '        name: KELIVO Current Model',
+        '',
+      ].join('\n'),
+      flush: true,
+    );
+    return AgentModelBridgeConfigFiles(
+      jsonFile: modelsFile,
+      yamlFile: yamlFile,
+    );
   }
 
   Future<void> close() async {
