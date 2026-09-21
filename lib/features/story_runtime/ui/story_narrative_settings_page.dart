@@ -165,7 +165,7 @@ class _StoryNarrativeSettingsPageState
               children: [
                 Text(
                   zh ? '作品形态' : 'Story surface',
-                  style: const TextStyle(fontWeight: AppFontWeights.semibold),
+                  style: TextStyle(fontWeight: AppFontWeights.semibold),
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<StorySurfaceMode>(
@@ -234,7 +234,7 @@ class _SectionTitle extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 10),
     child: Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 17,
         fontWeight: AppFontWeights.semibold,
       ),
