@@ -102,7 +102,7 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
               children: [
                 Row(
                   children: [
-                    Icon(Lucide.Gamepad2, size: 17, color: cs.primary),
+                    Icon(Lucide.Compass, size: 17, color: cs.primary),
                     const SizedBox(width: 7),
                     Text(
                       zh ? '互动' : 'Interact',
@@ -120,7 +120,7 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
                     if (data.timeLabel?.trim().isNotEmpty == true) ...[
                       const SizedBox(width: 6),
                       _MetaChip(
-                        icon: Lucide.Clock3,
+                        icon: Lucide.clock,
                         text: data.timeLabel!.trim(),
                       ),
                     ],
@@ -193,7 +193,7 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: widget.disabled ? null : widget.onFreeAction,
-                        icon: const Icon(Lucide.PenLine, size: 16),
+                        icon: const Icon(Lucide.Pencil, size: 16),
                         label: Text(zh ? '自由行动…' : 'Free action…'),
                       ),
                     ),
