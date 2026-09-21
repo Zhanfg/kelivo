@@ -75,6 +75,9 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
             final byOrder = a.order.compareTo(b.order);
             return byOrder != 0 ? byOrder : a.id.compareTo(b.id);
           });
+    final receipt = await StoryActionReceiptStore(
+      preferences,
+    ).latestForConversation(widget.conversationId);
     final messageId = widget.latestAssistantMessageId;
     final record = messageId == null
         ? null
@@ -95,7 +98,10 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
       location: scene.location,
       timeLabel: scene.timeLabel,
       participantCount: scene.participantCharacterIds.length,
-      choices: choiceEvent?.choices ?? const <StoryChoice>[],
+      receipt: receipt,
+      choices: scene.availableChoices.isNotEmpty
+          ? scene.availableChoices
+          : (choiceEvent?.choices ?? const <StoryChoice>[]),
       quickReplies: quickReplies.take(4).toList(growable: false),
     );
   }
@@ -148,24 +154,19 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
                     ],
                   ],
                 ),
-                if (pending?.isNotEmpty == true) ...[
+                if (data.receipt != null) ...[
                   const SizedBox(height: 10),
-                  Text(
-                    zh ? '你刚刚的行动' : 'Your latest action',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    pending!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      height: 1.35,
-                      fontSize: 13,
-                      color: cs.onSurface,
+                  _ActionReceiptCard(receipt: data.receipt!),
+                ] else if (pending?.isNotEmpty == true) ...[
+                  const SizedBox(height: 10),
+                  _ActionReceiptCard(
+                    receipt: StoryActionReceipt(
+                      id: 'ephemeral',
+                      conversationId: widget.conversationId,
+                      source: StoryActionSource.freeAction,
+                      label: pending!,
+                      submitText: pending,
+                      createdAt: DateTime.now().toUtc(),
                     ),
                   ),
                 ],
@@ -261,6 +262,113 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
   }
 }
 
+class _ActionReceiptCard extends StatelessWidget {
+  const _ActionReceiptCard({required this.receipt});
+
+  final StoryActionReceipt receipt;
+
+  @override
+  Widget build(BuildContext context) {
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final cs = Theme.of(context).colorScheme;
+    final failed = receipt.status == StoryActionReceiptStatus.failed;
+    final pending = receipt.status == StoryActionReceiptStatus.pending;
+    final source = switch (receipt.source) {
+      StoryActionSource.freeAction => zh ? '自由行动' : 'Free action',
+      StoryActionSource.quickReply => zh ? '快捷行动' : 'Quick action',
+      StoryActionSource.formalChoice => zh ? '正式选项' : 'Choice',
+    };
+    final status = switch (receipt.status) {
+      StoryActionReceiptStatus.pending => zh ? '处理中' : 'In progress',
+      StoryActionReceiptStatus.resolved => zh ? '已回应' : 'Resolved',
+      StoryActionReceiptStatus.failed => zh ? '未完成' : 'Failed',
+    };
+    final result = _receiptResult(receipt, zh);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: failed
+            ? cs.errorContainer.withValues(alpha: 0.42)
+            : cs.primaryContainer.withValues(alpha: pending ? 0.28 : 0.38),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(11, 9, 11, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  source,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: failed ? cs.error : cs.onSurfaceVariant,
+                    fontWeight: AppFontWeights.emphasis,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: failed ? cs.error : cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              receipt.label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                height: 1.35,
+                fontSize: 13,
+                color: cs.onSurface,
+                fontWeight: AppFontWeights.emphasis,
+              ),
+            ),
+            if (result != null) ...[
+              const SizedBox(height: 5),
+              Text(
+                result,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  height: 1.35,
+                  fontSize: 12,
+                  color: failed ? cs.error : cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String? _receiptResult(StoryActionReceipt receipt, bool zh) {
+  final raw = receipt.resultSummary?.trim();
+  if (raw == null || raw.isEmpty) {
+    if (receipt.status == StoryActionReceiptStatus.resolved) {
+      return zh ? '剧情已经回应这次行动。' : 'The story has responded to this action.';
+    }
+    return null;
+  }
+  return switch (raw) {
+    'action_cancelled' => zh ? '行动已取消。' : 'The action was cancelled.',
+    'action_submission_rejected' =>
+      zh ? '行动未能提交。' : 'The action could not be submitted.',
+    'oauth_login_required' =>
+      zh ? '模型服务需要重新登录。' : 'The model provider requires login.',
+    'request_failed' =>
+      zh ? '请求失败，行动没有完成。' : 'The request failed before the action completed.',
+    _ => raw,
+  };
+}
+
 class _MetaChip extends StatelessWidget {
   const _MetaChip({required this.icon, required this.text});
 
@@ -306,6 +414,7 @@ class _StoryInteractionSnapshot {
     this.location,
     this.timeLabel,
     this.participantCount = 0,
+    this.receipt,
     this.choices = const <StoryChoice>[],
     this.quickReplies = const <StoryQuickReply>[],
   });
@@ -313,6 +422,7 @@ class _StoryInteractionSnapshot {
   final String? location;
   final String? timeLabel;
   final int participantCount;
+  final StoryActionReceipt? receipt;
   final List<StoryChoice> choices;
   final List<StoryQuickReply> quickReplies;
 }
