@@ -1862,6 +1862,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                             initialized: service.initialized,
                                             query: _query,
                                             assistantId: currentAssistantId,
+                                            workspaceMode: workspaceMode,
                                             chatService: service,
                                           ),
                                         );
