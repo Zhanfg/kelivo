@@ -40,7 +40,9 @@ class _AgentTaskDetailPageState extends State<AgentTaskDetailPage> {
     setState(() => _sending = true);
     try {
       final runner = context.read<AgentTaskRunner>();
-      final accepted = followUp
+      final accepted = text.startsWith('!')
+          ? await runner.runShell(widget.taskId, text.substring(1))
+          : followUp
           ? await runner.followUp(widget.taskId, text)
           : await runner.steer(widget.taskId, text);
       if (!mounted) return;
@@ -172,8 +174,8 @@ class _AgentTaskDetailPageState extends State<AgentTaskDetailPage> {
                       decoration: InputDecoration(
                         border: InputBorder.none,
                         hintText: _zh
-                            ? '运行中补充指令或调整方向…'
-                            : 'Steer the running task…',
+                            ? '补充指令；以 ! 开头可直接执行命令…'
+                            : 'Steer the task; start with ! to run a shell command…',
                       ),
                     ),
                     Row(
