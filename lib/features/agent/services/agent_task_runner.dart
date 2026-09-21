@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
@@ -137,6 +138,11 @@ class AgentTaskRunner {
         endpoint: modelEndpoint,
       );
       await agentSettings.loaded;
+      final engineConfigFile = await _writeEngineConfig(
+        taskDir,
+        maxParallelAgents: agentSettings.maxParallelAgents,
+        subagentIsolation: agentSettings.subagentIsolation,
+      );
 
       final mounts = <Mount>[
         Mount(host: workspaceRoot, guest: '/workspace'),
@@ -149,6 +155,11 @@ class AgentTaskRunner {
         Mount(
           host: modelConfigFiles.yamlFile.path,
           guest: '/home/kelivo/.pi/agent/models.yml',
+          readOnly: true,
+        ),
+        Mount(
+          host: engineConfigFile.path,
+          guest: '/home/kelivo/.pi/agent/config.yml',
           readOnly: true,
         ),
         installation.asMount(),
@@ -180,6 +191,7 @@ class AgentTaskRunner {
           'PI_SKIP_VERSION_CHECK': '1',
           'KELIVO_AGENT_PERMISSION_MODE': agentSettings.permissionMode.name,
           'KELIVO_AGENT_BRIDGE_KEY': modelEndpoint.token,
+          'OMP_WORKTREE_DIR': '/kelivo-agent-task/worktrees',
         },
       );
       _sessions[taskId] = session;
@@ -598,6 +610,38 @@ class AgentTaskRunner {
       AgentTaskPhase.running,
       currentStep: 'Working',
     );
+  }
+
+  Future<File> _writeEngineConfig(
+    Directory taskDir, {
+    required int maxParallelAgents,
+    required bool subagentIsolation,
+  }) async {
+    final file = File('${taskDir.path}/omp-config.yml');
+    await file.writeAsString(
+      [
+        'tools:',
+        '  approvalMode: yolo',
+        'async:',
+        '  enabled: true',
+        'bash:',
+        '  autoBackground:',
+        '    enabled: true',
+        'task:',
+        '  batch: true',
+        '  maxConcurrency: ${maxParallelAgents.clamp(1, 4)}',
+        '  maxRecursionDepth: 2',
+        '  isolation:',
+        '    enabled: ${subagentIsolation ? 'true' : 'false'}',
+        'isolation:',
+        '  backend: rcopy',
+        'github:',
+        '  enabled: false',
+        '',
+      ].join('\n'),
+      flush: true,
+    );
+    return file;
   }
 
   static String _messageRole(Object? raw) {
