@@ -209,10 +209,7 @@ final class StoryActionReceiptStore extends JsonBlobStore<StoryActionReceipt> {
     required String conversationId,
     String? resultSummary,
   }) async {
-    final receipt = await latestForConversation(
-      conversationId,
-      status: StoryActionReceiptStatus.pending,
-    );
+    final receipt = await nextPending(conversationId);
     if (receipt == null) return;
     await _upsert(
       receipt.copyWith(
