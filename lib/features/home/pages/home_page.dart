@@ -837,7 +837,8 @@ class _HomePageState extends State<HomePage>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _workspaceConversationSyncScheduled = false;
       if (!mounted) return;
-      final active = context.read<WorkspaceModeProvider>().mode;
+      final active =
+          context.read<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
       if (active == WorkspaceMode.agent) return;
       await _controller.ensureConversationForWorkspace(active);
     });
@@ -999,7 +1000,8 @@ class _HomePageState extends State<HomePage>
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final assistant = context.watch<AssistantProvider>().currentAssistant;
-    final workspaceMode = context.watch<WorkspaceModeProvider>().mode;
+    final workspaceMode =
+        context.watch<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
     _scheduleWorkspaceConversationSync(workspaceMode);
     final agentMode = workspaceMode == WorkspaceMode.agent;
 
