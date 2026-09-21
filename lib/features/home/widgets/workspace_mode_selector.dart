@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/database/business_preferences.dart';
-import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
 import '../models/workspace_mode.dart';
 import '../providers/workspace_mode_provider.dart';
-import '../../story_runtime/orchestration/story_mode_transition_service.dart';
 import '../../story_runtime/ui/story_conversation_mode_control.dart';
 
 /// Stable app-bar mode switcher.
@@ -205,17 +203,8 @@ Future<void> _switchWorkspaceMode(
   if (provider.busy || provider.mode == mode) return;
 
   final preferences = context.read<BusinessPreferences>();
-  final chat = context.read<ChatService>();
-  final conversationId = chat.currentConversationId;
-  if (mode == WorkspaceMode.story && conversationId != null) {
-    await StoryModeTransitionService(
-      preferences: preferences,
-      chatService: chat,
-    ).setMode(
-      conversationId: conversationId,
-      storyEnabled: true,
-    );
-  }
+  // Workspace selection is navigation only. Chat -> Story promotion is an
+  // explicit irreversible action and must never happen as a side effect here.
   await preferences.setBool(
     storyWorkspaceSelectedKey,
     mode == WorkspaceMode.story,
