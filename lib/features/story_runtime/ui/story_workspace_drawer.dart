@@ -6,6 +6,7 @@ import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../settings/pages/settings_page.dart';
 import '../state/story_runtime_store.dart';
 import 'story_conversation_mode_control.dart';
 import 'story_mode_runtime_page.dart';
@@ -143,9 +144,16 @@ class _StoryWorkspaceDrawerState extends State<StoryWorkspaceDrawer> {
             ),
             ListTile(
               leading: const Icon(Lucide.Settings),
-              title: Text(zh ? '故事设置' : 'Story settings'),
+              title: Text(zh ? '设置' : 'Settings'),
               onTap: () => Navigator.of(context, rootNavigator: true).push(
                 MaterialPageRoute(builder: (_) => const StoryModeRuntimePage()),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Lucide.Settings2),
+              title: Text(zh ? '全部设置' : 'All settings'),
+              onTap: () => Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
               ),
             ),
           ],
