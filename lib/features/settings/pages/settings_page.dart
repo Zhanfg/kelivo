@@ -26,6 +26,9 @@ import '../../backup/pages/backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
+import '../../agent/ui/agent_settings_page.dart';
+import '../../story_runtime/ui/story_mode_runtime_page.dart';
+import '../../chat/pages/chat_settings_page.dart';
 import '../../../shared/widgets/section_card.dart';
 import 'network_proxy_page.dart';
 import 'storage_space_page.dart';
@@ -164,8 +167,64 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
 
-          // 通用设置：使用iOS风格分组卡片，黑色（中性）图标与标题，无描述
-          header(l10n.settingsPageGeneralSection, first: true),
+          header(
+            Localizations.localeOf(context).languageCode == 'zh'
+                ? '模式'
+                : 'Modes',
+            first: true,
+          ),
+          SectionCard(
+            children: [
+              _iosNavRow(
+                context,
+                icon: Lucide.MessageCircle,
+                label: Localizations.localeOf(context).languageCode == 'zh'
+                    ? '聊天'
+                    : 'Chat',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ChatSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.BookOpen,
+                label: Localizations.localeOf(context).languageCode == 'zh'
+                    ? '故事'
+                    : 'Story',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const StoryModeRuntimePage(),
+                    ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Bot,
+                label: Localizations.localeOf(context).languageCode == 'zh'
+                    ? '代理'
+                    : 'Agent',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AgentSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          // 通用设置
+          header(l10n.settingsPageGeneralSection),
           SectionCard(
             children: [
               _iosNavRow(
