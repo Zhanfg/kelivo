@@ -58,12 +58,17 @@ jobs:
       - name: Static analysis
         run: dart analyze --fatal-infos lib test
 
-      - name: Focused Skill lifecycle regression
+      - name: Focused Story regression
         run: |
           flutter test --concurrency=1 \
             test/features/story_runtime/story_skill_github_install_dialog_test.dart \
             test/features/story_runtime/built_in_story_skill_assets_test.dart \
-            test/features/story_runtime/story_conversation_mode_control_test.dart
+            test/features/story_runtime/story_conversation_mode_control_test.dart \
+            test/features/story_runtime/story_narrative_view_test.dart \
+            test/core/models/conversation_kind_test.dart \
+            test/story_protocol_sanitizer_test.dart \
+            test/story_narrative_director_test.dart \
+            test/story_response_contract_v2_test.dart
 
       - name: Build Android debug APKs
         run: flutter build apk --debug --split-per-abi
