@@ -436,6 +436,19 @@ class ChatActions {
         state.messageId,
         null,
       );
+      streamController.streamingContentNotifier.updateHealth(
+        state.messageId,
+        (current) => current.phase == stream_ctrl.GenerationTransportPhase.retrying
+            ? current.copyWith(
+                phase: stream_ctrl.GenerationTransportPhase.httpRequest,
+                httpOpen: true,
+                sseOpen: false,
+                requestStartedAt: DateTime.now(),
+                lastProgressAt: DateTime.now(),
+                clearRetryStatus: true,
+              )
+            : current.copyWith(clearRetryStatus: true),
+      );
       _scheduleBackgroundGenerationUpdate(state);
       return;
     }
@@ -449,6 +462,17 @@ class ChatActions {
     streamController.streamingContentNotifier.updateRetryStatus(
       state.messageId,
       status,
+    );
+    streamController.streamingContentNotifier.updateHealth(
+      state.messageId,
+      (current) => current.copyWith(
+        phase: stream_ctrl.GenerationTransportPhase.retrying,
+        httpOpen: false,
+        sseOpen: false,
+        retryStatus: status,
+        lastProgressAt: DateTime.now(),
+        clearActiveTool: true,
+      ),
     );
   }
 
@@ -2039,6 +2063,17 @@ class ChatActions {
       _messages,
     );
     if (visibleStreaming != null) {
+      streamController.streamingContentNotifier.updateHealth(
+        visibleStreaming.id,
+        (current) => current.copyWith(
+          phase: stream_ctrl.GenerationTransportPhase.cancelled,
+          httpOpen: false,
+          sseOpen: false,
+          lastProgressAt: DateTime.now(),
+          clearActiveTool: true,
+          clearRetryStatus: true,
+        ),
+      );
       streamController.markStreamingEnded(visibleStreaming.id);
       streamController.cleanupTimers(visibleStreaming.id);
       final cancelState = _streamingStates[visibleStreaming.id];
@@ -2168,6 +2203,14 @@ class ChatActions {
     final onToolCall = toolHandler == null
         ? null
         : (String name, Map<String, dynamic> args, {String? toolCallId}) async {
+            streamController.streamingContentNotifier.updateHealth(
+              state.messageId,
+              (current) => current.copyWith(
+                phase: stream_ctrl.GenerationTransportPhase.tool,
+                activeToolName: name,
+                lastProgressAt: DateTime.now(),
+              ),
+            );
             _background.update(
               _backgroundTaskId(ctx),
               phase: BackgroundTaskPhase.tool,
@@ -2177,6 +2220,16 @@ class ChatActions {
             try {
               return await toolHandler(name, args, toolCallId: toolCallId);
             } finally {
+              streamController.streamingContentNotifier.updateHealth(
+                state.messageId,
+                (current) => current.copyWith(
+                  phase: ctx.streamOutput
+                      ? stream_ctrl.GenerationTransportPhase.sseStreaming
+                      : stream_ctrl.GenerationTransportPhase.httpRequest,
+                  lastProgressAt: DateTime.now(),
+                  clearActiveTool: true,
+                ),
+              );
               _scheduleBackgroundGenerationUpdate(state);
             }
           };
@@ -2207,6 +2260,19 @@ class ChatActions {
           ..stateRevision = run.stateRevision
           ..nextSeq = run.checkpointSeq + 1;
       }
+      streamController.streamingContentNotifier.updateHealth(
+        state.messageId,
+        (current) => current.copyWith(
+          phase: stream_ctrl.GenerationTransportPhase.httpRequest,
+          httpOpen: true,
+          sseOpen: false,
+          requestStartedAt: DateTime.now(),
+          lastProgressAt: DateTime.now(),
+          clearRetryStatus: true,
+          clearError: true,
+        ),
+      );
+
       final previousSub = _conversationStreams.remove(conversationId);
       if (previousSub != null) {
         ChatApiService.cancelRequest(conversationId);
@@ -2238,6 +2304,17 @@ class ChatActions {
             onRetry: (pending) => _setRetryStatus(state, pending),
           );
           _setRetryStatus(state, null);
+          streamController.streamingContentNotifier.updateHealth(
+            state.messageId,
+            (current) => current.copyWith(
+              phase: stream_ctrl.GenerationTransportPhase.httpRequest,
+              httpOpen: true,
+              sseOpen: false,
+              lastNetworkEventAt: DateTime.now(),
+              lastProgressAt: DateTime.now(),
+              clearRetryStatus: true,
+            ),
+          );
           state.streamStartedAt ??= DateTime.now();
           await _markGenerationStreaming(state);
           state.partsHandler.handleResult(result);
@@ -2314,8 +2391,25 @@ class ChatActions {
   ) async {
     if (chunk is RetryPending) {
       _setRetryStatus(state, chunk);
+    } else if (chunk is RetryAttemptStart) {
+      _setRetryStatus(state, null);
+      streamController.streamingContentNotifier.updateHealth(
+        state.messageId,
+        (current) => current.copyWith(
+          phase: stream_ctrl.GenerationTransportPhase.httpRequest,
+          httpOpen: true,
+          sseOpen: false,
+          requestStartedAt: DateTime.now(),
+          lastProgressAt: DateTime.now(),
+          clearRetryStatus: true,
+          clearError: true,
+        ),
+      );
     } else {
       _setRetryStatus(state, null);
+      streamController.streamingContentNotifier.markNetworkEvent(
+        state.messageId,
+      );
     }
     if (chunk is! RetryPending && chunk is! RetryAttemptStart) {
       await _markGenerationStreaming(state);
@@ -2337,6 +2431,14 @@ class ChatActions {
         _scheduleStreamingCheckpoint(state);
       case ToolCallStart(:final id, :final toolName):
         if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
+        streamController.streamingContentNotifier.updateHealth(
+          state.messageId,
+          (current) => current.copyWith(
+            phase: stream_ctrl.GenerationTransportPhase.tool,
+            activeToolName: toolName.isEmpty ? null : toolName,
+            lastProgressAt: DateTime.now(),
+          ),
+        );
         await _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case ToolCallDelta(:final id, :final toolNameDelta):
@@ -2349,10 +2451,29 @@ class ChatActions {
         _scheduleStreamingCheckpoint(state);
       case ServerToolStart(:final id, :final toolName):
         if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
+        streamController.streamingContentNotifier.updateHealth(
+          state.messageId,
+          (current) => current.copyWith(
+            phase: stream_ctrl.GenerationTransportPhase.tool,
+            activeToolName: toolName.isEmpty ? null : toolName,
+            lastProgressAt: DateTime.now(),
+          ),
+        );
         await _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case ServerToolEnd() || ToolCallResult() || Annotations():
         await _handleToolResultsChunk(chunk, state);
+        streamController.streamingContentNotifier.updateHealth(
+          state.messageId,
+          (current) => current.copyWith(
+            phase: stream_ctrl.GenerationTransportPhase.sseStreaming,
+            httpOpen: true,
+            sseOpen: true,
+            lastNetworkEventAt: DateTime.now(),
+            lastProgressAt: DateTime.now(),
+            clearActiveTool: true,
+          ),
+        );
         _scheduleStreamingCheckpoint(state);
       case Usage(:final usage):
         _applyUsage(state, usage);
@@ -2668,6 +2789,18 @@ class ChatActions {
         terminalState: GenerationRunState.completed,
       );
       state.terminalPersisted = true;
+      streamController.streamingContentNotifier.updateHealth(
+        messageId,
+        (current) => current.copyWith(
+          phase: stream_ctrl.GenerationTransportPhase.completed,
+          httpOpen: false,
+          sseOpen: false,
+          lastProgressAt: DateTime.now(),
+          clearActiveTool: true,
+          clearRetryStatus: true,
+          clearError: true,
+        ),
+      );
 
       await onAssistantMessageFinished?.call(finalizedMessage);
 
@@ -2725,6 +2858,18 @@ class ChatActions {
         e is ProviderOAuthException &&
         e.kind == ProviderOAuthFailure.loginRequired;
     final errorText = oauthFailure ? '' : e.toString();
+    streamController.streamingContentNotifier.updateHealth(
+      messageId,
+      (current) => current.copyWith(
+        phase: stream_ctrl.GenerationTransportPhase.failed,
+        httpOpen: false,
+        sseOpen: false,
+        lastProgressAt: DateTime.now(),
+        errorText: oauthFailure ? 'oauth_login_required' : errorText,
+        clearActiveTool: true,
+        clearRetryStatus: true,
+      ),
+    );
 
     // Reset file processing state on error, scoped to this message so a
     // background conversation's indicator survives.
