@@ -69,6 +69,7 @@ jobs:
             test/features/story_runtime/built_in_story_skill_assets_test.dart \
             test/features/story_runtime/story_conversation_mode_control_test.dart \
             test/features/story_runtime/story_narrative_view_test.dart \
+            test/features/home/controllers/generation_health_test.dart \
             test/core/models/conversation_kind_test.dart \
             test/story_protocol_sanitizer_test.dart \
             test/story_narrative_director_test.dart \
