@@ -153,15 +153,47 @@ final class StoryActionReceiptStore extends JsonBlobStore<StoryActionReceipt> {
     return latest;
   }
 
+  Future<StoryActionReceipt?> pendingMatchingText(
+    String conversationId,
+    String submitText,
+  ) async {
+    final id = conversationId.trim();
+    final text = submitText.trim();
+    StoryActionReceipt? match;
+    for (final item in await readAll()) {
+      if (item.conversationId != id ||
+          item.status != StoryActionReceiptStatus.pending ||
+          item.submitText.trim() != text) {
+        continue;
+      }
+      if (match == null || item.createdAt.isBefore(match.createdAt)) {
+        match = item;
+      }
+    }
+    return match;
+  }
+
+  Future<StoryActionReceipt?> nextPending(String conversationId) async {
+    final id = conversationId.trim();
+    StoryActionReceipt? next;
+    for (final item in await readAll()) {
+      if (item.conversationId != id ||
+          item.status != StoryActionReceiptStatus.pending) {
+        continue;
+      }
+      if (next == null || item.createdAt.isBefore(next.createdAt)) {
+        next = item;
+      }
+    }
+    return next;
+  }
+
   Future<void> resolveLatestPending({
     required String conversationId,
     required String assistantMessageId,
     String? resultSummary,
   }) async {
-    final receipt = await latestForConversation(
-      conversationId,
-      status: StoryActionReceiptStatus.pending,
-    );
+    final receipt = await nextPending(conversationId);
     if (receipt == null) return;
     await _upsert(
       receipt.copyWith(
