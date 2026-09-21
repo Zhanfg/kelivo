@@ -53,12 +53,12 @@ final class StoryPromptCompiler {
   }) {
     final contributions = <StoryPromptContribution>[
       StoryPromptContribution(
-        id: 'story.core.v1',
+        id: 'story.core.v2',
         stability: StoryPromptStability.frozen,
         content: storyCoreInstructions.trim(),
         order: 0,
       ),
-      storyResponseContractContributionV1,
+      storyResponseContractContributionV2,
       storyStateUpdateContractContributionV1,
       if (sceneBaseline.trim().isNotEmpty)
         StoryPromptContribution(
