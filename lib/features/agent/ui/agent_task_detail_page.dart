@@ -333,6 +333,18 @@ class _EventCard extends StatelessWidget {
           icon: Lucide.CheckCircle,
           text: zh ? '批准请求已处理' : 'Approval resolved',
         ),
+      AgentTaskEventKind.subagentLifecycle => _SubagentLifecycleCard(
+          event: event,
+          zh: zh,
+        ),
+      AgentTaskEventKind.subagentProgress => _SubagentProgressCard(
+          event: event,
+          zh: zh,
+        ),
+      AgentTaskEventKind.subagentEvent => _SubagentEventCard(
+          event: event,
+          zh: zh,
+        ),
       AgentTaskEventKind.retry => _NoticeEventCard(
           icon: Lucide.RotateCcw,
           text: event.payload['state'] == 'start'
@@ -581,6 +593,184 @@ class _ToolEventCard extends StatelessWidget {
     'ls' => zh ? '列出目录' : 'List directory',
     _ => tool,
   };
+}
+
+class _SubagentLifecycleCard extends StatelessWidget {
+  const _SubagentLifecycleCard({required this.event, required this.zh});
+
+  final AgentTaskEvent event;
+  final bool zh;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = event.payload['status']?.toString() ?? 'updated';
+    final agent = event.payload['agent']?.toString() ?? 'subagent';
+    final description = event.payload['description']?.toString();
+    final index = event.payload['index'];
+    final label = index == null ? agent : '#${(index as num?)?.toInt() ?? index} · $agent';
+    final statusText = switch (status) {
+      'started' => zh ? '已启动' : 'Started',
+      'completed' => zh ? '已完成' : 'Completed',
+      'failed' => zh ? '失败' : 'Failed',
+      'aborted' => zh ? '已中止' : 'Aborted',
+      _ => status,
+    };
+    return _TextEventCard(
+      icon: status == 'completed'
+          ? Lucide.CheckCircle
+          : status == 'failed'
+          ? Lucide.CircleX
+          : status == 'aborted'
+          ? Lucide.Ban
+          : Lucide.Bot,
+      title: '${zh ? '子代理' : 'Subagent'} $label · $statusText',
+      text: (description ?? '').trim(),
+    );
+  }
+}
+
+class _SubagentProgressCard extends StatelessWidget {
+  const _SubagentProgressCard({required this.event, required this.zh});
+
+  final AgentTaskEvent event;
+  final bool zh;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final progressRaw = event.payload['progress'];
+    final progress = progressRaw is Map ? progressRaw : const <dynamic, dynamic>{};
+    final agent = progress['agent']?.toString() ??
+        event.payload['agent']?.toString() ??
+        'subagent';
+    final task = event.payload['task']?.toString() ??
+        progress['task']?.toString() ??
+        '';
+    final status = progress['status']?.toString() ?? 'running';
+    final currentTool = progress['currentTool']?.toString();
+    final currentArgs = progress['currentToolArgs']?.toString();
+    final recentOutput = progress['recentOutput'] is List
+        ? (progress['recentOutput'] as List)
+        : const <dynamic>[];
+    final toolCount = progress['toolCount'];
+    final requests = progress['requests'];
+    final tokens = progress['tokens'];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow.withValues(alpha: 0.76),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Lucide.Bot, size: 16),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  agent,
+                  style: TextStyle(fontWeight: AppFontWeights.semibold),
+                ),
+              ),
+              Text(
+                status,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: cs.onSurface.withValues(alpha: 0.52),
+                ),
+              ),
+            ],
+          ),
+          if (task.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(task, maxLines: 3, overflow: TextOverflow.ellipsis),
+          ],
+          if ((currentTool ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Lucide.Wrench, size: 14),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    currentArgs == null || currentArgs.isEmpty
+                        ? currentTool!
+                        : '$currentTool · $currentArgs',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (recentOutput.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _CodeBlock(text: recentOutput.last.toString()),
+          ],
+          if (toolCount != null || requests != null || tokens != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              [
+                if (toolCount != null)
+                  zh ? '工具 $toolCount' : '$toolCount tools',
+                if (requests != null)
+                  zh ? '请求 $requests' : '$requests requests',
+                if (tokens != null)
+                  '${tokens} tok',
+              ].join(' · '),
+              style: TextStyle(
+                fontSize: 10.5,
+                color: cs.onSurface.withValues(alpha: 0.48),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SubagentEventCard extends StatelessWidget {
+  const _SubagentEventCard({required this.event, required this.zh});
+
+  final AgentTaskEvent event;
+  final bool zh;
+
+  @override
+  Widget build(BuildContext context) {
+    final nestedRaw = event.payload['event'];
+    final nested = nestedRaw is Map ? nestedRaw : const <dynamic, dynamic>{};
+    final type = nested['type']?.toString() ?? '';
+    final agentId = event.payload['id']?.toString() ?? '';
+    final tool = nested['toolName']?.toString();
+    final messageRaw = nested['message'];
+    String text = '';
+    if (tool != null && tool.isNotEmpty) {
+      text = tool;
+    } else if (messageRaw is Map) {
+      final content = messageRaw['content'];
+      if (content is List) {
+        text = content
+            .whereType<Map>()
+            .where((part) => part['type']?.toString() == 'text')
+            .map((part) => part['text']?.toString() ?? '')
+            .where((part) => part.isNotEmpty)
+            .join('\n');
+      }
+    }
+    if (text.trim().isEmpty) return const SizedBox.shrink();
+    return _NoticeEventCard(
+      icon: type.startsWith('tool_') ? Lucide.Wrench : Lucide.MessageSquare,
+      text: '${zh ? '子代理' : 'Subagent'} ${agentId.isEmpty ? '' : agentId}: $text',
+    );
+  }
 }
 
 class _SubagentTaskRow extends StatelessWidget {
