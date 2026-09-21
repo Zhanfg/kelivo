@@ -22,6 +22,7 @@ import '../../chat/widgets/timeline_projection.dart';
 import '../../chat/widgets/timeline_visibility.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import '../../chat/widgets/message_more_sheet.dart';
+import '../../story_runtime/parsing/story_protocol_sanitizer.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/streaming_content_notifier.dart';
 import '../controllers/message_render_model.dart';
@@ -2221,9 +2222,12 @@ class _MessageListViewState extends State<MessageListView> {
             ? (_deferredStreamingHolds[message.id] ?? data)
             : data;
         // Use streaming content if available, otherwise fall back to message content
-        final displayContent = painted.content.isNotEmpty
+        final rawDisplayContent = painted.content.isNotEmpty
             ? painted.content
             : message.content;
+        final displayContent = message.role == 'assistant'
+            ? stripKelivoStoryProtocol(rawDisplayContent)
+            : rawDisplayContent;
         final displayTokens = painted.totalTokens > 0
             ? painted.totalTokens
             : message.totalTokens;
