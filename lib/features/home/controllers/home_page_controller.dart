@@ -1848,7 +1848,10 @@ class HomePageController extends ChangeNotifier {
       final preferences = _context.read<BusinessPreferences>();
       await StoryNativeLifecycleBridge(
         preferences,
-      ).commitFinalizedAssistant(message);
+      ).commitFinalizedAssistant(
+        message,
+        chatService: _context.read<ChatService>(),
+      );
     } catch (error) {
       debugPrint('Story finalize bridge failed: $error');
     }
