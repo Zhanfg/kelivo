@@ -1148,6 +1148,14 @@ class _HomePageState extends State<HomePage>
                         isGenerating:
                             _controller.isCurrentConversationGenerating,
                         hasLoadingTools: _controller.hasLoadingTools,
+                        onSubmitIntent: (text) async {
+                          await _controller.sendMessage(
+                            ChatInputData(text: text),
+                          );
+                        },
+                        onFreeAction: () {
+                          _controller.inputFocus.requestFocus();
+                        },
                         title: _controller.currentConversation?.title,
                       )
                     : _buildMessageListView(
