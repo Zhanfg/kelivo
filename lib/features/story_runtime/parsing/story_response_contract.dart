@@ -52,3 +52,43 @@ const StoryPromptContribution storyResponseContractContributionV1 =
       content: storyResponseContractV1,
       order: 100,
     );
+
+/// Sparse Story output contract used by the Narrative Director architecture.
+///
+/// The visible work is authoritative for presentation. The sidecar is optional:
+/// emit it only when Kelivo needs a semantic event it cannot reliably derive
+/// from text/runtime state. This prevents every turn from duplicating the prose
+/// as JSON and keeps model tokens focused on the story itself.
+const String storyResponseContractV2 = '''
+[STORY_OUTPUT_V2]
+Write only polished reader-facing fiction as ordinary Markdown prose.
+
+Do not restate Story Runtime state, Style DNA, Scene Packet, ids, or constraints.
+Do not format the response as an event log, game transcript, status panel, or JSON.
+
+Normally stop after the prose.
+
+Only when a machine-only semantic event is necessary and cannot be reliably
+derived by Kelivo, append one trailing sidecar:
+<!--KELIVO_STORY_EVENTS
+{"version":1,"events":[EVENT,...]}
+KELIVO_STORY_EVENTS-->
+Nothing may follow it.
+
+The sidecar is sparse, not a mirror of the prose:
+- include only indispensable interaction/state semantics;
+- never duplicate ordinary narration merely to describe what was just written;
+- choice_set is allowed only for a genuinely meaningful user decision;
+- omit the sidecar entirely when no such event exists;
+- never discuss or reveal the sidecar in visible prose.
+[/STORY_OUTPUT_V2]
+''';
+
+const StoryPromptContribution storyResponseContractContributionV2 =
+    StoryPromptContribution(
+      id: 'story.output.contract.v2',
+      stability: StoryPromptStability.frozen,
+      content: storyResponseContractV2,
+      order: 100,
+    );
+
