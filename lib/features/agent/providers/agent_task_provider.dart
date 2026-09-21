@@ -53,6 +53,8 @@ class AgentTaskProvider extends ChangeNotifier {
     String? conversationId,
     String? assistantId,
     String? worktreeId,
+    String? modelProviderKey,
+    String? modelId,
   }) async {
     await loaded;
     final now = DateTime.now().toUtc();
@@ -65,6 +67,8 @@ class AgentTaskProvider extends ChangeNotifier {
       conversationId: conversationId,
       assistantId: assistantId,
       worktreeId: worktreeId,
+      modelProviderKey: modelProviderKey,
+      modelId: modelId,
       phase: AgentTaskPhase.queued,
       createdAt: now,
       updatedAt: now,
