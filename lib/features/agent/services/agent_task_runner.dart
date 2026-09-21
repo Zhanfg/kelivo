@@ -54,6 +54,7 @@ class AgentTaskRunner {
   final Map<String, PiRpcSession> _sessions = <String, PiRpcSession>{};
   final Set<String> _running = <String>{};
   final Set<String> _cancelled = <String>{};
+  final Map<String, String> _toolOutputSnapshots = <String, String>{};
 
   bool isRunning(String taskId) => _running.contains(taskId);
 
@@ -265,6 +266,9 @@ class AgentTaskRunner {
       await modelBridge?.close();
       _sessions.remove(taskId);
       _running.remove(taskId);
+      _toolOutputSnapshots.removeWhere(
+        (key, _) => key.startsWith('$taskId:'),
+      );
     }
   }
 
@@ -438,21 +442,32 @@ class AgentTaskRunner {
       case 'tool_execution_update':
         if (!agentSettings.showToolOutput) break;
         final tool = event['toolName']?.toString() ?? 'tool';
+        final toolCallId = event['toolCallId']?.toString() ?? '';
         final output = _toolText(event['partialResult']);
-        if (output.isNotEmpty) {
+        final snapshotKey = '$taskId:$toolCallId';
+        final previous = _toolOutputSnapshots[snapshotKey] ?? '';
+        final delta = output.startsWith(previous)
+            ? output.substring(previous.length)
+            : output;
+        _toolOutputSnapshots[snapshotKey] = output;
+        if (delta.isNotEmpty) {
           await journal.append(
             taskId,
             AgentTaskEventKind.toolProgress,
             payload: <String, dynamic>{
               'tool': tool,
-              if (event['toolCallId'] != null)
-                'toolCallId': event['toolCallId'].toString(),
-              'output': _redact(_limit(output, 12000), secrets),
+              if (toolCallId.isNotEmpty) 'toolCallId': toolCallId,
+              'output': _redact(_limit(delta, 12000), secrets),
+              'delta': true,
             },
           );
         }
       case 'tool_execution_end':
         final tool = event['toolName']?.toString() ?? 'tool';
+        final toolCallId = event['toolCallId']?.toString() ?? '';
+        if (toolCallId.isNotEmpty) {
+          _toolOutputSnapshots.remove('$taskId:$toolCallId');
+        }
         if (tool == 'kelivo_plan') break;
         final output = agentSettings.showToolOutput
             ? _toolText(event['result'])
