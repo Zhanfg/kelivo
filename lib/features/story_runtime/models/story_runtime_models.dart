@@ -11,6 +11,7 @@ enum StoryEventType {
   narration,
   dialogue,
   action,
+  actionResult,
   expression,
   sceneTransition,
   choiceSet,
