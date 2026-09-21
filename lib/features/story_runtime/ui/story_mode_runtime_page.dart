@@ -14,6 +14,10 @@ import 'story_conversation_mode_control.dart';
 import 'story_continuity_page.dart';
 import 'story_mcp_profile_page.dart';
 import 'story_native_settings_widgets.dart';
+import 'story_voice_manager_page.dart';
+import 'story_character_manager_page.dart';
+import 'story_skill_manager_page.dart';
+import 'story_reference_library_page.dart';
 
 /// Product-facing Story behavior settings.
 ///
@@ -166,7 +170,7 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
     return Scaffold(
       appBar: AppBar(
         leading: StoryNativeBackButton(tooltip: tr('返回', 'Back')),
-        title: Text(tr('故事设置', 'Story settings')),
+        title: Text(tr('设置', 'Settings')),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -177,8 +181,8 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                   title: tr('当前故事', 'Current story'),
                   first: true,
                   footer: tr(
-                    '故事内容工具统一放在主页的全局故事工具栏；此页只配置故事运行行为。',
-                    'Story content tools live in the global Story toolbar on Home; this page only configures Story runtime behavior.',
+                    '这里统一管理当前故事的运行行为、资料、技能、角色与语音。',
+                    'Manage runtime behavior, references, skills, characters and voices for the current story here.',
                   ),
                   children: [
                     if (_conversations.isNotEmpty)
@@ -266,6 +270,68 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
                           : () => Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => StoryMcpProfilePage(
+                                  conversationId: selectedId,
+                                ),
+                              ),
+                            ),
+                    ),
+                    StoryNativeRow(
+                      title: tr('参考文本', 'Reference texts'),
+                      subtitle: tr(
+                        '导入和管理风格、设定与参考资料。',
+                        'Import and manage style, setting and reference material.',
+                      ),
+                      icon: Lucide.BookOpenText,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const StoryReferenceLibraryPage(),
+                        ),
+                      ),
+                    ),
+                    StoryNativeRow(
+                      title: 'Skills',
+                      subtitle: tr(
+                        '管理故事专用技能包与绑定。',
+                        'Manage Story-specific skill packages and bindings.',
+                      ),
+                      icon: Lucide.WandSparkles,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const StorySkillManagerPage(),
+                        ),
+                      ),
+                    ),
+                    StoryNativeRow(
+                      title: tr('角色', 'Characters'),
+                      subtitle: tr(
+                        '查看当前故事角色及其语音绑定。',
+                        'Review current story characters and voice bindings.',
+                      ),
+                      icon: Lucide.User,
+                      enabled: !_busy && selectedId != null,
+                      onTap: selectedId == null
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => StoryCharacterManagerPage(
+                                  conversationId: selectedId,
+                                ),
+                              ),
+                            ),
+                    ),
+                    StoryNativeRow(
+                      title: tr('语音', 'Voices'),
+                      subtitle: tr(
+                        '配置旁白与角色语音路由。',
+                        'Configure narrator and character voice routing.',
+                      ),
+                      icon: Lucide.Volume2,
+                      enabled: !_busy && selectedId != null,
+                      onTap: selectedId == null
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => StoryVoiceManagerPage(
                                   conversationId: selectedId,
                                 ),
                               ),
