@@ -84,6 +84,7 @@ import 'core/services/storage/storage_usage_service.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
 import 'features/agent/providers/agent_interaction_broker.dart';
+import 'features/agent/providers/agent_settings_provider.dart';
 import 'features/agent/providers/agent_task_provider.dart';
 import 'features/agent/services/agent_context_bridge.dart';
 import 'features/agent/services/agent_context_materializer.dart';
@@ -757,8 +758,15 @@ class MyApp extends StatelessWidget {
         Provider<ExtensionEntityStore>.value(
           value: databaseLease.extensionEntityStore,
         ),
-        Provider<AgentTaskJournal>(create: (_) => AgentTaskJournal()),
+        ChangeNotifierProvider<AgentTaskJournal>(
+          create: (_) => AgentTaskJournal(),
+        ),
         ChangeNotifierProvider(create: (_) => AgentInteractionBroker()),
+        ChangeNotifierProvider(
+          create: (_) => AgentSettingsProvider(
+            preferences: businessPreferences,
+          ),
+        ),
         ChangeNotifierProvider(
           create: (ctx) => AgentTaskProvider(
             store: ctx.read<ExtensionEntityStore>(),
@@ -840,6 +848,7 @@ class MyApp extends StatelessWidget {
             tasks: ctx.read<AgentTaskProvider>(),
             journal: ctx.read<AgentTaskJournal>(),
             interactions: ctx.read<AgentInteractionBroker>(),
+            agentSettings: ctx.read<AgentSettingsProvider>(),
             workspaces: ctx.read<WorkspaceProvider>(),
             assistants: ctx.read<AssistantProvider>(),
             chat: ctx.read<ChatService>(),
