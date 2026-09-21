@@ -62,10 +62,22 @@ class AgentRuntimeBootstrap {
     await homeDir.create(recursive: true);
     await tmpDir.create(recursive: true);
     final piAgentDir = Directory(p.join(homeDir.path, '.pi', 'agent'));
-    await piAgentDir.create(recursive: true);
+    final extensionsDir = Directory(p.join(piAgentDir.path, 'extensions'));
+    await extensionsDir.create(recursive: true);
     final persistentModelsFile = File(p.join(piAgentDir.path, 'models.json'));
     if (!await persistentModelsFile.exists()) {
       await persistentModelsFile.writeAsString('{}', flush: true);
+    }
+    final controlExtension = File(
+      p.join(extensionsDir.path, 'kelivo-control.ts'),
+    );
+    try {
+      final source = await rootBundle.loadString(
+        'assets/agent_runtime/kelivo-control.ts',
+      );
+      await controlExtension.writeAsString(source, flush: true);
+    } on FlutterError {
+      throw StateError('agent_control_extension_missing');
     }
 
     if (!await _validInstall(rootfsDir, marker)) {
