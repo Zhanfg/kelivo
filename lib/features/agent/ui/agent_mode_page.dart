@@ -6,11 +6,15 @@ import 'package:provider/provider.dart';
 import '../../../core/models/workspace.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../model/widgets/model_select_sheet.dart';
+import '../../home/utils/model_display_helper.dart';
 import '../models/agent_task.dart';
+import '../providers/agent_settings_provider.dart';
 import '../providers/agent_task_provider.dart';
 import '../services/agent_task_runner.dart';
 import 'agent_task_detail_page.dart';
@@ -32,6 +36,44 @@ class _AgentModePageState extends State<AgentModePage> {
     _taskController.dispose();
     _taskFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectAgentModel() async {
+    final settings = context.read<SettingsProvider>();
+    final agentSettings = context.read<AgentSettingsProvider>();
+    final assistant = context.read<AssistantProvider>().currentAssistant;
+    final chat = context.read<ChatService>();
+    final conversationId = chat.currentConversationId;
+    final conversation = conversationId == null
+        ? null
+        : chat.getConversation(conversationId);
+    final inherited = resolveChatModel(
+      settings,
+      conversation: conversation,
+      assistant: assistant,
+    );
+
+    final selected = await showModelSelector(
+      context,
+      initialProviderKey:
+          agentSettings.hasModelOverride
+              ? agentSettings.modelProvider
+              : inherited.providerKey,
+      initialModelId:
+          agentSettings.hasModelOverride
+              ? agentSettings.modelId
+              : inherited.modelId,
+      allowInherit: agentSettings.hasModelOverride,
+      inheritLabel: _isZh(context)
+          ? '跟随当前聊天模型'
+          : 'Follow current chat model',
+    );
+    if (selected == null || !mounted) return;
+    if (selected.isInherit) {
+      await agentSettings.clearModelOverride();
+    } else {
+      await agentSettings.setModel(selected.providerKey, selected.modelId);
+    }
   }
 
   Future<void> _submitTask() async {
@@ -131,6 +173,25 @@ class _AgentModePageState extends State<AgentModePage> {
   @override
   Widget build(BuildContext context) {
     final zh = _isZh(context);
+    final agentSettings = context.watch<AgentSettingsProvider>();
+    final appSettings = context.watch<SettingsProvider>();
+    final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final chat = context.read<ChatService>();
+    final conversationId = chat.currentConversationId;
+    final conversation = conversationId == null
+        ? null
+        : chat.getConversation(conversationId);
+    final inheritedModel = resolveChatModel(
+      appSettings,
+      conversation: conversation,
+      assistant: assistant,
+    );
+    final activeModelId = agentSettings.hasModelOverride
+        ? agentSettings.modelId
+        : inheritedModel.modelId;
+    final modelLabel = (activeModelId == null || activeModelId.isEmpty)
+        ? (zh ? '选择模型' : 'Select model')
+        : activeModelId;
     final tasks = List<AgentTask>.of(context.watch<AgentTaskProvider>().tasks)
       ..sort((a, b) => a.updatedAt.compareTo(b.updatedAt));
     final topInset = MediaQuery.paddingOf(context).top + kToolbarHeight + 8;
@@ -168,6 +229,9 @@ class _AgentModePageState extends State<AgentModePage> {
               controller: _taskController,
               focusNode: _taskFocus,
               submitting: _submitting,
+              modelLabel: modelLabel,
+              modelOverridden: agentSettings.hasModelOverride,
+              onSelectModel: _selectAgentModel,
               onSubmit: _submitTask,
             ),
           ),
@@ -185,12 +249,18 @@ class _TaskComposer extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.submitting,
+    required this.modelLabel,
+    required this.modelOverridden,
+    required this.onSelectModel,
     required this.onSubmit,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool submitting;
+  final String modelLabel;
+  final bool modelOverridden;
+  final VoidCallback onSelectModel;
   final VoidCallback onSubmit;
 
   @override
@@ -228,20 +298,43 @@ class _TaskComposer extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(
-                Lucide.workflow,
-                size: 16,
-                color: cs.onSurface.withValues(alpha: 0.46),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 190),
+                child: OutlinedButton.icon(
+                  onPressed: submitting ? null : onSelectModel,
+                  icon: const Icon(Lucide.Bot, size: 15),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          modelLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        modelOverridden
+                            ? Lucide.ChevronDown
+                            : Lucide.ChevronsUpDown,
+                        size: 13,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  zh
-                      ? '工作区、计划与结果会自动保存'
-                      : 'Workspace, plans and results are saved automatically',
+                  modelOverridden
+                      ? (zh ? '代理独立模型' : 'Agent model')
+                      : (zh ? '跟随聊天模型' : 'Following chat model'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 11.5,
-                    color: cs.onSurface.withValues(alpha: 0.5),
+                    color: cs.onSurface.withValues(alpha: 0.48),
                   ),
                 ),
               ),
