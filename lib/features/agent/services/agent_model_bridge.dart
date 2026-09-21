@@ -90,7 +90,7 @@ class AgentModelBridge {
     );
   }
 
-  Future<void> writePiConfig({
+  Future<File> writePiConfig({
     required Directory taskDirectory,
     required AgentModelBridgeEndpoint endpoint,
   }) async {
@@ -116,6 +116,7 @@ class AgentModelBridge {
       }),
       flush: true,
     );
+    return modelsFile;
   }
 
   Future<void> close() async {
