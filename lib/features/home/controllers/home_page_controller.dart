@@ -1018,9 +1018,8 @@ class HomePageController extends ChangeNotifier {
 
     final text = input.text.trim();
     if (text.isEmpty) return ChatInputSubmissionResult.rejected;
-    final store = StoryActionReceiptStore(
-      _context.read<BusinessPreferences>(),
-    );
+    final preferences = _context.read<BusinessPreferences>();
+    final store = StoryActionReceiptStore(preferences);
     await store.begin(
       conversationId: conversation.id,
       source: source,
@@ -1028,9 +1027,7 @@ class HomePageController extends ChangeNotifier {
       submitText: text,
     );
 
-    final sceneStore = StorySceneRuntimeStore(
-      _context.read<BusinessPreferences>(),
-    );
+    final sceneStore = StorySceneRuntimeStore(preferences);
     final scene = await sceneStore.readOrDefault(conversation.id);
     if (scene.availableChoices.isNotEmpty) {
       await sceneStore.upsert(
