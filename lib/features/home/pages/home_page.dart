@@ -50,6 +50,7 @@ import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../story_runtime/ui/story_conversation_mode_control.dart';
 import '../../story_runtime/context/story_context_resource_store.dart';
+import '../../story_runtime/interaction/story_action_receipt.dart';
 import '../../story_runtime/ui/story_narrative_view.dart';
 import '../../provider/pages/providers_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
@@ -1149,9 +1150,11 @@ class _HomePageState extends State<HomePage>
                         isGenerating:
                             _controller.isCurrentConversationGenerating,
                         hasLoadingTools: _controller.hasLoadingTools,
-                        onSubmitIntent: (text) async {
-                          await _controller.sendMessage(
+                        onSubmitIntent: (text, source, label) async {
+                          await _controller.submitStoryAction(
                             ChatInputData(text: text),
+                            source: source,
+                            label: label,
                           );
                         },
                         onFreeAction: () {
@@ -1683,7 +1686,16 @@ class _HomePageState extends State<HomePage>
       onReasoningBudgetChanged: _setComposerReasoningBudget,
       onComposerModelChanged: _setComposerModel,
       onSend: (text) async {
-        final result = await _controller.sendMessage(text);
+        final storySelected = isStoryWorkspaceSelected(
+          context.read<BusinessPreferences>(),
+        );
+        final result = storySelected
+            ? await _controller.submitStoryAction(
+                text,
+                source: StoryActionSource.freeAction,
+                label: text.text,
+              )
+            : await _controller.sendMessage(text);
         if (!mounted) return result;
         if (PlatformUtils.isMobile &&
             result == ChatInputSubmissionResult.sent) {
