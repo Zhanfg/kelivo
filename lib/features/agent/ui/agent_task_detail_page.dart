@@ -240,7 +240,7 @@ class _GoalCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Lucide.Target, size: 17),
+              const Icon(Lucide.Activity, size: 17),
               const SizedBox(width: 7),
               Text(
                 zh ? '目标' : 'Goal',
@@ -320,11 +320,11 @@ class _EventCard extends StatelessWidget {
           running: false,
         ),
       AgentTaskEventKind.approvalRequested => _NoticeEventCard(
-          icon: Lucide.ShieldQuestion,
+          icon: Lucide.Shield,
           text: zh ? '等待你的批准' : 'Waiting for approval',
         ),
       AgentTaskEventKind.approvalResolved => _NoticeEventCard(
-          icon: Lucide.ShieldCheck,
+          icon: Lucide.CheckCircle,
           text: zh ? '批准请求已处理' : 'Approval resolved',
         ),
       AgentTaskEventKind.retry => _NoticeEventCard(
@@ -334,7 +334,7 @@ class _EventCard extends StatelessWidget {
               : (zh ? '自动重试结束' : 'Retry finished'),
         ),
       AgentTaskEventKind.compaction => _NoticeEventCard(
-          icon: Lucide.Minimize2,
+          icon: Lucide.FoldVertical,
           text: event.payload['state'] == 'start'
               ? (zh ? '正在压缩上下文' : 'Compacting context')
               : (zh ? '上下文压缩完成' : 'Context compaction finished'),
@@ -345,7 +345,7 @@ class _EventCard extends StatelessWidget {
         ),
       AgentTaskEventKind.note => _NoteEventCard(event: event, zh: zh),
       AgentTaskEventKind.notice => _NoticeEventCard(
-          icon: Lucide.Info,
+          icon: Lucide.info,
           text: event.payload['message']?.toString() ??
               (zh ? '代理通知' : 'Agent notice'),
         ),
@@ -494,7 +494,7 @@ class _OutputEventCard extends StatelessWidget {
     final output = event.payload['output']?.toString() ?? '';
     if (output.trim().isEmpty) return const SizedBox.shrink();
     return _TextEventCard(
-      icon: Lucide.TerminalSquare,
+      icon: Lucide.SquareTerminal,
       title: zh ? '运行输出' : 'Live output',
       text: output,
       code: true,
@@ -674,7 +674,7 @@ class _ApprovalCardState extends State<_ApprovalCard> {
         children: [
           Row(
             children: [
-              const Icon(Lucide.ShieldQuestion, size: 18),
+              const Icon(Lucide.Shield, size: 18),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
