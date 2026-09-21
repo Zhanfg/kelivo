@@ -46,7 +46,7 @@ class PiRpcSession {
     Map<String, String> environment = const <String, String>{},
     Duration startupTimeout = const Duration(seconds: 20),
   }) async {
-    final runId = 'pi-rpc-${const Uuid().v4()}';
+    final runId = 'agent-rpc-${const Uuid().v4()}';
     final session = PiRpcSession._(runtime: runtime, runId: runId);
     session._decodedStdout = utf8.decoder
         .bind(session._stdout.stream)
@@ -113,7 +113,7 @@ class PiRpcSession {
           onDone: () {
             if (!session._started.isCompleted) {
               session._started.completeError(
-                StateError('Pi RPC process closed before startup'),
+                StateError('Agent RPC process closed before startup'),
               );
             }
             unawaited(session._finishProcess());
@@ -140,12 +140,12 @@ class PiRpcSession {
     Map<String, dynamic> command, {
     Duration timeout = const Duration(seconds: 30),
   }) async {
-    if (_closing) throw StateError('Pi RPC session is closed');
+    if (_closing) throw StateError('Agent RPC session is closed');
     final id = command['id']?.toString() ?? const Uuid().v4();
     final payload = <String, dynamic>{...command, 'id': id};
     final completer = Completer<Map<String, dynamic>>();
     if (_pending.containsKey(id)) {
-      throw StateError('Duplicate Pi RPC request id: $id');
+      throw StateError('Duplicate Agent RPC request id: $id');
     }
     _pending[id] = completer;
 
@@ -160,7 +160,7 @@ class PiRpcSession {
       return await completer.future.timeout(timeout);
     } on TimeoutException {
       _pending.remove(id);
-      throw TimeoutException('Pi RPC command timed out: ${command['type']}');
+      throw TimeoutException('Agent RPC command timed out: ${command['type']}');
     }
   }
 
@@ -272,7 +272,7 @@ class PiRpcSession {
     try {
       final decoded = jsonDecode(line);
       if (decoded is! Map) {
-        throw const FormatException('Pi RPC record is not an object');
+        throw const FormatException('Agent RPC record is not an object');
       }
       final message = decoded.cast<String, dynamic>();
       if (message['type'] == 'response') {
@@ -299,8 +299,8 @@ class PiRpcSession {
   String _exitDescription() {
     final suffix = _stderrTail.trim();
     final base = _exitCode == null
-        ? 'Pi RPC exited'
-        : 'Pi RPC exited with code $_exitCode';
+        ? 'Agent RPC exited'
+        : 'Agent RPC exited with code $_exitCode';
     return suffix.isEmpty ? base : '$base: $suffix';
   }
 
@@ -338,7 +338,7 @@ class PiRpcSession {
       return;
     }
     _closing = true;
-    final error = StateError('Pi RPC session closed');
+    final error = StateError('Agent RPC session closed');
     for (final pending in _pending.values) {
       if (!pending.isCompleted) pending.completeError(error);
     }
