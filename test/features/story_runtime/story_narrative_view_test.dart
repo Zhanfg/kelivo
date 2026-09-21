@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Future<void> submitNoop(String _) async {}
+  Future<void> submitNoop(String _, Object __, String ___) async {}
 
   testWidgets(
     'Story renders prose without permanent user chat bubbles',
