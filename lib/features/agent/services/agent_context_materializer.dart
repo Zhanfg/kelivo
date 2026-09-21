@@ -128,6 +128,19 @@ class AgentContextMaterializer {
       ..writeln(
         '- Keep the visible plan concise and reflect completed/in-progress steps.',
       )
+      ..writeln(
+        '- When independent research, review, testing, or implementation work '
+        'can safely proceed in parallel, use the task tool and batch independent '
+        'subtasks instead of serializing everything in the main agent.',
+      )
+      ..writeln(
+        '- Prefer isolated subagents for concurrent mutating work in Git '
+        'repositories so parallel edits do not overwrite one another.',
+      )
+      ..writeln(
+        '- Keep the main agent responsible for decomposition, coordination, '
+        'integration, verification, and the final user-facing result.',
+      )
       ..writeln()
       ..writeln('## Runtime boundary')
       ..writeln()
