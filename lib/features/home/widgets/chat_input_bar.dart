@@ -2322,7 +2322,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   Widget _buildResponsiveLeftActions(BuildContext context) {
     const double spacing = 8;
     const double normalButtonW = 32; // 20 + padding(6*2)
-    const double modelButtonW = 112;
+    const double modelButtonW = 30;
     const double plusButtonW = 32;
 
     final l10n = AppLocalizations.of(context)!;
@@ -2342,7 +2342,8 @@ class _ChatInputBarState extends State<ChatInputBar>
             builder: () => _ModelSelectChip(
               label: _composerModelLabel(),
               icon: widget.modelIcon,
-              tooltip: l10n.chatInputBarSelectModelTooltip,
+              tooltip:
+                  '${l10n.chatInputBarSelectModelTooltip}: ${_composerModelLabel()}',
               onTap: lockTap(widget.onSelectModel),
               onLongPress: lockTap(widget.onLongPressSelectModel),
             ),
@@ -4258,48 +4259,27 @@ class _ModelSelectChip extends StatelessWidget {
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.52),
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap,
-          onLongPress: isDesktop ? null : onLongPress,
-          child: SizedBox(
-            width: 112,
-            height: 32,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                children: [
-                  if (icon != null)
-                    SizedBox(width: 20, height: 20, child: icon)
-                  else
-                    Icon(
-                      Lucide.Boxes,
-                      size: 16,
-                      color: cs.onSurface.withValues(alpha: 0.68),
-                    ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: AppFontWeights.medium,
-                        color: cs.onSurface.withValues(alpha: 0.82),
+      child: Semantics(
+        button: true,
+        label: '$tooltip, $label',
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: onTap,
+            onLongPress: isDesktop ? null : onLongPress,
+            child: SizedBox(
+              width: 30,
+              height: 30,
+              child: Center(
+                child: icon != null
+                    ? SizedBox(width: 28, height: 28, child: icon)
+                    : Icon(
+                        Lucide.Boxes,
+                        size: 20,
+                        color: cs.onSurface.withValues(alpha: 0.62),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 3),
-                  Icon(
-                    Lucide.ChevronDown,
-                    size: 13,
-                    color: cs.onSurface.withValues(alpha: 0.45),
-                  ),
-                ],
               ),
             ),
           ),
