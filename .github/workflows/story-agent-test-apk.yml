@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - test/story-agent-android-20260921
+      - fix/agent-product-runtime-20260921
     paths:
       - ".github/workflows/story-agent-test-apk.yml"
       - "lib/**"
       - "test/**"
       - "integration_test/**"
       - "android/**"
+      - "assets/**"
       - "tool/**"
       - "pubspec.yaml"
   pull_request:
@@ -67,6 +69,10 @@ jobs:
           cat > lib/secrets/fallback.dart <<'EOF'
           const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
           EOF
+
+      - name: Prepare embedded Agent runtime
+        shell: bash
+        run: bash tool/prepare_agent_runtime.sh
 
       - name: Resolve dependencies
         run: flutter pub get
