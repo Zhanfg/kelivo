@@ -13,6 +13,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/conversation_kind.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/models/quick_phrase.dart';
@@ -55,6 +56,7 @@ import '../services/ocr_service.dart';
 import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
 import '../utils/chat_layout_constants.dart';
+import '../models/workspace_mode.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/share_destination_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
@@ -1272,6 +1274,35 @@ class HomePageController extends ChangeNotifier {
     try {
       await _viewModel.flushCurrentConversationProgress();
     } catch (_) {}
+  }
+
+  /// Ensures Chat/Story workspaces never display a conversation owned by
+  /// another workspace. Agent owns its own task surface and does not participate.
+  Future<void> ensureConversationForWorkspace(WorkspaceMode mode) async {
+    if (mode == WorkspaceMode.agent) return;
+
+    final expectedKind = mode == WorkspaceMode.story
+        ? ConversationKind.story
+        : ConversationKind.chat;
+    final current = currentConversation;
+    if (current != null && conversationKindOf(current) == expectedKind) return;
+
+    Conversation? target;
+    for (final conversation in _chatService.getAllConversations()) {
+      if (conversationKindOf(conversation) == expectedKind) {
+        target = conversation;
+        break;
+      }
+    }
+
+    if (target != null) {
+      await switchConversationAnimated(target.id);
+      return;
+    }
+
+    // HomeViewModel.createNewConversation reads WorkspaceModeProvider. In the
+    // Story workspace it creates a blank draft and promotes it before display.
+    await createNewConversationAnimated();
   }
 
   Future<void> createNewConversationAnimated({
