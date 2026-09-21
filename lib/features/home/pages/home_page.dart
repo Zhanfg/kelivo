@@ -1141,6 +1141,7 @@ class _HomePageState extends State<HomePage>
                 child: storySelected
                     ? StoryNarrativeView(
                         messages: _controller.chatController.collapsedMessages,
+                        conversationId: _controller.currentConversation?.id,
                         topPadding: topContentPadding,
                         bottomPadding: bottomContentPadding,
                         streamingContentNotifier:
