@@ -41,6 +41,8 @@ class AgentTask {
     this.conversationId,
     this.assistantId,
     this.worktreeId,
+    this.modelProviderKey,
+    this.modelId,
     this.currentStep,
     this.completedSteps = 0,
     this.totalSteps,
@@ -67,6 +69,11 @@ class AgentTask {
   /// Optional isolated Git worktree used by this task.
   final String? worktreeId;
 
+  /// Model snapshot captured when the task was created. This makes resumed
+  /// tasks reproducible even if the mode-level model changes later.
+  final String? modelProviderKey;
+  final String? modelId;
+
   final AgentTaskPhase phase;
   final String? currentStep;
   final int completedSteps;
@@ -87,6 +94,8 @@ class AgentTask {
     String? conversationId,
     String? assistantId,
     String? worktreeId,
+    String? modelProviderKey,
+    String? modelId,
     AgentTaskPhase? phase,
     String? currentStep,
     int? completedSteps,
@@ -98,6 +107,7 @@ class AgentTask {
     bool clearConversationId = false,
     bool clearAssistantId = false,
     bool clearWorktreeId = false,
+    bool clearModel = false,
     bool clearCurrentStep = false,
     bool clearTotalSteps = false,
     bool clearLastError = false,
@@ -115,6 +125,10 @@ class AgentTask {
           : (conversationId ?? this.conversationId),
       assistantId: clearAssistantId ? null : (assistantId ?? this.assistantId),
       worktreeId: clearWorktreeId ? null : (worktreeId ?? this.worktreeId),
+      modelProviderKey: clearModel
+          ? null
+          : (modelProviderKey ?? this.modelProviderKey),
+      modelId: clearModel ? null : (modelId ?? this.modelId),
       phase: phase ?? this.phase,
       currentStep: clearCurrentStep ? null : (currentStep ?? this.currentStep),
       completedSteps: completedSteps ?? this.completedSteps,
@@ -136,6 +150,8 @@ class AgentTask {
     'conversationId': conversationId,
     'assistantId': assistantId,
     'worktreeId': worktreeId,
+    'modelProviderKey': modelProviderKey,
+    'modelId': modelId,
     'phase': phase.name,
     'currentStep': currentStep,
     'completedSteps': completedSteps,
@@ -157,6 +173,8 @@ class AgentTask {
       conversationId: json['conversationId'] as String?,
       assistantId: json['assistantId'] as String?,
       worktreeId: json['worktreeId'] as String?,
+      modelProviderKey: json['modelProviderKey'] as String?,
+      modelId: json['modelId'] as String?,
       phase: _phaseFromString(json['phase'] as String?),
       currentStep: json['currentStep'] as String?,
       completedSteps: (json['completedSteps'] as num?)?.toInt() ?? 0,
