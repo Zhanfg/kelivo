@@ -457,6 +457,10 @@ class _ToolEventCard extends StatelessWidget {
     final command = args is Map && args['command'] != null
         ? args['command'].toString()
         : null;
+    final subagentTasks =
+        tool == 'task' && args is Map && args['tasks'] is List
+        ? (args['tasks'] as List).whereType<Map>().toList(growable: false)
+        : const <Map>[];
     final path = args is Map
         ? (args['path'] ?? args['file_path'] ?? args['filePath'])?.toString()
         : null;
@@ -500,7 +504,13 @@ class _ToolEventCard extends StatelessWidget {
               ),
             ],
           ),
-          if (command != null && command.isNotEmpty) ...[
+          if (subagentTasks.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            for (final item in subagentTasks) ...[
+              _SubagentTaskRow(item: item, zh: zh),
+              const SizedBox(height: 6),
+            ],
+          ] else if (command != null && command.isNotEmpty) ...[
             const SizedBox(height: 8),
             _CodeBlock(text: '\$ $command'),
           ] else if (path != null && path.isNotEmpty) ...[
@@ -545,6 +555,10 @@ class _ToolEventCard extends StatelessWidget {
 
   static IconData _toolIcon(String tool) => switch (tool) {
     'bash' => Lucide.Terminal,
+    'task' => Lucide.Network,
+    'hub' => Lucide.MessagesSquare,
+    'job' => Lucide.Activity,
+    'todo' => Lucide.ListChecks,
     'read' => Lucide.FileText,
     'write' => Lucide.FilePlus,
     'edit' => Lucide.FilePen,
@@ -555,6 +569,10 @@ class _ToolEventCard extends StatelessWidget {
 
   static String _toolTitle(String tool, bool zh) => switch (tool) {
     'bash' => zh ? '执行命令' : 'Run command',
+    'task' => zh ? '并行子代理' : 'Subagents',
+    'hub' => zh ? '代理协作' : 'Agent coordination',
+    'job' => zh ? '后台任务' : 'Background job',
+    'todo' => zh ? '任务清单' : 'Todo',
     'read' => zh ? '读取文件' : 'Read file',
     'write' => zh ? '写入文件' : 'Write file',
     'edit' => zh ? '编辑文件' : 'Edit file',
@@ -563,6 +581,75 @@ class _ToolEventCard extends StatelessWidget {
     'ls' => zh ? '列出目录' : 'List directory',
     _ => tool,
   };
+}
+
+class _SubagentTaskRow extends StatelessWidget {
+  const _SubagentTaskRow({required this.item, required this.zh});
+
+  final Map item;
+  final bool zh;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final name = (item['name'] ?? item['agent'])?.toString().trim();
+    final task = item['task']?.toString().trim() ?? '';
+    final isolated = item['isolated'] == true;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.46),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isolated ? Lucide.GitFork : Lucide.Bot,
+            size: 15,
+            color: cs.onSurface.withValues(alpha: 0.62),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (name != null && name.isNotEmpty)
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                if (task.isNotEmpty)
+                  Text(
+                    task,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.3,
+                      color: cs.onSurface.withValues(alpha: 0.72),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (isolated)
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: Text(
+                zh ? '隔离' : 'isolated',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: cs.onSurface.withValues(alpha: 0.48),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _OutputEventCard extends StatelessWidget {
