@@ -2307,6 +2307,16 @@ class _ChatInputBarState extends State<ChatInputBar>
     return (images: images, docs: docs);
   }
 
+  String _composerModelLabel() {
+    final raw = (widget.currentModelId ?? widget.chatModelId ?? '').trim();
+    if (raw.isEmpty) return 'Model';
+    final slash = raw.lastIndexOf('/');
+    final value = slash >= 0 && slash + 1 < raw.length
+        ? raw.substring(slash + 1)
+        : raw;
+    return value.length <= 20 ? value : '${value.substring(0, 18)}…';
+  }
+
   // Build a responsive left action bar that hides overflowing actions
   // into an anchored "+" menu using DesktopContextMenu style.
   Widget _buildResponsiveLeftActions(BuildContext context) {
