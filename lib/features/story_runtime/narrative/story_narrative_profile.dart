@@ -249,5 +249,5 @@ List<String> _strings(Object? value) {
 
 double? _double(Object? value) {
   if (value is! num || value.isNaN || value.isInfinite) return null;
-  return value.toDouble().clamp(0.0, 1.0);
+  return value.toDouble().clamp(0.0, 1.0).toDouble();
 }
