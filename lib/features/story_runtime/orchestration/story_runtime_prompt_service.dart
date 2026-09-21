@@ -16,6 +16,8 @@ import '../mcp/story_mcp_profile_resolver.dart';
 import '../mcp/story_mcp_profile_store.dart';
 import '../memory/story_worldline_memory.dart';
 import '../memory/story_worldline_memory_store.dart';
+import '../narrative/story_narrative_director.dart';
+import '../narrative/story_narrative_profile_store.dart';
 import '../reference/story_reference_selection_store.dart';
 import '../reference/story_reference_store.dart';
 import '../skills/story_skill_binding_store.dart';
@@ -88,6 +90,7 @@ final class StoryRuntimePromptService {
       _sceneStore = StorySceneRuntimeStore(preferences),
       _worldTreeStore = StoryWorldTreeStore(preferences),
       _worldlineMemoryStore = StoryWorldlineMemoryStore(preferences),
+      _narrativeProfileStore = StoryNarrativeProfileStore(preferences),
       _contextResourceStore = StoryContextResourceStore(preferences),
       _executionStore = StoryRuntimeExecutionStore(preferences),
       _memoryRepository = MemoryRepository(preferences),
@@ -105,6 +108,7 @@ final class StoryRuntimePromptService {
   final StorySceneRuntimeStore _sceneStore;
   final StoryWorldTreeStore _worldTreeStore;
   final StoryWorldlineMemoryStore _worldlineMemoryStore;
+  final StoryNarrativeProfileStore _narrativeProfileStore;
   final StoryContextResourceStore _contextResourceStore;
   final StoryRuntimeExecutionStore _executionStore;
   final MemoryRepository _memoryRepository;
@@ -187,6 +191,14 @@ final class StoryRuntimePromptService {
         await _sceneStore.upsert(scene);
       }
 
+      final narrativeProfile = await _narrativeProfileStore.readOrDefault(
+        conversation.id,
+      );
+      final narrativeFrame = const StoryNarrativeDirector().build(
+        profile: narrativeProfile,
+        scene: scene,
+      );
+
       final memoryLinks = await _worldlineMemoryStore.readForTree(
         tree.worldTreeId,
       );
@@ -263,6 +275,7 @@ final class StoryRuntimePromptService {
           manualEnabledSkillIds: scene.activeSkillIds.toSet(),
           additionalStable: <StoryPromptContribution>[
             ...compiledContext.stableContributions,
+            ...narrativeFrame.stable,
             StoryPromptContribution(
               id: 'story.worldline.ancestry',
               stability: StoryPromptStability.epochStable,
@@ -272,6 +285,7 @@ final class StoryRuntimePromptService {
           ],
           volatile: <StoryPromptContribution>[
             ...compiledContext.volatileContributions,
+            ...narrativeFrame.volatile,
             StoryPromptContribution(
               id: 'story.worldline.cursor',
               stability: StoryPromptStability.volatile,
@@ -284,15 +298,6 @@ final class StoryRuntimePromptService {
                 stability: StoryPromptStability.volatile,
                 order: 820,
                 content: _memoryText(storyScopedMemory),
-              ),
-            if (scene.openLoops.isNotEmpty ||
-                scene.continuityState.isNotEmpty ||
-                scene.serialState.isNotEmpty)
-              StoryPromptContribution(
-                id: 'story.scene.dynamic',
-                stability: StoryPromptStability.volatile,
-                order: 840,
-                content: _sceneDynamicText(scene),
               ),
           ],
           localOnly: <StoryPromptContribution>[
@@ -469,13 +474,14 @@ final class StoryRuntimePromptService {
   }
 
   String _storyCoreInstructions(StoryRuntimeSessionState session) =>
-      '[KELIVO_STORY_RUNTIME_V1]\n'
-      'This conversation is in Story Mode. Produce polished original fiction directly readable in Kelivo.\n'
+      '[KELIVO_STORY_RUNTIME_V2]\n'
+      'This conversation is in Story Mode. Write polished original fiction as a continuous work, not a chat transcript, RPG log, status report, screenplay template, or event dump.\n'
+      'Treat runtime facts as hard continuity boundaries, not as required beats. The Narrative Director supplies intent and affordances, but you retain freedom over prose, rhythm, silence, omission, subtext, focus, and scene construction.\n'
       'SELF is always the real user. Never silently rename SELF, transfer control of SELF to an NPC, or decide consequential SELF choices.\n'
-      'Preserve established world facts, identity, injury, inventory, relationships, location, time, and unresolved consequences.\n'
-      'Use World Tree and worldline memory only as continuity context. Do not expose internal runtime tags, ids, cache data, schemas, tool routing, or implementation notes to the user.\n'
+      'Preserve established world facts, identity, injury, inventory, relationships, location, time, knowledge boundaries, and unresolved consequences. Never make a character know information unavailable to them.\n'
+      'Use World Tree, scene packets, style DNA, voice DNA, and worldline memory only as hidden continuity/creative context. Never expose runtime tags, ids, cache data, schemas, tool routing, protocol markers, or implementation notes.\n'
       'Agency mode: ${session.agencyMode.name}. Manual forbids invented SELF action/dialogue; balanced permits only trivial connective behavior; cinematic still forbids major goals, consent, commitments, irreversible actions, and consequential SELF dialogue.\n'
-      '[/KELIVO_STORY_RUNTIME_V1]';
+      '[/KELIVO_STORY_RUNTIME_V2]';
 }
 
 bool _sameStringSet(Iterable<String> left, Set<String> right) {
