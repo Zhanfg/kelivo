@@ -4319,9 +4319,7 @@ class _CompactIconButton extends StatelessWidget {
     this.allowLongPressOnDesktop = false,
     this.tooltip,
     this.active = false,
-    this.child,
     this.childBuilder,
-    this.modelIcon = false,
   });
 
   final IconData icon;
@@ -4330,9 +4328,7 @@ class _CompactIconButton extends StatelessWidget {
   final bool allowLongPressOnDesktop;
   final String? tooltip;
   final bool active;
-  final Widget? child;
   final Widget Function(Color color)? childBuilder;
-  final bool modelIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -4344,40 +4340,25 @@ class _CompactIconButton extends StatelessWidget {
     final bool isDesktop =
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
-    // Keep overall button size constant. For model icon with child, enlarge child slightly
-    // and reduce padding so (2*padding + childSize) stays unchanged.
-    final bool isModelChild = modelIcon && child != null;
-    final double iconSize = 20.0; // default glyph size
-    final double childSize = isModelChild
-        ? 28.0
-        : iconSize; // enlarge circle a bit more
-    final double padding = isModelChild
-        ? 1.0
-        : 6.0; // keep total ~30px (2*1 + 28)
+    const double childSize = 20.0;
 
     final button = IosIconButton(
-      size: isModelChild ? childSize : 20,
-      padding: EdgeInsets.all(padding),
+      size: 20,
+      padding: const EdgeInsets.all(6),
       onTap: onTap,
       // Model/reasoning long-press stays disabled on desktop, while
       // controls that explicitly opt in can use long-press in a mobile-width
       // Composer even when widget tests run on a desktop host.
       onLongPress: isDesktop && !allowLongPressOnDesktop ? null : onLongPress,
       color: fgColor,
-      builder: childBuilder != null
-          ? (c) => SizedBox(
+      builder: childBuilder == null
+          ? null
+          : (c) => SizedBox(
               width: childSize,
               height: childSize,
               child: childBuilder!(c),
-            )
-          : (child != null
-                ? (_) => SizedBox(
-                    width: childSize,
-                    height: childSize,
-                    child: child,
-                  )
-                : null),
-      icon: child == null && childBuilder == null ? icon : null,
+            ),
+      icon: childBuilder == null ? icon : null,
     );
 
     if (tooltip == null) {
