@@ -178,6 +178,18 @@ class PiRpcSession {
     return send(const <String, dynamic>{'type': 'get_state'});
   }
 
+  Future<Map<String, dynamic>> steer(String message) {
+    return send(<String, dynamic>{'type': 'steer', 'message': message});
+  }
+
+  Future<Map<String, dynamic>> followUp(String message) {
+    return send(<String, dynamic>{'type': 'follow_up', 'message': message});
+  }
+
+  Future<Map<String, dynamic>> clearQueue() {
+    return send(const <String, dynamic>{'type': 'clear_queue'});
+  }
+
   Future<void> abort() async {
     if (_closing) return;
     try {
