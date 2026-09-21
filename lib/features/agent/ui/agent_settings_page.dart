@@ -92,6 +92,22 @@ class AgentSettingsPage extends StatelessWidget {
             ),
             ListTile(
               leading: Icon(
+                settings.permissionMode == AgentPermissionMode.planFirst
+                    ? Lucide.CheckCircle
+                    : Lucide.circleDot,
+              ),
+              title: Text(zh ? '先计划' : 'Plan first'),
+              subtitle: Text(
+                zh
+                    ? '先只读分析并提交计划；你批准后，代理再连续实施。'
+                    : 'Research read-only, present a plan, then implement continuously after approval.',
+              ),
+              onTap: () => settings.setPermissionMode(
+                AgentPermissionMode.planFirst,
+              ),
+            ),
+            ListTile(
+              leading: Icon(
                 settings.permissionMode == AgentPermissionMode.readOnly
                     ? Lucide.CheckCircle
                     : Lucide.circleDot,
