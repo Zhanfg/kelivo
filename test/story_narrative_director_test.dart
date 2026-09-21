@@ -46,7 +46,7 @@ void main() {
       director: StoryNarrativeDirectorState(
         affordances: List<String>.generate(
           80,
-          (index) => 'long-affordance-number-' + index.toString(),
+          (index) => 'long-affordance-number-$index',
         ),
       ),
     );
