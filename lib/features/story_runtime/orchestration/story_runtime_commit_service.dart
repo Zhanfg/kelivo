@@ -2,6 +2,7 @@
 
 import '../../../core/database/business_preferences.dart';
 import '../../../core/models/chat_message.dart';
+import '../interaction/story_action_receipt.dart';
 import '../models/story_runtime_models.dart';
 import '../parsing/story_message_event_store.dart';
 import '../parsing/story_response_parser.dart';
@@ -38,6 +39,7 @@ final class StoryRuntimeCommitService {
         executionStore: StoryRuntimeExecutionStore(preferences),
         worldTreeStore: StoryWorldTreeStore(preferences),
         sceneRuntimeStore: StorySceneRuntimeStore(preferences),
+        actionReceiptStore: StoryActionReceiptStore(preferences),
         messageEventStore: StoryMessageEventStore(preferences),
         voiceContextStore: StoryVoiceContextHistoryStore(preferences),
       );
@@ -47,12 +49,14 @@ final class StoryRuntimeCommitService {
     required StoryRuntimeExecutionRepository executionStore,
     required StoryWorldTreeRepository worldTreeStore,
     StorySceneRuntimeRepository? sceneRuntimeStore,
+    StoryActionReceiptStore? actionReceiptStore,
     StoryMessageEventStore? messageEventStore,
     StoryVoiceContextHistoryStore? voiceContextStore,
   }) : _sessionStore = sessionStore,
        _executionStore = executionStore,
        _worldTreeStore = worldTreeStore,
        _sceneRuntimeStore = sceneRuntimeStore,
+       _actionReceiptStore = actionReceiptStore,
        _messageEventStore = messageEventStore,
        _voiceContextStore = voiceContextStore;
 
@@ -60,6 +64,7 @@ final class StoryRuntimeCommitService {
   final StoryRuntimeExecutionRepository _executionStore;
   final StoryWorldTreeRepository _worldTreeStore;
   final StorySceneRuntimeRepository? _sceneRuntimeStore;
+  final StoryActionReceiptStore? _actionReceiptStore;
   final StoryMessageEventStore? _messageEventStore;
   final StoryVoiceContextHistoryStore? _voiceContextStore;
 
@@ -213,6 +218,12 @@ final class StoryRuntimeCommitService {
         parsed?.visibleText ?? message.content,
       );
 
+      await _actionReceiptStore?.resolveLatestPending(
+        conversationId: conversationId,
+        assistantMessageId: message.id,
+        resultSummary: _actionFeedback(parsedTurn),
+      );
+
       await _sessionStore.upsert(
         session.copyWith(
           worldlineId: worldline.id,
@@ -236,6 +247,18 @@ final class StoryRuntimeCommitService {
       await machine.fail(conversationId: conversationId, error: error);
       rethrow;
     }
+  }
+
+  String? _actionFeedback(StoryTurn? turn) {
+    if (turn == null) return null;
+    for (final event in turn.events.reversed) {
+      if (event.type != StoryEventType.actionResult) continue;
+      final raw = event.metadata['feedback'];
+      if (raw is! String) return null;
+      final normalized = raw.trim();
+      return normalized.isEmpty ? null : normalized;
+    }
+    return null;
   }
 
   Future<void> _recordVoiceContext(ChatMessage message, String text) async {
