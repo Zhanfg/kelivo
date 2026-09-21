@@ -1143,6 +1143,11 @@ class _HomePageState extends State<HomePage>
                         messages: _controller.chatController.collapsedMessages,
                         topPadding: topContentPadding,
                         bottomPadding: bottomContentPadding,
+                        streamingContentNotifier:
+                            _controller.streamingContentNotifier,
+                        isGenerating:
+                            _controller.isCurrentConversationGenerating,
+                        hasLoadingTools: _controller.hasLoadingTools,
                         title: _controller.currentConversation?.title,
                       )
                     : _buildMessageListView(
