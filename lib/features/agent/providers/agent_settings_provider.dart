@@ -22,6 +22,8 @@ class AgentSettingsProvider extends ChangeNotifier {
   static const String showToolOutputKey = 'agent_show_tool_output_v1';
   static const String maxParallelAgentsKey = 'agent_max_parallel_agents_v1';
   static const String subagentIsolationKey = 'agent_subagent_isolation_v1';
+  static const String modelProviderKey = 'agent_model_provider_v1';
+  static const String modelIdKey = 'agent_model_id_v1';
 
   final BusinessPreferences preferences;
   late final Future<void> loaded;
@@ -30,11 +32,17 @@ class AgentSettingsProvider extends ChangeNotifier {
   bool _showToolOutput = true;
   int _maxParallelAgents = 3;
   bool _subagentIsolation = true;
+  String? _modelProvider;
+  String? _modelId;
 
   AgentPermissionMode get permissionMode => _permissionMode;
   bool get showToolOutput => _showToolOutput;
   int get maxParallelAgents => _maxParallelAgents;
   bool get subagentIsolation => _subagentIsolation;
+  String? get modelProvider => _modelProvider;
+  String? get modelId => _modelId;
+  bool get hasModelOverride =>
+      (_modelProvider?.isNotEmpty ?? false) && (_modelId?.isNotEmpty ?? false);
 
   Future<void> _load() async {
     if (!preferences.isLoaded) await preferences.load();
@@ -46,6 +54,8 @@ class AgentSettingsProvider extends ChangeNotifier {
         (preferences.getInt(maxParallelAgentsKey) ?? 3).clamp(1, 4);
     _subagentIsolation =
         preferences.getBool(subagentIsolationKey) ?? true;
+    _modelProvider = preferences.getString(modelProviderKey);
+    _modelId = preferences.getString(modelIdKey);
     notifyListeners();
   }
 
@@ -79,6 +89,24 @@ class AgentSettingsProvider extends ChangeNotifier {
     if (_subagentIsolation == value) return;
     await preferences.setBool(subagentIsolationKey, value);
     _subagentIsolation = value;
+    notifyListeners();
+  }
+
+  Future<void> setModel(String providerKey, String modelId) async {
+    await loaded;
+    _modelProvider = providerKey;
+    _modelId = modelId;
+    await preferences.setString(AgentSettingsProvider.modelProviderKey, providerKey);
+    await preferences.setString(AgentSettingsProvider.modelIdKey, modelId);
+    notifyListeners();
+  }
+
+  Future<void> clearModelOverride() async {
+    await loaded;
+    _modelProvider = null;
+    _modelId = null;
+    await preferences.remove(AgentSettingsProvider.modelProviderKey);
+    await preferences.remove(AgentSettingsProvider.modelIdKey);
     notifyListeners();
   }
 }
