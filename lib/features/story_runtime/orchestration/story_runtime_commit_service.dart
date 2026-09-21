@@ -244,6 +244,10 @@ final class StoryRuntimeCommitService {
         visibleText: parsed?.visibleText,
       );
     } catch (error) {
+      await _actionReceiptStore?.failLatestPending(
+        conversationId: conversationId,
+        resultSummary: 'story_runtime_commit_failed',
+      );
       await machine.fail(conversationId: conversationId, error: error);
       rethrow;
     }
