@@ -268,6 +268,41 @@ class AgentTaskRunner {
     }
   }
 
+  Future<bool> runShell(String taskId, String command) async {
+    final text = command.trim();
+    if (text.isEmpty) return false;
+    final session = _sessions[taskId];
+    if (session == null) return false;
+    final id = 'shell-${DateTime.now().microsecondsSinceEpoch}';
+    await journal.append(
+      taskId,
+      AgentTaskEventKind.toolStarted,
+      payload: <String, dynamic>{
+        'tool': 'bash',
+        'toolCallId': id,
+        'direct': true,
+        'args': <String, dynamic>{'command': text},
+      },
+    );
+    final response = await session.bash(text, id: id);
+    final data = response['data'];
+    final map = data is Map ? data.cast<String, dynamic>() : const <String, dynamic>{};
+    final output = map['output']?.toString() ?? '';
+    await journal.append(
+      taskId,
+      AgentTaskEventKind.toolFinished,
+      payload: <String, dynamic>{
+        'tool': 'bash',
+        'toolCallId': id,
+        'direct': true,
+        'isError': (map['exitCode'] as num?)?.toInt() != 0,
+        if (output.isNotEmpty) 'output': _limit(output, 16000),
+        if (map['exitCode'] != null) 'exitCode': map['exitCode'],
+      },
+    );
+    return response['success'] == true;
+  }
+
   Future<bool> steer(String taskId, String message) async {
     final text = message.trim();
     if (text.isEmpty) return false;
@@ -354,6 +389,21 @@ class AgentTaskRunner {
             taskId,
             AgentTaskEventKind.assistantMessage,
             payload: <String, dynamic>{'text': _redact(text, secrets)},
+          );
+        }
+      case 'bash_execution_update':
+        if (!agentSettings.showToolOutput) break;
+        final delta = event['delta']?.toString() ?? '';
+        if (delta.isNotEmpty) {
+          await journal.append(
+            taskId,
+            AgentTaskEventKind.toolProgress,
+            payload: <String, dynamic>{
+              'tool': 'bash',
+              if (event['id'] != null) 'toolCallId': event['id'].toString(),
+              'output': _redact(_limit(delta, 12000), secrets),
+              'delta': true,
+            },
           );
         }
       case 'tool_execution_start':
