@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/story_runtime/models/story_runtime_models.dart';
 import 'package:Kelivo/features/story_runtime/parsing/story_response_parser.dart';
 import 'package:Kelivo/features/story_runtime/state/story_scene_runtime_reducer.dart';
 import 'package:Kelivo/features/story_runtime/state/story_scene_runtime_state.dart';
@@ -68,6 +69,80 @@ void main() {
       expect(next.revision, 5);
     },
   );
+
+  test('action result updates scene relationships and replaces choices', () {
+    const raw = '''
+{
+  "version": 1,
+  "events": [
+    {
+      "type": "action_result",
+      "actor": {"type": "world"},
+      "metadata": {
+        "feedback": "你推开门，守卫明显更警惕了。",
+        "scene_patch": {
+          "location": "Archive",
+          "participant_add": ["guard"],
+          "participant_remove": ["mira"]
+        },
+        "relationship_patch": [
+          {
+            "from": "guard",
+            "to": "self",
+            "delta": {"trust": -0.2, "fear": 0.1}
+          }
+        ]
+      }
+    },
+    {
+      "type": "choice_set",
+      "actor": {"type": "self"},
+      "choices": [
+        {"id": "hide", "label": "躲到书架后"},
+        {"id": "speak", "label": "主动开口"}
+      ]
+    }
+  ]
+}
+''';
+    final turn = const StoryResponseParser().parse(raw, turnId: 'turn-action');
+    const current = StorySceneRuntimeState(
+      conversationId: 'conversation',
+      worldTreeId: 'tree',
+      worldlineId: 'line',
+      location: 'Hall',
+      participantCharacterIds: <String>['mira'],
+      availableChoices: <StoryChoice>[
+        StoryChoice(id: 'old', label: '旧选项'),
+      ],
+      relationships: <StoryRelationshipEdge>[
+        StoryRelationshipEdge(
+          fromId: 'guard',
+          toId: 'self',
+          dimensions: <String, double>{'trust': 0.4},
+        ),
+      ],
+      revision: 3,
+    );
+
+    final next = reduceStoryTurnIntoScene(
+      current: current,
+      turn: turn,
+      worldTreeId: 'tree',
+      worldlineId: 'line',
+    );
+
+    expect(next.location, 'Archive');
+    expect(next.participantCharacterIds, <String>['guard']);
+    expect(next.availableChoices.map((item) => item.id), <String>[
+      'hide',
+      'speak',
+    ]);
+    final edge = next.relationships.single;
+    expect(edge.dimensions['trust'], closeTo(0.2, 0.0001));
+    expect(edge.dimensions['fear'], closeTo(0.1, 0.0001));
+    expect(next.revision, 4);
+  });
 
   test(
     'malformed metadata is ignored and unchanged state does not churn revision',
