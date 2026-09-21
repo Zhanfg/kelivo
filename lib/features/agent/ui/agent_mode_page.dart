@@ -13,6 +13,7 @@ import '../../../theme/app_font_weights.dart';
 import '../models/agent_task.dart';
 import '../providers/agent_task_provider.dart';
 import '../services/agent_task_runner.dart';
+import 'agent_task_detail_page.dart';
 
 class AgentModePage extends StatefulWidget {
   const AgentModePage({super.key});
@@ -150,7 +151,15 @@ class _AgentModePageState extends State<AgentModePage> {
                   _EmptyTasks(zh: zh)
                 else
                   for (final task in tasks) ...[
-                    _TaskCard(task: task, zh: zh),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => AgentTaskDetailPage(taskId: task.id),
+                        ),
+                      ),
+                      child: _TaskCard(task: task, zh: zh),
+                    ),
                     const SizedBox(height: 10),
                   ],
               ],
