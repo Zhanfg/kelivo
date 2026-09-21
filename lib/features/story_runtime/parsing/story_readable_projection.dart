@@ -41,6 +41,38 @@ String projectStoryReadableOrOriginal(
   required String turnId,
   bool streaming = false,
 }) {
+  // Preferred contract: reader-visible prose followed by a hidden event
+  // sidecar. StoryNarrativeView does not use a Markdown renderer, so strip the
+  // sidecar explicitly rather than relying on HTML-comment hiding.
+  try {
+    final embedded = const StoryResponseParser().parseEmbedded(
+      raw,
+      turnId: turnId,
+    );
+    return embedded.visibleText;
+  } on StoryResponseParseException {
+    // Some model/provider combinations return the event sidecar without
+    // duplicating reader-visible prose. Project that envelope instead of ever
+    // exposing protocol JSON to the reader.
+  }
+
+  final start = raw.lastIndexOf(storyEventsCommentStart);
+  if (start >= 0) {
+    final end = raw.indexOf(
+      storyEventsCommentEnd,
+      start + storyEventsCommentStart.length,
+    );
+    if (end < 0) return '';
+    final eventJson = raw
+        .substring(start + storyEventsCommentStart.length, end)
+        .trim();
+    final projected = tryProjectStoryReadable(eventJson, turnId: turnId);
+    if (projected != null) return projected.markdown;
+    // A recognizable Story protocol block is internal data. Even if malformed,
+    // do not print it as narrative text.
+    return '';
+  }
+
   final projected = tryProjectStoryReadable(raw, turnId: turnId);
   if (projected != null) return projected.markdown;
   if (streaming && looksLikeStoryEnvelopePrefix(raw)) return '';
