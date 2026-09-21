@@ -446,21 +446,6 @@ final class StoryRuntimePromptService {
         '[/STORY_SCENE_BASELINE]';
   }
 
-  String _sceneDynamicText(StorySceneRuntimeState scene) {
-    final buffer = StringBuffer('[STORY_SCENE_DYNAMIC]\n');
-    if (scene.openLoops.isNotEmpty) {
-      buffer.writeln('open_loops=${scene.openLoops.join(' | ')}');
-    }
-    if (scene.continuityState.isNotEmpty) {
-      buffer.writeln('continuity=${jsonEncode(scene.continuityState)}');
-    }
-    if (scene.serialState.isNotEmpty) {
-      buffer.writeln('serial=${jsonEncode(scene.serialState)}');
-    }
-    buffer.write('[/STORY_SCENE_DYNAMIC]');
-    return buffer.toString();
-  }
-
   String _memoryText(List<StoryResolvedMemory> memories) {
     final buffer = StringBuffer('[STORY_WORLDLINE_MEMORY]\n');
     for (final item in memories) {
