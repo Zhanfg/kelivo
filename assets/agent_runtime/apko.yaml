@@ -5,6 +5,7 @@ contents:
     - https://packages.wolfi.dev/os
   packages:
     - wolfi-base
+    - busybox
     - ca-certificates-bundle
     - bash
     - git
@@ -13,9 +14,6 @@ contents:
     - findutils
     - grep
     - sed
-    - tar
-    - gzip
-    - xz
     - openssh-client
     - patch
     - diffutils
