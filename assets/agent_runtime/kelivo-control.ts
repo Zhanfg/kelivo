@@ -3,6 +3,12 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 
 const SAFE_TOOLS = new Set(["read", "grep", "find", "ls", "kelivo_plan"]);
 const sessionAllowed = new Set();
+let approvedPlanFingerprint = null;
+
+function planFingerprint(params) {
+  const steps = Array.isArray(params?.steps) ? params.steps : [];
+  return JSON.stringify(steps.map((step) => String(step?.text || "").trim()));
+}
 
 function summarize(event) {
   const input = event.input || {};
@@ -32,10 +38,52 @@ export default function (pi) {
           }),
         ),
       }),
-      async execute(_toolCallId, params) {
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        const mode = process.env.KELIVO_AGENT_PERMISSION_MODE || "ask";
+        const fingerprint = planFingerprint(params);
+        let approved = mode !== "planFirst";
+
+        if (mode === "planFirst") {
+          if (approvedPlanFingerprint === fingerprint) {
+            approved = true;
+          } else if (ctx.hasUI) {
+            const summary = String(params?.summary || "").trim();
+            const steps = Array.isArray(params?.steps) ? params.steps : [];
+            const preview = [
+              summary,
+              ...steps.map((step, index) =>
+                `${index + 1}. ${String(step?.text || "").trim()}`
+              ),
+            ].filter(Boolean).join("\n");
+
+            const choice = await ctx.ui.select(
+              `Approve Agent plan?\n${preview}`,
+              ["Approve and implement", "Keep planning", "Do not implement"],
+            );
+            approved = choice === "Approve and implement";
+            if (approved) approvedPlanFingerprint = fingerprint;
+          }
+
+          if (!approved) {
+            return {
+              content: [{
+                type: "text",
+                text:
+                  "The plan is visible in KELIVO but has not been approved for implementation. Continue read-only investigation or revise the plan.",
+              }],
+              details: { ...params, approved: false },
+            };
+          }
+        }
+
         return {
-          content: [{ type: "text", text: "Plan updated in KELIVO." }],
-          details: params,
+          content: [{
+            type: "text",
+            text: approved
+              ? "Plan approved in KELIVO. Implementation may proceed."
+              : "Plan updated in KELIVO.",
+          }],
+          details: { ...params, approved },
         };
       },
     }),
@@ -51,6 +99,15 @@ export default function (pi) {
       return {
         block: true,
         reason: "Blocked by KELIVO read-only permission mode",
+      };
+    }
+
+    if (mode === "planFirst") {
+      if (approvedPlanFingerprint != null) return undefined;
+      return {
+        block: true,
+        reason:
+          "KELIVO Plan first mode requires an approved kelivo_plan before mutating tools can run",
       };
     }
 
