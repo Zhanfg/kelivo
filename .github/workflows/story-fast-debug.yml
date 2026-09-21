@@ -8,6 +8,10 @@ on:
       - 'feat/story-narrative-runtime-v2-*'
   workflow_dispatch:
 
+concurrency:
+  group: story-fast-debug-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
