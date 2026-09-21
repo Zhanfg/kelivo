@@ -2064,6 +2064,13 @@ class _MessageListViewState extends State<MessageListView> {
                     final baseData = baseMediaQuery?.data;
                     final data = baseData ?? MediaQuery.of(context);
                     final textScale = data.textScaler.scale(1);
+                    final renderMessage =
+                        message.role == 'assistant' &&
+                            containsKelivoStoryProtocol(message.content)
+                        ? message.copyWith(
+                            content: stripKelivoStoryProtocol(message.content),
+                          )
+                        : message;
                     return MediaQuery(
                       // Keep chat font scaling without rebuilding on keyboard insets.
                       data: data.copyWith(
@@ -2074,7 +2081,7 @@ class _MessageListViewState extends State<MessageListView> {
                       child: isStreaming
                           ? _buildStreamingMessageWidget(
                               context,
-                              message: message,
+                              message: renderMessage,
                               index: index,
                               r: r,
                               t: t,
@@ -2092,7 +2099,7 @@ class _MessageListViewState extends State<MessageListView> {
                             )
                           : _buildChatMessageWidget(
                               context,
-                              message: message,
+                              message: renderMessage,
                               index: index,
                               r: r,
                               t: t,
