@@ -91,6 +91,7 @@ import 'features/agent/services/agent_context_materializer.dart';
 import 'features/agent/services/agent_task_journal.dart';
 import 'features/agent/services/agent_runtime_bootstrap.dart';
 import 'features/agent/services/agent_engine_installer.dart';
+import 'features/agent/services/agent_github_cli_installer.dart';
 import 'features/agent/services/agent_task_runner.dart';
 import 'features/home/providers/workspace_mode_provider.dart';
 import 'utils/app_directories.dart';
@@ -842,6 +843,11 @@ class MyApp extends StatelessWidget {
             runtimeBootstrap: ctx.read<AgentRuntimeBootstrap>(),
           ),
         ),
+        Provider<AgentGithubCliInstaller>(
+          create: (ctx) => AgentGithubCliInstaller(
+            runtimeBootstrap: ctx.read<AgentRuntimeBootstrap>(),
+          ),
+        ),
         Provider<AgentTaskRunner>(
           lazy: false,
           create: (ctx) => AgentTaskRunner(
@@ -857,6 +863,7 @@ class MyApp extends StatelessWidget {
             runtimeBootstrap: ctx.read<AgentRuntimeBootstrap>(),
             environment: ctx.read<EnvironmentProvider>(),
             engineInstaller: ctx.read<AgentEngineInstaller>(),
+            githubCliInstaller: ctx.read<AgentGithubCliInstaller>(),
           ),
         ),
         ProxyProvider<_WorkspaceStackHolder, EnvironmentManager?>(
