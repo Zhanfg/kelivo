@@ -34,9 +34,8 @@ export default function (pi) {
 
     const target = summarize(event);
     const choice = await ctx.ui.select(
-      "Approve action",
+      `Approve action: ${target}`,
       ["Allow once", "Always allow this tool", "Block"],
-      { message: target },
     );
 
     if (choice === "Always allow this tool") {
