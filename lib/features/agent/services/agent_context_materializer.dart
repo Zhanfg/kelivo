@@ -119,6 +119,16 @@ class AgentContextMaterializer {
     }
 
     out
+      ..writeln('## Task execution')
+      ..writeln()
+      ..writeln(
+        '- For work with more than one meaningful step, call the kelivo_plan '
+        'tool before the first mutating action and update it when the plan changes.',
+      )
+      ..writeln(
+        '- Keep the visible plan concise and reflect completed/in-progress steps.',
+      )
+      ..writeln()
       ..writeln('## Runtime boundary')
       ..writeln()
       ..writeln('- /workspace is the persistent KELIVO project workspace.')
