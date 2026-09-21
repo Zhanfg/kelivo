@@ -138,6 +138,74 @@ final class StoryChoice {
   /// concise while the runtime receives an unambiguous action.
   final String? submitText;
   final Map<String, Object?> metadata;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'id': id,
+    'label': label,
+    if (submitText != null) 'submitText': submitText,
+    'metadata': metadata,
+  };
+
+  factory StoryChoice.fromJson(Map<String, dynamic> json) => StoryChoice(
+    id: (json['id'] as String).trim(),
+    label: (json['label'] as String).trim(),
+    submitText: _optionalModelString(json['submitText']),
+    metadata: Map<String, Object?>.from(
+      (json['metadata'] as Map?) ?? const <String, Object?>{},
+    ),
+  );
+}
+
+final class StoryRelationshipEdge {
+  const StoryRelationshipEdge({
+    required this.fromId,
+    required this.toId,
+    this.dimensions = const <String, double>{},
+  });
+
+  final String fromId;
+  final String toId;
+  final Map<String, double> dimensions;
+
+  String get key => '$fromId>$toId';
+
+  StoryRelationshipEdge applyDelta(Map<String, double> delta) {
+    final next = <String, double>{...dimensions};
+    for (final entry in delta.entries) {
+      final value = (next[entry.key] ?? 0) + entry.value;
+      next[entry.key] = value.clamp(-1.0, 1.0).toDouble();
+    }
+    return StoryRelationshipEdge(
+      fromId: fromId,
+      toId: toId,
+      dimensions: Map.unmodifiable(next),
+    );
+  }
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'fromId': fromId,
+    'toId': toId,
+    'dimensions': dimensions,
+  };
+
+  factory StoryRelationshipEdge.fromJson(Map<String, dynamic> json) {
+    final raw = (json['dimensions'] as Map?) ?? const <String, Object?>{};
+    final dimensions = <String, double>{};
+    for (final entry in raw.entries) {
+      final value = entry.value;
+      if (value is num && value.isFinite) {
+        dimensions[entry.key.toString()] = value
+            .toDouble()
+            .clamp(-1.0, 1.0)
+            .toDouble();
+      }
+    }
+    return StoryRelationshipEdge(
+      fromId: (json['fromId'] as String).trim(),
+      toId: (json['toId'] as String).trim(),
+      dimensions: Map.unmodifiable(dimensions),
+    );
+  }
 }
 
 /// One semantic event in story order.
@@ -200,4 +268,11 @@ final class StorySceneSnapshot {
   final String? timeLabel;
   final List<String> participantCharacterIds;
   final int revision;
+}
+
+
+String? _optionalModelString(Object? value) {
+  if (value is! String) return null;
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
 }
