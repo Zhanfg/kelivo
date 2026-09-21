@@ -22,19 +22,18 @@ class StoryNarrativeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Story is a continuous work, not a Chat transcript. User turns remain
+    // authoritative input in Conversation history/runtime, but they are not
+    // inserted into the reader-facing prose stream.
     final entries = messages
+        .where((message) => message.role == 'assistant')
         .map(
-          (message) => (
-            message: message,
-            content: message.role == 'user'
-                ? message.content
-                : projectStoryReadableOrOriginal(
-                    message.content,
-                    turnId: message.id,
-                  ),
+          (message) => projectStoryReadableOrOriginal(
+            message.content,
+            turnId: message.id,
           ),
         )
-        .where((entry) => entry.content.trim().isNotEmpty)
+        .where((content) => content.trim().isNotEmpty)
         .toList(growable: false);
     final cs = Theme.of(context).colorScheme;
     final zh = Localizations.localeOf(context).languageCode == 'zh';
@@ -54,34 +53,7 @@ class StoryNarrativeView extends StatelessWidget {
             empty: entries.isEmpty,
           );
         }
-        final entry = entries[index - 1];
-        final message = entry.message;
-        final content = entry.content;
-        if (message.role == 'user') {
-          return Semantics(
-            label: zh ? '创作指令' : 'Writing direction',
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: cs.primaryContainer.withValues(alpha: 0.38),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 11,
-                ),
-                child: Text(
-                  content,
-                  style: TextStyle(
-                    height: 1.48,
-                    fontSize: 14,
-                    color: cs.onSurface.withValues(alpha: 0.78),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
+        final content = entries[index - 1];
         return Text(
           content,
           style: TextStyle(
