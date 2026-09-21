@@ -6,9 +6,9 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
-import '../../../core/providers/environment_provider.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
 import '../../../utils/app_directories.dart';
+import 'agent_runtime_bootstrap.dart';
 import 'pi_distribution.dart';
 
 class PiInstallation {
@@ -29,8 +29,7 @@ class PiInstallation {
 
 class PiBinaryInstaller {
   PiBinaryInstaller({
-    required this.runtimeProvider,
-    required this.environment,
+    required this.runtimeBootstrap,
     http.Client? client,
   }) : _client = client ?? http.Client();
 
@@ -38,38 +37,22 @@ class PiBinaryInstaller {
   static const String _packageGuestRoot = '/kelivo-agent-package';
   static const String _environmentGuestRoot = '/kelivo-agent-env';
 
-  final WorkspaceRuntimeProvider runtimeProvider;
-  final EnvironmentProvider environment;
+  final AgentRuntimeBootstrap runtimeBootstrap;
   final http.Client _client;
 
   Future<PiInstallation> ensureInstalled({
     String environmentId = 'default',
   }) async {
-    await environment.loaded;
-    await runtimeProvider.initialization;
-
-    final runtime = runtimeProvider.runtime;
-    if (runtime == null) {
-      throw StateError('agent_runtime_unavailable');
-    }
-    final status = await runtime.status();
-    if (!status.ready) {
-      throw StateError(status.reason ?? 'agent_environment_not_ready');
-    }
-    if (!status.sandboxed) {
-      throw UnsupportedError('pi_managed_install_requires_sandbox');
-    }
-
-    final asset = PiDistribution.forLinuxArch(environment.state.arch);
-    if (asset == null) {
-      throw StateError(
-        'pi_unsupported_arch:${environment.state.arch ?? 'unknown'}',
-      );
-    }
-
-    final environmentDir = await AppDirectories.agentEnvironmentDir(
-      environmentId,
+    final handle = await runtimeBootstrap.ensureReady(
+      environmentId: environmentId,
     );
+    final runtime = handle.runtime;
+    final asset = PiDistribution.forLinuxArch(handle.arch);
+    if (asset == null) {
+      throw StateError('pi_unsupported_arch:${handle.arch}');
+    }
+
+    final environmentDir = handle.environmentDir;
     final installDir = Directory(
       p.join(environmentDir.path, 'pi', 'v${asset.version}'),
     );
