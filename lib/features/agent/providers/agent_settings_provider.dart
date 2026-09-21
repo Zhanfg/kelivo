@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/database/business_preferences.dart';
 
-enum AgentPermissionMode { ask, auto, readOnly }
+enum AgentPermissionMode { ask, auto, planFirst, readOnly }
 
 extension AgentPermissionModeCodec on AgentPermissionMode {
   static AgentPermissionMode fromStorage(String? value) {
