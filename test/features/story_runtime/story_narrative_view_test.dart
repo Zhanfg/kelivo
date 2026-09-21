@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets(
-    'Story renders prose and writing direction without chat bubbles',
+    'Story renders only reader-facing prose in the main surface',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -36,7 +36,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('雨夜'), findsOneWidget);
-      expect(find.text('让雨更密一些。'), findsOneWidget);
+      expect(find.text('让雨更密一些。'), findsNothing);
       expect(find.text('雨声贴着窗沿落下。'), findsOneWidget);
     },
   );
