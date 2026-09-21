@@ -61,16 +61,12 @@ class _AgentModePageState extends State<AgentModePage> {
       if (!mounted) return;
       unawaited(context.read<AgentTaskRunner>().run(task.id));
       _taskController.clear();
-      _taskFocus.requestFocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isZh(context)
-                ? '任务已加入代理队列：${task.title}'
-                : 'Task queued for Agent: ${task.title}',
-          ),
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AgentTaskDetailPage(taskId: task.id),
         ),
       );
+      if (mounted) _taskFocus.requestFocus();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
