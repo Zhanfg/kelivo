@@ -190,6 +190,24 @@ class PiRpcSession {
     return send(const <String, dynamic>{'type': 'clear_queue'});
   }
 
+  Future<Map<String, dynamic>> bash(
+    String command, {
+    String? id,
+  }) {
+    return send(
+      <String, dynamic>{
+        'type': 'bash',
+        'command': command,
+        if (id != null) 'id': id,
+      },
+      timeout: const Duration(minutes: 10),
+    );
+  }
+
+  Future<Map<String, dynamic>> getSessionStats() {
+    return send(const <String, dynamic>{'type': 'get_session_stats'});
+  }
+
   Future<void> abort() async {
     if (_closing) return;
     try {
