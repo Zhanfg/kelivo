@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../mcp/pages/mcp_page.dart';
-import '../../model/pages/default_model_page.dart';
+import '../../model/widgets/model_select_sheet.dart';
 import '../../settings/pages/memory_settings_page.dart';
 import '../../workspace/pages/skills_page.dart';
 import '../../workspace/pages/workspace_settings_page.dart';
@@ -16,6 +17,7 @@ class AgentSettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final zh = Localizations.localeOf(context).languageCode == 'zh';
     final settings = context.watch<AgentSettingsProvider>();
+    final appSettings = context.watch<SettingsProvider>();
     final cs = Theme.of(context).colorScheme;
 
     Widget section(String title, List<Widget> children) => Padding(
@@ -172,10 +174,39 @@ class AgentSettingsPage extends StatelessWidget {
             ),
           ]),
           section(zh ? '上下文与能力' : 'Context and capabilities', [
-            nav(
-              Lucide.Heart,
-              zh ? '模型' : 'Model',
-              const DefaultModelPage(),
+            ListTile(
+              leading: const Icon(Lucide.Bot),
+              title: Text(zh ? '模型' : 'Model'),
+              subtitle: Text(
+                settings.hasModelOverride
+                    ? '${settings.modelProvider} / ${settings.modelId}'
+                    : (zh ? '跟随当前聊天模型' : 'Follow current chat model'),
+              ),
+              trailing: const Icon(Lucide.ChevronRight, size: 18),
+              onTap: () async {
+                final selected = await showModelSelector(
+                  context,
+                  initialProviderKey: settings.hasModelOverride
+                      ? settings.modelProvider
+                      : appSettings.currentModelProvider,
+                  initialModelId: settings.hasModelOverride
+                      ? settings.modelId
+                      : appSettings.currentModelId,
+                  allowInherit: settings.hasModelOverride,
+                  inheritLabel: zh
+                      ? '跟随当前聊天模型'
+                      : 'Follow current chat model',
+                );
+                if (selected == null || !context.mounted) return;
+                if (selected.isInherit) {
+                  await settings.clearModelOverride();
+                } else {
+                  await settings.setModel(
+                    selected.providerKey,
+                    selected.modelId,
+                  );
+                }
+              },
             ),
             nav(
               Lucide.FolderCode,
