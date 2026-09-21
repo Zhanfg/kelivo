@@ -162,6 +162,7 @@ class AgentTaskRunner {
       );
       final engineConfigFile = await _writeEngineConfig(
         taskDir,
+        permissionMode: agentSettings.permissionMode,
         maxParallelAgents: agentSettings.maxParallelAgents,
         subagentIsolation: agentSettings.subagentIsolation,
         githubEnabled: githubCli != null,
@@ -201,12 +202,13 @@ class AgentTaskRunner {
         cwd: '/workspace',
         sessionDir: '/kelivo-agent-task/pi-session',
         sessionName: task.title.isEmpty ? 'KELIVO Agent' : task.title,
+        approvalMode: _ompApprovalMode(agentSettings.permissionMode),
         appendSystemPrompt: materializedContext.guestPromptFile,
-        extraArgs: const <String>[
+        extraArgs: <String>[
           '--model',
           'kelivo/current',
           '--tools',
-          'read,bash,edit,write,grep,glob,find,lsp,task,hub,todo,github,ask,checkpoint,rewind,ast_grep,ast_edit,security_scan',
+          _ompTools(agentSettings.permissionMode),
         ],
         mounts: mounts,
         environment: <String, String>{
@@ -720,8 +722,26 @@ class AgentTaskRunner {
     );
   }
 
+  static String _ompApprovalMode(AgentPermissionMode mode) => switch (mode) {
+    AgentPermissionMode.auto => 'yolo',
+    AgentPermissionMode.ask => 'always-ask',
+    AgentPermissionMode.planFirst => 'always-ask',
+    AgentPermissionMode.readOnly => 'yolo',
+  };
+
+  static String _ompTools(AgentPermissionMode mode) {
+    if (mode == AgentPermissionMode.readOnly) {
+      // Do not merely rely on prompts here: a read-only task must not receive
+      // mutating/exec tools at all. This also prevents headless subagents from
+      // inheriting an execution surface through task/hub.
+      return 'read,grep,glob,find,ask,todo';
+    }
+    return 'read,bash,edit,write,grep,glob,find,lsp,task,hub,todo,github,ask,checkpoint,rewind,ast_grep,ast_edit,security_scan';
+  }
+
   Future<File> _writeEngineConfig(
     Directory taskDir, {
+    required AgentPermissionMode permissionMode,
     required int maxParallelAgents,
     required bool subagentIsolation,
     required bool githubEnabled,
@@ -730,7 +750,7 @@ class AgentTaskRunner {
     await file.writeAsString(
       [
         'tools:',
-        '  approvalMode: yolo',
+        '  approvalMode: ${_ompApprovalMode(permissionMode)}',
         'async:',
         '  enabled: true',
         '  maxJobs: ${(maxParallelAgents + 2).clamp(3, 6)}',
