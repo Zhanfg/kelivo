@@ -3,18 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/models/environment_state.dart';
 import '../../../core/models/workspace.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/providers/assistant_provider.dart';
-import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
 import '../models/agent_task.dart';
 import '../providers/agent_task_provider.dart';
-import '../services/agent_context_bridge.dart';
 import '../services/agent_task_runner.dart';
 
 class AgentModePage extends StatefulWidget {
@@ -28,8 +25,6 @@ class _AgentModePageState extends State<AgentModePage> {
   final TextEditingController _taskController = TextEditingController();
   final FocusNode _taskFocus = FocusNode();
   bool _submitting = false;
-  String? _contextKey;
-  Future<AgentContextSnapshot>? _contextFuture;
 
   @override
   void dispose() {
@@ -136,86 +131,41 @@ class _AgentModePageState extends State<AgentModePage> {
     return '${String.fromCharCodes(runes.take(40))}…';
   }
 
-  Future<AgentContextSnapshot> _contextSnapshot() {
-    final chat = context.read<ChatService>();
-    final assistant = context.read<AssistantProvider>().currentAssistant;
-    final conversationId = chat.currentConversationId;
-    final conversation = conversationId == null
-        ? null
-        : chat.getConversation(conversationId);
-    final skillIds = assistant?.skillIds;
-    final key = [
-      assistant?.id ?? '',
-      ...(skillIds ?? const <String>[]),
-      ...(conversation?.mcpServerIds ?? const <String>[]),
-    ].join('|');
-
-    if (_contextKey != key || _contextFuture == null) {
-      _contextKey = key;
-      _contextFuture = context.read<AgentContextBridge>().build(
-        assistantId: conversation?.assistantId ?? assistant?.id,
-        skillIds: skillIds?.toSet(),
-        mcpServerIds: conversation?.mcpServerIds.toSet(),
-      );
-    }
-    return _contextFuture!;
-  }
-
   @override
   Widget build(BuildContext context) {
     final zh = _isZh(context);
     final tasks = List<AgentTask>.of(context.watch<AgentTaskProvider>().tasks)
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    final environment = context.watch<EnvironmentProvider>().state;
-    final topInset = MediaQuery.paddingOf(context).top + kToolbarHeight + 12;
+      ..sort((a, b) => a.updatedAt.compareTo(b.updatedAt));
+    final topInset = MediaQuery.paddingOf(context).top + kToolbarHeight + 8;
 
     return SafeArea(
       top: false,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(16, topInset, 16, 24),
+      child: Column(
         children: [
-          _HeroCard(
-            zh: zh,
-            environment: environment,
-            contextFuture: _contextSnapshot(),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(16, topInset, 16, 12),
+              children: [
+                if (tasks.isEmpty)
+                  _EmptyTasks(zh: zh)
+                else
+                  for (final task in tasks) ...[
+                    _TaskCard(task: task, zh: zh),
+                    const SizedBox(height: 10),
+                  ],
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
-          _TaskComposer(
-            controller: _taskController,
-            focusNode: _taskFocus,
-            submitting: _submitting,
-            onSubmit: _submitTask,
+          SafeArea(
+            top: false,
+            minimum: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+            child: _TaskComposer(
+              controller: _taskController,
+              focusNode: _taskFocus,
+              submitting: _submitting,
+              onSubmit: _submitTask,
+            ),
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Text(
-                zh ? '任务' : 'Tasks',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: AppFontWeights.semibold,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                tasks.length.toString(),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (tasks.isEmpty)
-            _EmptyTasks(zh: zh)
-          else
-            for (final task in tasks.take(12)) ...[
-              _TaskCard(task: task, zh: zh),
-              const SizedBox(height: 8),
-            ],
         ],
       ),
     );
@@ -223,115 +173,6 @@ class _AgentModePageState extends State<AgentModePage> {
 
   static bool _isZh(BuildContext context) =>
       Localizations.localeOf(context).languageCode == 'zh';
-}
-
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({
-    required this.zh,
-    required this.environment,
-    required this.contextFuture,
-  });
-
-  final bool zh;
-  final EnvironmentState environment;
-  final Future<AgentContextSnapshot> contextFuture;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final environmentReady = environment.phase == EnvironmentPhase.ready;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.18),
-          width: 0.7,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Lucide.Bot, size: 20, color: cs.primary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      zh ? '代理' : 'Agent',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: AppFontWeights.semibold,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      zh
-                          ? '把任务交给 KELIVO，由代理持续规划、执行和恢复。'
-                          : 'Hand work to KELIVO for durable planning, execution and recovery.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.35,
-                        color: cs.onSurface.withValues(alpha: 0.62),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _StatusChip(
-                icon: Lucide.Terminal,
-                label: environmentReady
-                    ? (zh ? '环境就绪' : 'Environment ready')
-                    : (zh ? '环境待准备' : 'Environment pending'),
-              ),
-              FutureBuilder<AgentContextSnapshot>(
-                future: contextFuture,
-                builder: (context, snapshot) {
-                  final data = snapshot.data;
-                  if (data == null) {
-                    return _StatusChip(
-                      icon: Lucide.workflow,
-                      label: zh ? '正在载入上下文' : 'Loading context',
-                    );
-                  }
-                  final counts =
-                      '${data.memories.length} · '
-                      '${data.skills.length} · '
-                      '${data.mcpServers.length}';
-                  return _StatusChip(
-                    icon: Lucide.workflow,
-                    label: zh
-                        ? '记忆 / 技能 / MCP  $counts'
-                        : 'Memory / Skills / MCP  $counts',
-                  );
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _TaskComposer extends StatelessWidget {
@@ -391,8 +232,8 @@ class _TaskComposer extends StatelessWidget {
               Expanded(
                 child: Text(
                   zh
-                      ? '任务状态、工作区和环境会持久保存'
-                      : 'Task, workspace and environment state are durable',
+                      ? '工作区、计划与结果会自动保存'
+                      : 'Workspace, plans and results are saved automatically',
                   style: TextStyle(
                     fontSize: 11.5,
                     color: cs.onSurface.withValues(alpha: 0.5),
@@ -411,40 +252,6 @@ class _TaskComposer extends StatelessWidget {
                 label: Text(zh ? '开始' : 'Start'),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: cs.onSurface.withValues(alpha: 0.68)),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11.5,
-              color: cs.onSurface.withValues(alpha: 0.68),
-              fontWeight: AppFontWeights.medium,
-            ),
           ),
         ],
       ),
@@ -475,7 +282,7 @@ class _EmptyTasks extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            zh ? '还没有代理任务' : 'No Agent tasks yet',
+            zh ? '把一个目标交给代理' : 'Give Agent a goal',
             style: TextStyle(
               fontWeight: AppFontWeights.medium,
               color: cs.onSurface.withValues(alpha: 0.68),
@@ -484,8 +291,8 @@ class _EmptyTasks extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             zh
-                ? '上方输入一个目标即可创建第一项任务。'
-                : 'Enter a goal above to create the first task.',
+                ? '代理会在当前工作区持续执行，并把进度和结果保留下来。'
+                : 'Agent works in the current workspace and keeps progress and results.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
@@ -508,6 +315,7 @@ class _TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final status = _phaseLabel(task.phase, zh);
+    final step = _friendlyStep(task.currentStep, zh);
     final active = {
       AgentTaskPhase.preparing,
       AgentTaskPhase.running,
@@ -566,10 +374,10 @@ class _TaskCard extends StatelessWidget {
                     fontWeight: AppFontWeights.semibold,
                   ),
                 ),
-                if ((task.currentStep ?? '').isNotEmpty) ...[
+                if (step != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    task.currentStep!,
+                    step,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -641,7 +449,26 @@ class _TaskCard extends StatelessWidget {
     );
   }
 
-  static String _phaseLabel(AgentTaskPhase phase, bool zh) => switch (phase) {
+  static String? _friendlyStep(String? raw, bool zh) {
+  final value = raw?.trim();
+  if (value == null || value.isEmpty) return null;
+  final lower = value.toLowerCase();
+  if (lower.contains('preparing pi') || lower.contains('runtime')) {
+    return zh ? '正在准备任务' : 'Preparing task';
+  }
+  if (lower.contains('pi is working') || lower.contains('tool:')) {
+    return zh ? '正在执行' : 'Working';
+  }
+  if (lower.contains('verifying pi') || lower.contains('verifying')) {
+    return zh ? '正在检查结果' : 'Checking results';
+  }
+  if (lower == 'completed') return zh ? '已完成' : 'Completed';
+  if (lower == 'cancelled') return zh ? '已取消' : 'Cancelled';
+  if (lower == 'agent failed') return zh ? '执行失败' : 'Task failed';
+  return value;
+}
+
+String _phaseLabel(AgentTaskPhase phase, bool zh) => switch (phase) {
     AgentTaskPhase.queued => zh ? '排队中' : 'Queued',
     AgentTaskPhase.preparing => zh ? '准备中' : 'Preparing',
     AgentTaskPhase.running => zh ? '执行中' : 'Running',
