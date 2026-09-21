@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../utils/app_directories.dart';
@@ -15,6 +16,14 @@ enum AgentTaskEventKind {
   checkpoint,
   artifact,
   environmentMutation,
+  assistantMessage,
+  turnStarted,
+  turnFinished,
+  toolProgress,
+  queueChanged,
+  retry,
+  compaction,
+  notice,
   note,
 }
 
@@ -66,7 +75,7 @@ class AgentTaskEvent {
 /// The journal is not the source of project files or Linux environment state.
 /// It records enough durable metadata to recover orchestration after process
 /// death and to build a user-facing Activity timeline.
-class AgentTaskJournal {
+class AgentTaskJournal extends ChangeNotifier {
   AgentTaskJournal({Directory? rootDirectory})
     : _injectedRootDirectory = rootDirectory;
 
@@ -95,6 +104,7 @@ class AgentTaskJournal {
       } finally {
         await sink.close();
       }
+      notifyListeners();
     });
     _writeTail = operation.catchError((Object _) {});
     return operation.then((_) => event);
