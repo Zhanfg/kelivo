@@ -1,0 +1,34 @@
+contents:
+  keyring:
+    - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+  repositories:
+    - https://packages.wolfi.dev/os
+  packages:
+    - wolfi-base
+    - ca-certificates-bundle
+    - bash
+    - git
+    - curl
+    - coreutils
+    - findutils
+    - grep
+    - sed
+    - tar
+    - gzip
+    - xz
+    - openssh-client
+    - patch
+    - diffutils
+    - file
+    - jq
+
+environment:
+  HOME: /home/kelivo
+  PATH: /home/kelivo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  LANG: C.UTF-8
+
+entrypoint:
+  command: /bin/sh -l
+
+archs:
+  - aarch64
