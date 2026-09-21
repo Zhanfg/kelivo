@@ -59,6 +59,7 @@ class AgentTaskRunner {
   final Set<String> _running = <String>{};
   final Set<String> _cancelled = <String>{};
   final Map<String, String> _toolOutputSnapshots = <String, String>{};
+  final Map<String, String> _subagentProgressSnapshots = <String, String>{};
 
   bool isRunning(String taskId) => _running.contains(taskId);
 
@@ -300,6 +301,9 @@ class AgentTaskRunner {
       _sessions.remove(taskId);
       _running.remove(taskId);
       _toolOutputSnapshots.removeWhere(
+        (key, _) => key.startsWith('$taskId:'),
+      );
+      _subagentProgressSnapshots.removeWhere(
         (key, _) => key.startsWith('$taskId:'),
       );
     }
@@ -549,11 +553,33 @@ class AgentTaskRunner {
         final payload = raw is Map
             ? raw.cast<String, dynamic>()
             : <String, dynamic>{};
-        await journal.append(
-          taskId,
-          AgentTaskEventKind.subagentProgress,
-          payload: payload,
-        );
+        final progress = payload['progress'];
+        final progressMap = progress is Map
+            ? progress.cast<String, dynamic>()
+            : const <String, dynamic>{};
+        final subagentId =
+            progressMap['id']?.toString() ?? payload['index']?.toString() ?? '';
+        final signature = [
+          progressMap['status'],
+          progressMap['currentTool'],
+          progressMap['currentToolArgs'],
+          progressMap['toolCount'],
+          progressMap['requests'],
+          progressMap['tokens'],
+          (progressMap['recentOutput'] is List &&
+                  (progressMap['recentOutput'] as List).isNotEmpty)
+              ? (progressMap['recentOutput'] as List).last
+              : null,
+        ].join('|');
+        final snapshotKey = '$taskId:$subagentId';
+        if (_subagentProgressSnapshots[snapshotKey] != signature) {
+          _subagentProgressSnapshots[snapshotKey] = signature;
+          await journal.append(
+            taskId,
+            AgentTaskEventKind.subagentProgress,
+            payload: payload,
+          );
+        }
       case 'subagent_event':
         final raw = _safeValue(event['payload'], secrets);
         final payload = raw is Map
