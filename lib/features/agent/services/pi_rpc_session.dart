@@ -32,6 +32,12 @@ class PiRpcSession {
   Future<void> get closed => _closed.future;
   int? get exitCode => _exitCode;
   String get stderrTail => _stderrTail;
+  String get exitDescription {
+    final code = _exitCode;
+    final stderr = _stderrTail.trim();
+    final base = code == null ? 'agent_rpc_closed' : 'agent_rpc_exit_$code';
+    return stderr.isEmpty ? base : '$base:$stderr';
+  }
 
   static Future<PiRpcSession> start({
     required WorkspaceStdioRuntime runtime,
