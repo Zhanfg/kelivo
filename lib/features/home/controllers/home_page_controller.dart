@@ -338,6 +338,9 @@ class HomePageController extends ChangeNotifier {
   stream_ctrl.StreamingContentNotifier get streamingContentNotifier =>
       _streamController.streamingContentNotifier;
 
+  bool hasLoadingTools(String messageId) =>
+      _streamController.hasLoadingTools(messageId);
+
   // Delegate to scroll controller
   scroll_ctrl.ChatScrollController get scrollCtrl => _scrollCtrl;
 
