@@ -132,7 +132,7 @@ class AgentTaskRunner {
         conversationId: task.conversationId,
       );
       final modelEndpoint = await modelBridge.start();
-      final taskModelsFile = await modelBridge.writePiConfig(
+      final modelConfigFiles = await modelBridge.writePiConfig(
         taskDirectory: taskDir,
         endpoint: modelEndpoint,
       );
@@ -142,8 +142,13 @@ class AgentTaskRunner {
         Mount(host: workspaceRoot, guest: '/workspace'),
         Mount(host: taskDir.path, guest: '/kelivo-agent-task'),
         Mount(
-          host: taskModelsFile.path,
+          host: modelConfigFiles.jsonFile.path,
           guest: '/home/kelivo/.pi/agent/models.json',
+          readOnly: true,
+        ),
+        Mount(
+          host: modelConfigFiles.yamlFile.path,
+          guest: '/home/kelivo/.pi/agent/models.yml',
           readOnly: true,
         ),
         installation.asMount(),
@@ -174,6 +179,7 @@ class AgentTaskRunner {
           'PI_TELEMETRY': '0',
           'PI_SKIP_VERSION_CHECK': '1',
           'KELIVO_AGENT_PERMISSION_MODE': agentSettings.permissionMode.name,
+          'KELIVO_AGENT_BRIDGE_KEY': modelEndpoint.token,
         },
       );
       _sessions[taskId] = session;
