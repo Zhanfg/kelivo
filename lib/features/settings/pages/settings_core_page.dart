@@ -18,9 +18,6 @@ import '../../provider/pages/providers_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../search/pages/search_services_page.dart';
 import '../../stats/pages/stats_page.dart';
-import '../../story_runtime/ui/story_reference_library_page.dart';
-import '../../story_runtime/ui/story_skill_manager_page.dart';
-import '../../story_runtime/ui/story_studio_page.dart';
 import '../../world_book/pages/world_book_page.dart';
 import 'about_page.dart';
 import 'display_settings_page.dart';
@@ -39,12 +36,6 @@ class SettingsPage extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
-    final languageCode = Localizations.localeOf(context).languageCode;
-    final referenceTextsLabel = languageCode == 'zh'
-        ? '参考文本'
-        : 'Reference Texts';
-    const skillsLabel = 'Skills';
-    final storyModeLabel = languageCode == 'zh' ? '故事模式' : 'Story Mode';
 
     String modeLabel(ThemeMode mode) {
       switch (mode) {
@@ -279,43 +270,6 @@ class SettingsPage extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => const MemorySettingsPage(),
                     ),
-                  );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.BookOpenText,
-                label: referenceTextsLabel,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const StoryReferenceLibraryPage(),
-                    ),
-                  );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Shapes,
-                label: skillsLabel,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const StorySkillManagerPage(),
-                    ),
-                  );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Compass,
-                label: storyModeLabel,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const StoryStudioPage()),
                   );
                 },
               ),
