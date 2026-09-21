@@ -103,9 +103,20 @@ class AgentTaskRunner {
       final installation = await engineInstaller.ensureInstalled(
         environmentId: task.environmentId,
       );
-      final githubCli = await githubCliInstaller.ensureInstalled(
-        environmentId: task.environmentId,
-      );
+      AgentGithubCliInstallation? githubCli;
+      try {
+        githubCli = await githubCliInstaller.ensureInstalled(
+          environmentId: task.environmentId,
+        );
+      } catch (_) {
+        await journal.append(
+          taskId,
+          AgentTaskEventKind.notice,
+          payload: const <String, dynamic>{
+            'kind': 'github_cli_unavailable',
+          },
+        );
+      }
       final execution = await environment.loadExecutionConfig();
       secretValues = execution.variables;
 
@@ -149,6 +160,7 @@ class AgentTaskRunner {
         taskDir,
         maxParallelAgents: agentSettings.maxParallelAgents,
         subagentIsolation: agentSettings.subagentIsolation,
+        githubEnabled: githubCli != null,
       );
 
       final mounts = <Mount>[
@@ -170,7 +182,7 @@ class AgentTaskRunner {
           readOnly: true,
         ),
         installation.asMount(),
-        githubCli.asMount(),
+        if (githubCli != null) githubCli.asMount(),
         for (final skill in materializedContext.skillMounts)
           Mount(
             host: skill.hostDirectory,
@@ -200,8 +212,9 @@ class AgentTaskRunner {
           'KELIVO_AGENT_PERMISSION_MODE': agentSettings.permissionMode.name,
           'KELIVO_AGENT_BRIDGE_KEY': modelEndpoint.token,
           'OMP_WORKTREE_DIR': '/kelivo-agent-task/worktrees',
-          'PATH':
-              '${githubCli.guestRoot}/bin:/home/kelivo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+          if (githubCli != null)
+            'PATH':
+                '${githubCli.guestRoot}/bin:/home/kelivo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
         },
       );
       _sessions[taskId] = session;
@@ -706,6 +719,7 @@ class AgentTaskRunner {
     Directory taskDir, {
     required int maxParallelAgents,
     required bool subagentIsolation,
+    required bool githubEnabled,
   }) async {
     final file = File('${taskDir.path}/omp-config.yml');
     await file.writeAsString(
@@ -726,7 +740,7 @@ class AgentTaskRunner {
         'isolation:',
         '  backend: rcopy',
         'github:',
-        '  enabled: true',
+        '  enabled: ${githubEnabled ? 'true' : 'false'}',
         '',
       ].join('\n'),
       flush: true,
