@@ -123,6 +123,41 @@ class AgentSettingsPage extends StatelessWidget {
               ),
             ),
           ]),
+          section(zh ? '调度与并行' : 'Scheduling and parallelism', [
+            ListTile(
+              leading: const Icon(Lucide.Network),
+              title: Text(zh ? '最大并行子代理' : 'Max parallel subagents'),
+              subtitle: Text(
+                zh
+                    ? '独立子任务可以并发执行；移动端默认 3 个，最多 4 个。'
+                    : 'Independent subtasks may run concurrently; mobile defaults to 3 and caps at 4.',
+              ),
+              trailing: DropdownButton<int>(
+                value: settings.maxParallelAgents,
+                underline: const SizedBox.shrink(),
+                items: const [
+                  DropdownMenuItem(value: 1, child: Text('1')),
+                  DropdownMenuItem(value: 2, child: Text('2')),
+                  DropdownMenuItem(value: 3, child: Text('3')),
+                  DropdownMenuItem(value: 4, child: Text('4')),
+                ],
+                onChanged: (value) {
+                  if (value != null) settings.setMaxParallelAgents(value);
+                },
+              ),
+            ),
+            SwitchListTile(
+              secondary: const Icon(Lucide.GitFork),
+              title: Text(zh ? '子代理隔离工作区' : 'Isolated subagent workspaces'),
+              subtitle: Text(
+                zh
+                    ? 'Git 项目中的并行修改可在隔离工作区执行并返回补丁，降低互相覆盖风险。'
+                    : 'Parallel changes in Git projects can run in isolated workspaces and return patches.',
+              ),
+              value: settings.subagentIsolation,
+              onChanged: settings.setSubagentIsolation,
+            ),
+          ]),
           section(zh ? '显示' : 'Display', [
             SwitchListTile(
               secondary: const Icon(Lucide.SquareTerminal),
