@@ -75,6 +75,11 @@ derived by Kelivo, append one trailing sidecar:
 KELIVO_STORY_EVENTS-->
 Nothing may follow it.
 
+EVENT uses: type, actor, optional text, optional choices, optional metadata.
+For action_result use type="action_result" and actor={"type":"world"}.
+For choice_set use type="choice_set", actor={"type":"self"}, and choices with
+{id,label,submit_text}. Other ordinary prose does not need an event.
+
 The sidecar is sparse, not a mirror of the prose:
 - include only indispensable interaction/state semantics;
 - never duplicate ordinary narration merely to describe what was just written;
