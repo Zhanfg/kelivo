@@ -255,7 +255,7 @@ class AgentTaskRunner {
           if (!agentEnd.isCompleted && !_cancelled.contains(taskId)) {
             agentEnd.completeError(
               StateError(
-                session?._exitDescriptionForRunner() ?? 'pi_rpc_closed',
+                session?.exitDescription ?? 'agent_rpc_closed',
               ),
             );
           }
@@ -847,11 +847,3 @@ class AgentTaskRunner {
   }
 }
 
-extension on PiRpcSession {
-  String _exitDescriptionForRunner() {
-    final code = exitCode;
-    final stderr = stderrTail.trim();
-    final base = code == null ? 'pi_rpc_closed' : 'pi_rpc_exit_$code';
-    return stderr.isEmpty ? base : '$base:$stderr';
-  }
-}
