@@ -183,8 +183,10 @@ class _StoryGenerationStatusState extends State<_StoryGenerationStatus> {
       label = zh ? '正在写作' : 'Writing';
     } else if (widget.message != null) {
       label = zh ? '等待模型响应' : 'Waiting for model';
-    } else {
+    } else if (widget.isGenerating) {
       label = zh ? '正在准备上下文' : 'Preparing context';
+    } else {
+      label = zh ? '正在等待' : 'Waiting';
     }
 
     final startedAt =
