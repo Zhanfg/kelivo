@@ -198,7 +198,12 @@ class AgentTaskRunner {
         sessionDir: '/kelivo-agent-task/pi-session',
         sessionName: task.title.isEmpty ? 'KELIVO Agent' : task.title,
         appendSystemPrompt: materializedContext.guestPromptFile,
-        extraArgs: const <String>['--model', 'kelivo/current'],
+        extraArgs: const <String>[
+          '--model',
+          'kelivo/current',
+          '--tools',
+          'read,bash,edit,write,grep,glob,find,lsp,task,hub,todo,github,ask,checkpoint,rewind,ast_grep,ast_edit,security_scan,kelivo_plan',
+        ],
         mounts: mounts,
         environment: <String, String>{
           ...execution.variables,
@@ -724,6 +729,7 @@ class AgentTaskRunner {
         '  approvalMode: yolo',
         'async:',
         '  enabled: true',
+        '  maxJobs: ${(maxParallelAgents + 2).clamp(3, 6)}',
         'bash:',
         '  autoBackground:',
         '    enabled: true',
