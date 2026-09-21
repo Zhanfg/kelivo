@@ -198,10 +198,6 @@ class AgentTaskRunner {
         sessionDir: '/kelivo-agent-task/pi-session',
         sessionName: task.title.isEmpty ? 'KELIVO Agent' : task.title,
         appendSystemPrompt: materializedContext.guestPromptFile,
-        skills: [
-          for (final skill in materializedContext.skillMounts)
-            skill.guestDirectory,
-        ],
         extraArgs: const <String>['--model', 'kelivo/current'],
         mounts: mounts,
         environment: <String, String>{
