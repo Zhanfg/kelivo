@@ -1,7 +1,11 @@
-import { Type } from "@earendil-works/pi-ai";
-import { defineTool } from "@earendil-works/pi-coding-agent";
-
-const SAFE_TOOLS = new Set(["read", "grep", "find", "ls", "kelivo_plan"]);
+const SAFE_TOOLS = new Set([
+  "read",
+  "grep",
+  "find",
+  "ls",
+  "lsp",
+  "kelivo_plan",
+]);
 const sessionAllowed = new Set();
 let approvedPlanFingerprint = null;
 
@@ -19,75 +23,78 @@ function summarize(event) {
 }
 
 export default function (pi) {
-  pi.registerTool(
-    defineTool({
-      name: "kelivo_plan",
-      label: "Update plan",
-      description:
-        "Publish or update the visible KELIVO task plan. For multi-step work, call this before the first mutating action and whenever the plan materially changes.",
-      parameters: Type.Object({
-        summary: Type.Optional(Type.String()),
-        steps: Type.Array(
-          Type.Object({
-            text: Type.String(),
-            status: Type.Union([
-              Type.Literal("pending"),
-              Type.Literal("in_progress"),
-              Type.Literal("completed"),
-            ]),
-          }),
-        ),
-      }),
-      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-        const mode = process.env.KELIVO_AGENT_PERMISSION_MODE || "ask";
-        const fingerprint = planFingerprint(params);
-        let approved = mode !== "planFirst";
+  const z = pi.zod;
 
-        if (mode === "planFirst") {
-          if (approvedPlanFingerprint === fingerprint) {
-            approved = true;
-          } else if (ctx.hasUI) {
-            const summary = String(params?.summary || "").trim();
-            const steps = Array.isArray(params?.steps) ? params.steps : [];
-            const preview = [
-              summary,
-              ...steps.map((step, index) =>
-                `${index + 1}. ${String(step?.text || "").trim()}`
-              ),
-            ].filter(Boolean).join("\n");
+  pi.registerTool({
+    name: "kelivo_plan",
+    label: "Update plan",
+    description:
+      "Publish or update the visible KELIVO task plan. For multi-step work, call this before the first mutating action and whenever the plan materially changes.",
+    parameters: z.object({
+      summary: z.string().optional(),
+      steps: z.array(
+        z.object({
+          text: z.string(),
+          status: z.enum(["pending", "in_progress", "completed"]),
+        }),
+      ),
+    }),
+    async execute(_toolCallId, params, _onUpdate, ctx, _signal) {
+      const mode = process.env.KELIVO_AGENT_PERMISSION_MODE || "ask";
+      const fingerprint = planFingerprint(params);
+      let approved = mode !== "planFirst";
 
-            const choice = await ctx.ui.select(
-              `Approve Agent plan?\n${preview}`,
-              ["Approve and implement", "Keep planning", "Do not implement"],
-            );
-            approved = choice === "Approve and implement";
-            if (approved) approvedPlanFingerprint = fingerprint;
-          }
+      if (mode === "planFirst") {
+        if (approvedPlanFingerprint === fingerprint) {
+          approved = true;
+        } else if (ctx.hasUI) {
+          const summary = String(params?.summary || "").trim();
+          const steps = Array.isArray(params?.steps) ? params.steps : [];
+          const preview = [
+            summary,
+            ...steps.map(
+              (step, index) =>
+                `${index + 1}. ${String(step?.text || "").trim()}`,
+            ),
+          ]
+            .filter(Boolean)
+            .join("\n");
 
-          if (!approved) {
-            return {
-              content: [{
+          const choice = await ctx.ui.select(
+            `Approve Agent plan?\n${preview}`,
+            ["Approve and implement", "Keep planning", "Do not implement"],
+          );
+          approved = choice === "Approve and implement";
+          if (approved) approvedPlanFingerprint = fingerprint;
+        }
+
+        if (!approved) {
+          return {
+            content: [
+              {
                 type: "text",
                 text:
                   "The plan is visible in KELIVO but has not been approved for implementation. Continue read-only investigation or revise the plan.",
-              }],
-              details: { ...params, approved: false },
-            };
-          }
+              },
+            ],
+            details: { ...params, approved: false },
+          };
         }
+      }
 
-        return {
-          content: [{
+      return {
+        content: [
+          {
             type: "text",
             text: approved
               ? "Plan approved in KELIVO. Implementation may proceed."
               : "Plan updated in KELIVO.",
-          }],
-          details: { ...params, approved },
-        };
-      },
-    }),
-  );
+          },
+        ],
+        details: { ...params, approved },
+      };
+    },
+  });
 
   pi.on("tool_call", async (event, ctx) => {
     const mode = process.env.KELIVO_AGENT_PERMISSION_MODE || "ask";
