@@ -195,15 +195,10 @@ final class StoryRuntimePromptService {
       }
 
       final latestUserTurn = _latestUserTurnText(messages);
-      final pendingAction = await _actionReceiptStore.latestForConversation(
+      final activeAction = await _actionReceiptStore.pendingMatchingText(
         conversation.id,
-        status: StoryActionReceiptStatus.pending,
+        latestUserTurn,
       );
-      final activeAction =
-          pendingAction != null &&
-              pendingAction.submitText.trim() == latestUserTurn.trim()
-          ? pendingAction
-          : null;
 
       final narrativeProfile = await _narrativeProfileStore.readOrDefault(
         conversation.id,
