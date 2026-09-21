@@ -11,6 +11,9 @@ import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/models/chat_item.dart';
+import '../../../core/models/conversation_kind.dart';
+import '../models/workspace_mode.dart';
+import '../providers/workspace_mode_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../settings/pages/settings_page.dart';
 import '../../chat/pages/chat_settings_page.dart';
@@ -185,6 +188,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   bool? _cachedSidebarRowsInitialized;
   String? _cachedSidebarRowsQuery;
   String? _cachedSidebarRowsAssistantId;
+  WorkspaceMode? _cachedSidebarRowsWorkspaceMode;
   List<_SidebarRow>? _cachedSidebarRows;
 
   bool _selectionMode = false;
@@ -1423,19 +1427,22 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     required bool initialized,
     required String query,
     required String? assistantId,
+    required WorkspaceMode workspaceMode,
     required ChatService chatService,
   }) {
     if (_cachedSidebarRows != null &&
         _cachedSidebarRowsRevision == revision &&
         _cachedSidebarRowsInitialized == initialized &&
         _cachedSidebarRowsQuery == query &&
-        _cachedSidebarRowsAssistantId == assistantId) {
+        _cachedSidebarRowsAssistantId == assistantId &&
+        _cachedSidebarRowsWorkspaceMode == workspaceMode) {
       return _cachedSidebarRows!;
     }
     SideDrawer.debugSidebarRowsComputeCount++;
     final rows = _computeSidebarRows(
       chatService: chatService,
       assistantId: assistantId,
+      workspaceMode: workspaceMode,
       query: query,
     );
     _cachedSidebarRows = rows;
@@ -1443,19 +1450,27 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     _cachedSidebarRowsInitialized = initialized;
     _cachedSidebarRowsQuery = query;
     _cachedSidebarRowsAssistantId = assistantId;
+    _cachedSidebarRowsWorkspaceMode = workspaceMode;
     return rows;
   }
 
   List<_SidebarRow> _computeSidebarRows({
     required ChatService chatService,
     required String? assistantId,
+    required WorkspaceMode workspaceMode,
     required String query,
   }) {
     final q = query.trim().toLowerCase();
     final pinned = <ChatItem>[];
     final rest = <ChatItem>[];
-    // Single pass: filter assistant + query, split pinned/rest via ChatItem.isPinned.
+    // Single pass: isolate workspace ownership first, then assistant/query.
+    final expectedKind = switch (workspaceMode) {
+      WorkspaceMode.chat => ConversationKind.chat,
+      WorkspaceMode.story => ConversationKind.story,
+      WorkspaceMode.agent => ConversationKind.agent,
+    };
     for (final c in chatService.getAllConversations()) {
+      if (conversationKindOf(c) != expectedKind) continue;
       if (c.assistantId != assistantId && c.assistantId != null) continue;
       final title = c.title;
       if (q.isNotEmpty && !title.toLowerCase().contains(q)) continue;
@@ -1624,6 +1639,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final textBase = cs.onSurface; // 纯黑（白天），夜间自动适配
     final ap = context.watch<AssistantProvider>();
     final currentAssistantId = ap.currentAssistantId;
+    final workspaceMode = context.watch<WorkspaceModeProvider>().mode;
     final chatServiceForSelection = context.read<ChatService>();
     if (_selectionMode) {
       // Header/action bar live outside the conversation-list Selector.
@@ -1637,8 +1653,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         _selectedConversationIds.clear();
         _selectionAssistantId = null;
       } else {
+        final expectedKind = switch (workspaceMode) {
+          WorkspaceMode.chat => ConversationKind.chat,
+          WorkspaceMode.story => ConversationKind.story,
+          WorkspaceMode.agent => ConversationKind.agent,
+        };
         final liveIds = <String>{
-          for (final c in chatServiceForSelection.getAllConversations()) c.id,
+          for (final c in chatServiceForSelection.getAllConversations())
+            if (conversationKindOf(c) == expectedKind) c.id,
         };
         _selectedConversationIds.removeWhere((id) => !liveIds.contains(id));
       }
@@ -1651,6 +1673,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         initialized: chatServiceForSelection.initialized,
         query: _query,
         assistantId: currentAssistantId,
+        workspaceMode: workspaceMode,
         chatService: chatServiceForSelection,
       );
       final visibleIds = <String>[
@@ -2688,6 +2711,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       final assistantId = context
                           .watch<AssistantProvider>()
                           .currentAssistantId;
+                      final workspaceMode = context
+                          .watch<WorkspaceModeProvider>()
+                          .mode;
                       // Use last-activity time (updatedAt) for ordering and grouping.
                       // Flattened + memoized by
                       // (revision, initialized, query, assistantId).
@@ -2696,6 +2722,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         initialized: selection.initialized,
                         query: _query,
                         assistantId: assistantId,
+                        workspaceMode: workspaceMode,
                         chatService: chatService,
                       );
                       if (useTabs) {
