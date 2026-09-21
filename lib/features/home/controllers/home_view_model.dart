@@ -6,6 +6,7 @@ import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/compress_context_options.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
@@ -21,6 +22,9 @@ import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/chat_suggestion_service.dart';
 import '../utils/model_display_helper.dart';
+import '../models/workspace_mode.dart';
+import '../providers/workspace_mode_provider.dart';
+import '../../story_runtime/orchestration/story_mode_transition_service.dart';
 import 'chat_actions.dart';
 import 'file_processing_indicator_controller.dart';
 import 'chat_controller.dart';
@@ -1124,10 +1128,19 @@ class HomeViewModel extends ChangeNotifier {
     final assistantId = ap.currentAssistantId;
     final a = ap.currentAssistant;
 
-    final conversation = await _chatService.createDraftConversation(
+    var conversation = await _chatService.createDraftConversation(
       title: getTitleForLocale(_contextProvider),
       assistantId: assistantId,
     );
+
+    final workspaceMode = _contextProvider.read<WorkspaceModeProvider>().mode;
+    if (workspaceMode == WorkspaceMode.story) {
+      await StoryModeTransitionService(
+        preferences: _contextProvider.read<BusinessPreferences>(),
+        chatService: _chatService,
+      ).promoteToStory(conversation.id);
+      conversation = _chatService.getConversation(conversation.id) ?? conversation;
+    }
 
     _chatController.setDraftConversation(conversation);
     _streamController.clearAllState(
