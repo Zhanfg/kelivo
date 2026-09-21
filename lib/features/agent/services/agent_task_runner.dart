@@ -409,6 +409,17 @@ class AgentTaskRunner {
       case 'tool_execution_start':
         final tool = event['toolName']?.toString() ?? 'tool';
         final args = _safeValue(event['args'], secrets);
+        if (tool == 'kelivo_plan') {
+          final plan = args is Map
+              ? args.cast<String, dynamic>()
+              : const <String, dynamic>{};
+          await journal.append(
+            taskId,
+            AgentTaskEventKind.planUpdated,
+            payload: plan,
+          );
+          break;
+        }
         await tasks.setPhase(
           taskId,
           AgentTaskPhase.running,
@@ -442,6 +453,7 @@ class AgentTaskRunner {
         }
       case 'tool_execution_end':
         final tool = event['toolName']?.toString() ?? 'tool';
+        if (tool == 'kelivo_plan') break;
         final output = agentSettings.showToolOutput
             ? _toolText(event['result'])
             : '';
