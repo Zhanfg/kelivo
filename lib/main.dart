@@ -88,6 +88,7 @@ import 'features/agent/providers/agent_task_provider.dart';
 import 'features/agent/services/agent_context_bridge.dart';
 import 'features/agent/services/agent_context_materializer.dart';
 import 'features/agent/services/agent_task_journal.dart';
+import 'features/agent/services/agent_runtime_bootstrap.dart';
 import 'features/agent/services/pi_binary_installer.dart';
 import 'features/agent/services/agent_task_runner.dart';
 import 'features/home/providers/workspace_mode_provider.dart';
@@ -825,10 +826,12 @@ class MyApp extends StatelessWidget {
           create: (ctx) =>
               AgentContextMaterializer(bridge: ctx.read<AgentContextBridge>()),
         ),
+        Provider<AgentRuntimeBootstrap>(
+          create: (_) => AgentRuntimeBootstrap(),
+        ),
         Provider<PiBinaryInstaller>(
           create: (ctx) => PiBinaryInstaller(
-            runtimeProvider: ctx.read<WorkspaceRuntimeProvider>(),
-            environment: ctx.read<EnvironmentProvider>(),
+            runtimeBootstrap: ctx.read<AgentRuntimeBootstrap>(),
           ),
         ),
         Provider<AgentTaskRunner>(
@@ -842,7 +845,7 @@ class MyApp extends StatelessWidget {
             chat: ctx.read<ChatService>(),
             contextMaterializer: ctx.read<AgentContextMaterializer>(),
             settings: ctx.read<SettingsProvider>(),
-            runtimeProvider: ctx.read<WorkspaceRuntimeProvider>(),
+            runtimeBootstrap: ctx.read<AgentRuntimeBootstrap>(),
             environment: ctx.read<EnvironmentProvider>(),
             piInstaller: ctx.read<PiBinaryInstaller>(),
           ),
