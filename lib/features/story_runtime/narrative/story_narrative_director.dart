@@ -160,7 +160,7 @@ final class StoryNarrativeDirector {
     final raw = b.toString();
     if (raw.length <= maxScenePacketChars) return raw;
     const suffix = '\npacket_truncated=true\n[/STORY_SCENE_PACKET]';
-    final keep = (maxScenePacketChars - suffix.length).clamp(0, raw.length);
+    final keep = (maxScenePacketChars - suffix.length).clamp(0, raw.length).toInt();
     return raw.substring(0, keep) + suffix;
   }
 }
