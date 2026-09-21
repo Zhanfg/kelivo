@@ -286,6 +286,7 @@ StoryEventType _parseEventType(String value) => switch (value) {
   'narration' => StoryEventType.narration,
   'dialogue' => StoryEventType.dialogue,
   'action' => StoryEventType.action,
+  'action_result' => StoryEventType.actionResult,
   'expression' => StoryEventType.expression,
   'scene_transition' => StoryEventType.sceneTransition,
   'choice_set' => StoryEventType.choiceSet,
@@ -296,6 +297,7 @@ StoryEventType _parseEventType(String value) => switch (value) {
 void _validateActorForType(StoryEventType type, StoryActorRef actor) {
   switch (type) {
     case StoryEventType.narration:
+    case StoryEventType.actionResult:
     case StoryEventType.sceneTransition:
     case StoryEventType.runtimeNotice:
       if (!actor.isWorld) {
