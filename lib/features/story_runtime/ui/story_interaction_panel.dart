@@ -165,17 +165,6 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
                     ),
                   ),
                 ],
-                if (data.openLoops.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final item in data.openLoops)
-                        _ThreadChip(text: item),
-                    ],
-                  ),
-                ],
                 if (data.choices.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -296,35 +285,6 @@ class _MetaChip extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ThreadChip extends StatelessWidget {
-  const _ThreadChip({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: cs.tertiaryContainer.withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        child: Text(
-          text,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 11.5,
-            color: cs.onTertiaryContainer,
-          ),
         ),
       ),
     );
