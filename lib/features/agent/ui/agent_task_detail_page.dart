@@ -302,6 +302,10 @@ class _EventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (event.kind) {
+      AgentTaskEventKind.planUpdated => _PlanEventCard(
+          event: event,
+          zh: zh,
+        ),
       AgentTaskEventKind.assistantMessage => _TextEventCard(
           icon: Lucide.Bot,
           title: zh ? '代理' : 'Agent',
@@ -354,6 +358,81 @@ class _EventCard extends StatelessWidget {
       _ => const SizedBox.shrink(),
     };
   }
+}
+
+class _PlanEventCard extends StatelessWidget {
+  const _PlanEventCard({required this.event, required this.zh});
+
+  final AgentTaskEvent event;
+  final bool zh;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final rawSteps = event.payload['steps'];
+    final steps = rawSteps is List
+        ? rawSteps.whereType<Map>().toList(growable: false)
+        : const <Map>[];
+    final summary = event.payload['summary']?.toString();
+
+    if (steps.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: cs.primary.withValues(alpha: 0.16),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Lucide.ListChecks, size: 17),
+              const SizedBox(width: 7),
+              Text(
+                zh ? '计划' : 'Plan',
+                style: TextStyle(fontWeight: AppFontWeights.semibold),
+              ),
+            ],
+          ),
+          if ((summary ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 7),
+            Text(summary!),
+          ],
+          const SizedBox(height: 8),
+          for (final step in steps) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(
+                    _statusIcon(step['status']?.toString()),
+                    size: 15,
+                    color: cs.onSurface.withValues(alpha: 0.68),
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(step['text']?.toString() ?? ''),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static IconData _statusIcon(String? status) => switch (status) {
+    'completed' => Lucide.CheckCircle,
+    'in_progress' => Lucide.Loader,
+    _ => Lucide.circleDot,
+  };
 }
 
 class _ToolEventCard extends StatelessWidget {
