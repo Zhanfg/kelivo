@@ -54,11 +54,109 @@ class RetryStatus {
   int get hashCode => Object.hash(attempt, maxRetries, retryAt);
 }
 
+
+enum GenerationTransportPhase {
+  preparing,
+  httpRequest,
+  sseStreaming,
+  tool,
+  retrying,
+  completed,
+  failed,
+  cancelled,
+}
+
+enum GenerationHealthClass { working, suspectedStall, failed, terminal }
+
+@immutable
+class GenerationHealthData {
+  const GenerationHealthData({
+    this.phase = GenerationTransportPhase.preparing,
+    this.httpOpen = false,
+    this.sseOpen = false,
+    this.requestStartedAt,
+    this.lastNetworkEventAt,
+    this.lastProgressAt,
+    this.activeToolName,
+    this.retryStatus,
+    this.errorText,
+  });
+
+  final GenerationTransportPhase phase;
+  final bool httpOpen;
+  final bool sseOpen;
+  final DateTime? requestStartedAt;
+  final DateTime? lastNetworkEventAt;
+  final DateTime? lastProgressAt;
+  final String? activeToolName;
+  final RetryStatus? retryStatus;
+  final String? errorText;
+
+  GenerationHealthData copyWith({
+    GenerationTransportPhase? phase,
+    bool? httpOpen,
+    bool? sseOpen,
+    DateTime? requestStartedAt,
+    DateTime? lastNetworkEventAt,
+    DateTime? lastProgressAt,
+    String? activeToolName,
+    bool clearActiveTool = false,
+    RetryStatus? retryStatus,
+    bool clearRetryStatus = false,
+    String? errorText,
+    bool clearError = false,
+  }) => GenerationHealthData(
+    phase: phase ?? this.phase,
+    httpOpen: httpOpen ?? this.httpOpen,
+    sseOpen: sseOpen ?? this.sseOpen,
+    requestStartedAt: requestStartedAt ?? this.requestStartedAt,
+    lastNetworkEventAt: lastNetworkEventAt ?? this.lastNetworkEventAt,
+    lastProgressAt: lastProgressAt ?? this.lastProgressAt,
+    activeToolName: clearActiveTool ? null : (activeToolName ?? this.activeToolName),
+    retryStatus: clearRetryStatus ? null : (retryStatus ?? this.retryStatus),
+    errorText: clearError ? null : (errorText ?? this.errorText),
+  );
+
+  GenerationHealthClass classify(DateTime now) {
+    switch (phase) {
+      case GenerationTransportPhase.failed:
+        return GenerationHealthClass.failed;
+      case GenerationTransportPhase.completed:
+      case GenerationTransportPhase.cancelled:
+        return GenerationHealthClass.terminal;
+      case GenerationTransportPhase.retrying:
+      case GenerationTransportPhase.tool:
+      case GenerationTransportPhase.preparing:
+        return GenerationHealthClass.working;
+      case GenerationTransportPhase.httpRequest:
+        final sinceStart = requestStartedAt == null
+            ? Duration.zero
+            : now.difference(requestStartedAt!);
+        if (!httpOpen || sinceStart >= const Duration(seconds: 25)) {
+          return GenerationHealthClass.suspectedStall;
+        }
+        return GenerationHealthClass.working;
+      case GenerationTransportPhase.sseStreaming:
+        final last = lastNetworkEventAt ?? lastProgressAt ?? requestStartedAt;
+        if (!httpOpen || !sseOpen) {
+          return GenerationHealthClass.suspectedStall;
+        }
+        if (last != null &&
+            now.difference(last) >= const Duration(seconds: 30)) {
+          return GenerationHealthClass.suspectedStall;
+        }
+        return GenerationHealthClass.working;
+    }
+  }
+}
+
 class StreamingContentNotifier {
   /// Map of message ID to its content notifier.
   /// Each streaming message has its own `ValueNotifier<String>`.
   final Map<String, ValueNotifier<StreamingContentData>> _notifiers =
       <String, ValueNotifier<StreamingContentData>>{};
+  final Map<String, ValueNotifier<GenerationHealthData>> _healthNotifiers =
+      <String, ValueNotifier<GenerationHealthData>>{};
 
   /// Incremented tool-height events. Listeners must not rebuild the page.
   final ValueNotifier<ToolHeightEvent?> toolHeightEvents =
@@ -81,6 +179,45 @@ class StreamingContentNotifier {
 
   /// Check if a notifier exists for a message.
   bool hasNotifier(String messageId) => _notifiers.containsKey(messageId);
+
+  ValueNotifier<GenerationHealthData> getHealthNotifier(String messageId) {
+    return _healthNotifiers.putIfAbsent(
+      messageId,
+      () => ValueNotifier<GenerationHealthData>(
+        const GenerationHealthData(),
+      ),
+    );
+  }
+
+  bool hasHealthNotifier(String messageId) =>
+      _healthNotifiers.containsKey(messageId);
+
+  void updateHealth(
+    String messageId,
+    GenerationHealthData Function(GenerationHealthData current) update,
+  ) {
+    final notifier = getHealthNotifier(messageId);
+    notifier.value = update(notifier.value);
+  }
+
+  void markNetworkEvent(
+    String messageId, {
+    GenerationTransportPhase phase = GenerationTransportPhase.sseStreaming,
+  }) {
+    final now = DateTime.now();
+    updateHealth(
+      messageId,
+      (current) => current.copyWith(
+        phase: phase,
+        httpOpen: true,
+        sseOpen: phase == GenerationTransportPhase.sseStreaming,
+        lastNetworkEventAt: now,
+        lastProgressAt: now,
+        clearRetryStatus: true,
+        clearError: true,
+      ),
+    );
+  }
 
   /// Update content for a streaming message.
   /// This will only notify the specific widget listening to this message's notifier.
@@ -216,15 +353,28 @@ class StreamingContentNotifier {
     );
   }
 
-  /// Remove notifier when streaming is complete.
+  /// Remove high-frequency content notifier when streaming is complete.
+  ///
+  /// Terminal generation health is intentionally retained so Story Mode can
+  /// show a definitive failure/completion state after the content stream ends.
   void removeNotifier(String messageId) {
     final notifier = _notifiers.remove(messageId);
+    notifier?.dispose();
+  }
+
+  void removeHealthNotifier(String messageId) {
+    final notifier = _healthNotifiers.remove(messageId);
     notifier?.dispose();
   }
 
   /// Dispose notifiers except those belonging to retained generation runs.
   void clear({Set<String> keepMessageIds = const {}}) {
     _notifiers.removeWhere((id, notifier) {
+      if (keepMessageIds.contains(id)) return false;
+      notifier.dispose();
+      return true;
+    });
+    _healthNotifiers.removeWhere((id, notifier) {
       if (keepMessageIds.contains(id)) return false;
       notifier.dispose();
       return true;
