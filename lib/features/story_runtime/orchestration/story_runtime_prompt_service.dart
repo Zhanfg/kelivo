@@ -11,6 +11,7 @@ import '../cache/story_prompt_cache_plan.dart';
 import '../context/story_context_resource_compiler.dart';
 import '../context/story_context_resources.dart';
 import '../context/story_context_resource_store.dart';
+import '../interaction/story_action_receipt.dart';
 import '../mcp/story_mcp_profile.dart';
 import '../mcp/story_mcp_profile_resolver.dart';
 import '../mcp/story_mcp_profile_store.dart';
@@ -91,6 +92,7 @@ final class StoryRuntimePromptService {
       _worldTreeStore = StoryWorldTreeStore(preferences),
       _worldlineMemoryStore = StoryWorldlineMemoryStore(preferences),
       _narrativeProfileStore = StoryNarrativeProfileStore(preferences),
+      _actionReceiptStore = StoryActionReceiptStore(preferences),
       _contextResourceStore = StoryContextResourceStore(preferences),
       _executionStore = StoryRuntimeExecutionStore(preferences),
       _memoryRepository = MemoryRepository(preferences),
@@ -109,6 +111,7 @@ final class StoryRuntimePromptService {
   final StoryWorldTreeStore _worldTreeStore;
   final StoryWorldlineMemoryStore _worldlineMemoryStore;
   final StoryNarrativeProfileStore _narrativeProfileStore;
+  final StoryActionReceiptStore _actionReceiptStore;
   final StoryContextResourceStore _contextResourceStore;
   final StoryRuntimeExecutionStore _executionStore;
   final MemoryRepository _memoryRepository;
@@ -191,6 +194,17 @@ final class StoryRuntimePromptService {
         await _sceneStore.upsert(scene);
       }
 
+      final latestUserTurn = _latestUserTurnText(messages);
+      final pendingAction = await _actionReceiptStore.latestForConversation(
+        conversation.id,
+        status: StoryActionReceiptStatus.pending,
+      );
+      final activeAction =
+          pendingAction != null &&
+              pendingAction.submitText.trim() == latestUserTurn.trim()
+          ? pendingAction
+          : null;
+
       final narrativeProfile = await _narrativeProfileStore.readOrDefault(
         conversation.id,
       );
@@ -225,7 +239,7 @@ final class StoryRuntimePromptService {
         conversation.id,
       );
       final transformedUserTurn = _contextCompiler.applyRegex(
-        _latestUserTurnText(messages),
+        latestUserTurn,
         target: StoryRegexTarget.userInput,
         rules: contextResources.regexRules,
       );
@@ -286,6 +300,13 @@ final class StoryRuntimePromptService {
           volatile: <StoryPromptContribution>[
             ...compiledContext.volatileContributions,
             ...narrativeFrame.volatile,
+            if (activeAction != null)
+              StoryPromptContribution(
+                id: 'story.interaction.pending-action',
+                stability: StoryPromptStability.volatile,
+                order: 810,
+                content: _actionReceiptText(activeAction),
+              ),
             StoryPromptContribution(
               id: 'story.worldline.cursor',
               stability: StoryPromptStability.volatile,
@@ -437,13 +458,42 @@ final class StoryRuntimePromptService {
 
   String _sceneBaseline(StorySceneRuntimeState scene) {
     final participants = scene.participantCharacterIds.join(',');
+    final relationships = scene.relationships
+        .map(
+          (edge) =>
+              '${edge.fromId}>${edge.toId}:' +
+              edge.dimensions.entries
+                  .map((entry) => '${entry.key}=${entry.value.toStringAsFixed(2)}')
+                  .join(','),
+        )
+        .where((item) => item.isNotEmpty)
+        .join('|');
+    final choices = scene.availableChoices
+        .map((choice) => '${choice.id}:${choice.label}')
+        .join('|');
     return '[STORY_SCENE_BASELINE]\n'
         'scene=${scene.sceneId ?? ''}\n'
         'location=${scene.location ?? ''}\n'
         'time=${scene.timeLabel ?? ''}\n'
         'participants=$participants\n'
         'pov=${scene.pov}\n'
+        'relationships=$relationships\n'
+        'available_choices=$choices\n'
         '[/STORY_SCENE_BASELINE]';
+  }
+
+  String _actionReceiptText(StoryActionReceipt action) {
+    final label = action.source == StoryActionSource.freeAction
+        ? ''
+        : action.label.trim();
+    return '[STORY_PENDING_ACTION]\n'
+        'receipt=${action.id}\n'
+        'source=${action.source.name}\n'
+        'label=$label\n'
+        'latest_user_turn_is_action=true\n'
+        'Respond to the action naturally in prose. Emit sparse action_result '
+        'metadata only for semantic changes that Kelivo cannot derive reliably.\n'
+        '[/STORY_PENDING_ACTION]';
   }
 
   String _memoryText(List<StoryResolvedMemory> memories) {
