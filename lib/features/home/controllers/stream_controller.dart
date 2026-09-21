@@ -59,8 +59,21 @@ class StreamController {
   /// MessageListView can detect it and use ValueListenableBuilder.
   void markStreamingStarted(String messageId) {
     _activeStreamingIds.add(messageId);
-    // Pre-create notifier so MessageListView can detect streaming state
+    // Pre-create notifiers so both Chat and Story surfaces observe the same
+    // generation lifecycle from the first preparation frame.
     streamingContentNotifier.getNotifier(messageId);
+    streamingContentNotifier.updateHealth(
+      messageId,
+      (current) => current.copyWith(
+        phase: GenerationTransportPhase.preparing,
+        httpOpen: false,
+        sseOpen: false,
+        lastProgressAt: DateTime.now(),
+        clearActiveTool: true,
+        clearRetryStatus: true,
+        clearError: true,
+      ),
+    );
   }
 
   /// Mark a message as no longer streaming.
