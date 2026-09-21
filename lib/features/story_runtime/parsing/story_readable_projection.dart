@@ -114,6 +114,7 @@ String storyTurnToReadableMarkdown(StoryTurn turn) {
       case StoryEventType.actionResult:
         // Machine-only interaction feedback is rendered by StoryInteractionPanel,
         // never duplicated into the novel surface.
+        continue;
       case StoryEventType.sceneTransition:
         if (text.isNotEmpty) blocks.add('---\n\n*$text*\n\n---');
       case StoryEventType.choiceSet:
