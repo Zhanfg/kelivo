@@ -669,6 +669,23 @@ class ChatActions {
     final message = _messageWithCurrentReasoning(
       active?.id == fallback.id ? active! : fallback,
     ).copyWith(isStreaming: false);
+    streamController.streamingContentNotifier.updateHealth(
+      message.id,
+      (current) => current.copyWith(
+        phase: terminalState == GenerationRunState.failed
+            ? stream_ctrl.GenerationTransportPhase.failed
+            : stream_ctrl.GenerationTransportPhase.cancelled,
+        httpOpen: false,
+        sseOpen: false,
+        lastProgressAt: DateTime.now(),
+        errorText: terminalState == GenerationRunState.failed
+            ? (errorCode ?? 'preparation_failed')
+            : null,
+        clearActiveTool: true,
+        clearRetryStatus: true,
+        clearError: terminalState != GenerationRunState.failed,
+      ),
+    );
     streamController.markStreamingEnded(message.id);
     streamController.cleanupTimers(message.id);
     streamController.removeStreamingNotifier(message.id);
