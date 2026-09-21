@@ -1,11 +1,16 @@
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart';
+import 'package:Kelivo/features/story_runtime/interaction/story_action_receipt.dart';
 import 'package:Kelivo/features/story_runtime/ui/story_narrative_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Future<void> submitNoop(String _, Object __, String ___) async {}
+  Future<void> submitNoop(
+    String _,
+    StoryActionSource __,
+    String ___,
+  ) async {}
 
   testWidgets(
     'Story renders prose without permanent user chat bubbles',
