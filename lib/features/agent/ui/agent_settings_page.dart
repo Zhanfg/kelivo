@@ -58,43 +58,52 @@ class AgentSettingsPage extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           section(zh ? '执行权限' : 'Execution permissions', [
-            RadioListTile<AgentPermissionMode>(
-              value: AgentPermissionMode.ask,
-              groupValue: settings.permissionMode,
-              onChanged: (value) {
-                if (value != null) settings.setPermissionMode(value);
-              },
+            ListTile(
+              leading: Icon(
+                settings.permissionMode == AgentPermissionMode.ask
+                    ? Lucide.CheckCircle
+                    : Lucide.circleDot,
+              ),
               title: Text(zh ? '请求批准' : 'Ask for approval'),
               subtitle: Text(
                 zh
                     ? '读取操作自动执行；命令、写入和其他有副作用的工具先询问。'
                     : 'Reads run automatically; commands, writes and other mutating tools ask first.',
               ),
+              onTap: () => settings.setPermissionMode(
+                AgentPermissionMode.ask,
+              ),
             ),
-            RadioListTile<AgentPermissionMode>(
-              value: AgentPermissionMode.auto,
-              groupValue: settings.permissionMode,
-              onChanged: (value) {
-                if (value != null) settings.setPermissionMode(value);
-              },
+            ListTile(
+              leading: Icon(
+                settings.permissionMode == AgentPermissionMode.auto
+                    ? Lucide.CheckCircle
+                    : Lucide.circleDot,
+              ),
               title: Text(zh ? '自动执行' : 'Auto'),
               subtitle: Text(
                 zh
                     ? '允许代理在受管执行环境内连续工作，不逐项询问。'
                     : 'Let Agent work continuously inside its managed environment.',
               ),
+              onTap: () => settings.setPermissionMode(
+                AgentPermissionMode.auto,
+              ),
             ),
-            RadioListTile<AgentPermissionMode>(
-              value: AgentPermissionMode.readOnly,
-              groupValue: settings.permissionMode,
-              onChanged: (value) {
-                if (value != null) settings.setPermissionMode(value);
-              },
+            ListTile(
+              leading: Icon(
+                settings.permissionMode == AgentPermissionMode.readOnly
+                    ? Lucide.CheckCircle
+                    : Lucide.circleDot,
+              ),
               title: Text(zh ? '只读' : 'Read only'),
               subtitle: Text(
                 zh
                     ? '允许读取、搜索和分析，但阻止命令与文件修改。'
                     : 'Allow reading, searching and analysis while blocking commands and edits.',
+              ),
+              onTap: () => settings.setPermissionMode(
+                AgentPermissionMode.readOnly,
               ),
             ),
           ]),
