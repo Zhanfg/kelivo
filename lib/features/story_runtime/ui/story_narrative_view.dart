@@ -6,6 +6,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../shared/widgets/thinking_sheen.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../home/controllers/streaming_content_notifier.dart';
+import '../interaction/story_action_receipt.dart';
 import '../parsing/story_readable_projection.dart';
 import 'story_interaction_panel.dart';
 
@@ -32,7 +33,11 @@ class StoryNarrativeView extends StatelessWidget {
   final StreamingContentNotifier streamingContentNotifier;
   final bool isGenerating;
   final bool Function(String messageId) hasLoadingTools;
-  final Future<void> Function(String text) onSubmitIntent;
+  final Future<void> Function(
+    String text,
+    StoryActionSource source,
+    String label,
+  ) onSubmitIntent;
   final VoidCallback onFreeAction;
 
   @override
