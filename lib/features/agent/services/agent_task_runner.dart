@@ -204,6 +204,12 @@ class AgentTaskRunner {
         },
       );
       _sessions[taskId] = session;
+      final subagentSubscription = await session.setSubagentSubscription(
+        level: 'events',
+      );
+      if (subagentSubscription['success'] != true) {
+        throw StateError('agent_subagent_subscription_rejected');
+      }
 
       final agentEnd = Completer<void>();
       Future<void> eventTail = Future<void>.value();
@@ -521,6 +527,55 @@ class AgentTaskRunner {
               'followUpCount': (event['followUp'] as List).length,
           },
         );
+      case 'subagent_lifecycle':
+        final raw = _safeValue(event['payload'], secrets);
+        final payload = raw is Map
+            ? raw.cast<String, dynamic>()
+            : <String, dynamic>{};
+        await journal.append(
+          taskId,
+          AgentTaskEventKind.subagentLifecycle,
+          payload: payload,
+        );
+        final agent = payload['agent']?.toString() ?? 'subagent';
+        final status = payload['status']?.toString() ?? 'updated';
+        await tasks.setPhase(
+          taskId,
+          AgentTaskPhase.running,
+          currentStep: '$agent: $status',
+        );
+      case 'subagent_progress':
+        final raw = _safeValue(event['payload'], secrets);
+        final payload = raw is Map
+            ? raw.cast<String, dynamic>()
+            : <String, dynamic>{};
+        await journal.append(
+          taskId,
+          AgentTaskEventKind.subagentProgress,
+          payload: payload,
+        );
+      case 'subagent_event':
+        final raw = _safeValue(event['payload'], secrets);
+        final payload = raw is Map
+            ? raw.cast<String, dynamic>()
+            : <String, dynamic>{};
+        final nested = payload['event'];
+        final nestedType = nested is Map
+            ? nested['type']?.toString()
+            : null;
+        if ({
+          'tool_execution_start',
+          'tool_execution_end',
+          'message_end',
+          'auto_retry_start',
+          'auto_retry_end',
+        }.contains(nestedType)) {
+          await journal.append(
+            taskId,
+            AgentTaskEventKind.subagentEvent,
+            payload: payload,
+          );
+        }
       case 'auto_retry_start':
         await tasks.setPhase(
           taskId,
