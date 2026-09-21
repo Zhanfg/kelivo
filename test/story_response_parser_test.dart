@@ -96,6 +96,31 @@ leak''', turnId: 'turn-trailer-leak'),
       },
     );
 
+    test('parses sparse action result with world authority', () {
+      final turn = parser.parse('''
+        {
+          "version": 1,
+          "events": [
+            {
+              "type": "action_result",
+              "actor": {"type": "world"},
+              "metadata": {
+                "feedback": "你成功绕过了守卫。",
+                "relationship_patch": [
+                  {"from":"guard","to":"self","delta":{"trust":-0.1}}
+                ]
+              }
+            }
+          ]
+        }
+        ''', turnId: 'turn-action-result');
+
+      final event = turn.events.single;
+      expect(event.type, StoryEventType.actionResult);
+      expect(event.actor.isWorld, isTrue);
+      expect(event.metadata['feedback'], '你成功绕过了守卫。');
+    });
+
     test('parses timed choice set without making it a generic chat reply', () {
       final turn = parser.parse('''
         {
