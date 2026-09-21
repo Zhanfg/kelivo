@@ -41,6 +41,9 @@ class WorkspaceModeTitle extends StatelessWidget {
 
     return PopupMenuButton<WorkspaceMode>(
       tooltip: zh ? '切换模式' : 'Switch mode',
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
       enabled: !provider.busy,
       initialValue: selected,
       onSelected: (mode) => _switchWorkspaceMode(context, mode),
@@ -71,7 +74,7 @@ class WorkspaceModeTitle extends StatelessWidget {
           ),
       ],
       child: _HeaderButton(
-        width: 92,
+        width: 88,
         icon: _modeIcon(selected),
         label: _modeLabel(selected, zh),
         trailing: Lucide.ChevronDown,
@@ -151,16 +154,16 @@ class _HeaderButton extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       width: width,
-      height: 34,
+      height: 32,
       padding: const EdgeInsets.symmetric(horizontal: 9),
       decoration: BoxDecoration(
         color: emphasized
-            ? cs.surfaceContainerHighest.withValues(alpha: 0.70)
-            : cs.surfaceContainerHigh.withValues(alpha: 0.46),
-        borderRadius: BorderRadius.circular(11),
+            ? cs.surfaceContainerHighest.withValues(alpha: 0.38)
+            : cs.surfaceContainerHigh.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.18),
-          width: 0.7,
+          color: cs.outlineVariant.withValues(alpha: 0.14),
+          width: 0.6,
         ),
       ),
       child: Row(
