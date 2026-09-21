@@ -24,6 +24,9 @@ import '../../story_runtime/ui/story_conversation_mode_control.dart';
 import '../../story_runtime/orchestration/story_mode_transition_service.dart';
 import '../../story_runtime/ui/story_workspace_drawer.dart';
 import '../widgets/assistant_avatar.dart';
+import '../models/workspace_mode.dart';
+import '../providers/workspace_mode_provider.dart';
+import '../../agent/ui/agent_workspace_drawer.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
@@ -102,11 +105,11 @@ class HomeMobileScaffold extends StatelessWidget {
       scrimColor: cs.onSurface,
       maxScrimOpacity: 0.12,
       barrierDismissible: true,
-      drawer: ValueListenableBuilder<int>(
-        valueListenable: storyConversationModeRevision,
-        builder: (context, _, _) =>
-            isStoryWorkspaceSelected(context.read<BusinessPreferences>())
-            ? StoryWorkspaceDrawer(
+      drawer: Consumer<WorkspaceModeProvider>(
+        builder: (context, modeProvider, _) {
+          switch (modeProvider.mode) {
+            case WorkspaceMode.story:
+              return StoryWorkspaceDrawer(
                 onSelectStory: (id) {
                   onSelectConversation(id);
                   drawerController.close();
@@ -124,8 +127,11 @@ class HomeMobileScaffold extends StatelessWidget {
                   }
                   drawerController.close();
                 },
-              )
-            : SideDrawer(
+              );
+            case WorkspaceMode.agent:
+              return const AgentWorkspaceDrawer();
+            case WorkspaceMode.chat:
+              return SideDrawer(
                 userName: context.watch<UserProvider>().name,
                 assistantName: _getAssistantName(context),
                 closePickerTicker: assistantPickerCloseTick,
@@ -147,7 +153,9 @@ class HomeMobileScaffold extends StatelessWidget {
                   await onCreateNewConversation();
                   if (closeDrawer) drawerController.close();
                 },
-              ),
+              );
+          }
+        },
       ),
       child: ChatFrostedBackdrop(
         backdrop: const MobileBackgroundLayer(),
