@@ -134,13 +134,18 @@ class AgentTaskRunner {
       );
 
       await settings.loaded;
-      final selectedModel = resolveChatModel(
+      await agentSettings.loaded;
+      final inheritedModel = resolveChatModel(
         settings,
         conversation: conversation,
         assistant: assistant,
       );
-      final providerKey = selectedModel.providerKey;
-      final modelId = selectedModel.modelId;
+      final providerKey = agentSettings.hasModelOverride
+          ? agentSettings.modelProvider
+          : inheritedModel.providerKey;
+      final modelId = agentSettings.hasModelOverride
+          ? agentSettings.modelId
+          : inheritedModel.modelId;
       if (providerKey == null || modelId == null) {
         throw StateError('agent_model_not_configured');
       }
@@ -155,7 +160,6 @@ class AgentTaskRunner {
         taskDirectory: taskDir,
         endpoint: modelEndpoint,
       );
-      await agentSettings.loaded;
       final engineConfigFile = await _writeEngineConfig(
         taskDir,
         maxParallelAgents: agentSettings.maxParallelAgents,
