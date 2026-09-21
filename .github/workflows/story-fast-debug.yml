@@ -5,8 +5,7 @@ on:
   push:
     branches:
       - feat/story-runtime-foundation
-    paths:
-      - .github/workflows/story-fast-debug.yml
+      - 'feat/story-narrative-runtime-v2-*'
   workflow_dispatch:
 
 permissions:
