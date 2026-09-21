@@ -18,6 +18,7 @@ void main() {
           home: Scaffold(
             body: StoryNarrativeView(
               title: '雨夜',
+              conversationId: 'story-1',
               topPadding: 0,
               bottomPadding: 0,
               streamingContentNotifier: streaming,
@@ -77,6 +78,7 @@ void main() {
         home: Scaffold(
           body: StoryNarrativeView(
             title: '测试',
+            conversationId: 'story-test',
             topPadding: 0,
             bottomPadding: 0,
             streamingContentNotifier: streaming,
