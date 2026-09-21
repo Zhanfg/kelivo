@@ -1639,7 +1639,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final textBase = cs.onSurface; // 纯黑（白天），夜间自动适配
     final ap = context.watch<AssistantProvider>();
     final currentAssistantId = ap.currentAssistantId;
-    final workspaceMode = context.watch<WorkspaceModeProvider>().mode;
+    final workspaceMode =
+        context.watch<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
     final chatServiceForSelection = context.read<ChatService>();
     if (_selectionMode) {
       // Header/action bar live outside the conversation-list Selector.
@@ -2711,9 +2712,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       final assistantId = context
                           .watch<AssistantProvider>()
                           .currentAssistantId;
-                      final workspaceMode = context
-                          .watch<WorkspaceModeProvider>()
-                          .mode;
+                      final workspaceMode =
+                          context.watch<WorkspaceModeProvider?>()?.mode ??
+                          WorkspaceMode.chat;
                       // Use last-activity time (updatedAt) for ordering and grouping.
                       // Flattened + memoized by
                       // (revision, initialized, query, assistantId).
