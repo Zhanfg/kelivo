@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  Future<void> submitNoop(String _) async {}
+
   testWidgets(
-    'Story renders only reader-facing prose in the main surface',
+    'Story renders prose without permanent user chat bubbles',
     (tester) async {
       final streaming = StreamingContentNotifier();
       addTearDown(streaming.dispose);
@@ -21,9 +23,7 @@ void main() {
               streamingContentNotifier: streaming,
               isGenerating: false,
               hasLoadingTools: (_) => false,
-              onSubmitIntent: (_) async {},
-              onFreeAction: () {},
-              onSubmitIntent: (_) async {},
+              onSubmitIntent: submitNoop,
               onFreeAction: () {},
               messages: [
                 ChatMessage(
@@ -49,10 +49,11 @@ void main() {
       expect(find.text('雨夜'), findsOneWidget);
       expect(find.text('让雨更密一些。'), findsNothing);
       expect(find.text('雨声贴着窗沿落下。'), findsOneWidget);
+      expect(find.text('自由行动…'), findsOneWidget);
     },
   );
 
-  testWidgets('Story exposes live reasoning state outside prose', (tester) async {
+  testWidgets('Story exposes live reasoning outside prose', (tester) async {
     final streaming = StreamingContentNotifier();
     addTearDown(streaming.dispose);
     final message = ChatMessage(
@@ -63,6 +64,7 @@ void main() {
       isStreaming: true,
     );
     streaming.getNotifier(message.id);
+    streaming.markNetworkEvent(message.id);
     streaming.updateReasoning(
       message.id,
       reasoningText: 'checking continuity',
@@ -80,10 +82,8 @@ void main() {
             streamingContentNotifier: streaming,
             isGenerating: true,
             hasLoadingTools: (_) => false,
-              onSubmitIntent: (_) async {},
-              onFreeAction: () {},
-              onSubmitIntent: (_) async {},
-              onFreeAction: () {},
+            onSubmitIntent: submitNoop,
+            onFreeAction: () {},
             messages: [message],
           ),
         ),
@@ -91,7 +91,8 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('思考中'), findsOneWidget);
+    expect(find.text('模型仍在工作'), findsOneWidget);
+    expect(find.text('SSE 已连接 · 思考中'), findsOneWidget);
     expect(find.text('查看模型返回的思考'), findsOneWidget);
     expect(find.text('checking continuity'), findsNothing);
 
@@ -112,6 +113,7 @@ void main() {
       isStreaming: true,
     );
     streaming.getNotifier(message.id);
+    streaming.markNetworkEvent(message.id);
     streaming.updateContent(message.id, '门在雨声里慢慢打开。', 8);
 
     await tester.pumpWidget(
@@ -125,10 +127,8 @@ void main() {
             streamingContentNotifier: streaming,
             isGenerating: true,
             hasLoadingTools: (_) => false,
-              onSubmitIntent: (_) async {},
-              onFreeAction: () {},
-              onSubmitIntent: (_) async {},
-              onFreeAction: () {},
+            onSubmitIntent: submitNoop,
+            onFreeAction: () {},
             messages: [message],
           ),
         ),
@@ -137,6 +137,47 @@ void main() {
     await tester.pump();
 
     expect(find.text('门在雨声里慢慢打开。'), findsOneWidget);
-    expect(find.text('正在写作'), findsOneWidget);
+    expect(find.text('SSE 已连接 · 正在写作'), findsOneWidget);
+  });
+
+  testWidgets('Story shows definitive request failure', (tester) async {
+    final streaming = StreamingContentNotifier();
+    addTearDown(streaming.dispose);
+    final message = ChatMessage(
+      id: 'assistant-failed',
+      role: 'assistant',
+      content: '',
+      conversationId: 'story-4',
+    );
+    streaming.updateHealth(
+      message.id,
+      (current) => current.copyWith(
+        phase: GenerationTransportPhase.failed,
+        errorText: 'socket closed',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        home: Scaffold(
+          body: StoryNarrativeView(
+            title: '测试',
+            topPadding: 0,
+            bottomPadding: 0,
+            streamingContentNotifier: streaming,
+            isGenerating: false,
+            hasLoadingTools: (_) => false,
+            onSubmitIntent: submitNoop,
+            onFreeAction: () {},
+            messages: [message],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('请求已失败'), findsOneWidget);
+    expect(find.text('socket closed'), findsOneWidget);
   });
 }
