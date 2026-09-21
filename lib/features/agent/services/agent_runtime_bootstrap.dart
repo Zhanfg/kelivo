@@ -189,6 +189,12 @@ class AgentAndroidRuntime implements WorkspaceStdioRuntime {
   final Directory tmpDir;
 
   @override
+  bool get supportsPty => false;
+
+  @override
+  bool get supportsSystemTerminal => false;
+
+  @override
   Future<RuntimeStatus> status() async {
     if (!await rootfsDir.exists() ||
         !await File(p.join(rootfsDir.path, 'bin', 'sh')).exists()) {
@@ -269,5 +275,26 @@ class AgentAndroidRuntime implements WorkspaceStdioRuntime {
   @override
   Future<void> cancel(String runId) async {
     await channel.cancel(runId);
+  }
+
+  @override
+  Future<PtySession> openPty({
+    required List<Mount> mounts,
+    required String cwd,
+    required Map<String, String> env,
+    required int cols,
+    required int rows,
+  }) {
+    throw UnsupportedError('Agent runtime does not expose an interactive PTY');
+  }
+
+  @override
+  Future<void> openInSystemTerminal(String hostDir) {
+    throw UnsupportedError('Agent runtime is not exposed as a system terminal');
+  }
+
+  @override
+  Future<void> revealInFileManager(String hostPath) {
+    throw UnsupportedError('Agent runtime filesystem is implementation detail');
   }
 }
