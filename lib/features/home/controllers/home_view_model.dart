@@ -1133,7 +1133,8 @@ class HomeViewModel extends ChangeNotifier {
       assistantId: assistantId,
     );
 
-    final workspaceMode = _contextProvider.read<WorkspaceModeProvider>().mode;
+    final workspaceMode =
+        _contextProvider.read<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
     if (workspaceMode == WorkspaceMode.story) {
       await StoryModeTransitionService(
         preferences: _contextProvider.read<BusinessPreferences>(),
