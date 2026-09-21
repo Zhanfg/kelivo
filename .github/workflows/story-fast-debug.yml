@@ -73,6 +73,9 @@ jobs:
             test/core/models/conversation_kind_test.dart \
             test/story_protocol_sanitizer_test.dart \
             test/story_narrative_director_test.dart \
+            test/story_action_receipt_test.dart \
+            test/story_response_parser_test.dart \
+            test/story_scene_runtime_reducer_test.dart \
             test/story_response_contract_v2_test.dart
 
       - name: Build Android debug APKs
