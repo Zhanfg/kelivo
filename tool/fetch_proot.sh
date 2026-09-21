@@ -36,11 +36,43 @@ TALLOC_VERSION="${TALLOC_VERSION:-2.4.3}"
 SHMEM_VERSION="${SHMEM_VERSION:-0.7}"
 
 # termux-arch:android-abi
-ABIS=(
+ALL_ABIS=(
   "arm:armeabi-v7a"
   "aarch64:arm64-v8a"
   "x86_64:x86_64"
 )
+
+# CI quick builds may request a subset, for example:
+#   KELIVO_ANDROID_ABIS=arm64-v8a
+# Normal release builds keep all three ABIs.
+ABIS=()
+if [[ -n "${KELIVO_ANDROID_ABIS:-}" ]]; then
+  IFS=',' read -r -a requested_abis <<< "$KELIVO_ANDROID_ABIS"
+  for pair in "${ALL_ABIS[@]}"; do
+    android_abi="${pair##*:}"
+    for requested in "${requested_abis[@]}"; do
+      if [[ "$android_abi" == "${requested//[[:space:]]/}" ]]; then
+        ABIS+=("$pair")
+        break
+      fi
+    done
+  done
+  if [[ "${#ABIS[@]}" -eq 0 ]]; then
+    echo "error: KELIVO_ANDROID_ABIS selected no supported ABI: $KELIVO_ANDROID_ABIS" >&2
+    exit 1
+  fi
+else
+  ABIS=("${ALL_ABIS[@]}")
+fi
+
+selected_abi() {
+  local candidate="$1"
+  local pair
+  for pair in "${ABIS[@]}"; do
+    [[ "${pair##*:}" == "$candidate" ]] && return 0
+  done
+  return 1
+}
 
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -148,6 +180,11 @@ verify_checksums() {
   local hash path actual
   while read -r hash path; do
     [[ -z "${hash:-}" || "$hash" == \#* ]] && continue
+    if [[ "$path" =~ android/app/src/main/jniLibs/([^/]+)/ ]]; then
+      if ! selected_abi "${BASH_REMATCH[1]}"; then
+        continue
+      fi
+    fi
     if [[ ! -f "$REPO_ROOT/$path" ]]; then
       echo "error: checksum path missing: $path" >&2
       exit 1
