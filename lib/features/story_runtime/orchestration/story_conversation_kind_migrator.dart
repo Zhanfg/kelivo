@@ -15,21 +15,18 @@ final class StoryConversationKindMigrator {
     required BusinessPreferences preferences,
     required ChatService chatService,
   }) => StoryConversationKindMigrator._(
-    store: StoryRuntimeStore(preferences),
-    sceneStore: StorySceneRuntimeStore(preferences),
-    worldTreeStore: StoryWorldTreeStore(preferences),
-    chatService: chatService,
+    _store: StoryRuntimeStore(preferences),
+    _sceneStore: StorySceneRuntimeStore(preferences),
+    _worldTreeStore: StoryWorldTreeStore(preferences),
+    _chatService: chatService,
   );
 
   StoryConversationKindMigrator._({
-    required StoryRuntimeStore store,
-    required StorySceneRuntimeStore sceneStore,
-    required StoryWorldTreeStore worldTreeStore,
-    required ChatService chatService,
-  }) : _store = store,
-       _sceneStore = sceneStore,
-       _worldTreeStore = worldTreeStore,
-       _chatService = chatService;
+    required this._store,
+    required this._sceneStore,
+    required this._worldTreeStore,
+    required this._chatService,
+  });
 
   final StoryRuntimeStore _store;
   final StorySceneRuntimeStore _sceneStore;
