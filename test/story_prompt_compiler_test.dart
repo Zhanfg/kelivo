@@ -67,7 +67,7 @@ void main() {
           .map((section) => section.id)
           .toList();
       expect(
-        ids.indexOf('story.core.v1'),
+        ids.indexOf('story.core.v2'),
         lessThan(ids.indexOf('story.scene.baseline')),
       );
       expect(
