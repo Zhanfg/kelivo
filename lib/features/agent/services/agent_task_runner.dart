@@ -10,6 +10,7 @@ import '../../../utils/app_directories.dart';
 import '../../home/utils/model_display_helper.dart';
 import '../models/agent_task.dart';
 import '../providers/agent_interaction_broker.dart';
+import '../providers/agent_settings_provider.dart';
 import '../providers/agent_task_provider.dart';
 import 'agent_context_materializer.dart';
 import 'agent_model_bridge.dart';
@@ -23,6 +24,7 @@ class AgentTaskRunner {
     required this.tasks,
     required this.journal,
     required this.interactions,
+    required this.agentSettings,
     required this.workspaces,
     required this.assistants,
     required this.chat,
@@ -38,6 +40,7 @@ class AgentTaskRunner {
   final AgentTaskProvider tasks;
   final AgentTaskJournal journal;
   final AgentInteractionBroker interactions;
+  final AgentSettingsProvider agentSettings;
   final WorkspaceProvider workspaces;
   final AssistantProvider assistants;
   final ChatService chat;
@@ -128,14 +131,20 @@ class AgentTaskRunner {
         conversationId: task.conversationId,
       );
       final modelEndpoint = await modelBridge.start();
-      await modelBridge.writePiConfig(
+      final taskModelsFile = await modelBridge.writePiConfig(
         taskDirectory: taskDir,
         endpoint: modelEndpoint,
       );
+      await agentSettings.loaded;
 
       final mounts = <Mount>[
         Mount(host: workspaceRoot, guest: '/workspace'),
         Mount(host: taskDir.path, guest: '/kelivo-agent-task'),
+        Mount(
+          host: taskModelsFile.path,
+          guest: '/home/kelivo/.pi/agent/models.json',
+          readOnly: true,
+        ),
         installation.asMount(),
         for (final skill in materializedContext.skillMounts)
           Mount(
@@ -160,7 +169,10 @@ class AgentTaskRunner {
         mounts: mounts,
         environment: <String, String>{
           ...execution.variables,
-          'PI_CODING_AGENT_DIR': '/kelivo-agent-task/pi-config',
+          'PI_CODING_AGENT_DIR': '/home/kelivo/.pi/agent',
+          'PI_TELEMETRY': '0',
+          'PI_SKIP_VERSION_CHECK': '1',
+          'KELIVO_AGENT_PERMISSION_MODE': agentSettings.permissionMode.name,
         },
       );
       _sessions[taskId] = session;
@@ -171,7 +183,12 @@ class AgentTaskRunner {
         (event) {
           eventTail = eventTail
               .then((_) async {
-                final ended = await _handleEvent(taskId, session!, event);
+                final ended = await _handleEvent(
+                  taskId,
+                  session!,
+                  event,
+                  secrets: secretValues.values,
+                );
                 if (ended && !agentEnd.isCompleted) agentEnd.complete();
               })
               .catchError((Object error, StackTrace stack) {
@@ -251,6 +268,43 @@ class AgentTaskRunner {
     }
   }
 
+  Future<bool> steer(String taskId, String message) async {
+    final text = message.trim();
+    if (text.isEmpty) return false;
+    final session = _sessions[taskId];
+    if (session == null) return false;
+    final response = await session.steer(text);
+    if (response['success'] == true) {
+      await journal.append(
+        taskId,
+        AgentTaskEventKind.note,
+        payload: <String, dynamic>{'kind': 'steer', 'text': _limit(text, 4000)},
+      );
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> followUp(String taskId, String message) async {
+    final text = message.trim();
+    if (text.isEmpty) return false;
+    final session = _sessions[taskId];
+    if (session == null) return false;
+    final response = await session.followUp(text);
+    if (response['success'] == true) {
+      await journal.append(
+        taskId,
+        AgentTaskEventKind.note,
+        payload: <String, dynamic>{
+          'kind': 'follow_up',
+          'text': _limit(text, 4000),
+        },
+      );
+      return true;
+    }
+    return false;
+  }
+
   Future<void> cancel(String taskId) async {
     await recovery;
     _cancelled.add(taskId);
@@ -270,8 +324,9 @@ class AgentTaskRunner {
   Future<bool> _handleEvent(
     String taskId,
     PiRpcSession session,
-    Map<String, dynamic> event,
-  ) async {
+    Map<String, dynamic> event, {
+    required Iterable<String> secrets,
+  }) async {
     final type = event['type']?.toString();
     switch (type) {
       case 'agent_start':
@@ -280,8 +335,30 @@ class AgentTaskRunner {
           AgentTaskPhase.running,
           currentStep: 'Working',
         );
+      case 'agent_settled':
+        await journal.append(
+          taskId,
+          AgentTaskEventKind.checkpoint,
+          payload: const <String, dynamic>{'kind': 'agent_settled'},
+        );
+        return true;
+      case 'turn_start':
+        await journal.append(taskId, AgentTaskEventKind.turnStarted);
+      case 'turn_end':
+        await journal.append(taskId, AgentTaskEventKind.turnFinished);
+      case 'message_end':
+        final message = event['message'];
+        final text = _messageText(message);
+        if (text.isNotEmpty && _messageRole(message) == 'assistant') {
+          await journal.append(
+            taskId,
+            AgentTaskEventKind.assistantMessage,
+            payload: <String, dynamic>{'text': _redact(text, secrets)},
+          );
+        }
       case 'tool_execution_start':
         final tool = event['toolName']?.toString() ?? 'tool';
+        final args = _safeValue(event['args'], secrets);
         await tasks.setPhase(
           taskId,
           AgentTaskPhase.running,
@@ -290,22 +367,110 @@ class AgentTaskRunner {
         await journal.append(
           taskId,
           AgentTaskEventKind.toolStarted,
-          payload: <String, dynamic>{'tool': tool},
+          payload: <String, dynamic>{
+            'tool': tool,
+            if (event['toolCallId'] != null)
+              'toolCallId': event['toolCallId'].toString(),
+            if (args != null) 'args': args,
+          },
         );
+      case 'tool_execution_update':
+        if (!agentSettings.showToolOutput) break;
+        final tool = event['toolName']?.toString() ?? 'tool';
+        final output = _toolText(event['partialResult']);
+        if (output.isNotEmpty) {
+          await journal.append(
+            taskId,
+            AgentTaskEventKind.toolProgress,
+            payload: <String, dynamic>{
+              'tool': tool,
+              if (event['toolCallId'] != null)
+                'toolCallId': event['toolCallId'].toString(),
+              'output': _redact(_limit(output, 12000), secrets),
+            },
+          );
+        }
       case 'tool_execution_end':
         final tool = event['toolName']?.toString() ?? 'tool';
+        final output = agentSettings.showToolOutput
+            ? _toolText(event['result'])
+            : '';
         await journal.append(
           taskId,
           AgentTaskEventKind.toolFinished,
           payload: <String, dynamic>{
             'tool': tool,
+            if (event['toolCallId'] != null)
+              'toolCallId': event['toolCallId'].toString(),
             'isError': event['isError'] == true,
+            if (output.isNotEmpty)
+              'output': _redact(_limit(output, 16000), secrets),
+          },
+        );
+      case 'queue_update':
+        await journal.append(
+          taskId,
+          AgentTaskEventKind.queueChanged,
+          payload: <String, dynamic>{
+            if (event['steering'] is List)
+              'steeringCount': (event['steering'] as List).length,
+            if (event['followUp'] is List)
+              'followUpCount': (event['followUp'] as List).length,
+          },
+        );
+      case 'auto_retry_start':
+        await tasks.setPhase(
+          taskId,
+          AgentTaskPhase.running,
+          currentStep: 'Retrying',
+        );
+        await journal.append(
+          taskId,
+          AgentTaskEventKind.retry,
+          payload: <String, dynamic>{
+            'state': 'start',
+            if (event['attempt'] != null) 'attempt': event['attempt'],
+            if (event['maxAttempts'] != null)
+              'maxAttempts': event['maxAttempts'],
+          },
+        );
+      case 'auto_retry_end':
+        await journal.append(
+          taskId,
+          AgentTaskEventKind.retry,
+          payload: <String, dynamic>{
+            'state': 'end',
+            'success': event['success'] == true,
+          },
+        );
+      case 'compaction_start':
+        await journal.append(
+          taskId,
+          AgentTaskEventKind.compaction,
+          payload: const <String, dynamic>{'state': 'start'},
+        );
+      case 'compaction_end':
+        await journal.append(
+          taskId,
+          AgentTaskEventKind.compaction,
+          payload: const <String, dynamic>{'state': 'end'},
+        );
+      case 'extension_error':
+        await journal.append(
+          taskId,
+          AgentTaskEventKind.notice,
+          payload: <String, dynamic>{
+            'kind': 'extension_error',
+            if (event['error'] != null)
+              'message': _redact(_limit(event['error'].toString(), 4000), secrets),
           },
         );
       case 'extension_ui_request':
         await _handleExtensionUi(taskId, session, event);
       case 'agent_end':
-        return true;
+        // A low-level run may still be followed by retry, compaction or queued
+        // continuations. Only agent_settled completes a KELIVO task.
+        break;
     }
     return false;
   }
@@ -351,6 +516,74 @@ class AgentTaskRunner {
       AgentTaskPhase.running,
       currentStep: 'Working',
     );
+  }
+
+  static String _messageRole(Object? raw) {
+    if (raw is Map) return raw['role']?.toString() ?? '';
+    return '';
+  }
+
+  static String _messageText(Object? raw) {
+    if (raw is! Map) return '';
+    final content = raw['content'];
+    if (content is String) return content;
+    if (content is! List) return '';
+    final buffer = StringBuffer();
+    for (final item in content) {
+      if (item is Map && item['type']?.toString() == 'text') {
+        final text = item['text']?.toString() ?? '';
+        if (text.isNotEmpty) {
+          if (buffer.isNotEmpty) buffer.writeln();
+          buffer.write(text);
+        }
+      }
+    }
+    return buffer.toString();
+  }
+
+  static String _toolText(Object? raw) {
+    if (raw == null) return '';
+    if (raw is String) return raw;
+    if (raw is Map) {
+      final content = raw['content'];
+      if (content is List) {
+        final buffer = StringBuffer();
+        for (final item in content) {
+          if (item is Map && item['text'] != null) {
+            if (buffer.isNotEmpty) buffer.writeln();
+            buffer.write(item['text'].toString());
+          }
+        }
+        if (buffer.isNotEmpty) return buffer.toString();
+      }
+      if (raw['text'] != null) return raw['text'].toString();
+    }
+    return raw.toString();
+  }
+
+  static Object? _safeValue(Object? value, Iterable<String> secrets) {
+    if (value == null || value is num || value is bool) return value;
+    if (value is String) return _redact(_limit(value, 12000), secrets);
+    if (value is List) {
+      return <Object?>[
+        for (final item in value.take(64)) _safeValue(item, secrets),
+      ];
+    }
+    if (value is Map) {
+      final result = <String, Object?>{};
+      var count = 0;
+      for (final entry in value.entries) {
+        if (count++ >= 64) break;
+        result[entry.key.toString()] = _safeValue(entry.value, secrets);
+      }
+      return result;
+    }
+    return _redact(_limit(value.toString(), 12000), secrets);
+  }
+
+  static String _limit(String value, int maxChars) {
+    if (value.length <= maxChars) return value;
+    return '${value.substring(0, maxChars)}\n… [truncated]';
   }
 
   Future<void> _waitUntilIdle(PiRpcSession session) async {
