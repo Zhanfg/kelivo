@@ -94,6 +94,7 @@ import 'features/agent/services/agent_engine_installer.dart';
 import 'features/agent/services/agent_github_cli_installer.dart';
 import 'features/agent/services/agent_task_runner.dart';
 import 'features/home/providers/workspace_mode_provider.dart';
+import 'features/story_runtime/orchestration/story_conversation_kind_migrator.dart';
 import 'utils/app_directories.dart';
 import 'utils/platform_utils.dart';
 import 'utils/sandbox_path_resolver.dart';
@@ -138,6 +139,12 @@ void _wireWorkspaceServices(BuildContext ctx) {
         workspaceById: workspaces.byId,
       );
     };
+    unawaited(
+      StoryConversationKindMigrator(
+        preferences: ctx.read<BusinessPreferences>(),
+        chatService: chat,
+      ).migrate(),
+    );
     WorkspaceNavigation.onOpenEnvironmentPage = openEnvironmentPage;
     WorkspaceNavigation.onOpenTerminal = (navContext, {command}) {
       openTerminal(
