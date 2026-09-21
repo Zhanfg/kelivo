@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../../core/database/business_preferences.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
+import '../context/story_context_resource_store.dart';
+import '../context/story_context_resources.dart';
 import '../models/story_runtime_models.dart';
 import '../parsing/story_message_event_store.dart';
 import '../state/story_scene_runtime_state.dart';
@@ -49,10 +51,25 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
   }
 
   Future<_StoryInteractionSnapshot> _load() async {
-    final preferences = context.read<BusinessPreferences>();
+    BusinessPreferences preferences;
+    try {
+      preferences = context.read<BusinessPreferences>();
+    } on ProviderNotFoundException {
+      return const _StoryInteractionSnapshot();
+    }
+
     final scene = await StorySceneRuntimeStore(
       preferences,
     ).readOrDefault(widget.conversationId);
+    final resources = await StoryContextResourceStore(
+      preferences,
+    ).readOrDefault(widget.conversationId);
+    final quickReplies =
+        resources.quickReplies.where((item) => item.enabled).toList()
+          ..sort((a, b) {
+            final byOrder = a.order.compareTo(b.order);
+            return byOrder != 0 ? byOrder : a.id.compareTo(b.id);
+          });
     final messageId = widget.latestAssistantMessageId;
     final record = messageId == null
         ? null
@@ -75,6 +92,7 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
       participantCount: scene.participantCharacterIds.length,
       openLoops: scene.openLoops.take(3).toList(growable: false),
       choices: choiceEvent?.choices ?? const <StoryChoice>[],
+      quickReplies: quickReplies.take(4).toList(growable: false),
     );
   }
 
@@ -183,6 +201,30 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
                                       : choice.label,
                                 ),
                           child: Text(choice.label),
+                        ),
+                    ],
+                  ),
+                ],
+                if (data.quickReplies.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    zh ? '快捷行动' : 'Quick actions',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 7,
+                    children: [
+                      for (final reply in data.quickReplies)
+                        ActionChip(
+                          label: Text(reply.label),
+                          onPressed: widget.disabled
+                              ? null
+                              : () => widget.onSubmitIntent(reply.submitText),
                         ),
                     ],
                   ),
@@ -296,6 +338,7 @@ class _StoryInteractionSnapshot {
     this.participantCount = 0,
     this.openLoops = const <String>[],
     this.choices = const <StoryChoice>[],
+    this.quickReplies = const <StoryQuickReply>[],
   });
 
   final String? location;
@@ -303,4 +346,5 @@ class _StoryInteractionSnapshot {
   final int participantCount;
   final List<String> openLoops;
   final List<StoryChoice> choices;
+  final List<StoryQuickReply> quickReplies;
 }
