@@ -1029,7 +1029,8 @@ class HomePageController extends ChangeNotifier {
 
     final sceneStore = StorySceneRuntimeStore(preferences);
     final scene = await sceneStore.readOrDefault(conversation.id);
-    if (scene.availableChoices.isNotEmpty) {
+    final previousChoices = scene.availableChoices;
+    if (previousChoices.isNotEmpty) {
       await sceneStore.upsert(
         scene.copyWith(
           availableChoices: const [],
@@ -1038,9 +1039,22 @@ class HomePageController extends ChangeNotifier {
       );
     }
 
+    Future<void> restoreChoices() async {
+      if (previousChoices.isEmpty) return;
+      final latest = await sceneStore.readOrDefault(conversation.id);
+      if (latest.availableChoices.isNotEmpty) return;
+      await sceneStore.upsert(
+        latest.copyWith(
+          availableChoices: previousChoices,
+          revision: latest.revision + 1,
+        ),
+      );
+    }
+
     try {
       final result = await sendMessage(input);
       if (result == ChatInputSubmissionResult.rejected) {
+        await restoreChoices();
         await store.failLatestPending(
           conversationId: conversation.id,
           resultSummary: 'action_submission_rejected',
@@ -1048,6 +1062,7 @@ class HomePageController extends ChangeNotifier {
       }
       return result;
     } catch (_) {
+      await restoreChoices();
       await store.failLatestPending(
         conversationId: conversation.id,
         resultSummary: 'action_submission_failed',
