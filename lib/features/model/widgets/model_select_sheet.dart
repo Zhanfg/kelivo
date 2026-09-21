@@ -901,7 +901,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           expand: false,
           initialChildSize: _initialSize,
           maxChildSize: _maxSize,
-          minChildSize: 0.4,
+          minChildSize: _initialSize,
           builder: (c, controller) {
             return Column(
               children: [
@@ -2321,11 +2321,9 @@ class _DesktopModelSelectDialogBodyState
     if (targetIndex == null) return;
 
     try {
-      await _itemScrollController.scrollTo(
+      _itemScrollController.jumpTo(
         index: targetIndex,
-        alignment: 0.5, // try to center the current model
-        duration: const Duration(milliseconds: 360),
-        curve: Curves.easeOutCubic,
+        alignment: 0.5,
       );
       _autoScrolled = true;
     } catch (_) {
@@ -2333,11 +2331,9 @@ class _DesktopModelSelectDialogBodyState
       Future.delayed(const Duration(milliseconds: 80), () async {
         if (!mounted || _autoScrolled) return;
         try {
-          await _itemScrollController.scrollTo(
+          _itemScrollController.jumpTo(
             index: targetIndex!,
             alignment: 0.5,
-            duration: const Duration(milliseconds: 360),
-            curve: Curves.easeOutCubic,
           );
           _autoScrolled = true;
         } catch (_) {}
