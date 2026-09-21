@@ -6,6 +6,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
 import '../context/story_context_resource_store.dart';
 import '../context/story_context_resources.dart';
+import '../interaction/story_action_receipt.dart';
 import '../models/story_runtime_models.dart';
 import '../parsing/story_message_event_store.dart';
 import '../state/story_scene_runtime_state.dart';
@@ -23,7 +24,11 @@ class StoryInteractionPanel extends StatefulWidget {
 
   final String conversationId;
   final String? latestAssistantMessageId;
-  final Future<void> Function(String text) onSubmitIntent;
+  final Future<void> Function(
+    String text,
+    StoryActionSource source,
+    String label,
+  ) onSubmitIntent;
   final VoidCallback onFreeAction;
   final bool disabled;
   final String? pendingUserAction;
@@ -187,6 +192,8 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
                                   (choice.submitText?.trim().isNotEmpty == true)
                                       ? choice.submitText!.trim()
                                       : choice.label,
+                                  StoryActionSource.formalChoice,
+                                  choice.label,
                                 ),
                           child: Text(choice.label),
                         ),
@@ -212,7 +219,11 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
                           label: Text(reply.label),
                           onPressed: widget.disabled
                               ? null
-                              : () => widget.onSubmitIntent(reply.submitText),
+                              : () => widget.onSubmitIntent(
+                                  reply.submitText,
+                                  StoryActionSource.quickReply,
+                                  reply.label,
+                                ),
                         ),
                     ],
                   ),
