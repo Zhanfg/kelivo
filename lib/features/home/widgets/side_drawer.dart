@@ -13,6 +13,7 @@ import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/models/chat_item.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../settings/pages/settings_page.dart';
+import '../../chat/pages/chat_settings_page.dart';
 import '../../translate/pages/translate_page.dart';
 import '../../backup/pages/backup_page.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -2883,7 +2884,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                         ),
                                       ),
                                       const SizedBox(width: 4),
-                                      // 设置按钮（圆形，无水波纹）
+                                      // 当前模式设置
                                       SizedBox(
                                         width: 45,
                                         height: 45,
@@ -2897,10 +2898,34 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                               Navigator.of(context).push(
                                                 MaterialPageRoute(
                                                   builder: (_) =>
+                                                      const ChatSettingsPage(),
+                                                ),
+                                              );
+                                            },
+                                            semanticLabel: 'Settings',
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      // 全部设置
+                                      SizedBox(
+                                        width: 45,
+                                        height: 45,
+                                        child: Center(
+                                          child: IosIconButton(
+                                            size: 22,
+                                            color: textBase,
+                                            icon: Lucide.Settings2,
+                                            padding: const EdgeInsets.all(10),
+                                            onTap: () {
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
                                                       const SettingsPage(),
                                                 ),
                                               );
                                             },
+                                            semanticLabel: 'All settings',
                                           ),
                                         ),
                                       ),
