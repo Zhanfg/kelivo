@@ -13,6 +13,7 @@ class StoryNarrativeView extends StatelessWidget {
   const StoryNarrativeView({
     super.key,
     required this.messages,
+    required this.conversationId,
     required this.topPadding,
     required this.bottomPadding,
     required this.streamingContentNotifier,
@@ -24,6 +25,7 @@ class StoryNarrativeView extends StatelessWidget {
   });
 
   final List<ChatMessage> messages;
+  final String? conversationId;
   final double topPadding;
   final double bottomPadding;
   final String? title;
@@ -111,6 +113,12 @@ class StoryNarrativeView extends StatelessWidget {
       final raw = message.id == streaming?.id
           ? (streamingData?.content ?? message.content)
           : message.content;
+      if (health?.phase == GenerationTransportPhase.failed &&
+          message.id == latestCompletedAssistant?.id &&
+          health?.errorText?.trim().isNotEmpty == true &&
+          raw.trim() == health!.errorText!.trim()) {
+        continue;
+      }
       final projected = projectStoryReadableOrOriginal(
         raw,
         turnId: message.id,
@@ -124,7 +132,8 @@ class StoryNarrativeView extends StatelessWidget {
     final heading = title?.trim();
     final failed = health?.phase == GenerationTransportPhase.failed;
     final showStatus = streaming != null || isGenerating || failed;
-    final conversationId = messages.isEmpty ? null : messages.last.conversationId;
+    final effectiveConversationId =
+        conversationId ?? (messages.isEmpty ? null : messages.last.conversationId);
     final pendingUserAction =
         streaming != null &&
             latestUser != null &&
@@ -134,7 +143,7 @@ class StoryNarrativeView extends StatelessWidget {
             )
         ? latestUser.content
         : null;
-    final showInteraction = conversationId != null;
+    final showInteraction = effectiveConversationId != null;
     final count =
         entries.length + 1 + (showStatus ? 1 : 0) + (showInteraction ? 1 : 0);
 
@@ -182,7 +191,7 @@ class StoryNarrativeView extends StatelessWidget {
 
         if (showInteraction && index == cursor) {
           return StoryInteractionPanel(
-            conversationId: conversationId!,
+            conversationId: effectiveConversationId!,
             latestAssistantMessageId: latestCompletedAssistant?.id,
             onSubmitIntent: onSubmitIntent,
             onFreeAction: onFreeAction,
