@@ -725,6 +725,8 @@ class _HomePageState extends State<HomePage>
   late final Future<void> _chatReady;
   bool _readingIncomingShares = false;
   bool _incomingShareChanged = false;
+  WorkspaceMode? _requestedWorkspaceMode;
+  bool _workspaceConversationSyncScheduled = false;
 
   // ============================================================================
   // Page Controller (manages all business logic and state)
@@ -822,6 +824,23 @@ class _HomePageState extends State<HomePage>
     _scrollController.dispose();
     routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  void _scheduleWorkspaceConversationSync(WorkspaceMode mode) {
+    if (_requestedWorkspaceMode == mode &&
+        !_workspaceConversationSyncScheduled) {
+      return;
+    }
+    _requestedWorkspaceMode = mode;
+    if (_workspaceConversationSyncScheduled) return;
+    _workspaceConversationSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _workspaceConversationSyncScheduled = false;
+      if (!mounted) return;
+      final active = context.read<WorkspaceModeProvider>().mode;
+      if (active == WorkspaceMode.agent) return;
+      await _controller.ensureConversationForWorkspace(active);
+    });
   }
 
   void _onControllerChanged() {
@@ -980,8 +999,9 @@ class _HomePageState extends State<HomePage>
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final assistant = context.watch<AssistantProvider>().currentAssistant;
-    final agentMode =
-        context.watch<WorkspaceModeProvider>().mode == WorkspaceMode.agent;
+    final workspaceMode = context.watch<WorkspaceModeProvider>().mode;
+    _scheduleWorkspaceConversationSync(workspaceMode);
+    final agentMode = workspaceMode == WorkspaceMode.agent;
 
     final modelInfo = getModelDisplayInfo(
       settings,
