@@ -90,7 +90,7 @@ import 'features/agent/services/agent_context_bridge.dart';
 import 'features/agent/services/agent_context_materializer.dart';
 import 'features/agent/services/agent_task_journal.dart';
 import 'features/agent/services/agent_runtime_bootstrap.dart';
-import 'features/agent/services/pi_binary_installer.dart';
+import 'features/agent/services/agent_engine_installer.dart';
 import 'features/agent/services/agent_task_runner.dart';
 import 'features/home/providers/workspace_mode_provider.dart';
 import 'utils/app_directories.dart';
@@ -837,8 +837,8 @@ class MyApp extends StatelessWidget {
         Provider<AgentRuntimeBootstrap>(
           create: (_) => AgentRuntimeBootstrap(),
         ),
-        Provider<PiBinaryInstaller>(
-          create: (ctx) => PiBinaryInstaller(
+        Provider<AgentEngineInstaller>(
+          create: (ctx) => AgentEngineInstaller(
             runtimeBootstrap: ctx.read<AgentRuntimeBootstrap>(),
           ),
         ),
@@ -856,7 +856,7 @@ class MyApp extends StatelessWidget {
             settings: ctx.read<SettingsProvider>(),
             runtimeBootstrap: ctx.read<AgentRuntimeBootstrap>(),
             environment: ctx.read<EnvironmentProvider>(),
-            piInstaller: ctx.read<PiBinaryInstaller>(),
+            engineInstaller: ctx.read<AgentEngineInstaller>(),
           ),
         ),
         ProxyProvider<_WorkspaceStackHolder, EnvironmentManager?>(
