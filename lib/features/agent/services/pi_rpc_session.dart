@@ -45,6 +45,7 @@ class PiRpcSession {
     required String cwd,
     required String sessionDir,
     required String sessionName,
+    String approvalMode = 'always-ask',
     String? appendSystemPrompt,
     List<String> skills = const <String>[],
     List<String> extraArgs = const <String>[],
@@ -69,7 +70,8 @@ class PiRpcSession {
       'rpc',
       '--session-dir',
       sessionDir,
-      '--auto-approve',
+      '--approval-mode',
+      approvalMode,
       if (appendSystemPrompt != null && appendSystemPrompt.isNotEmpty) ...[
         '--append-system-prompt',
         appendSystemPrompt,
