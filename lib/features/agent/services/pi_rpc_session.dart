@@ -63,14 +63,11 @@ class PiRpcSession {
       'rpc',
       '--session-dir',
       sessionDir,
-      '--name',
-      sessionName,
-      '--no-approve',
+      '--auto-approve',
       if (appendSystemPrompt != null && appendSystemPrompt.isNotEmpty) ...[
         '--append-system-prompt',
         appendSystemPrompt,
       ],
-      for (final skill in skills) ...['--skill', skill],
       ...extraArgs,
     ];
     final launch =
@@ -126,7 +123,11 @@ class PiRpcSession {
     try {
       await session._started.future.timeout(startupTimeout);
       if (session._closing) {
-        throw StateError('Pi RPC startup cancelled');
+        throw StateError('Agent RPC startup cancelled');
+      }
+      final named = await session.setSessionName(sessionName);
+      if (named['success'] != true) {
+        throw StateError('agent_rpc_session_name_rejected');
       }
       return session;
     } catch (_) {
@@ -176,6 +177,13 @@ class PiRpcSession {
 
   Future<Map<String, dynamic>> getState() {
     return send(const <String, dynamic>{'type': 'get_state'});
+  }
+
+  Future<Map<String, dynamic>> setSessionName(String name) {
+    return send(<String, dynamic>{
+      'type': 'set_session_name',
+      'name': name,
+    });
   }
 
   Future<Map<String, dynamic>> steer(String message) {
