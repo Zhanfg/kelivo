@@ -1,4 +1,7 @@
-const SAFE_TOOLS = new Set(["read", "grep", "find", "ls"]);
+import { Type } from "@earendil-works/pi-ai";
+import { defineTool } from "@earendil-works/pi-coding-agent";
+
+const SAFE_TOOLS = new Set(["read", "grep", "find", "ls", "kelivo_plan"]);
 const sessionAllowed = new Set();
 
 function summarize(event) {
@@ -10,6 +13,34 @@ function summarize(event) {
 }
 
 export default function (pi) {
+  pi.registerTool(
+    defineTool({
+      name: "kelivo_plan",
+      label: "Update plan",
+      description:
+        "Publish or update the visible KELIVO task plan. For multi-step work, call this before the first mutating action and whenever the plan materially changes.",
+      parameters: Type.Object({
+        summary: Type.Optional(Type.String()),
+        steps: Type.Array(
+          Type.Object({
+            text: Type.String(),
+            status: Type.Union([
+              Type.Literal("pending"),
+              Type.Literal("in_progress"),
+              Type.Literal("completed"),
+            ]),
+          }),
+        ),
+      }),
+      async execute(_toolCallId, params) {
+        return {
+          content: [{ type: "text", text: "Plan updated in KELIVO." }],
+          details: params,
+        };
+      },
+    }),
+  );
+
   pi.on("tool_call", async (event, ctx) => {
     const mode = process.env.KELIVO_AGENT_PERMISSION_MODE || "ask";
     const tool = event.toolName;
