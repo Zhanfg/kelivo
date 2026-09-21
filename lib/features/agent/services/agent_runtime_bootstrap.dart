@@ -61,6 +61,12 @@ class AgentRuntimeBootstrap {
 
     await homeDir.create(recursive: true);
     await tmpDir.create(recursive: true);
+    final piAgentDir = Directory(p.join(homeDir.path, '.pi', 'agent'));
+    await piAgentDir.create(recursive: true);
+    final persistentModelsFile = File(p.join(piAgentDir.path, 'models.json'));
+    if (!await persistentModelsFile.exists()) {
+      await persistentModelsFile.writeAsString('{}', flush: true);
+    }
 
     if (!await _validInstall(rootfsDir, marker)) {
       await _installEmbeddedRuntime(
