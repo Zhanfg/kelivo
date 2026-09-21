@@ -54,7 +54,6 @@ class StoryNarrativeView extends StatelessWidget {
       if (!message.isStreaming) latestCompletedAssistant ??= message;
       if (message.isStreaming && streaming == null) streaming = message;
       if (latestUser != null &&
-          latestAssistant != null &&
           latestCompletedAssistant != null &&
           streaming != null) {
         break;
@@ -196,7 +195,7 @@ class StoryNarrativeView extends StatelessWidget {
 
         if (showInteraction && index == cursor) {
           return StoryInteractionPanel(
-            conversationId: effectiveConversationId!,
+            conversationId: effectiveConversationId,
             latestAssistantMessageId: latestCompletedAssistant?.id,
             onSubmitIntent: onSubmitIntent,
             onFreeAction: onFreeAction,
@@ -323,7 +322,7 @@ class _StoryGenerationStatusState extends State<_StoryGenerationStatus> {
     final elapsed = now.difference(startedAt);
 
     String seconds(Duration value) =>
-        (value.inMilliseconds / 1000).clamp(0, 999999).toStringAsFixed(0) + 's';
+        '${(value.inMilliseconds / 1000).clamp(0, 999999).toStringAsFixed(0)}s';
 
     final networkIdle = health.lastNetworkEventAt == null
         ? null
