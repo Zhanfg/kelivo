@@ -13,6 +13,12 @@ import '../widgets/side_drawer.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/workspace_binding.dart';
+import '../../story_runtime/orchestration/story_mode_transition_service.dart';
+import '../../story_runtime/ui/story_workspace_drawer.dart';
+import '../../agent/ui/agent_workspace_drawer.dart';
+import '../providers/workspace_mode_provider.dart';
+import '../models/workspace_mode.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -180,29 +186,53 @@ class HomeDesktopScaffold extends StatelessWidget {
     ColorScheme cs,
     bool topicsOnRight,
   ) {
-    final sidebar = SideDrawer(
-      embedded: true,
-      embeddedWidth: embeddedSidebarWidth,
-      userName: context.watch<UserProvider>().name,
-      assistantName: _getAssistantName(context),
-      closePickerTicker: assistantPickerCloseTick,
-      loadingConversationIds: loadingConversationIds,
-      useDesktopTabs: _isDesktop && !topicsOnRight,
-      desktopAssistantsOnly: _isDesktop && topicsOnRight,
-      globalSearchMode: globalSearchMode,
-      globalSearchQuery: globalSearchQuery,
-      onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
-      onEnterGlobalSearch: () {
-        ChatActionBus.instance.fire(ChatAction.enterGlobalSearch);
-      },
-      onExitGlobalSearch: () {
-        ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
-      },
-      onOpenGlobalSearchResult: onOpenGlobalSearchResult,
-      onNewConversation: ({closeDrawer = true}) => onNewConversation(),
-      onSelectConversation: (id, {closeDrawer = true}) =>
-          onSelectConversation(id),
-    );
+    final mode = context.watch<WorkspaceModeProvider>().mode;
+    final Widget sidebar;
+    switch (mode) {
+      case WorkspaceMode.story:
+        sidebar = StoryWorkspaceDrawer(
+          onSelectStory: onSelectConversation,
+          onNewStory: () async {
+            await onCreateNewConversation();
+            if (!context.mounted) return;
+            final chat = context.read<ChatService>();
+            final id = chat.currentConversationId;
+            if (id != null) {
+              await StoryModeTransitionService(
+                preferences: context.read<BusinessPreferences>(),
+                chatService: chat,
+              ).setMode(conversationId: id, storyEnabled: true);
+              storyConversationModeRevision.value++;
+            }
+          },
+        );
+      case WorkspaceMode.agent:
+        sidebar = const AgentWorkspaceDrawer();
+      case WorkspaceMode.chat:
+        sidebar = SideDrawer(
+          embedded: true,
+          embeddedWidth: embeddedSidebarWidth,
+          userName: context.watch<UserProvider>().name,
+          assistantName: _getAssistantName(context),
+          closePickerTicker: assistantPickerCloseTick,
+          loadingConversationIds: loadingConversationIds,
+          useDesktopTabs: _isDesktop && !topicsOnRight,
+          desktopAssistantsOnly: _isDesktop && topicsOnRight,
+          globalSearchMode: globalSearchMode,
+          globalSearchQuery: globalSearchQuery,
+          onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
+          onEnterGlobalSearch: () {
+            ChatActionBus.instance.fire(ChatAction.enterGlobalSearch);
+          },
+          onExitGlobalSearch: () {
+            ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
+          },
+          onOpenGlobalSearchResult: onOpenGlobalSearchResult,
+          onNewConversation: ({closeDrawer = true}) => onNewConversation(),
+          onSelectConversation: (id, {closeDrawer = true}) =>
+              onSelectConversation(id),
+        );
+    }
 
     return AnimatedContainer(
       duration: _sidebarAnimDuration,
@@ -225,7 +255,10 @@ class HomeDesktopScaffold extends StatelessWidget {
     ColorScheme cs,
     bool topicsOnRight,
   ) {
-    if (!_isDesktop || !topicsOnRight) return const SizedBox.shrink();
+    final mode = context.watch<WorkspaceModeProvider>().mode;
+    if (!_isDesktop || !topicsOnRight || mode != WorkspaceMode.chat) {
+      return const SizedBox.shrink();
+    }
 
     return Row(
       mainAxisSize: MainAxisSize.min,
