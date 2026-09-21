@@ -186,6 +186,22 @@ class PiRpcSession {
     });
   }
 
+  Future<Map<String, dynamic>> setSubagentSubscription({
+    String level = 'events',
+  }) {
+    if (!{'off', 'progress', 'events'}.contains(level)) {
+      throw ArgumentError.value(level, 'level', 'Invalid subagent subscription');
+    }
+    return send(<String, dynamic>{
+      'type': 'set_subagent_subscription',
+      'level': level,
+    });
+  }
+
+  Future<Map<String, dynamic>> getSubagents() {
+    return send(const <String, dynamic>{'type': 'get_subagents'});
+  }
+
   Future<Map<String, dynamic>> steer(String message) {
     return send(<String, dynamic>{'type': 'steer', 'message': message});
   }
