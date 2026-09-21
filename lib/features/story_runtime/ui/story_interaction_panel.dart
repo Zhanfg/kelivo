@@ -103,7 +103,9 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
       receipt: receipt,
       choices: scene.availableChoices.isNotEmpty
           ? scene.availableChoices
-          : (choiceEvent?.choices ?? const <StoryChoice>[]),
+          : (receipt == null
+                ? (choiceEvent?.choices ?? const <StoryChoice>[])
+                : const <StoryChoice>[]),
       quickReplies: quickReplies.take(4).toList(growable: false),
     );
   }
@@ -367,6 +369,10 @@ String? _receiptResult(StoryActionReceipt receipt, bool zh) {
       zh ? '模型服务需要重新登录。' : 'The model provider requires login.',
     'request_failed' =>
       zh ? '请求失败，行动没有完成。' : 'The request failed before the action completed.',
+    'action_submission_failed' =>
+      zh ? '提交行动时发生错误。' : 'An error occurred while submitting the action.',
+    'story_runtime_commit_failed' =>
+      zh ? '故事状态没有成功提交，请重试或回退本轮。' : 'Story state failed to commit; retry or roll back this turn.',
     _ => raw,
   };
 }
