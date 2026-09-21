@@ -8,6 +8,7 @@ import '../../world_book/pages/world_book_page.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
 import 'story_character_manager_page.dart';
+import 'story_narrative_settings_page.dart';
 import 'story_conversation_mode_control.dart';
 import 'story_reference_library_page.dart';
 import 'story_skill_manager_page.dart';
@@ -108,6 +109,11 @@ class _StoryQuickTools extends StatelessWidget {
         label: zh ? '世界书' : 'World Book',
         icon: Lucide.BookOpen,
         page: const WorldBookPage(),
+      ),
+      _StoryToolSpec(
+        label: zh ? '叙事' : 'Narrative',
+        icon: Lucide.BookOpenText,
+        page: StoryNarrativeSettingsPage(conversationId: conversationId),
       ),
       _StoryToolSpec(
         label: zh ? '记忆' : 'Memory',
