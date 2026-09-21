@@ -50,7 +50,9 @@ class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
   void didUpdateWidget(covariant StoryInteractionPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.conversationId != widget.conversationId ||
-        oldWidget.latestAssistantMessageId != widget.latestAssistantMessageId) {
+        oldWidget.latestAssistantMessageId != widget.latestAssistantMessageId ||
+        oldWidget.pendingUserAction != widget.pendingUserAction ||
+        oldWidget.disabled != widget.disabled) {
       _snapshot = _load();
     }
   }
