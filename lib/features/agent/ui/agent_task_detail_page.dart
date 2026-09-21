@@ -723,7 +723,7 @@ class _SubagentProgressCard extends StatelessWidget {
                 if (requests != null)
                   zh ? '请求 $requests' : '$requests requests',
                 if (tokens != null)
-                  '${tokens} tok',
+                  '$tokens tok',
               ].join(' · '),
               style: TextStyle(
                 fontSize: 10.5,
