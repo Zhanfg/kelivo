@@ -465,11 +465,10 @@ class AgentTaskRunner {
       case 'tool_execution_end':
         final tool = event['toolName']?.toString() ?? 'tool';
         final toolCallId = event['toolCallId']?.toString() ?? '';
-        if (toolCallId.isNotEmpty) {
-          _toolOutputSnapshots.remove('$taskId:$toolCallId');
-        }
+        final hadStreamingOutput = toolCallId.isNotEmpty &&
+            _toolOutputSnapshots.remove('$taskId:$toolCallId') != null;
         if (tool == 'kelivo_plan') break;
-        final output = agentSettings.showToolOutput
+        final output = agentSettings.showToolOutput && !hadStreamingOutput
             ? _toolText(event['result'])
             : '';
         await journal.append(
