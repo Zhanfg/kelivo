@@ -6,6 +6,9 @@ void main() {
   test('V2 sidecar is sparse and optional', () {
     expect(storyResponseContractV2, contains('Normally stop after the prose'));
     expect(storyResponseContractV2, contains('omit the sidecar entirely'));
+    expect(storyResponseContractV2, contains('action_result'));
+    expect(storyResponseContractV2, contains('relationship_patch'));
+    expect(storyResponseContractV2, contains('scene_patch'));
     expect(
       storyResponseContractV2,
       isNot(contains('events must semantically mirror the visible prose')),
