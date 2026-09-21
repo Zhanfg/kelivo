@@ -60,7 +60,7 @@ class AgentContextMaterializer {
       for (final skill in snapshot.skills)
         AgentSkillMount(
           hostDirectory: skill.directory,
-          guestDirectory: '/kelivo-skills/${_safeSegment(skill.id)}',
+          guestDirectory: '/home/kelivo/.pi/agent/skills/${_safeSegment(skill.id)}',
         ),
     ];
 
