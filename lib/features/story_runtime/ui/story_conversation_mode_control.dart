@@ -197,6 +197,7 @@ Future<void> _promoteCurrentChat(
 
   final preferences = context.read<BusinessPreferences>();
   final chat = context.read<ChatService>();
+  final workspace = context.read<WorkspaceModeProvider?>();
   await StoryModeTransitionService(
     preferences: preferences,
     chatService: chat,
@@ -204,7 +205,6 @@ Future<void> _promoteCurrentChat(
   if (!context.mounted) return;
 
   await preferences.setBool(storyWorkspaceSelectedKey, true);
-  final workspace = context.read<WorkspaceModeProvider?>();
   if (workspace != null) {
     await workspace.setMode(WorkspaceMode.story);
   }
