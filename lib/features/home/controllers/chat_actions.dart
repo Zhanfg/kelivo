@@ -4,6 +4,7 @@ import 'dart:collection';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/database/generation_run.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
@@ -25,6 +26,7 @@ import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
+import '../../story_runtime/interaction/story_action_receipt.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
 import 'active_streaming_message_store.dart';
@@ -686,6 +688,22 @@ class ChatActions {
         clearError: terminalState != GenerationRunState.failed,
       ),
     );
+    if (terminalState == GenerationRunState.failed ||
+        terminalState == GenerationRunState.cancelled ||
+        terminalState == GenerationRunState.interrupted) {
+      try {
+        await StoryActionReceiptStore(
+          contextProvider.read<BusinessPreferences>(),
+        ).failLatestPending(
+          conversationId: conversationId,
+          resultSummary: terminalState == GenerationRunState.failed
+              ? (errorCode ?? 'request_failed')
+              : 'action_cancelled',
+        );
+      } catch (_) {
+        // Story receipts are optional for ordinary Chat conversations.
+      }
+    }
     streamController.markStreamingEnded(message.id);
     streamController.cleanupTimers(message.id);
     streamController.removeStreamingNotifier(message.id);
@@ -2091,6 +2109,16 @@ class ChatActions {
           clearRetryStatus: true,
         ),
       );
+      try {
+        await StoryActionReceiptStore(
+          contextProvider.read<BusinessPreferences>(),
+        ).failLatestPending(
+          conversationId: cid,
+          resultSummary: 'action_cancelled',
+        );
+      } catch (_) {
+        // Ordinary Chat conversations have no Story action receipt.
+      }
       streamController.markStreamingEnded(visibleStreaming.id);
       streamController.cleanupTimers(visibleStreaming.id);
       final cancelState = _streamingStates[visibleStreaming.id];
@@ -2896,6 +2924,18 @@ class ChatActions {
         clearRetryStatus: true,
       ),
     );
+    try {
+      await StoryActionReceiptStore(
+        contextProvider.read<BusinessPreferences>(),
+      ).failLatestPending(
+        conversationId: conversationId,
+        resultSummary: oauthFailure
+            ? 'oauth_login_required'
+            : (errorText.trim().isEmpty ? 'request_failed' : errorText),
+      );
+    } catch (_) {
+      // Ordinary Chat conversations have no Story action receipt.
+    }
 
     // Reset file processing state on error, scoped to this message so a
     // background conversation's indicator survives.
