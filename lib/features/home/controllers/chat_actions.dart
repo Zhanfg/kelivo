@@ -2161,6 +2161,9 @@ class ChatActions {
           onMessagesChanged?.call();
         }
         streamController.removeStreamingNotifier(streaming.id);
+        streamController.streamingContentNotifier.removeHealthNotifier(
+          streaming.id,
+        );
         await _background.finish(
           backgroundTaskId,
           BackgroundTaskOutcome.cancelled,
@@ -2847,6 +2850,11 @@ class ChatActions {
         onMessagesChanged?.call();
       }
       streamController.removeStreamingNotifier(messageId);
+      if (state.terminalPersisted) {
+        streamController.streamingContentNotifier.removeHealthNotifier(
+          messageId,
+        );
+      }
       _setConversationLoading(conversationId, false);
       // Terminal widgets are usually taller than the streaming ones; pin
       // once more after isGenerating becomes false so layout-phase follow
