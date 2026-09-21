@@ -206,7 +206,7 @@ class AgentTaskRunner {
           '--model',
           'kelivo/current',
           '--tools',
-          'read,bash,edit,write,grep,glob,find,lsp,task,hub,todo,github,ask,checkpoint,rewind,ast_grep,ast_edit,security_scan,kelivo_plan',
+          'read,bash,edit,write,grep,glob,find,lsp,task,hub,todo,github,ask,checkpoint,rewind,ast_grep,ast_edit,security_scan',
         ],
         mounts: mounts,
         environment: <String, String>{
