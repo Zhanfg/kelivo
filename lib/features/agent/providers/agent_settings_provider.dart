@@ -20,15 +20,21 @@ class AgentSettingsProvider extends ChangeNotifier {
 
   static const String permissionModeKey = 'agent_permission_mode_v1';
   static const String showToolOutputKey = 'agent_show_tool_output_v1';
+  static const String maxParallelAgentsKey = 'agent_max_parallel_agents_v1';
+  static const String subagentIsolationKey = 'agent_subagent_isolation_v1';
 
   final BusinessPreferences preferences;
   late final Future<void> loaded;
 
   AgentPermissionMode _permissionMode = AgentPermissionMode.ask;
   bool _showToolOutput = true;
+  int _maxParallelAgents = 3;
+  bool _subagentIsolation = true;
 
   AgentPermissionMode get permissionMode => _permissionMode;
   bool get showToolOutput => _showToolOutput;
+  int get maxParallelAgents => _maxParallelAgents;
+  bool get subagentIsolation => _subagentIsolation;
 
   Future<void> _load() async {
     if (!preferences.isLoaded) await preferences.load();
@@ -36,6 +42,10 @@ class AgentSettingsProvider extends ChangeNotifier {
       preferences.getString(permissionModeKey),
     );
     _showToolOutput = preferences.getBool(showToolOutputKey) ?? true;
+    _maxParallelAgents =
+        (preferences.getInt(maxParallelAgentsKey) ?? 3).clamp(1, 4);
+    _subagentIsolation =
+        preferences.getBool(subagentIsolationKey) ?? true;
     notifyListeners();
   }
 
@@ -52,6 +62,23 @@ class AgentSettingsProvider extends ChangeNotifier {
     if (_showToolOutput == value) return;
     await preferences.setBool(showToolOutputKey, value);
     _showToolOutput = value;
+    notifyListeners();
+  }
+
+  Future<void> setMaxParallelAgents(int value) async {
+    await loaded;
+    final next = value.clamp(1, 4);
+    if (_maxParallelAgents == next) return;
+    await preferences.setInt(maxParallelAgentsKey, next);
+    _maxParallelAgents = next;
+    notifyListeners();
+  }
+
+  Future<void> setSubagentIsolation(bool value) async {
+    await loaded;
+    if (_subagentIsolation == value) return;
+    await preferences.setBool(subagentIsolationKey, value);
+    _subagentIsolation = value;
     notifyListeners();
   }
 }
