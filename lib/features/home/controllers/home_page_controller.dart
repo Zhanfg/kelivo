@@ -61,6 +61,7 @@ import '../widgets/chat_input_bar.dart';
 import '../widgets/share_destination_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../story_runtime/orchestration/story_native_lifecycle_bridge.dart';
+import '../../story_runtime/interaction/story_action_receipt.dart';
 import '../../story_runtime/voice/story_voice_playback_service.dart';
 
 enum ChatSelectionMode { share, delete }
@@ -999,6 +1000,39 @@ class HomePageController extends ChangeNotifier {
     final result = await _viewModel.sendMessage(input);
     if (result != ChatInputSubmissionResult.rejected) {
       notifyListeners();
+    }
+    return result;
+  }
+
+  Future<ChatInputSubmissionResult> submitStoryAction(
+    ChatInputData input, {
+    required StoryActionSource source,
+    String? label,
+  }) async {
+    final conversation = currentConversation;
+    if (conversation == null ||
+        conversationKindOf(conversation) != ConversationKind.story) {
+      return sendMessage(input);
+    }
+
+    final text = input.text.trim();
+    if (text.isEmpty) return ChatInputSubmissionResult.rejected;
+    final store = StoryActionReceiptStore(
+      _context.read<BusinessPreferences>(),
+    );
+    await store.begin(
+      conversationId: conversation.id,
+      source: source,
+      label: label?.trim().isNotEmpty == true ? label!.trim() : text,
+      submitText: text,
+    );
+
+    final result = await sendMessage(input);
+    if (result == ChatInputSubmissionResult.rejected) {
+      await store.failLatestPending(
+        conversationId: conversation.id,
+        resultSummary: 'action_submission_rejected',
+      );
     }
     return result;
   }
