@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../../core/database/business_preferences.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/models/conversation_kind.dart';
+import '../../../icons/lucide_adapter.dart';
+import '../../home/models/workspace_mode.dart';
+import '../../home/providers/workspace_mode_provider.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
 import '../../../theme/app_font_weights.dart';
@@ -131,13 +135,81 @@ class _StoryConversationModeTitleState
   }
 }
 
-/// Compatibility shim for Home layouts that previously exposed a separate
-/// conversion action. The persistent centered switch now owns mode conversion.
+/// Explicit irreversible Chat -> Story promotion.
+///
+/// Workspace switching is navigation-only; promotion lives here so entering
+/// the Story workspace can never silently mutate the current Chat.
 class StoryConversationModeAction extends StatelessWidget {
   const StoryConversationModeAction({super.key});
 
   @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
+  Widget build(BuildContext context) {
+    final mode =
+        context.watch<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
+    final chat = context.watch<ChatService>();
+    final conversationId = chat.currentConversationId;
+    final conversation = conversationId == null
+        ? null
+        : chat.getConversation(conversationId);
+    if (mode != WorkspaceMode.chat ||
+        conversation == null ||
+        conversationKindOf(conversation) != ConversationKind.chat) {
+      return const SizedBox.shrink();
+    }
+
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    return IconButton(
+      tooltip: zh ? '转为故事' : 'Convert to Story',
+      icon: const Icon(Lucide.BookOpen, size: 20),
+      onPressed: () => _promoteCurrentChat(context, conversation.id),
+    );
+  }
+}
+
+Future<void> _promoteCurrentChat(
+  BuildContext context,
+  String conversationId,
+) async {
+  final zh = Localizations.localeOf(context).languageCode == 'zh';
+  final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(zh ? '转为故事？' : 'Convert to Story?'),
+          content: Text(
+            zh
+                ? '转换后将建立故事世界线、场景状态和连续性数据。此转换不可逆；之后只能从故事创建新的聊天副本。'
+                : 'This creates Story worldline, scene and continuity state. The conversion is irreversible; a normal Chat can only be created later as a separate copy.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(zh ? '取消' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(zh ? '转换' : 'Convert'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+  if (!confirmed || !context.mounted) return;
+
+  final preferences = context.read<BusinessPreferences>();
+  final chat = context.read<ChatService>();
+  await StoryModeTransitionService(
+    preferences: preferences,
+    chatService: chat,
+  ).promoteToStory(conversationId);
+  if (!context.mounted) return;
+
+  await preferences.setBool(storyWorkspaceSelectedKey, true);
+  final workspace = context.read<WorkspaceModeProvider?>();
+  if (workspace != null) {
+    await workspace.setMode(WorkspaceMode.story);
+  }
+  storyConversationModeRevision.value++;
+  Haptics.light();
 }
 
 /// Kept for focused layout tests and callers that already use this public
