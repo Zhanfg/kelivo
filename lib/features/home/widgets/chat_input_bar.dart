@@ -2312,7 +2312,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   Widget _buildResponsiveLeftActions(BuildContext context) {
     const double spacing = 8;
     const double normalButtonW = 32; // 20 + padding(6*2)
-    const double modelButtonW = 30; // 28 + padding(1*2)
+    const double modelButtonW = 112;
     const double plusButtonW = 32;
 
     final l10n = AppLocalizations.of(context)!;
@@ -2328,14 +2328,13 @@ class _ChatInputBarState extends State<ChatInputBar>
         // Model select (always present; can be hidden if overflow)
         actions.add(
           _OverflowAction(
-            width: (widget.modelIcon != null) ? modelButtonW : normalButtonW,
-            builder: () => _CompactIconButton(
+            width: modelButtonW,
+            builder: () => _ModelSelectChip(
+              label: _composerModelLabel(),
+              icon: widget.modelIcon,
               tooltip: l10n.chatInputBarSelectModelTooltip,
-              icon: Lucide.Boxes,
-              modelIcon: true,
               onTap: lockTap(widget.onSelectModel),
               onLongPress: lockTap(widget.onLongPressSelectModel),
-              child: widget.modelIcon,
             ),
             menu: DesktopContextMenuItem(
               icon: Lucide.Boxes,
@@ -4225,6 +4224,79 @@ class _OverflowAction {
     required this.builder,
     required this.menu,
   });
+}
+
+class _ModelSelectChip extends StatelessWidget {
+  const _ModelSelectChip({
+    required this.label,
+    required this.tooltip,
+    required this.onTap,
+    required this.onLongPress,
+    this.icon,
+  });
+
+  final String label;
+  final String tooltip;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final Widget? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDesktop =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          onLongPress: isDesktop ? null : onLongPress,
+          child: SizedBox(
+            width: 112,
+            height: 32,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  if (icon != null)
+                    SizedBox(width: 20, height: 20, child: icon)
+                  else
+                    Icon(
+                      Lucide.Boxes,
+                      size: 16,
+                      color: cs.onSurface.withValues(alpha: 0.68),
+                    ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: AppFontWeights.medium,
+                        color: cs.onSurface.withValues(alpha: 0.82),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Icon(
+                    Lucide.ChevronDown,
+                    size: 13,
+                    color: cs.onSurface.withValues(alpha: 0.45),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // New compact button for the integrated input bar
