@@ -2243,9 +2243,10 @@ class ChatActions {
               streamController.streamingContentNotifier.updateHealth(
                 state.messageId,
                 (current) => current.copyWith(
-                  phase: ctx.streamOutput
-                      ? stream_ctrl.GenerationTransportPhase.sseStreaming
-                      : stream_ctrl.GenerationTransportPhase.httpRequest,
+                  phase: stream_ctrl.GenerationTransportPhase.httpRequest,
+                  httpOpen: true,
+                  sseOpen: false,
+                  requestStartedAt: DateTime.now(),
                   lastProgressAt: DateTime.now(),
                   clearActiveTool: true,
                 ),
