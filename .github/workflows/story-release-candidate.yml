@@ -52,6 +52,10 @@ jobs:
           const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
           EOF
 
+      - name: Prepare embedded Agent runtime
+        shell: bash
+        run: bash tool/prepare_agent_runtime.sh
+
       - name: Resolve dependencies
         run: flutter pub get
 
