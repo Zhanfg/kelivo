@@ -281,6 +281,8 @@ class HomeMobileScaffold extends StatelessWidget {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
+      centerTitle: true,
+      titleSpacing: 0,
       leading: Builder(
         builder: (context) {
           final drawerController = InteractiveDrawer.maybeControllerOf(context);
@@ -312,7 +314,6 @@ class HomeMobileScaffold extends StatelessWidget {
           );
         },
       ),
-      titleSpacing: 2,
       title: titleOverride ?? StoryConversationModeTitle(fallback: nativeTitle),
       actions: showChatActions
           ? [
