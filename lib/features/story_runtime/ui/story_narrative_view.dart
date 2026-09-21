@@ -173,7 +173,6 @@ class StoryNarrativeView extends StatelessWidget {
               message: streaming,
               data: streamingData,
               health: health ?? const GenerationHealthData(),
-              isGenerating: isGenerating,
               hasLoadingTools:
                   streaming == null ? false : hasLoadingTools(streaming.id),
             );
@@ -203,14 +202,12 @@ class _StoryGenerationStatus extends StatefulWidget {
     required this.message,
     required this.data,
     required this.health,
-    required this.isGenerating,
     required this.hasLoadingTools,
   });
 
   final ChatMessage? message;
   final StreamingContentData? data;
   final GenerationHealthData health;
-  final bool isGenerating;
   final bool hasLoadingTools;
 
   @override
@@ -242,7 +239,9 @@ class _StoryGenerationStatusState extends State<_StoryGenerationStatus> {
     final data = widget.data;
     final health = widget.health;
     final now = DateTime.now();
-    final healthClass = health.classify(now);
+    final healthClass = widget.hasLoadingTools
+        ? GenerationHealthClass.working
+        : health.classify(now);
     final reasoningActive =
         data?.reasoningStartAt != null && data?.reasoningFinishedAt == null;
     final hasContent = data?.content.trim().isNotEmpty ?? false;
@@ -265,7 +264,13 @@ class _StoryGenerationStatusState extends State<_StoryGenerationStatus> {
         headlineColor = cs.onSurfaceVariant;
     }
 
-    final phase = switch (health.phase) {
+    final phase = widget.hasLoadingTools
+        ? (health.activeToolName?.trim().isNotEmpty == true
+              ? (zh
+                    ? '正在调用工具 · ${health.activeToolName}'
+                    : 'Using tool · ${health.activeToolName}')
+              : (zh ? '正在调用工具' : 'Using tool'))
+        : switch (health.phase) {
       GenerationTransportPhase.preparing =>
         zh ? '正在准备上下文' : 'Preparing context',
       GenerationTransportPhase.httpRequest =>
