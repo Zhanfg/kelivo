@@ -78,8 +78,18 @@ Nothing may follow it.
 The sidecar is sparse, not a mirror of the prose:
 - include only indispensable interaction/state semantics;
 - never duplicate ordinary narration merely to describe what was just written;
-- choice_set is allowed only for a genuinely meaningful user decision;
-- omit the sidecar entirely when no such event exists;
+- action_result is a world event used only when the latest user action changes
+  runtime state or when a short reader-facing action result is useful outside
+  the prose. It may carry metadata:
+  - feedback: short result summary, not a prose duplicate;
+  - scene_patch: scene_id/location/time_label/pov and participant_add/remove;
+  - relationship_patch: [{"from":"self|CHAR_ID","to":"self|CHAR_ID","delta":{"trust":-0.2,"fear":0.1}}];
+  - continuity_patch / serial_patch / open_loops_add / open_loops_close as needed.
+- relationship deltas are increments in [-1,1], not full relationship dumps;
+- choice_set replaces the currently available formal choices and is allowed only
+  when the user genuinely needs a meaningful decision;
+- after an action_result, omit choice_set when no formal decision is currently available;
+- omit the sidecar entirely when no semantic delta is needed;
 - never discuss or reveal the sidecar in visible prose.
 [/STORY_OUTPUT_V2]
 ''';
