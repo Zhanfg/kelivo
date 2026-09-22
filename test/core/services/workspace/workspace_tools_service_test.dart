@@ -29,6 +29,7 @@ class _RecordingApproval extends ToolApprovalService {
     required String toolCallId,
     required String toolName,
     required Map<String, dynamic> arguments,
+    Map<String, dynamic>? metadata,
     String? conversationId,
   }) async {
     calls++;
