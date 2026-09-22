@@ -79,6 +79,7 @@ import '../controllers/scroll_controller.dart' as scroll_ctrl;
 import '../models/workspace_mode.dart';
 import '../providers/workspace_mode_provider.dart';
 import '../widgets/workspace_mode_selector.dart';
+import '../../agent/providers/agent_settings_provider.dart';
 import '../../agent/ui/agent_mode_page.dart';
 import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
@@ -1066,6 +1067,39 @@ class _HomePageState extends State<HomePage>
     _handleProcessText(isZh ? '请绘制：' : 'Draw: ');
   }
 
+  Future<void> _showAgentModelSelector(BuildContext context) async {
+    final agentSettings = context.read<AgentSettingsProvider>();
+    final settings = context.read<SettingsProvider>();
+    final assistant = context.read<AssistantProvider>().currentAssistant;
+    final inherited = resolveChatModel(
+      settings,
+      conversation: _controller.currentConversation,
+      assistant: assistant,
+    );
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+
+    final selected = await showModelSelector(
+      context,
+      initialProviderKey: agentSettings.hasModelOverride
+          ? agentSettings.modelProvider
+          : inherited.providerKey,
+      initialModelId: agentSettings.hasModelOverride
+          ? agentSettings.modelId
+          : inherited.modelId,
+      allowInherit: agentSettings.hasModelOverride,
+      inheritLabel: zh ? '跟随当前聊天模型' : 'Follow current chat model',
+    );
+    if (selected == null || !mounted) return;
+    if (selected.isInherit) {
+      await agentSettings.clearModelOverride();
+    } else {
+      await agentSettings.setModel(
+        selected.providerKey,
+        selected.modelId,
+      );
+    }
+  }
+
   // ============================================================================
   // Build Methods
   // ============================================================================
@@ -1076,14 +1110,22 @@ class _HomePageState extends State<HomePage>
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final assistant = context.watch<AssistantProvider>().currentAssistant;
-    final agentMode =
-        context.watch<WorkspaceModeProvider>().mode == WorkspaceMode.agent;
+    final workspaceMode = context.watch<WorkspaceModeProvider>().mode;
+    final agentMode = workspaceMode == WorkspaceMode.agent;
+    final agentSettings = context.watch<AgentSettingsProvider>();
 
-    final modelInfo = getModelDisplayInfo(
+    final chatModelInfo = getModelDisplayInfo(
       settings,
       conversation: _controller.currentConversation,
       assistant: assistant,
     );
+    final modelInfo = agentMode && agentSettings.hasModelOverride
+        ? getModelDisplayInfoForIds(
+            settings,
+            providerKey: agentSettings.modelProvider,
+            modelId: agentSettings.modelId,
+          )
+        : chatModelInfo;
 
     final title = _controller.isTemporaryConversation
         ? AppLocalizations.of(context)!.temporaryChatTitle
@@ -1128,17 +1170,17 @@ class _HomePageState extends State<HomePage>
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
-      titleOverride: agentMode
-          ? WorkspaceModeTitle(
-              onModeChanged: _handleWorkspaceModeChanged,
-            )
-          : WorkspaceModeHeader(
-              onModeChanged: _handleWorkspaceModeChanged,
-              modelDisplay: modelDisplay,
-              providerName: providerName,
-              onSelectModel: () =>
-                  showModelSelectSheet(context, controller: _controller),
-            ),
+      titleOverride: WorkspaceModeHeader(
+          onModeChanged: _handleWorkspaceModeChanged,
+          modelDisplay: modelDisplay,
+          providerName: providerName,
+          onSelectModel: agentMode
+              ? () => _showAgentModelSelector(context)
+              : () => showModelSelectSheet(
+                  context,
+                  controller: _controller,
+                ),
+        ),
       showChatActions: !agentMode,
       providerName: providerName,
       modelDisplay: modelDisplay,
@@ -1284,17 +1326,17 @@ class _HomePageState extends State<HomePage>
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
-      titleOverride: agentMode
-          ? WorkspaceModeTitle(
-              onModeChanged: _handleWorkspaceModeChanged,
-            )
-          : WorkspaceModeHeader(
-              onModeChanged: _handleWorkspaceModeChanged,
-              modelDisplay: modelDisplay,
-              providerName: providerName,
-              onSelectModel: () =>
-                  showModelSelectSheet(context, controller: _controller),
-            ),
+      titleOverride: WorkspaceModeHeader(
+          onModeChanged: _handleWorkspaceModeChanged,
+          modelDisplay: modelDisplay,
+          providerName: providerName,
+          onSelectModel: agentMode
+              ? () => _showAgentModelSelector(context)
+              : () => showModelSelectSheet(
+                  context,
+                  controller: _controller,
+                ),
+        ),
       showChatActions: !agentMode,
       providerName: providerName,
       modelDisplay: modelDisplay,
