@@ -114,10 +114,13 @@ String? mcpServerNameFromToolMetadata(Map<String, dynamic>? metadata) {
   return name.isEmpty ? null : name;
 }
 
-String? _mcpSourceLabel(ToolUIPart part) {
-  final server = mcpServerNameFromToolMetadata(part.metadata);
+String? _mcpSourceLabelFromMetadata(Map<String, dynamic>? metadata) {
+  final server = mcpServerNameFromToolMetadata(metadata);
   return server == null ? null : 'MCP · $server';
 }
+
+String? _mcpSourceLabel(ToolUIPart part) =>
+    _mcpSourceLabelFromMetadata(part.metadata);
 
 @visibleForTesting
 const double kToolImageTimelineHeight = 120;
@@ -5332,7 +5335,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
       widget.part.arguments,
       isResult: !widget.part.loading && !isPendingApproval,
     );
-    final sourceLabel = _mcpSourceLabel(widget.part);
+    final sourceLabel =
+        _mcpSourceLabel(widget.part) ??
+        _mcpSourceLabelFromMetadata(approvalRequest?.metadata);
     final label = ThinkingSheen(
       enabled: widget.part.loading && !_isAskUser,
       color: fg.strong,
@@ -5630,7 +5635,6 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
         ? _textToSpeechToolText(widget.part.arguments)
         : '';
-    final sourceLabel = _mcpSourceLabel(widget.part);
 
     if (widget.part.toolName == LocalToolNames.askUser) {
       return _AskUserToolCard(part: widget.part);
@@ -5650,6 +5654,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
         : null;
     final isPendingApproval = pendingRequest != null;
     final pendingToolCallId = pendingRequest?.toolCallId;
+    final sourceLabel =
+        _mcpSourceLabel(widget.part) ??
+        _mcpSourceLabelFromMetadata(pendingRequest?.metadata);
 
     return IosCardPress(
       borderRadius: BorderRadius.circular(16),
