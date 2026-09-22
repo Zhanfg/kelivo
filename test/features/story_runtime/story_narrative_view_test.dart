@@ -7,11 +7,16 @@ void main() {
   testWidgets(
     'Story renders prose and writing direction without chat bubbles',
     (tester) async {
+      final scrollController = ScrollController();
+      addTearDown(scrollController.dispose);
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: StoryNarrativeView(
               title: '雨夜',
+              scrollController: scrollController,
+              onJumpToLatest: () {},
               topPadding: 0,
               bottomPadding: 0,
               messages: [
