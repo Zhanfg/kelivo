@@ -90,8 +90,12 @@ jobs:
       - name: Analyze
         run: dart analyze --fatal-infos lib test integration_test
 
-      - name: Mode settings ownership regression
-        run: flutter test test/features/settings/mode_settings_ownership_test.dart
+      - name: Mode and Story isolation regression
+        run: |
+          flutter test --concurrency=1 \
+            test/features/settings/mode_settings_ownership_test.dart \
+            test/features/home/models/workspace_mode_test.dart \
+            test/story_readable_projection_test.dart
 
       - name: Preinstall Rust Android target
         shell: bash
