@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../assistant/pages/assistant_settings_page.dart';
+import '../../chat/pages/chat_settings_page.dart';
+import '../../agent/ui/agent_settings_page.dart';
+import '../../story_runtime/ui/story_mode_runtime_page.dart';
 import '../../backup/pages/backup_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../mcp/pages/mcp_page.dart';
@@ -50,6 +53,9 @@ Future<void> openMobileSettingsSearchResult(
     SettingsSearchDestination.haptics => const HapticsSettingsPage(),
     SettingsSearchDestination.background =>
       const MobileBackgroundSettingsPage(),
+    SettingsSearchDestination.chat => const ChatSettingsPage(),
+    SettingsSearchDestination.story => const StoryModeRuntimePage(),
+    SettingsSearchDestination.agent => const AgentSettingsPage(),
     SettingsSearchDestination.assistant => const AssistantSettingsPage(),
     SettingsSearchDestination.providers => const ProvidersPage(),
     SettingsSearchDestination.defaultModel => const DefaultModelPage(),
