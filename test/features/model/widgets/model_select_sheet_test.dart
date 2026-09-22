@@ -185,6 +185,33 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
+    'mobile model selector supports combined provider and model search',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      try {
+        final settings = await _settingsWithOnlyTestProviders(tester);
+        await _pumpModelSelector(tester, settings: settings);
+
+        final searchField = find.byType(TextField).first;
+        await tester.enterText(searchField, 'Provider 7 model-02');
+        await tester.pump(const Duration(milliseconds: 250));
+
+        expect(find.text('provider-7-model-02'), findsOneWidget);
+        expect(find.text('provider-6-model-02'), findsNothing);
+        expect(find.text('provider-8-model-02'), findsNothing);
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+
+  testWidgets(
     'mobile model selector uses explicit initial model over global current model',
     (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;

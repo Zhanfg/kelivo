@@ -1507,6 +1507,19 @@ class _ChatInputBarState extends State<ChatInputBar>
     final submittedText = submittedValue.text;
     final text = submittedText.trim();
     if (text.isEmpty && _images.isEmpty && _docs.isEmpty) return;
+
+    if ((widget.chatModelProviderKey == null || widget.chatModelId == null) &&
+        widget.onLongPressSelectModel != null) {
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      showAppSnackBar(
+        context,
+        message: l10n.settingsPageWarningMessage,
+        type: NotificationType.warning,
+      );
+      (widget.onLongPressSelectModel ?? widget.onSelectModel)?.call();
+      return;
+    }
     final submittedImages = List<_DraftImage>.of(_images);
     final submittedImageIds = submittedImages.map((image) => image.id).toSet();
     final submittedDocuments = List<DocumentAttachment>.of(_docs);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../agent/ui/agent_settings_page.dart';
 import '../../assistant/pages/assistant_settings_page.dart';
 import '../../backup/pages/backup_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
@@ -9,10 +10,12 @@ import '../../provider/pages/providers_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../scheduled_tasks/pages/scheduled_tasks_page.dart';
 import '../../search/pages/search_services_page.dart';
+import '../../story_runtime/ui/story_mode_runtime_page.dart';
 import '../../stats/pages/stats_page.dart';
 import '../../workspace/pages/skills_page.dart';
 import '../../workspace/pages/workspace_settings_page.dart';
 import '../../world_book/pages/world_book_page.dart';
+import '../../chat/pages/chat_settings_page.dart';
 import '../pages/about_page.dart';
 import '../pages/auto_retry_page.dart';
 import '../pages/display_settings_page.dart';
@@ -36,6 +39,9 @@ Future<void> openMobileSettingsSearchResult(
   SettingsSearchItem item,
 ) async {
   final Widget page = switch (item.destination) {
+    SettingsSearchDestination.chatMode => const ChatSettingsPage(),
+    SettingsSearchDestination.storyMode => const StoryModeRuntimePage(),
+    SettingsSearchDestination.agentMode => const AgentSettingsPage(),
     SettingsSearchDestination.display => const DisplaySettingsPage(),
     SettingsSearchDestination.theme => const ThemeSettingsPage(),
     SettingsSearchDestination.themeAdvanced =>

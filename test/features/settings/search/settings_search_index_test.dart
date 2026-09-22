@@ -52,6 +52,22 @@ void main() {
     }
   });
 
+  test('mode-owned settings are searchable on mobile only', () {
+    final ios = SettingsSearchIndex(en, platform: TargetPlatform.iOS);
+    final android = SettingsSearchIndex(en, platform: TargetPlatform.android);
+    final desktop = SettingsSearchIndex(en, platform: TargetPlatform.macOS);
+
+    for (final candidate in [ios, android]) {
+      expect(candidate.search('chat settings').first.id, 'chatMode');
+      expect(candidate.search('故事设置').first.id, 'storyMode');
+      expect(candidate.search('代理 权限').first.id, 'agentMode');
+    }
+
+    expect(desktop.entries.map((e) => e.id), isNot(contains('chatMode')));
+    expect(desktop.entries.map((e) => e.id), isNot(contains('storyMode')));
+    expect(desktop.entries.map((e) => e.id), isNot(contains('agentMode')));
+  });
+
   test('platform and runtime availability match the settings surfaces', () {
     Set<String> ids(
       TargetPlatform platform, {

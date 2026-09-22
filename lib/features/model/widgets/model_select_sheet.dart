@@ -761,12 +761,19 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     super.dispose();
   }
 
-  // Match model name/id only (avoid provider key causing false positives)
+  // Match all search tokens across the visible provider + model identity.
+  //
+  // This keeps provider keys out of search (avoiding internal-ID noise) while
+  // allowing useful combined queries such as "OpenAI GPT-5".
   bool _matchesSearch(String query, _ModelItem item, String providerName) {
     if (query.isEmpty) return true;
-    final q = query.toLowerCase();
-    return item.id.toLowerCase().contains(q) ||
-        item.info.displayName.toLowerCase().contains(q);
+    final tokens = query
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((token) => token.isNotEmpty);
+    final haystack =
+        '${item.id} ${item.info.displayName} $providerName'.toLowerCase();
+    return tokens.every(haystack.contains);
   }
 
   // Check if a provider should be shown based on search query (match display name only)
@@ -2000,9 +2007,13 @@ class _DesktopModelSelectDialogBodyState
 
   bool _matchesSearch(String query, _ModelItem item, String providerName) {
     if (query.isEmpty) return true;
-    final q = query.toLowerCase();
-    return item.id.toLowerCase().contains(q) ||
-        item.info.displayName.toLowerCase().contains(q);
+    final tokens = query
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((token) => token.isNotEmpty);
+    final haystack =
+        '${item.id} ${item.info.displayName} $providerName'.toLowerCase();
+    return tokens.every(haystack.contains);
   }
 
   bool _providerMatchesSearch(String query, String providerName) {

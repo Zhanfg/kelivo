@@ -135,4 +135,60 @@ void main() {
       expect(controller.text, 'from b');
     },
   );
+  testWidgets(
+    'Home recovery path keeps the draft and opens provider setup when no model is resolved',
+    (tester) async {
+      final controller = TextEditingController(text: 'keep this draft');
+      final focusNode = FocusNode();
+      var providerSetupOpens = 0;
+      var sends = 0;
+      addTearDown(controller.dispose);
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) =>
+                  SettingsProvider(createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => AssistantProvider(
+                preferences: createBusinessTestPreferences(),
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: ChatInputBar(
+                conversationId: 'conv-no-model',
+                controller: controller,
+                focusNode: focusNode,
+                onLongPressSelectModel: () => providerSetupOpens++,
+                onSend: (_) async {
+                  sends++;
+                  return ChatInputSubmissionResult.sent;
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Lucide.ArrowUp));
+      await tester.pump();
+
+      expect(sends, 0);
+      expect(providerSetupOpens, 1);
+      expect(controller.text, 'keep this draft');
+
+      // Let the recovery SnackBar finish its display timer so the widget test
+      // does not leak framework timers after the behavior assertions pass.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    },
+  );
+
 }

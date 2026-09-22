@@ -26,9 +26,11 @@ class WorkspaceModeTitle extends StatelessWidget {
       WorkspaceMode.story,
       WorkspaceMode.agent,
     ],
+    this.compact = false,
   });
 
   final List<WorkspaceMode> availableModes;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +76,7 @@ class WorkspaceModeTitle extends StatelessWidget {
           ),
       ],
       child: _HeaderButton(
-        width: 88,
+        width: compact ? 82 : 88,
         icon: _modeIcon(selected),
         label: _modeLabel(selected, zh),
         trailing: Lucide.ChevronDown,
@@ -97,12 +99,14 @@ class WorkspaceModeHeader extends StatelessWidget {
       WorkspaceMode.story,
       WorkspaceMode.agent,
     ],
+    this.compact = false,
   });
 
   final String? modelDisplay;
   final String? providerName;
   final VoidCallback? onSelectModel;
   final List<WorkspaceMode> availableModes;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +114,10 @@ class WorkspaceModeHeader extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        WorkspaceModeTitle(availableModes: availableModes),
+        WorkspaceModeTitle(
+          availableModes: availableModes,
+          compact: compact,
+        ),
         if (model != null && model.isNotEmpty && onSelectModel != null) ...[
           const SizedBox(width: 6),
           Tooltip(
@@ -121,7 +128,7 @@ class WorkspaceModeHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(11),
               onTap: onSelectModel,
               child: _HeaderButton(
-                width: 132,
+                width: compact ? 112 : 132,
                 icon: Lucide.Bot,
                 label: model,
                 trailing: Lucide.ChevronDown,
