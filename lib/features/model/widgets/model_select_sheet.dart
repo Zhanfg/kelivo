@@ -769,7 +769,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     if (query.isEmpty) return true;
     final tokens = query
         .toLowerCase()
-        .split(RegExp(r'\\s+'))
+        .split(RegExp(r'\s+'))
         .where((token) => token.isNotEmpty);
     final haystack =
         '${item.id} ${item.info.displayName} $providerName'.toLowerCase();
@@ -2009,7 +2009,7 @@ class _DesktopModelSelectDialogBodyState
     if (query.isEmpty) return true;
     final tokens = query
         .toLowerCase()
-        .split(RegExp(r'\\s+'))
+        .split(RegExp(r'\s+'))
         .where((token) => token.isNotEmpty);
     final haystack =
         '${item.id} ${item.info.displayName} $providerName'.toLowerCase();
