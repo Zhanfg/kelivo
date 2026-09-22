@@ -10,6 +10,7 @@ import 'package:Kelivo/features/agent/services/pi_rpc_session.dart';
 void main() {
   test('Pi RPC correlates responses and uses persistent stdin', () async {
     final runtime = _FakeStdioRuntime();
+    runtime.onWrite = runtime.respondSuccess;
     final session = await PiRpcSession.start(
       runtime: runtime,
       executable: '/pi/pi',
@@ -22,15 +23,8 @@ void main() {
     expect(runtime.request?.timeout, Duration.zero);
     expect(runtime.request?.command, contains('--mode'));
     expect(runtime.request?.command, contains('rpc'));
-
-    runtime.onWrite = (message) {
-      runtime.emitJson(<String, dynamic>{
-        'id': message['id'],
-        'type': 'response',
-        'command': message['type'],
-        'success': true,
-      });
-    };
+    expect(runtime.writes.single['type'], 'set_session_name');
+    runtime.writes.clear();
 
     final response = await session.prompt('hello');
     expect(response['success'], isTrue);
@@ -43,6 +37,7 @@ void main() {
 
   test('Pi RPC splits only on LF and preserves chunked UTF-8', () async {
     final runtime = _FakeStdioRuntime();
+    runtime.onWrite = runtime.respondSuccess;
     final session = await PiRpcSession.start(
       runtime: runtime,
       executable: '/pi/pi',
@@ -104,6 +99,15 @@ class _FakeStdioRuntime extends WorkspaceRuntime
     final message = (decoded as Map).cast<String, dynamic>();
     writes.add(message);
     onWrite?.call(message);
+  }
+
+  void respondSuccess(Map<String, dynamic> message) {
+    emitJson(<String, dynamic>{
+      'id': message['id'],
+      'type': 'response',
+      'command': message['type'],
+      'success': true,
+    });
   }
 
   void emitJson(Map<String, dynamic> message) {
