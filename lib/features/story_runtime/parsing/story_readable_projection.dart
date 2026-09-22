@@ -75,7 +75,7 @@ String projectStoryReadableOrOriginal(
 
   final projected = tryProjectStoryReadable(raw, turnId: turnId);
   if (projected != null) return projected.markdown;
-  if (streaming && looksLikeStoryEnvelopePrefix(raw)) return '';
+  if (looksLikeStoryEnvelopePrefix(raw)) return '';
   return raw;
 }
 
