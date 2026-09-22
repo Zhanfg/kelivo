@@ -138,11 +138,12 @@ class McpToolService extends ChangeNotifier {
             toolName: toolName,
             errorMessage: errMsg,
           ),
+          metadata: _sourceMetadata(route),
         );
       }
       return const McpToolResult();
     }
-    return _flattenToolResult(res);
+    return _flattenToolResult(res, route: route);
   }
 
   Future<String> callToolTextForConversation(
@@ -204,9 +205,10 @@ class McpToolService extends ChangeNotifier {
               toolName: toolName,
               errorMessage: errMsg,
             ),
+            metadata: _sourceMetadata(route),
           );
         }
-        return _flattenToolResult(res);
+        return _flattenToolResult(res, route: route);
       }
     }
     return const McpToolResult();
@@ -276,7 +278,10 @@ class McpToolService extends ChangeNotifier {
     );
   }
 
-  Future<McpToolResult> _flattenToolResult(mcp.CallToolResult res) async {
+  Future<McpToolResult> _flattenToolResult(
+    mcp.CallToolResult res, {
+    required _McpToolRoute route,
+  }) async {
     final buf = StringBuffer();
     final imageUris = <String>[];
     final seen = <String>{};
@@ -351,7 +356,24 @@ class McpToolService extends ChangeNotifier {
         }
       } catch (_) {}
     }
-    return McpToolResult(markdown: buf.toString().trim(), imageUris: imageUris);
+    return McpToolResult(
+      markdown: buf.toString().trim(),
+      imageUris: imageUris,
+      metadata: _sourceMetadata(route),
+    );
+  }
+
+  Map<String, dynamic> _sourceMetadata(_McpToolRoute route) {
+    return <String, dynamic>{
+      kMcpSourceMetadataKey: <String, dynamic>{
+        'version': kMcpSourceMetadataVersion,
+        'serverId': route.server.id,
+        'serverName': route.server.name,
+        'transport': route.server.transport.name,
+        'toolName': route.tool.name,
+        'exposedName': route.exposedName,
+      },
+    };
   }
 
   void _writeEscapedToolText(StringBuffer buf, String text) {
