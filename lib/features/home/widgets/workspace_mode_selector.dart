@@ -26,9 +26,11 @@ class WorkspaceModeTitle extends StatelessWidget {
       WorkspaceMode.story,
       WorkspaceMode.agent,
     ],
+    this.compact = false,
   });
 
   final List<WorkspaceMode> availableModes;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +123,7 @@ class WorkspaceModeHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(11),
               onTap: onSelectModel,
               child: _HeaderButton(
-                width: 132,
+                width: compact ? 112 : 132,
                 icon: Lucide.Bot,
                 label: model,
                 trailing: Lucide.ChevronDown,
