@@ -52,6 +52,40 @@ void main() {
     }
   });
 
+  test('mobile mode settings are searchable and own Chat behavior', () {
+    final mobile = SettingsSearchIndex(
+      en,
+      platform: TargetPlatform.android,
+    );
+    final desktop = SettingsSearchIndex(
+      en,
+      platform: TargetPlatform.macOS,
+    );
+
+    expect(mobile.search('chat').map((e) => e.id), contains('chatMode'));
+    expect(mobile.search('story').map((e) => e.id), contains('storyMode'));
+    expect(mobile.search('agent').map((e) => e.id), contains('agentMode'));
+
+    expect(
+      mobile
+          .search(en.displaySettingsPageShowRegenerateConfirmDialogTitle)
+          .first
+          .destination,
+      SettingsSearchDestination.chat,
+    );
+    expect(
+      desktop
+          .search(en.displaySettingsPageShowRegenerateConfirmDialogTitle)
+          .first
+          .destination,
+      SettingsSearchDestination.behavior,
+    );
+
+    expect(desktop.entries.map((e) => e.id), isNot(contains('chatMode')));
+    expect(desktop.entries.map((e) => e.id), isNot(contains('storyMode')));
+    expect(desktop.entries.map((e) => e.id), isNot(contains('agentMode')));
+  });
+
   test('platform and runtime availability match the settings surfaces', () {
     Set<String> ids(
       TargetPlatform platform, {
