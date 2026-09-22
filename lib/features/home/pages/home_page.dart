@@ -1032,7 +1032,14 @@ class _HomePageState extends State<HomePage>
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
-      titleOverride: const WorkspaceModeTitle(),
+      titleOverride: agentMode
+          ? const WorkspaceModeTitle()
+          : WorkspaceModeHeader(
+              modelDisplay: modelDisplay,
+              providerName: providerName,
+              onSelectModel: () =>
+                  showModelSelectSheet(context, controller: _controller),
+            ),
       showChatActions: !agentMode,
       providerName: providerName,
       modelDisplay: modelDisplay,
@@ -1178,7 +1185,14 @@ class _HomePageState extends State<HomePage>
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
-      titleOverride: const WorkspaceModeTitle(),
+      titleOverride: agentMode
+          ? const WorkspaceModeTitle()
+          : WorkspaceModeHeader(
+              modelDisplay: modelDisplay,
+              providerName: providerName,
+              onSelectModel: () =>
+                  showModelSelectSheet(context, controller: _controller),
+            ),
       showChatActions: !agentMode,
       providerName: providerName,
       modelDisplay: modelDisplay,
