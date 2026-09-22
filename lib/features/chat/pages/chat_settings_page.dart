@@ -38,7 +38,7 @@ class ChatSettingsPage extends StatelessWidget {
                 ),
               ),
             ),
-            SectionCard(children: children, dividers: true),
+            SectionCard(dividers: true, children: children),
             if (footer != null) ...[
               const SizedBox(height: 7),
               Padding(
@@ -198,7 +198,7 @@ class ChatSettingsPage extends StatelessWidget {
             zh ? '学习模式' : 'Learning mode',
             [
               toggle(
-                icon: Lucide.GraduationCap,
+                icon: Lucide.BookOpenText,
                 title: zh ? '启用学习模式' : 'Enable learning mode',
                 subtitle: zh
                     ? '让 Chat 在回答时更偏向教学、引导与逐步解释。'
