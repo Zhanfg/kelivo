@@ -6,6 +6,9 @@ import '../../../l10n/app_localizations_en.dart';
 import '../../../l10n/app_localizations_zh.dart';
 
 enum SettingsSearchDestination {
+  chatMode,
+  storyMode,
+  agentMode,
   display,
   colorMode,
   theme,
@@ -44,6 +47,9 @@ enum SettingsSearchDestination {
 
 extension SettingsSearchDestinationDetails on SettingsSearchDestination {
   String title(AppLocalizations l) => switch (this) {
+    SettingsSearchDestination.chatMode => _modeSettingsTitle(l, 'chat'),
+    SettingsSearchDestination.storyMode => _modeSettingsTitle(l, 'story'),
+    SettingsSearchDestination.agentMode => _modeSettingsTitle(l, 'agent'),
     SettingsSearchDestination.display => l.settingsPageDisplay,
     SettingsSearchDestination.colorMode => l.settingsPageColorMode,
     SettingsSearchDestination.theme => l.displaySettingsPageThemeSettingsTitle,
@@ -86,6 +92,9 @@ extension SettingsSearchDestinationDetails on SettingsSearchDestination {
   };
 
   IconData get icon => switch (this) {
+    SettingsSearchDestination.chatMode => LucideIcons.messageCircle,
+    SettingsSearchDestination.storyMode => LucideIcons.bookOpen,
+    SettingsSearchDestination.agentMode => LucideIcons.bot,
     SettingsSearchDestination.display => LucideIcons.monitor,
     SettingsSearchDestination.colorMode => LucideIcons.sunMoon,
     SettingsSearchDestination.theme => LucideIcons.palette,
@@ -134,6 +143,17 @@ extension SettingsSearchDestinationDetails on SettingsSearchDestination {
     SettingsSearchDestination.haptics ||
     SettingsSearchDestination.background => true,
     _ => false,
+  };
+}
+
+String _modeSettingsTitle(AppLocalizations l, String mode) {
+  final hant = l is AppLocalizationsZhHant;
+  final zh = l is AppLocalizationsZh;
+  return switch (mode) {
+    'chat' => hant ? '聊天設定' : (zh ? '聊天设置' : 'Chat settings'),
+    'story' => hant ? '故事設定' : (zh ? '故事设置' : 'Story settings'),
+    'agent' => hant ? '代理設定' : (zh ? '代理设置' : 'Agent settings'),
+    _ => l.settingsPageTitle,
   };
 }
 
@@ -232,6 +252,33 @@ class SettingsSearchIndex {
           alternateTitles: [title(en), title(zh), title(hant)],
           keywords: keywords,
         ),
+      );
+    }
+
+    if (!desktop) {
+      add(
+        'chatMode',
+        SettingsSearchDestination.chatMode,
+        (l) => _modeSettingsTitle(l, 'chat'),
+        page: true,
+        keywords:
+            'chat mode conversation model reasoning regenerate learning 聊天 模式 对话 對話 模型 思考 重生成 学习 學習',
+      );
+      add(
+        'storyMode',
+        SettingsSearchDestination.storyMode,
+        (l) => _modeSettingsTitle(l, 'story'),
+        page: true,
+        keywords:
+            'story mode narrative interactive novel 故事 模式 互动 互動 小说 小說 剧情 劇情',
+      );
+      add(
+        'agentMode',
+        SettingsSearchDestination.agentMode,
+        (l) => _modeSettingsTitle(l, 'agent'),
+        page: true,
+        keywords:
+            'agent mode permission parallel subagent 代理 模式 权限 權限 并行 並行 子代理',
       );
     }
 
