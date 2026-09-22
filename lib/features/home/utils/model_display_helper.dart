@@ -77,6 +77,18 @@ ModelDisplayInfo getModelDisplayInfo(
   final providerKey = resolved.providerKey;
   final modelId = resolved.modelId;
 
+  return getModelDisplayInfoForIds(
+    settings,
+    providerKey: providerKey,
+    modelId: modelId,
+  );
+}
+
+ModelDisplayInfo getModelDisplayInfoForIds(
+  SettingsProvider settings, {
+  required String? providerKey,
+  required String? modelId,
+}) {
   if (providerKey == null || modelId == null) {
     return const ModelDisplayInfo();
   }
@@ -84,11 +96,9 @@ ModelDisplayInfo getModelDisplayInfo(
   final cfg = settings.getProviderConfig(providerKey);
   final providerName = cfg.name.isNotEmpty ? cfg.name : providerKey;
 
-  // Extract model display name from overrides or use raw modelId
   String modelDisplay = modelId;
   final ov = cfg.modelOverrides[modelId] as Map?;
   if (ov != null) {
-    // Priority: override name > apiModelId > api_model_id > raw modelId
     final overrideName = (ov['name'] as String?)?.trim();
     if (overrideName != null && overrideName.isNotEmpty) {
       modelDisplay = overrideName;
