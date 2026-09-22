@@ -148,64 +148,83 @@ class StoryNarrativeView extends StatelessWidget {
         ? latestUser.content
         : null;
     final showInteraction = effectiveConversationId != null;
-    final count =
-        entries.length + 1 + (showStatus ? 1 : 0) + (showInteraction ? 1 : 0);
+    final footerVisible = showStatus || showInteraction;
+    final availableHeight =
+        MediaQuery.sizeOf(context).height - topPadding - bottomPadding;
+    final footerMaxHeight =
+        (availableHeight * 0.48).clamp(180.0, 420.0).toDouble();
 
-    return ListView.separated(
+    Widget buildStatus() => _StoryGenerationStatus(
+      message: streaming,
+      data: streamingData,
+      health: health ?? const GenerationHealthData(),
+      hasLoadingTools:
+          streaming == null ? false : hasLoadingTools(streaming.id),
+    );
+
+    Widget buildInteraction() => StoryInteractionPanel(
+      conversationId: effectiveConversationId!,
+      latestAssistantMessageId: latestCompletedAssistant?.id,
+      onSubmitIntent: onSubmitIntent,
+      onFreeAction: onFreeAction,
+      disabled: isGenerating || streaming != null,
+      pendingUserAction: pendingUserAction,
+    );
+
+    return Column(
       key: const ValueKey<String>('story-narrative-view'),
-      padding: EdgeInsets.fromLTRB(24, topPadding + 28, 24, bottomPadding + 28),
-      itemCount: count,
-      separatorBuilder: (_, index) => SizedBox(height: index == 0 ? 28 : 20),
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return _StoryHeading(
-            title: heading?.isNotEmpty == true
-                ? heading!
-                : (zh ? '未命名故事' : 'Untitled story'),
-            empty: entries.isEmpty,
-          );
-        }
-
-        final proseEnd = entries.length;
-        if (index <= proseEnd) {
-          return Text(
-            entries[index - 1],
-            style: TextStyle(
-              height: 1.78,
-              fontSize: 17,
-              color: cs.onSurface.withValues(alpha: 0.94),
-              fontWeight: AppFontWeights.regular,
+      children: [
+        Expanded(
+          child: ListView.separated(
+            padding: EdgeInsets.fromLTRB(
+              24,
+              topPadding + 28,
+              24,
+              footerVisible ? 20 : bottomPadding + 28,
             ),
-          );
-        }
-
-        var cursor = proseEnd + 1;
-        if (showStatus) {
-          if (index == cursor) {
-            return _StoryGenerationStatus(
-              message: streaming,
-              data: streamingData,
-              health: health ?? const GenerationHealthData(),
-              hasLoadingTools:
-                  streaming == null ? false : hasLoadingTools(streaming.id),
-            );
-          }
-          cursor++;
-        }
-
-        if (showInteraction && index == cursor) {
-          return StoryInteractionPanel(
-            conversationId: effectiveConversationId,
-            latestAssistantMessageId: latestCompletedAssistant?.id,
-            onSubmitIntent: onSubmitIntent,
-            onFreeAction: onFreeAction,
-            disabled: isGenerating || streaming != null,
-            pendingUserAction: pendingUserAction,
-          );
-        }
-
-        return const SizedBox.shrink();
-      },
+            itemCount: entries.length + 1,
+            separatorBuilder: (_, index) =>
+                SizedBox(height: index == 0 ? 28 : 20),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _StoryHeading(
+                  title: heading?.isNotEmpty == true
+                      ? heading!
+                      : (zh ? '未命名故事' : 'Untitled story'),
+                  empty: entries.isEmpty,
+                );
+              }
+              return Text(
+                entries[index - 1],
+                style: TextStyle(
+                  height: 1.78,
+                  fontSize: 17,
+                  color: cs.onSurface.withValues(alpha: 0.94),
+                  fontWeight: AppFontWeights.regular,
+                ),
+              );
+            },
+          ),
+        ),
+        if (footerVisible)
+          Padding(
+            padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding + 12),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: footerMaxHeight),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (showStatus) buildStatus(),
+                    if (showStatus && showInteraction)
+                      const SizedBox(height: 12),
+                    if (showInteraction) buildInteraction(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
