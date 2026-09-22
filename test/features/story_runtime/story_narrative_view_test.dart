@@ -2,10 +2,18 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart';
 import 'package:Kelivo/features/story_runtime/interaction/story_action_receipt.dart';
 import 'package:Kelivo/features/story_runtime/ui/story_narrative_view.dart';
+import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  Widget zhApp(Widget child) => MaterialApp(
+    locale: const Locale('zh'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: Scaffold(body: child),
+  );
+
   Future<void> submitNoop(
     String _,
     StoryActionSource __,
@@ -19,9 +27,8 @@ void main() {
       addTearDown(streaming.dispose);
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: StoryNarrativeView(
+        zhApp(
+          StoryNarrativeView(
               title: '雨夜',
               conversationId: 'story-1',
               topPadding: 0,
@@ -43,7 +50,6 @@ void main() {
                   conversationId: 'story-1',
                 ),
               ],
-            ),
           ),
         ),
       );
