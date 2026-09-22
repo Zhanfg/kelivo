@@ -5630,6 +5630,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
         ? _textToSpeechToolText(widget.part.arguments)
         : '';
+    final sourceLabel = _mcpSourceLabel(widget.part);
 
     if (widget.part.toolName == LocalToolNames.askUser) {
       return _AskUserToolCard(part: widget.part);
@@ -5738,7 +5739,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                           ),
                         ),
                       ),
-                      if (_mcpSourceLabel(widget.part) case final sourceLabel?)
+                      if (sourceLabel != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(
