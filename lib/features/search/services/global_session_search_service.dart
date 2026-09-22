@@ -37,6 +37,9 @@ class GlobalSessionSearchService {
     r'<reasoning>[\s\S]*?<\/reasoning>',
     caseSensitive: false,
   );
+  static final RegExp _storyEventsRe = RegExp(
+    r'<!--KELIVO_STORY_EVENTS[\s\S]*?KELIVO_STORY_EVENTS-->',
+  );
 
   static Future<List<GlobalSessionSearchResult>> search({
     required ChatService chatService,
@@ -286,7 +289,8 @@ class GlobalSessionSearchService {
       content
           .replaceAll(_geminiThoughtSigRe, ' ')
           .replaceAll(_thinkBlockRe, ' ')
-          .replaceAll(_reasoningBlockRe, ' '),
+          .replaceAll(_reasoningBlockRe, ' ')
+          .replaceAll(_storyEventsRe, ' '),
     );
   }
 
