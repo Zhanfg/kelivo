@@ -143,26 +143,38 @@ class SettingsPage extends StatelessWidget {
             Material(
               color: cs.errorContainer.withValues(alpha: 0.30),
               borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(
-                      Lucide.MessageCircleWarning,
-                      size: 18,
-                      color: cs.error,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.settingsPageWarningMessage,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurface.withValues(alpha: 0.8),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProvidersPage()),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Lucide.MessageCircleWarning,
+                        size: 18,
+                        color: cs.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l10n.settingsPageWarningMessage,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withValues(alpha: 0.8),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Icon(
+                        Lucide.ChevronRight,
+                        size: 18,
+                        color: cs.onSurface.withValues(alpha: 0.55),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
