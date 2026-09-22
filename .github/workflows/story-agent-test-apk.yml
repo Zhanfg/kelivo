@@ -6,6 +6,7 @@ on:
       - test/story-agent-android-20260921
       - fix/agent-product-runtime-20260921
       - fix/mcp-source-identity-20260922
+      - fix/core-settings-ownership-20260922
     paths:
       - ".github/workflows/story-agent-test-apk.yml"
       - "lib/**"
@@ -88,6 +89,9 @@ jobs:
 
       - name: Analyze
         run: dart analyze --fatal-infos lib test integration_test
+
+      - name: Mode settings ownership regression
+        run: flutter test test/features/settings/mode_settings_ownership_test.dart
 
       - name: Preinstall Rust Android target
         shell: bash
