@@ -141,28 +141,23 @@ class McpToolService extends ChangeNotifier {
   }) async {
     final selected = chat.getConversationMcpServers(conversationId).toSet();
     final route = _findRoute(mcpProvider, selected, toolName);
-    final res = route == null
-        ? null
-        : await mcpProvider.callTool(
-            route.server.id,
-            route.tool.name,
-            arguments,
-          );
+    if (route == null) return const McpToolResult();
+    final res = await mcpProvider.callTool(
+      route.server.id,
+      route.tool.name,
+      arguments,
+    );
     if (res == null) {
-      if (route != null) {
-        final errMsg =
-            mcpProvider.errorFor(route.server.id) ??
-            'MCP server is unavailable.';
-        return McpToolResult(
-          markdown: _renderToolErrorForModel(
-            serverName: route.server.name,
-            toolName: toolName,
-            errorMessage: errMsg,
-          ),
-          metadata: _mcpSourceMetadata(route),
-        );
-      }
-      return const McpToolResult();
+      final errMsg =
+          mcpProvider.errorFor(route.server.id) ?? 'MCP server is unavailable.';
+      return McpToolResult(
+        markdown: _renderToolErrorForModel(
+          serverName: route.server.name,
+          toolName: toolName,
+          errorMessage: errMsg,
+        ),
+        metadata: _mcpSourceMetadata(route),
+      );
     }
     return _flattenToolResult(res, route: route);
   }
