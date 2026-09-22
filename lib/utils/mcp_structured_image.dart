@@ -13,6 +13,8 @@ const int kMcpStructuredImageClose = 0xE013;
 const String kMcpToolResultKind = 'mcp_tool_result';
 const String kMcpResultMetadataKey = 'mcpResult';
 const int kMcpResultVersion = 1;
+const String kMcpSourceMetadataKey = 'mcpSource';
+const int kMcpSourceMetadataVersion = 1;
 
 /// Compact prefix written by the previous JSON-in-content iteration.
 ///
@@ -25,6 +27,7 @@ class McpToolResult {
     this.markdown = '',
     this.imageUris = const [],
     this.legacyBody,
+    this.metadata,
   });
 
   /// Model / export / old-client view. Standard Markdown, no private JSON.
@@ -35,6 +38,9 @@ class McpToolResult {
 
   /// Original envelope `text` for old JSON rows. Null for new Markdown writes.
   final String? legacyBody;
+
+  /// Durable UI metadata such as the MCP server/platform that executed the tool.
+  final Map<String, dynamic>? metadata;
 
   bool get hasImages => imageUris.isNotEmpty;
 
@@ -104,6 +110,7 @@ class ClientToolResult {
       return ClientToolResult(
         raw.markdown,
         metadata: <String, dynamic>{
+          if (raw.metadata != null) ...raw.metadata!,
           kMcpResultMetadataKey: mcpResultMetadata(raw.imageUris),
         },
       );

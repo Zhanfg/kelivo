@@ -35,6 +35,14 @@ class McpToolRouteSnapshot {
 
   bool containsExposedName(String name) => _find(name) != null;
 
+  /// Stable source identity for an exposed MCP tool.
+  ///
+  /// Used by approval/UI surfaces before the tool result exists.
+  Map<String, dynamic>? sourceMetadataFor(String exposedName) {
+    final route = _find(exposedName);
+    return route == null ? null : _mcpSourceMetadata(route);
+  }
+
   Set<String> get exposedNames =>
       Set.unmodifiable({for (final route in _routes) route.exposedName});
 
@@ -65,6 +73,19 @@ class McpToolRouteSnapshot {
           route,
     ]);
   }
+}
+
+Map<String, dynamic> _mcpSourceMetadata(_McpToolRoute route) {
+  return <String, dynamic>{
+    kMcpSourceMetadataKey: <String, dynamic>{
+      'version': kMcpSourceMetadataVersion,
+      'serverId': route.server.id,
+      'serverName': route.server.name,
+      'transport': route.server.transport.name,
+      'toolName': route.tool.name,
+      'exposedName': route.exposedName,
+    },
+  };
 }
 
 class McpToolService extends ChangeNotifier {
@@ -120,29 +141,25 @@ class McpToolService extends ChangeNotifier {
   }) async {
     final selected = chat.getConversationMcpServers(conversationId).toSet();
     final route = _findRoute(mcpProvider, selected, toolName);
-    final res = route == null
-        ? null
-        : await mcpProvider.callTool(
-            route.server.id,
-            route.tool.name,
-            arguments,
-          );
+    if (route == null) return const McpToolResult();
+    final res = await mcpProvider.callTool(
+      route.server.id,
+      route.tool.name,
+      arguments,
+    );
     if (res == null) {
-      if (route != null) {
-        final errMsg =
-            mcpProvider.errorFor(route.server.id) ??
-            'MCP server is unavailable.';
-        return McpToolResult(
-          markdown: _renderToolErrorForModel(
-            serverName: route.server.name,
-            toolName: toolName,
-            errorMessage: errMsg,
-          ),
-        );
-      }
-      return const McpToolResult();
+      final errMsg =
+          mcpProvider.errorFor(route.server.id) ?? 'MCP server is unavailable.';
+      return McpToolResult(
+        markdown: _renderToolErrorForModel(
+          serverName: route.server.name,
+          toolName: toolName,
+          errorMessage: errMsg,
+        ),
+        metadata: _mcpSourceMetadata(route),
+      );
     }
-    return _flattenToolResult(res);
+    return _flattenToolResult(res, route: route);
   }
 
   Future<String> callToolTextForConversation(
@@ -204,9 +221,10 @@ class McpToolService extends ChangeNotifier {
               toolName: toolName,
               errorMessage: errMsg,
             ),
+            metadata: _mcpSourceMetadata(route),
           );
         }
-        return _flattenToolResult(res);
+        return _flattenToolResult(res, route: route);
       }
     }
     return const McpToolResult();
@@ -276,7 +294,10 @@ class McpToolService extends ChangeNotifier {
     );
   }
 
-  Future<McpToolResult> _flattenToolResult(mcp.CallToolResult res) async {
+  Future<McpToolResult> _flattenToolResult(
+    mcp.CallToolResult res, {
+    required _McpToolRoute route,
+  }) async {
     final buf = StringBuffer();
     final imageUris = <String>[];
     final seen = <String>{};
@@ -351,8 +372,14 @@ class McpToolService extends ChangeNotifier {
         }
       } catch (_) {}
     }
-    return McpToolResult(markdown: buf.toString().trim(), imageUris: imageUris);
+    return McpToolResult(
+      markdown: buf.toString().trim(),
+      imageUris: imageUris,
+      metadata: _mcpSourceMetadata(route),
+    );
   }
+
+
 
   void _writeEscapedToolText(StringBuffer buf, String text) {
     final escaped = escapeMcpStructuredImageText(text);

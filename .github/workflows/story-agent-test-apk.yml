@@ -5,6 +5,7 @@ on:
     branches:
       - test/story-agent-android-20260921
       - fix/agent-product-runtime-20260921
+      - fix/mcp-source-identity-20260922
     paths:
       - ".github/workflows/story-agent-test-apk.yml"
       - "lib/**"
