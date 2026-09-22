@@ -1508,7 +1508,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     final text = submittedText.trim();
     if (text.isEmpty && _images.isEmpty && _docs.isEmpty) return;
 
-    if (widget.chatModelProviderKey == null || widget.chatModelId == null) {
+    if ((widget.chatModelProviderKey == null || widget.chatModelId == null) &&
+        widget.onLongPressSelectModel != null) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
