@@ -23,10 +23,12 @@ import '../../../core/database/business_preferences.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/conversation.dart';
 import '../../../core/models/compress_context_options.dart';
 import '../../../core/services/android_process_text.dart';
 import '../../../core/services/incoming_share_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
@@ -49,6 +51,8 @@ import '../../chat/widgets/chat_assistant_background.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../story_runtime/ui/story_conversation_mode_control.dart';
+import '../../story_runtime/orchestration/story_mode_transition_service.dart';
+import '../../story_runtime/state/story_runtime_store.dart';
 import '../../story_runtime/context/story_context_resource_store.dart';
 import '../../story_runtime/ui/story_narrative_view.dart';
 import '../../provider/pages/providers_page.dart';
@@ -759,6 +763,7 @@ class _HomePageState extends State<HomePage>
     _drawerController.addListener(_onDrawerValueChanged);
 
     _chatReady = _controller.initChat();
+    unawaited(_initializeWorkspaceIsolation());
     _initProcessText();
     _initIncomingShares();
 
@@ -822,6 +827,97 @@ class _HomePageState extends State<HomePage>
     _scrollController.dispose();
     routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  Future<void> _initializeWorkspaceIsolation() async {
+    try {
+      await _chatReady;
+      if (!mounted) return;
+      final modeProvider = context.read<WorkspaceModeProvider>();
+      await modeProvider.loaded;
+      if (!mounted) return;
+      await _migrateLegacyStoryConversationOwnership();
+      if (!mounted) return;
+      await _ensureConversationForWorkspace(modeProvider.mode);
+    } catch (error) {
+      debugPrint('Workspace isolation bootstrap failed: $error');
+    }
+  }
+
+  Future<void> _migrateLegacyStoryConversationOwnership() async {
+    final chat = context.read<ChatService>();
+    final sessions = await StoryRuntimeStore(
+      context.read<BusinessPreferences>(),
+    ).readAll();
+    final storyConversationIds = <String>{
+      for (final session in sessions)
+        if (session.enabled ||
+            session.worldlineId != null ||
+            session.sceneEpochId != null)
+          session.conversationId,
+    };
+    if (storyConversationIds.isEmpty) return;
+
+    for (final conversation in chat.getAllConversations()) {
+      if (conversation.extras.containsKey(conversationWorkspaceModeKey)) {
+        continue;
+      }
+      if (!storyConversationIds.contains(conversation.id)) continue;
+      await chat.updateConversationExtrasAffectingList(
+        conversation.id,
+        (extras) => withConversationWorkspaceMode(
+          extras,
+          WorkspaceMode.story,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleWorkspaceModeChanged(WorkspaceMode mode) async {
+    if (!mounted) return;
+    await _migrateLegacyStoryConversationOwnership();
+    if (!mounted) return;
+    await _ensureConversationForWorkspace(mode);
+  }
+
+  Future<void> _ensureConversationForWorkspace(WorkspaceMode mode) async {
+    if (mode == WorkspaceMode.agent || !mounted) return;
+
+    final chat = context.read<ChatService>();
+    bool belongsToMode(Conversation conversation) =>
+        workspaceModeFromConversationExtras(conversation.extras) == mode;
+
+    final current = _controller.currentConversation;
+    if (current == null || !belongsToMode(current)) {
+      String? targetId;
+      for (final conversation in chat.getAllConversations()) {
+        if (belongsToMode(conversation)) {
+          targetId = conversation.id;
+          break;
+        }
+      }
+      if (targetId == null) {
+        await _controller.createNewConversationAnimated();
+      } else {
+        await _controller.switchConversationAnimated(targetId);
+      }
+    }
+
+    if (!mounted || mode != WorkspaceMode.story) return;
+    final active = _controller.currentConversation;
+    if (active == null) return;
+    final preferences = context.read<BusinessPreferences>();
+    final session = await StoryRuntimeStore(
+      preferences,
+    ).readOrDefault(active.id);
+    if (session.enabled) return;
+    await StoryModeTransitionService(
+      preferences: preferences,
+      chatService: chat,
+    ).setMode(
+      conversationId: active.id,
+      storyEnabled: true,
+    );
   }
 
   void _onControllerChanged() {
@@ -1033,8 +1129,11 @@ class _HomePageState extends State<HomePage>
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
       titleOverride: agentMode
-          ? const WorkspaceModeTitle()
+          ? WorkspaceModeTitle(
+              onModeChanged: _handleWorkspaceModeChanged,
+            )
           : WorkspaceModeHeader(
+              onModeChanged: _handleWorkspaceModeChanged,
               modelDisplay: modelDisplay,
               providerName: providerName,
               onSelectModel: () =>
@@ -1186,8 +1285,11 @@ class _HomePageState extends State<HomePage>
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
       titleOverride: agentMode
-          ? const WorkspaceModeTitle()
+          ? WorkspaceModeTitle(
+              onModeChanged: _handleWorkspaceModeChanged,
+            )
           : WorkspaceModeHeader(
+              onModeChanged: _handleWorkspaceModeChanged,
               modelDisplay: modelDisplay,
               providerName: providerName,
               onSelectModel: () =>
