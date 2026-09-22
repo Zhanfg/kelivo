@@ -183,6 +183,11 @@ void main() {
       expect(sends, 0);
       expect(providerSetupOpens, 1);
       expect(controller.text, 'keep this draft');
+
+      // Let the recovery SnackBar finish its display timer so the widget test
+      // does not leak framework timers after the behavior assertions pass.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
     },
   );
 
