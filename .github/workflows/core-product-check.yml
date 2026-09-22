@@ -1,0 +1,46 @@
+name: Core Product Check
+
+on:
+  push:
+    branches:
+      - feat/core-product-settings-20260922
+    paths:
+      - ".github/workflows/core-product-check.yml"
+      - "lib/features/chat/pages/chat_settings_page.dart"
+      - "lib/features/agent/ui/agent_settings_page.dart"
+      - "lib/features/home/widgets/workspace_mode_selector.dart"
+      - "lib/features/home/pages/home_page.dart"
+      - "lib/features/settings/search/**"
+      - "lib/features/settings/pages/settings_page.dart"
+      - "test/features/settings/search/settings_search_index_test.dart"
+  workflow_dispatch:
+
+concurrency:
+  group: core-product-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.9"
+          channel: stable
+          cache: true
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Generate l10n
+        run: flutter gen-l10n
+      - name: Analyze
+        run: dart analyze --fatal-infos lib test integration_test
+      - name: Focused product tests
+        run: |
+          flutter test \
+            test/features/settings/search/settings_search_index_test.dart \
+            test/features/model/widgets/model_select_sheet_test.dart \
+            test/features/home/controllers/home_page_controller_switch_test.dart
