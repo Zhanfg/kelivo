@@ -35,6 +35,14 @@ class McpToolRouteSnapshot {
 
   bool containsExposedName(String name) => _find(name) != null;
 
+  /// Stable source identity for an exposed MCP tool.
+  ///
+  /// Used by approval/UI surfaces before the tool result exists.
+  Map<String, dynamic>? sourceMetadataFor(String exposedName) {
+    final route = _find(exposedName);
+    return route == null ? null : _mcpSourceMetadata(route);
+  }
+
   Set<String> get exposedNames =>
       Set.unmodifiable({for (final route in _routes) route.exposedName});
 
@@ -65,6 +73,19 @@ class McpToolRouteSnapshot {
           route,
     ]);
   }
+}
+
+Map<String, dynamic> _mcpSourceMetadata(_McpToolRoute route) {
+  return <String, dynamic>{
+    kMcpSourceMetadataKey: <String, dynamic>{
+      'version': kMcpSourceMetadataVersion,
+      'serverId': route.server.id,
+      'serverName': route.server.name,
+      'transport': route.server.transport.name,
+      'toolName': route.tool.name,
+      'exposedName': route.exposedName,
+    },
+  };
 }
 
 class McpToolService extends ChangeNotifier {
@@ -138,7 +159,7 @@ class McpToolService extends ChangeNotifier {
             toolName: toolName,
             errorMessage: errMsg,
           ),
-          metadata: _sourceMetadata(route),
+          metadata: _mcpSourceMetadata(route),
         );
       }
       return const McpToolResult();
@@ -205,7 +226,7 @@ class McpToolService extends ChangeNotifier {
               toolName: toolName,
               errorMessage: errMsg,
             ),
-            metadata: _sourceMetadata(route),
+            metadata: _mcpSourceMetadata(route),
           );
         }
         return _flattenToolResult(res, route: route);
@@ -359,22 +380,11 @@ class McpToolService extends ChangeNotifier {
     return McpToolResult(
       markdown: buf.toString().trim(),
       imageUris: imageUris,
-      metadata: _sourceMetadata(route),
+      metadata: _mcpSourceMetadata(route),
     );
   }
 
-  Map<String, dynamic> _sourceMetadata(_McpToolRoute route) {
-    return <String, dynamic>{
-      kMcpSourceMetadataKey: <String, dynamic>{
-        'version': kMcpSourceMetadataVersion,
-        'serverId': route.server.id,
-        'serverName': route.server.name,
-        'transport': route.server.transport.name,
-        'toolName': route.tool.name,
-        'exposedName': route.exposedName,
-      },
-    };
-  }
+
 
   void _writeEscapedToolText(StringBuffer buf, String text) {
     final escaped = escapeMcpStructuredImageText(text);
