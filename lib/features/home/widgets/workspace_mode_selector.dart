@@ -117,32 +117,96 @@ class WorkspaceModeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final model = modelDisplay?.trim();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        WorkspaceModeTitle(
-          availableModes: availableModes,
-          onModeChanged: onModeChanged,
-        ),
-        if (model != null && model.isNotEmpty && onSelectModel != null) ...[
-          const SizedBox(width: 6),
-          Tooltip(
-            message: providerName == null || providerName!.trim().isEmpty
-                ? model
-                : '$model · $providerName',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(11),
-              onTap: onSelectModel,
-              child: _HeaderButton(
-                width: 132,
-                icon: Lucide.Bot,
-                label: model,
-                trailing: Lucide.ChevronDown,
-              ),
+    final canSelectModel =
+        model != null && model.isNotEmpty && onSelectModel != null;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const modeWidth = 88.0;
+        const gap = 6.0;
+        const preferredModelWidth = 132.0;
+        const minModelWidth = 76.0;
+        const compactModelWidth = 44.0;
+
+        final maxWidth = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : modeWidth + gap + preferredModelWidth;
+        final modelRoom = maxWidth - modeWidth - gap;
+        final showFullModel = canSelectModel && modelRoom >= minModelWidth;
+        final showCompactModel =
+            canSelectModel && !showFullModel && modelRoom >= compactModelWidth;
+        final modelWidth = showFullModel
+            ? modelRoom.clamp(minModelWidth, preferredModelWidth).toDouble()
+            : compactModelWidth;
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            WorkspaceModeTitle(
+              availableModes: availableModes,
+              onModeChanged: onModeChanged,
             ),
+            if (showFullModel || showCompactModel) ...[
+              const SizedBox(width: gap),
+              Tooltip(
+                message: providerName == null || providerName!.trim().isEmpty
+                    ? model!
+                    : '$model · $providerName',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(11),
+                  onTap: onSelectModel,
+                  child: showFullModel
+                      ? _HeaderButton(
+                          width: modelWidth,
+                          icon: Lucide.Bot,
+                          label: model!,
+                          trailing: Lucide.ChevronDown,
+                        )
+                      : const _CompactModelButton(),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CompactModelButton extends StatelessWidget {
+  const _CompactModelButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: 44,
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 7),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.14),
+          width: 0.6,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Lucide.Bot,
+            size: 15,
+            color: cs.onSurface.withValues(alpha: 0.78),
+          ),
+          const SizedBox(width: 2),
+          Icon(
+            Lucide.ChevronDown,
+            size: 12,
+            color: cs.onSurface.withValues(alpha: 0.48),
           ),
         ],
-      ],
+      ),
     );
   }
 }
