@@ -111,7 +111,7 @@ class ChatSettingsPage extends StatelessWidget {
                     },
             ),
             SwitchListTile(
-              secondary: const Icon(Lucide.MousePointerClick),
+              secondary: const Icon(Lucide.Pencil),
               title: Text(zh ? '点击仅填入输入框' : 'Tap to insert only'),
               subtitle: Text(
                 zh
@@ -126,7 +126,7 @@ class ChatSettingsPage extends StatelessWidget {
           ]),
           section(zh ? '对话行为' : 'Conversation behavior', [
             SwitchListTile(
-              secondary: const Icon(Lucide.GraduationCap),
+              secondary: const Icon(Lucide.Lightbulb),
               title: Text(zh ? '学习模式' : 'Learning mode'),
               subtitle: Text(
                 zh
@@ -148,7 +148,7 @@ class ChatSettingsPage extends StatelessWidget {
               onChanged: settings.setShowRegenerateConfirmDialog,
             ),
             SwitchListTile(
-              secondary: const Icon(Lucide.MessageSquareX),
+              secondary: const Icon(Lucide.MessageSquare),
               title: Text(
                 zh ? '重新生成时删除后续消息' : 'Delete trailing messages on regenerate',
               ),
@@ -161,7 +161,7 @@ class ChatSettingsPage extends StatelessWidget {
               onChanged: settings.setRegenerateDeleteTrailingMessages,
             ),
             SwitchListTile(
-              secondary: const Icon(Lucide.GitBranch),
+              secondary: const Icon(Lucide.GitFork),
               title: Text(zh ? '分支时保留消息版本' : 'Keep message versions when forking'),
               subtitle: Text(
                 zh
@@ -172,7 +172,7 @@ class ChatSettingsPage extends StatelessWidget {
               onChanged: settings.setForkKeepMessageVersions,
             ),
             SwitchListTile(
-              secondary: const Icon(Lucide.BrainCircuit),
+              secondary: const Icon(Lucide.Brain),
               title: Text(
                 zh
                     ? '编辑助手消息时保留思考与工具卡片'
