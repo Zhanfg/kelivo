@@ -23,18 +23,19 @@ class AgentEngineAsset {
 /// giving the managed runtime OMP's task/subagent/job/worktree tool layer.
 abstract final class AgentEngineDistribution {
   static const String engineName = 'omp';
-  static const String version = '18.2.7';
+  static const String version = '18.2.8';
 
   static final AgentEngineAsset linuxMuslArm64 = AgentEngineAsset(
     version: version,
     platform: 'linux-musl',
     arch: 'arm64',
     uri: Uri.parse(
-      'https://github.com/can1357/oh-my-pi/releases/download/v$version/'
-      'omp-linux-musl-arm64',
+      'https://github.com/Zhanfg/oh-my-pi/releases/download/'
+      'kelivo-mobile-v18.2.8-1c5802c9/'
+      'omp-kelivo-mobile-linux-musl-arm64',
     ),
-    sha256: 'aaaeb6821a1cebc4c2203e616cec949ff8b760a61f3ae8dfd98f32ef24eca983',
-    fileName: 'omp-linux-musl-arm64',
+    sha256: '1e617d191468de58c1988cacdf077ba1e864ca259cd7b2236cb5d953316f61aa',
+    fileName: 'omp-kelivo-mobile-linux-musl-arm64',
   );
 
   static AgentEngineAsset? forLinuxArch(String? arch) => switch (arch) {
