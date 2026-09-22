@@ -259,19 +259,6 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Bot,
-                label: l10n.settingsPageAssistant,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const AssistantSettingsPage(),
-                    ),
-                  );
-                },
-              ),
             ],
           ),
 
@@ -279,6 +266,17 @@ class SettingsPage extends StatelessWidget {
           header(l10n.settingsPageModelsServicesSection),
           SectionCard(
             children: [
+              _iosNavRow(
+                context,
+                icon: Lucide.Boxes,
+                label: l10n.settingsPageProviders,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProvidersPage()),
+                  );
+                },
+              ),
+              _iosDivider(context),
               _iosNavRow(
                 context,
                 icon: Lucide.Heart,
@@ -292,11 +290,13 @@ class SettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosNavRow(
                 context,
-                icon: Lucide.Boxes,
-                label: l10n.settingsPageProviders,
+                icon: Lucide.Bot,
+                label: l10n.settingsPageAssistant,
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ProvidersPage()),
+                    MaterialPageRoute(
+                      builder: (_) => const AssistantSettingsPage(),
+                    ),
                   );
                 },
               ),
@@ -324,7 +324,17 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
-              _iosDivider(context),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          header(
+            Localizations.localeOf(context).languageCode == 'zh'
+                ? '共享能力与上下文'
+                : 'Capabilities & context',
+          ),
+          SectionCard(
+            children: [
               _iosNavRow(
                 context,
                 icon: Lucide.Terminal,
@@ -349,19 +359,6 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
               _iosDivider(context),
-              if (defaultTargetPlatform == TargetPlatform.android) ...[
-                _iosNavRow(
-                  context,
-                  icon: LucideIcons.clock,
-                  label: l10n.scheduledTasksTitle,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ScheduledTasksPage(),
-                    ),
-                  ),
-                ),
-                _iosDivider(context),
-              ],
               _iosNavRow(
                 context,
                 icon: Lucide.WandSparkles,
@@ -375,17 +372,6 @@ class SettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosNavRow(
                 context,
-                icon: Lucide.BookOpen,
-                label: l10n.settingsPageWorldBook,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const WorldBookPage()),
-                  );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
                 icon: Lucide.Brain,
                 label: l10n.settingsPageMemory,
                 onTap: () {
@@ -393,6 +379,17 @@ class SettingsPage extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => const MemorySettingsPage(),
                     ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.BookOpen,
+                label: l10n.settingsPageWorldBook,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const WorldBookPage()),
                   );
                 },
               ),
@@ -421,6 +418,42 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
               _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Wrench,
+                label: l10n.toolSchemaSettingsPageTitle,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ToolSchemaSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          header(
+            Localizations.localeOf(context).languageCode == 'zh'
+                ? '自动化与网络'
+                : 'Automation & network',
+          ),
+          SectionCard(
+            children: [
+              if (defaultTargetPlatform == TargetPlatform.android) ...[
+                _iosNavRow(
+                  context,
+                  icon: LucideIcons.clock,
+                  label: l10n.scheduledTasksTitle,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ScheduledTasksPage(),
+                    ),
+                  ),
+                ),
+                _iosDivider(context),
+              ],
               _iosNavRow(
                 context,
                 icon: Lucide.EthernetPort,
@@ -515,19 +548,7 @@ class SettingsPage extends StatelessWidget {
                   },
                 ),
               ],
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Wrench,
-                label: l10n.toolSchemaSettingsPageTitle,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ToolSchemaSettingsPage(),
-                    ),
-                  );
-                },
-              ),
+
               _iosDivider(context),
               _iosNavRow(
                 context,
