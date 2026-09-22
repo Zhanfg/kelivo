@@ -334,12 +334,19 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 final ap = context.read<AssistantProvider>();
                 final currentAid = ap.currentAssistantId;
                 if (currentAid != null) {
+                  final workspaceMode =
+                      context.read<WorkspaceModeProvider?>()?.mode ??
+                      WorkspaceMode.chat;
                   final all = chatService.getAllConversations();
                   final candidates =
                       all
                           .where(
                             (c) =>
-                                c.assistantId == currentAid && c.id != chat.id,
+                                workspaceMode != WorkspaceMode.agent &&
+                                workspaceModeFromConversationExtras(c.extras) ==
+                                    workspaceMode &&
+                                c.assistantId == currentAid &&
+                                c.id != chat.id,
                           )
                           .toList()
                         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -537,11 +544,19 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                           final ap = context.read<AssistantProvider>();
                           final currentAid = ap.currentAssistantId;
                           if (currentAid != null) {
+                            final workspaceMode =
+                                context.read<WorkspaceModeProvider?>()?.mode ??
+                                WorkspaceMode.chat;
                             final all = chatService.getAllConversations();
                             final candidates =
                                 all
                                     .where(
                                       (c) =>
+                                          workspaceMode != WorkspaceMode.agent &&
+                                          workspaceModeFromConversationExtras(
+                                                c.extras,
+                                              ) ==
+                                              workspaceMode &&
                                           c.assistantId == currentAid &&
                                           c.id != chat.id,
                                     )
@@ -833,12 +848,18 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       final ap = context.read<AssistantProvider>();
       final currentAid = ap.currentAssistantId;
       if (currentAid == null) return null;
+      final workspaceMode =
+          context.read<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
       final candidates =
           chatService
               .getAllConversations()
               .where(
                 (c) =>
-                    c.assistantId == currentAid && !excludeIds.contains(c.id),
+                    workspaceMode != WorkspaceMode.agent &&
+                    workspaceModeFromConversationExtras(c.extras) ==
+                        workspaceMode &&
+                    c.assistantId == currentAid &&
+                    !excludeIds.contains(c.id),
               )
               .toList()
             ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -3101,9 +3122,19 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       // otherwise create a new conversation.
       try {
         final chatService = context.read<ChatService>();
+        final workspaceMode =
+            context.read<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
         final all = chatService.getAllConversations();
-        // Filter conversations owned by this assistant and pick the newest
-        final recent = all.where((c) => c.assistantId == assistant.id).toList();
+        // Filter conversations owned by this assistant and active workspace.
+        final recent = all
+            .where(
+              (c) =>
+                  workspaceMode != WorkspaceMode.agent &&
+                  workspaceModeFromConversationExtras(c.extras) ==
+                      workspaceMode &&
+                  c.assistantId == assistant.id,
+            )
+            .toList();
         if (recent.isNotEmpty) {
           // getAllConversations is already sorted by updatedAt desc
           widget.onSelectConversation?.call(
