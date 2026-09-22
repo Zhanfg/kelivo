@@ -15,6 +15,8 @@ on:
       - "lib/features/settings/search/**"
       - "lib/features/settings/pages/settings_page.dart"
       - "test/features/settings/search/settings_search_index_test.dart"
+      - "test/features/model/widgets/model_select_sheet_test.dart"
+      - "test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart"
   workflow_dispatch:
 
 concurrency:
