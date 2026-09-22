@@ -1,0 +1,47 @@
+name: Agent Runtime Check
+
+on:
+  push:
+    branches:
+      - fix/agent-product-runtime-20260921
+      - "integrate/kelivo-runtime-*"
+    paths:
+      - ".github/workflows/agent-runtime-check.yml"
+      - "lib/features/agent/**"
+      - "test/features/agent/**"
+  workflow_dispatch:
+
+concurrency:
+  group: agent-runtime-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.9"
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze Agent runtime
+        run: dart analyze --fatal-infos lib/features/agent test/features/agent
+
+      - name: Agent runtime regression tests
+        run: |
+          flutter test --concurrency=1 \
+            test/features/agent/models/agent_task_test.dart \
+            test/features/agent/providers/agent_task_provider_test.dart \
+            test/features/agent/services/agent_engine_distribution_test.dart \
+            test/features/agent/services/agent_model_bridge_test.dart \
+            test/features/agent/services/agent_task_journal_test.dart \
+            test/features/agent/services/pi_rpc_session_test.dart
