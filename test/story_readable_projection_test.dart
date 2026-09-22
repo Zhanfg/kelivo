@@ -63,14 +63,26 @@ void main() {
     );
   });
 
-  test(
-    'invalid finalized Story-like JSON remains available as fallback text',
-    () {
-      const invalid = '{"version":1,"events":[';
-      expect(
-        projectStoryReadableOrOriginal(invalid, turnId: 'turn-4'),
-        invalid,
-      );
-    },
-  );
+  test('invalid finalized Story protocol is never exposed as source', () {
+    const invalid = '{"version":1,"events":[';
+    expect(
+      projectStoryReadableOrOriginal(invalid, turnId: 'turn-4'),
+      isEmpty,
+    );
+  });
+  test('embedded Story sidecar never reaches readable output', () {
+    const raw = '''
+The corridor is silent.
+
+<!--KELIVO_STORY_EVENTS
+{"version":1,"events":[{"type":"narration","actor":{"type":"world"},"text":[{"text":"The corridor is silent."}]}]}
+KELIVO_STORY_EVENTS-->
+''';
+
+    final rendered = projectStoryReadableOrOriginal(raw, turnId: 'turn-5');
+    expect(rendered, 'The corridor is silent.');
+    expect(rendered, isNot(contains('KELIVO_STORY_EVENTS')));
+    expect(rendered, isNot(contains('"events"')));
+  });
+
 }

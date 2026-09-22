@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 
 import '../../../core/database/business_preferences.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../home/models/workspace_mode.dart';
 import '../state/story_runtime_state.dart';
 import '../state/story_runtime_store.dart';
 import '../state/story_scene_runtime_state.dart';
@@ -56,6 +57,13 @@ final class StoryModeTransitionService {
         modeSelectionCommitted: true,
       );
       await _runtimeStore.upsert(next);
+      await _chatService.updateConversationExtrasAffectingList(
+        id,
+        (extras) => withConversationWorkspaceMode(
+          extras,
+          WorkspaceMode.chat,
+        ),
+      );
       return next;
     }
 
@@ -63,6 +71,13 @@ final class StoryModeTransitionService {
     if (conversation == null) {
       throw StateError('Cannot enter Story Mode for an unknown conversation.');
     }
+    await _chatService.updateConversationExtrasAffectingList(
+      id,
+      (extras) => withConversationWorkspaceMode(
+        extras,
+        WorkspaceMode.story,
+      ),
+    );
 
     final messageIds = List<String>.of(conversation.messageIds);
     final currentMessageId = messageIds.isEmpty ? null : messageIds.last;
