@@ -36,4 +36,24 @@ void main() {
     expect(agent, contains('subagentIsolation'));
     expect(agent, contains('hasModelOverride'));
   });
+
+  test('mode switcher does not convert the current conversation', () {
+    final selector = File(
+      'lib/features/home/widgets/workspace_mode_selector.dart',
+    ).readAsStringSync();
+
+    expect(selector, isNot(contains('ChatService')));
+    expect(selector, isNot(contains('StoryModeTransitionService')));
+    expect(selector, contains('onModeChanged'));
+  });
+
+  test('Home keeps stable mode and model controls together', () {
+    final home = File(
+      'lib/features/home/pages/home_page.dart',
+    ).readAsStringSync();
+
+    expect(home, contains('WorkspaceModeHeader('));
+    expect(home, contains('onModeChanged: _handleWorkspaceModeChanged'));
+    expect(home, contains('onSelectModel:'));
+  });
 }
