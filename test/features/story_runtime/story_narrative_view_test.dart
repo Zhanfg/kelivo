@@ -84,10 +84,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('zh'),
-        home: Scaffold(
-          body: StoryNarrativeView(
+      zhApp(
+        StoryNarrativeView(
             title: '测试',
             conversationId: 'story-test',
             topPadding: 0,
@@ -98,7 +96,6 @@ void main() {
             onSubmitIntent: submitNoop,
             onFreeAction: () {},
             messages: [message],
-          ),
         ),
       ),
     );
@@ -130,10 +127,8 @@ void main() {
     streaming.updateContent(message.id, '门在雨声里慢慢打开。', 8);
 
     await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('zh'),
-        home: Scaffold(
-          body: StoryNarrativeView(
+      zhApp(
+        StoryNarrativeView(
             title: '测试',
             conversationId: 'story-test-2',
             topPadding: 0,
@@ -144,7 +139,6 @@ void main() {
             onSubmitIntent: submitNoop,
             onFreeAction: () {},
             messages: [message],
-          ),
         ),
       ),
     );
@@ -172,10 +166,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('zh'),
-        home: Scaffold(
-          body: StoryNarrativeView(
+      zhApp(
+        StoryNarrativeView(
             title: '测试',
             conversationId: 'story-test-3',
             topPadding: 0,
@@ -186,7 +178,6 @@ void main() {
             onSubmitIntent: submitNoop,
             onFreeAction: () {},
             messages: [message],
-          ),
         ),
       ),
     );
