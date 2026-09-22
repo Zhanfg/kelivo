@@ -5,7 +5,6 @@ on:
     branches:
       - master
       - fix/agent-product-runtime-20260921
-      - feat/core-product-settings-20260922
     paths:
       - ".github/workflows/core-product-check.yml"
       - "lib/features/chat/pages/chat_settings_page.dart"
