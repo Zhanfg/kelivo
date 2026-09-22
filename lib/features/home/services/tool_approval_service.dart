@@ -21,6 +21,7 @@ class ToolApprovalRequest {
   final String toolCallId;
   final String toolName;
   final Map<String, dynamic> arguments;
+  final Map<String, dynamic>? metadata;
   final String? conversationId;
   final Completer<ToolApprovalResult> _completer;
 
@@ -28,6 +29,7 @@ class ToolApprovalRequest {
     required this.toolCallId,
     required this.toolName,
     required this.arguments,
+    this.metadata,
     this.conversationId,
     required this._completer,
   });
@@ -102,6 +104,7 @@ class ToolApprovalService extends ChangeNotifier {
     required String toolCallId,
     required String toolName,
     required Map<String, dynamic> arguments,
+    Map<String, dynamic>? metadata,
     String? conversationId,
   }) {
     final key = _storageKey(conversationId, toolCallId);
@@ -114,6 +117,7 @@ class ToolApprovalService extends ChangeNotifier {
       toolCallId: toolCallId,
       toolName: toolName,
       arguments: arguments,
+      metadata: metadata,
       conversationId: _storedConversationId(conversationId),
       completer: completer,
     );
