@@ -18,6 +18,9 @@ enum SettingsSearchDestination {
   autoRetry,
   haptics,
   background,
+  chat,
+  story,
+  agent,
   assistant,
   providers,
   defaultModel,
@@ -60,6 +63,9 @@ extension SettingsSearchDestinationDetails on SettingsSearchDestination {
     SettingsSearchDestination.haptics =>
       l.displaySettingsPageHapticsSettingsTitle,
     SettingsSearchDestination.background => l.backgroundSettingsTitle,
+    SettingsSearchDestination.chat => _modeSettingsTitle(l, 'chat'),
+    SettingsSearchDestination.story => _modeSettingsTitle(l, 'story'),
+    SettingsSearchDestination.agent => _modeSettingsTitle(l, 'agent'),
     SettingsSearchDestination.assistant => l.settingsPageAssistant,
     SettingsSearchDestination.providers => l.settingsPageProviders,
     SettingsSearchDestination.defaultModel => l.settingsPageDefaultModel,
@@ -98,6 +104,9 @@ extension SettingsSearchDestinationDetails on SettingsSearchDestination {
     SettingsSearchDestination.autoRetry => LucideIcons.refreshCw,
     SettingsSearchDestination.haptics => LucideIcons.vibrate,
     SettingsSearchDestination.background => LucideIcons.activity,
+    SettingsSearchDestination.chat => LucideIcons.messageCircle,
+    SettingsSearchDestination.story => LucideIcons.bookOpen,
+    SettingsSearchDestination.agent => LucideIcons.bot,
     SettingsSearchDestination.assistant => LucideIcons.bot,
     SettingsSearchDestination.providers => LucideIcons.boxes,
     SettingsSearchDestination.defaultModel => LucideIcons.heart,
@@ -211,6 +220,7 @@ class SettingsSearchIndex {
       String Function(AppLocalizations) title, {
       String keywords = '',
       bool page = false,
+      bool locateTarget = true,
       String? targetLabel,
     }) {
       final path = <String>[
@@ -228,7 +238,9 @@ class SettingsSearchIndex {
           title: title(l),
           path: path,
           destination: destination,
-          targetLabel: targetLabel ?? (page ? null : title(l)),
+          targetLabel: locateTarget
+              ? (targetLabel ?? (page ? null : title(l)))
+              : null,
           alternateTitles: [title(en), title(zh), title(hant)],
           keywords: keywords,
         ),
@@ -331,6 +343,32 @@ class SettingsSearchIndex {
         page: true,
         keywords:
             'background keep alive notification live activity 后台 後台 保活 灵动岛 靈動島',
+      );
+    }
+    if (!desktop) {
+      add(
+        'chatMode',
+        SettingsSearchDestination.chat,
+        (l) => _modeSettingsTitle(l, 'chat'),
+        page: true,
+        keywords:
+            'chat conversation model suggestion regenerate fork learning 聊天 对话 對話 模型 建议 建議 重生成 重新生成 分支 学习 學習',
+      );
+      add(
+        'storyMode',
+        SettingsSearchDestination.story,
+        (l) => _modeSettingsTitle(l, 'story'),
+        page: true,
+        keywords:
+            'story narrative novel interactive scene character choice 故事 小说 小說 互动 互動 剧情 劇情 场景 場景 角色 选项 選項',
+      );
+      add(
+        'agentMode',
+        SettingsSearchDestination.agent,
+        (l) => _modeSettingsTitle(l, 'agent'),
+        page: true,
+        keywords:
+            'agent coding permission parallel subagent tools command 代理 编码 編碼 权限 權限 并行 並行 子代理 工具 命令',
       );
     }
     add(
@@ -677,8 +715,11 @@ class SettingsSearchIndex {
     );
     add(
       'displaySettingsPageInsertSuggestionOnlyTitle',
-      SettingsSearchDestination.behavior,
+      desktop
+          ? SettingsSearchDestination.behavior
+          : SettingsSearchDestination.chat,
       (l) => l.displaySettingsPageInsertSuggestionOnlyTitle,
+      locateTarget: desktop,
     );
     add(
       'displaySettingsPageCollapseLongUserMessagesTitle',
@@ -688,23 +729,35 @@ class SettingsSearchIndex {
     );
     add(
       'displaySettingsPageRegenerateDeleteTrailingMessagesTitle',
-      SettingsSearchDestination.behavior,
+      desktop
+          ? SettingsSearchDestination.behavior
+          : SettingsSearchDestination.chat,
       (l) => l.displaySettingsPageRegenerateDeleteTrailingMessagesTitle,
+      locateTarget: desktop,
     );
     add(
       'displaySettingsPageShowRegenerateConfirmDialogTitle',
-      SettingsSearchDestination.behavior,
+      desktop
+          ? SettingsSearchDestination.behavior
+          : SettingsSearchDestination.chat,
       (l) => l.displaySettingsPageShowRegenerateConfirmDialogTitle,
+      locateTarget: desktop,
     );
     add(
       'displaySettingsPageForkKeepMessageVersionsTitle',
-      SettingsSearchDestination.behavior,
+      desktop
+          ? SettingsSearchDestination.behavior
+          : SettingsSearchDestination.chat,
       (l) => l.displaySettingsPageForkKeepMessageVersionsTitle,
+      locateTarget: desktop,
     );
     add(
       'displaySettingsPageEditAssistantKeepThinkingToolCardsTitle',
-      SettingsSearchDestination.behavior,
+      desktop
+          ? SettingsSearchDestination.behavior
+          : SettingsSearchDestination.chat,
       (l) => l.displaySettingsPageEditAssistantKeepThinkingToolCardsTitle,
+      locateTarget: desktop,
     );
     add(
       'displaySettingsPageShowUpdatesTitle',
@@ -927,6 +980,16 @@ class SettingsSearchIndex {
     });
     return [for (final match in matches) match.item];
   }
+}
+
+String _modeSettingsTitle(AppLocalizations l, String mode) {
+  final zh = l.localeName.toLowerCase().startsWith('zh');
+  return switch (mode) {
+    'chat' => zh ? '聊天' : 'Chat',
+    'story' => zh ? '故事' : 'Story',
+    'agent' => zh ? '代理' : 'Agent',
+    _ => mode,
+  };
 }
 
 final _separators = RegExp(r'[\s\-_/·,，。:：]+');
