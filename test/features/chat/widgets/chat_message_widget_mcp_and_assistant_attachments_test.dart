@@ -6,6 +6,7 @@ import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/utils/safe_resize_image.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
@@ -64,6 +65,59 @@ Widget _harness(Widget child, {SettingsProvider? settings}) {
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  test('reads MCP server source from persisted metadata', () {
+    expect(
+      mcpServerNameFromToolMetadata(const <String, dynamic>{
+        kMcpSourceMetadataKey: <String, dynamic>{
+          'version': kMcpSourceMetadataVersion,
+          'serverName': 'GitHub',
+        },
+      }),
+      'GitHub',
+    );
+    expect(mcpServerNameFromToolMetadata(const <String, dynamic>{}), isNull);
+  });
+
+  testWidgets('MCP tool timeline shows the server/platform source', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        ChatMessageWidget(
+          showModelIcon: false,
+          message: ChatMessage(
+            id: 'assistant-mcp-source',
+            role: 'assistant',
+            content: 'tool ran',
+            conversationId: 'conversation-mcp-source',
+          ),
+          toolParts: const [
+            ToolUIPart(
+              id: 'tool-source-1',
+              toolName: 'get_issue',
+              arguments: <String, dynamic>{'number': 1},
+              content: 'ok',
+              metadata: <String, dynamic>{
+                kMcpSourceMetadataKey: <String, dynamic>{
+                  'version': kMcpSourceMetadataVersion,
+                  'serverId': 'github',
+                  'serverName': 'GitHub',
+                  'transport': 'http',
+                  'toolName': 'get_issue',
+                  'exposedName': 'get_issue',
+                },
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('MCP · GitHub'), findsOneWidget);
+    expect(find.textContaining('get_issue'), findsWidgets);
   });
 
   group('parseMcpImagePathsForTesting', () {
