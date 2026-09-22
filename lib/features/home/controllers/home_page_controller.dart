@@ -59,6 +59,7 @@ import '../widgets/chat_input_bar.dart';
 import '../widgets/share_destination_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../story_runtime/orchestration/story_native_lifecycle_bridge.dart';
+import '../../story_runtime/parsing/story_readable_projection.dart';
 import '../../story_runtime/voice/story_voice_playback_service.dart';
 
 enum ChatSelectionMode { share, delete }
@@ -1848,7 +1849,10 @@ class HomePageController extends ChangeNotifier {
       final preferences = _context.read<BusinessPreferences>();
       await StoryNativeLifecycleBridge(
         preferences,
-      ).commitFinalizedAssistant(message);
+      ).commitFinalizedAssistant(
+        message,
+        chatService: _context.read<ChatService>(),
+      );
     } catch (error) {
       debugPrint('Story finalize bridge failed: $error');
     }
@@ -1895,8 +1899,15 @@ class HomePageController extends ChangeNotifier {
     }
 
     final sp = _context.read<SettingsProvider>();
+    final readableContent = message.role == 'assistant'
+        ? projectStoryReadableOrOriginal(
+            message.content,
+            turnId: message.id,
+            streaming: message.isStreaming,
+          )
+        : message.content;
     final text = TtsTextSelection.apply(
-      message.content,
+      readableContent,
       mode: sp.ttsTextSelectionMode,
     );
     if (text.trim().isEmpty) return;
