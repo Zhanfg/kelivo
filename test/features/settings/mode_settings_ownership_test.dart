@@ -37,6 +37,26 @@ void main() {
     expect(agent, contains('hasModelOverride'));
   });
 
+  test('global mobile Display no longer owns Chat-only behavior', () {
+    final display = File(
+      'lib/features/settings/pages/display_settings_page.dart',
+    ).readAsStringSync();
+
+    for (final chatOnly in <String>[
+      'displaySettingsPageInsertSuggestionOnlyTitle',
+      'displaySettingsPageRegenerateDeleteTrailingMessagesTitle',
+      'displaySettingsPageShowRegenerateConfirmDialogTitle',
+      'displaySettingsPageForkKeepMessageVersionsTitle',
+      'displaySettingsPageEditAssistantKeepThinkingToolCardsTitle',
+    ]) {
+      expect(
+        display,
+        isNot(contains(chatOnly)),
+        reason: 'Global Display still owns Chat-only setting: $chatOnly',
+      );
+    }
+  });
+
   test('mode switcher does not convert the current conversation', () {
     final selector = File(
       'lib/features/home/widgets/workspace_mode_selector.dart',
