@@ -23,6 +23,7 @@ on:
       - "test/features/model/widgets/model_select_sheet_test.dart"
       - "test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart"
       - "test/features/home/models/workspace_mode_test.dart"
+      - "test/features/story_runtime/story_narrative_view_test.dart"
       - "test/features/story_runtime/ui/story_narrative_view_test.dart"
       - "test/story_readable_projection_test.dart"
   pull_request:
@@ -47,6 +48,7 @@ on:
       - "test/features/model/widgets/model_select_sheet_test.dart"
       - "test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart"
       - "test/features/home/models/workspace_mode_test.dart"
+      - "test/features/story_runtime/story_narrative_view_test.dart"
       - "test/features/story_runtime/ui/story_narrative_view_test.dart"
       - "test/story_readable_projection_test.dart"
   workflow_dispatch:
@@ -82,5 +84,6 @@ jobs:
             test/features/home/controllers/home_page_controller_switch_test.dart \
             test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart \
             test/features/home/models/workspace_mode_test.dart \
+            test/features/story_runtime/story_narrative_view_test.dart \
             test/features/story_runtime/ui/story_narrative_view_test.dart \
             test/story_readable_projection_test.dart
