@@ -3,11 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../mcp/pages/mcp_page.dart';
 import '../../model/widgets/model_select_sheet.dart';
-import '../../settings/pages/memory_settings_page.dart';
-import '../../workspace/pages/skills_page.dart';
-import '../../workspace/pages/workspace_settings_page.dart';
 import '../providers/agent_settings_provider.dart';
 
 class AgentSettingsPage extends StatelessWidget {
@@ -42,17 +38,6 @@ class AgentSettingsPage extends StatelessWidget {
         ],
       ),
     );
-
-    Widget nav(IconData icon, String title, Widget page, {String? subtitle}) =>
-        ListTile(
-          leading: Icon(icon),
-          title: Text(title),
-          subtitle: subtitle == null ? null : Text(subtitle),
-          trailing: const Icon(Lucide.ChevronRight, size: 18),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => page),
-          ),
-        );
 
     return Scaffold(
       appBar: AppBar(title: Text(zh ? '设置' : 'Settings')),
@@ -173,10 +158,10 @@ class AgentSettingsPage extends StatelessWidget {
               onChanged: settings.setShowToolOutput,
             ),
           ]),
-          section(zh ? '上下文与能力' : 'Context and capabilities', [
+          section(zh ? '模型' : 'Model', [
             ListTile(
               leading: const Icon(Lucide.Bot),
-              title: Text(zh ? '模型' : 'Model'),
+              title: Text(zh ? '代理模型' : 'Agent model'),
               subtitle: Text(
                 settings.hasModelOverride
                     ? '${settings.modelProvider} / ${settings.modelId}'
@@ -208,35 +193,16 @@ class AgentSettingsPage extends StatelessWidget {
                 }
               },
             ),
-            nav(
-              Lucide.FolderCode,
-              zh ? '工作区' : 'Workspace',
-              const WorkspaceSettingsPage(),
-            ),
-            nav(
-              Lucide.WandSparkles,
-              'Skills',
-              const SkillsPage(),
-            ),
-            nav(
-              Lucide.Terminal,
-              'MCP',
-              const McpPage(),
-            ),
-            nav(
-              Lucide.Brain,
-              zh ? '记忆' : 'Memory',
-              const MemorySettingsPage(),
-            ),
           ]),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
             child: Text(
               zh
-                  ? '执行环境由 KELIVO 自动管理；这里配置的是代理行为，不暴露 Linux 实现细节。'
-                  : 'KELIVO manages the execution environment automatically; this page configures Agent behavior rather than Linux internals.',
+                  ? '这里只配置代理模式自身行为。Memory、MCP、Skills、Workspace 等共享能力请在总设置中统一管理；执行环境由 KELIVO 自动维护，不暴露 Linux 实现细节。'
+                  : 'This page only configures Agent-owned behavior. Shared capabilities such as Memory, MCP, Skills and Workspace are managed in the main Settings page; KELIVO manages the execution environment without exposing Linux internals.',
               style: TextStyle(
                 fontSize: 12,
+                height: 1.35,
                 color: cs.onSurface.withValues(alpha: 0.5),
               ),
             ),
