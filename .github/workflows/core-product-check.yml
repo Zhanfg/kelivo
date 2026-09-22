@@ -11,6 +11,7 @@ on:
       - "lib/features/home/widgets/workspace_mode_selector.dart"
       - "lib/features/home/pages/home_page.dart"
       - "lib/features/home/widgets/chat_input_bar.dart"
+      - "lib/features/model/widgets/model_select_sheet.dart"
       - "lib/features/settings/search/**"
       - "lib/features/settings/pages/settings_page.dart"
       - "test/features/settings/search/settings_search_index_test.dart"
