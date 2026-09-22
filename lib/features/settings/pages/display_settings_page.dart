@@ -1900,16 +1900,7 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setHideToolResultImages(v),
               ),
-              _iosDivider(context),
-              _iosSwitchRow(
-                context,
-                icon: Lucide.TextSelect,
-                label: l10n.displaySettingsPageInsertSuggestionOnlyTitle,
-                value: sp.insertSuggestionOnTapOnly,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setInsertSuggestionOnTapOnly(v),
-              ),
+
               _iosDivider(context),
               _iosSwitchRow(
                 context,
@@ -1937,50 +1928,10 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                       .setCollapseLongUserMessageChars(v),
                 ),
               ],
-              _iosDivider(context),
-              _iosSwitchRow(
-                context,
-                icon: Lucide.RefreshCw,
-                label: l10n
-                    .displaySettingsPageRegenerateDeleteTrailingMessagesTitle,
-                value: sp.regenerateDeleteTrailingMessages,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setRegenerateDeleteTrailingMessages(v),
-              ),
-              _iosDivider(context),
-              _iosSwitchRow(
-                context,
-                icon: Lucide.MessageCircleWarning,
-                label: l10n.displaySettingsPageShowRegenerateConfirmDialogTitle,
-                value: sp.showRegenerateConfirmDialog,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setShowRegenerateConfirmDialog(v),
-              ),
-              _iosDivider(context),
-              _iosSwitchRow(
-                context,
-                icon: Lucide.GitFork,
-                label: l10n.displaySettingsPageForkKeepMessageVersionsTitle,
-                value: sp.forkKeepMessageVersions,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setForkKeepMessageVersions(v),
-              ),
-              _iosDivider(context),
-              _iosSwitchRow(
-                context,
-                icon: Lucide.Pencil,
-                label: l10n
-                    .displaySettingsPageEditAssistantKeepThinkingToolCardsTitle,
-                tip: l10n
-                    .displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle,
-                value: sp.keepThinkingAndToolCardsWhenEditingAssistant,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setKeepThinkingAndToolCardsWhenEditingAssistant(v),
-              ),
+
+
+
+
               _iosDivider(context),
               _iosSwitchRow(
                 context,
