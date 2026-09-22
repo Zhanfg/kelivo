@@ -10,6 +10,7 @@ on:
       - "lib/features/agent/ui/agent_settings_page.dart"
       - "lib/features/home/widgets/workspace_mode_selector.dart"
       - "lib/features/home/pages/home_page.dart"
+      - "lib/features/home/widgets/chat_input_bar.dart"
       - "lib/features/settings/search/**"
       - "lib/features/settings/pages/settings_page.dart"
       - "test/features/settings/search/settings_search_index_test.dart"
@@ -43,4 +44,5 @@ jobs:
           flutter test \
             test/features/settings/search/settings_search_index_test.dart \
             test/features/model/widgets/model_select_sheet_test.dart \
-            test/features/home/controllers/home_page_controller_switch_test.dart
+            test/features/home/controllers/home_page_controller_switch_test.dart \
+            test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart
