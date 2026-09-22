@@ -94,6 +94,7 @@ jobs:
         run: |
           flutter test --concurrency=1 \
             test/features/settings/mode_settings_ownership_test.dart \
+            test/features/settings/search/settings_search_index_test.dart \
             test/features/home/models/workspace_mode_test.dart \
             test/story_readable_projection_test.dart
 
