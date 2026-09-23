@@ -5,6 +5,8 @@ import '../../../core/database/business_preferences.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../../home/models/workspace_mode.dart';
+import '../../home/providers/workspace_mode_provider.dart';
 import '../agency/story_agency_policy.dart';
 import '../orchestration/story_break_armor_mode.dart';
 import '../orchestration/story_mode_transition_service.dart';
@@ -125,6 +127,13 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
         chatService: chatService,
       );
       await transition.setMode(conversationId: id, storyEnabled: enabled);
+      if (!enabled && chatService.currentConversationId == id) {
+        await preferences.setBool(storyWorkspaceSelectedKey, false);
+        final workspace = context.read<WorkspaceModeProvider>();
+        if (workspace.mode == WorkspaceMode.story) {
+          await workspace.setMode(WorkspaceMode.chat);
+        }
+      }
       storyConversationModeRevision.value++;
     });
   }
