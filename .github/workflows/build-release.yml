@@ -31,25 +31,25 @@ on:
       build_ios:
         description: '构建 iOS'
         required: false
-        default: true
+        default: false
         type: boolean
 
       build_mac:
         description: '构建 macOS'
         required: false
-        default: true
+        default: false
         type: boolean
 
       build_windows:
         description: '构建 Windows'
         required: false
-        default: true
+        default: false
         type: boolean
 
       build_linux:
         description: '构建 Linux'
         required: false
-        default: true
+        default: false
         type: boolean
 
       # 是否发布到 Release（默认不发布）
@@ -79,13 +79,14 @@ jobs:
     if: ${{ github.event.inputs.build_android == 'true' }}
     name: 构建 Android
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions: write-all
 
     steps:
       - name: 📦 检出代码
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: ☕ 配置 Java 环境
         uses: actions/setup-java@v4
@@ -100,6 +101,23 @@ jobs:
           channel: ${{ inputs.flutter_channel }}
           flutter-version: ${{ inputs.flutter_version }}
           cache: true
+
+      - name: 🧰 缓存 Pub 包
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: 🧰 缓存 Android PRoot JNI
+        uses: actions/cache@v4
+        with:
+          path: |
+            android/app/src/main/jniLibs/armeabi-v7a
+            android/app/src/main/jniLibs/arm64-v8a
+            android/app/src/main/jniLibs/x86_64
+          key: ${{ runner.os }}-proot-jni-${{ github.event.inputs.publish_release == 'true' && 'all' || 'arm64' }}-${{ hashFiles('tool/fetch_proot.sh', 'tool/proot_checksums.txt') }}
 
       - name: 📝 Inject fallback
         shell: bash
@@ -134,8 +152,33 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
           echo "✅ 签名配置已写入"
+      - name: 📦 获取 Flutter 依赖
+        run: flutter pub get
+
       - name: 🏗️ 构建 APK
-        run: flutter build apk --release --split-per-abi
+        shell: bash
+        run: |
+          set -euo pipefail
+          extra_target=()
+          if [ "${{ github.event.inputs.publish_release }}" != "true" ]; then
+            extra_target=(--target-platform android-arm64)
+            export KELIVO_ANDROID_ABIS=arm64-v8a
+            echo "Non-release build: compiling arm64 only."
+          else
+            echo "Release build: compiling all configured Android ABIs."
+          fi
+          flutter build apk \
+            --release \
+            --no-pub \
+            --split-per-abi \
+            --split-debug-info=build/symbols/android \
+            "${extra_target[@]}"
+
+      - name: 📏 输出 APK 体积
+        shell: bash
+        run: |
+          ls -lh build/app/outputs/flutter-apk/*.apk
+          du -ch build/app/outputs/flutter-apk/*.apk | tail -n 1
 
       - name: 📦 重命名 APK
         run: |
@@ -158,18 +201,30 @@ jobs:
         with:
           name: Android-arm64-v8a
           path: build/app/outputs/flutter-apk/Kelivo_android_*_arm64-v8a.apk
+          compression-level: 0
 
       - name: 📤 上传构建产物 (armeabi-v7a)
+        if: ${{ github.event.inputs.publish_release == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: Android-armeabi-v7a
           path: build/app/outputs/flutter-apk/Kelivo_android_*_armeabi-v7a.apk
+          compression-level: 0
 
       - name: 📤 上传构建产物 (x86_64)
+        if: ${{ github.event.inputs.publish_release == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: Android-x86_64
           path: build/app/outputs/flutter-apk/Kelivo_android_*_x86_64.apk
+          compression-level: 0
+
+      - name: 🧭 上传 Android 符号文件
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-symbols
+          path: build/symbols/android
+          if-no-files-found: error
 
   # iOS 构建
   ios:
@@ -182,7 +237,7 @@ jobs:
       - name: 📦 检出代码
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: 🐦 安装 Flutter
         uses: subosito/flutter-action@v2
@@ -258,7 +313,7 @@ jobs:
       - name: 📦 检出代码
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: 🐦 安装 Flutter
         uses: subosito/flutter-action@v2
@@ -329,7 +384,7 @@ jobs:
       - name: 📦 检出代码
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: 🔧 安装最新 CMake
         uses: lukka/get-cmake@latest
@@ -490,7 +545,7 @@ jobs:
       - name: 📦 检出代码
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: 🔧 安装依赖
         run: |
