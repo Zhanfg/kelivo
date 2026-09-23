@@ -57,13 +57,18 @@ final class StoryModeTransitionService {
         modeSelectionCommitted: true,
       );
       await _runtimeStore.upsert(next);
-      await _chatService.updateConversationExtrasAffectingList(
-        id,
-        (extras) => withConversationWorkspaceMode(
-          extras,
-          WorkspaceMode.chat,
-        ),
-      );
+      try {
+        await _chatService.updateConversationExtrasAffectingList(
+          id,
+          (extras) => withConversationWorkspaceMode(
+            extras,
+            WorkspaceMode.chat,
+          ),
+        );
+      } catch (_) {
+        await _runtimeStore.upsert(current);
+        rethrow;
+      }
       return next;
     }
 
@@ -71,14 +76,6 @@ final class StoryModeTransitionService {
     if (conversation == null) {
       throw StateError('Cannot enter Story Mode for an unknown conversation.');
     }
-    await _chatService.updateConversationExtrasAffectingList(
-      id,
-      (extras) => withConversationWorkspaceMode(
-        extras,
-        WorkspaceMode.story,
-      ),
-    );
-
     final messageIds = List<String>.of(conversation.messageIds);
     final currentMessageId = messageIds.isEmpty ? null : messageIds.last;
     final rootContentHash = sha256
@@ -150,6 +147,18 @@ final class StoryModeTransitionService {
       sceneRevision: nextScene.revision,
     );
     await _runtimeStore.upsert(next);
+    try {
+      await _chatService.updateConversationExtrasAffectingList(
+        id,
+        (extras) => withConversationWorkspaceMode(
+          extras,
+          WorkspaceMode.story,
+        ),
+      );
+    } catch (_) {
+      await _runtimeStore.upsert(current);
+      rethrow;
+    }
     return next;
   }
 }
