@@ -1281,6 +1281,7 @@ class ChatService extends ChangeNotifier {
     String? conversationId,
     String? excludeConversationId,
     String? assistantId,
+    String? workspaceMode,
   }) async {
     if (!_initialized) return const <ConversationSearchMatch>[];
     return _repo.searchConversationMatches(
@@ -1290,6 +1291,7 @@ class ChatService extends ChangeNotifier {
       conversationId: conversationId,
       excludeConversationId: excludeConversationId,
       assistantId: assistantId,
+      workspaceMode: workspaceMode,
     );
   }
 
