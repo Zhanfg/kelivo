@@ -836,46 +836,13 @@ class _HomePageState extends State<HomePage>
       final modeProvider = context.read<WorkspaceModeProvider>();
       await modeProvider.loaded;
       if (!mounted) return;
-      await _migrateLegacyStoryConversationOwnership();
-      if (!mounted) return;
       await _ensureConversationForWorkspace(modeProvider.mode);
     } catch (error) {
       debugPrint('Workspace isolation bootstrap failed: $error');
     }
   }
 
-  Future<void> _migrateLegacyStoryConversationOwnership() async {
-    final chat = context.read<ChatService>();
-    final sessions = await StoryRuntimeStore(
-      context.read<BusinessPreferences>(),
-    ).readAll();
-    final storyConversationIds = <String>{
-      for (final session in sessions)
-        if (session.enabled ||
-            session.worldlineId != null ||
-            session.sceneEpochId != null)
-          session.conversationId,
-    };
-    if (storyConversationIds.isEmpty) return;
-
-    for (final conversation in chat.getAllConversations()) {
-      if (conversation.extras.containsKey(conversationWorkspaceModeKey)) {
-        continue;
-      }
-      if (!storyConversationIds.contains(conversation.id)) continue;
-      await chat.updateConversationExtrasAffectingList(
-        conversation.id,
-        (extras) => withConversationWorkspaceMode(
-          extras,
-          WorkspaceMode.story,
-        ),
-      );
-    }
-  }
-
   Future<void> _handleWorkspaceModeChanged(WorkspaceMode mode) async {
-    if (!mounted) return;
-    await _migrateLegacyStoryConversationOwnership();
     if (!mounted) return;
     await _ensureConversationForWorkspace(mode);
   }
@@ -918,6 +885,7 @@ class _HomePageState extends State<HomePage>
       conversationId: active.id,
       storyEnabled: true,
     );
+    _controller.syncCurrentConversationFromService();
   }
 
   void _onControllerChanged() {
