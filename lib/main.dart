@@ -93,6 +93,7 @@ import 'features/agent/services/agent_runtime_bootstrap.dart';
 import 'features/agent/services/agent_engine_installer.dart';
 import 'features/agent/services/agent_github_cli_installer.dart';
 import 'features/agent/services/agent_task_runner.dart';
+import 'features/home/providers/workspace_mode_provider.dart';
 import 'features/home/models/workspace_mode.dart';
 import 'utils/app_directories.dart';
 import 'utils/platform_utils.dart';
