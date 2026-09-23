@@ -1,4 +1,4 @@
-name: Fast Android APK
+name: Fast Test APK
 
 on:
   workflow_dispatch:
@@ -11,26 +11,29 @@ on:
   push:
     branches:
       - master
-      - fix/agent-product-runtime-20260921
+      - 'feat/**'
+      - 'fix/**'
+      - 'test/**'
     paths:
       - .github/workflows/build-apk-fast.yml
+      - lib/**
+      - test/**
+      - integration_test/**
       - android/**
-      - tool/fetch_proot.sh
-      - tool/proot_checksums.txt
-      - tool/prepare_agent_runtime.sh
-      - assets/agent_runtime/**
+      - assets/**
+      - tool/**
       - pubspec.yaml
-      - dependencies/**/pubspec.yaml
+      - dependencies/**
 
 concurrency:
-  group: fast-android-apk-${{ github.ref }}
+  group: fast-test-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   android-arm64:
-    name: Build Android arm64 APK
+    name: Build fast ARM64 test APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -59,6 +62,17 @@ jobs:
           key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pub-
+
+      - name: Cache Cargo downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-android-arm64-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-android-arm64-
+            ${{ runner.os }}-cargo-
 
       - name: Cache arm64 PRoot JNI
         uses: actions/cache@v4
@@ -94,52 +108,33 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup target add --toolchain stable aarch64-linux-android
 
-      - name: Build optimized arm64 release APK
+      - name: Build fast ARM64 debug APK
         env:
           KELIVO_ANDROID_ABIS: arm64-v8a
         run: |
           flutter build apk \
-            --release \
+            --debug \
             --no-pub \
-            --target-platform android-arm64 \
-            --split-per-abi \
-            --split-debug-info=build/symbols/android
+            --target-platform android-arm64
 
-      - name: Report APK size
+      - name: Package test APK
         shell: bash
         run: |
-          APK="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*arm64-v8a*release.apk' -print -quit)"
-          test -n "$APK"
-          ls -lh "$APK"
-          du -h "$APK"
-          echo "Largest APK entries:"
-          unzip -l "$APK" \
-            | awk 'NF == 4 && $1 ~ /^[0-9]+$/ {print $1, $4}' \
-            | sort -nr \
-            | sed -n '1,40p' \
-            | tee build/android-apk-largest-files.txt
+          set -euo pipefail
+          mkdir -p dist
+          APK="build/app/outputs/flutter-apk/app-debug.apk"
+          test -f "$APK"
+          SHORT_SHA="$(git rev-parse --short=8 HEAD)"
+          OUT="dist/Kelivo_Fast_Test_${SHORT_SHA}_arm64.apk"
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" > dist/SHA256SUMS.txt
+          ls -lh "$OUT"
 
-      - name: Upload arm64 APK
+      - name: Upload fast test APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kelivo-Android-arm64-fast
-          path: build/app/outputs/flutter-apk/*arm64-v8a*release.apk
+          name: Kelivo-Fast-Test-arm64
+          path: dist/
           if-no-files-found: error
           compression-level: 0
-          retention-days: 14
-
-      - name: Upload symbols
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kelivo-Android-arm64-symbols
-          path: build/symbols/android
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload size report
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kelivo-Android-arm64-size-report
-          path: build/android-apk-largest-files.txt
-          if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
