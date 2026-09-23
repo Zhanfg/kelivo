@@ -215,25 +215,34 @@ class _HeaderButton extends StatelessWidget {
   }
 }
 
+bool _workspaceModeSwitchInFlight = false;
+
 Future<void> _switchWorkspaceMode(
   BuildContext context,
   WorkspaceMode mode, {
   Future<void> Function(WorkspaceMode mode)? onModeChanged,
 }) async {
   final provider = context.read<WorkspaceModeProvider>();
-  if (provider.busy || provider.mode == mode) return;
-
-  final preferences = context.read<BusinessPreferences>();
-  await preferences.setBool(
-    storyWorkspaceSelectedKey,
-    mode == WorkspaceMode.story,
-  );
-  await provider.setMode(mode);
-  if (onModeChanged != null) {
-    await onModeChanged(mode);
+  if (_workspaceModeSwitchInFlight || provider.busy || provider.mode == mode) {
+    return;
   }
-  storyConversationModeRevision.value++;
-  Haptics.light();
+
+  _workspaceModeSwitchInFlight = true;
+  try {
+    final preferences = context.read<BusinessPreferences>();
+    await preferences.setBool(
+      storyWorkspaceSelectedKey,
+      mode == WorkspaceMode.story,
+    );
+    await provider.setMode(mode);
+    if (onModeChanged != null) {
+      await onModeChanged(mode);
+    }
+    storyConversationModeRevision.value++;
+    Haptics.light();
+  } finally {
+    _workspaceModeSwitchInFlight = false;
+  }
 }
 
 String _modeLabel(WorkspaceMode mode, bool zh) => switch (mode) {
