@@ -138,7 +138,7 @@ void _wireWorkspaceServices(BuildContext ctx) {
               assistant: assistants.getById(assistantId),
               workspaceById: workspaces.byId,
             );
-      return withConversationWorkspaceMode(base, workspaceMode.mode);
+      return withConversationWorkspaceMode(base, WorkspaceMode.chat);
     };
     WorkspaceNavigation.onOpenEnvironmentPage = openEnvironmentPage;
     WorkspaceNavigation.onOpenTerminal = (navContext, {command}) {
