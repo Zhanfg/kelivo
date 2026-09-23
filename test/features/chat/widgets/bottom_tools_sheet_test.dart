@@ -152,6 +152,14 @@ void main() {
   Future<AppLocalizations> pumpSheet(
     WidgetTester tester, {
     Conversation? conversation,
+    String? storyConversationId,
+    VoidCallback? onPhotos,
+    VoidCallback? onCamera,
+    VoidCallback? onUpload,
+    VoidCallback? onDrawing,
+    VoidCallback? onSearch,
+    VoidCallback? onMcp,
+    VoidCallback? onQuickPhrase,
   }) async {
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
@@ -185,6 +193,14 @@ void main() {
               body: BottomToolsSheet(
                 assistantId: assistantId,
                 conversationId: conversation?.id,
+                storyConversationId: storyConversationId,
+                onPhotos: onPhotos,
+                onCamera: onCamera,
+                onUpload: onUpload,
+                onDrawing: onDrawing,
+                onSearch: onSearch,
+                onMcp: onMcp,
+                onQuickPhrase: onQuickPhrase,
               ),
             ),
           ),
@@ -194,6 +210,43 @@ void main() {
     await tester.pump();
     return AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
   }
+
+  testWidgets('mobile tools expose the Story 2x2 primary actions', (
+    tester,
+  ) async {
+    final l10n = await pumpSheet(
+      tester,
+      onPhotos: () {},
+      onCamera: () {},
+      onUpload: () {},
+      onDrawing: () {},
+    );
+
+    expect(find.text(l10n.bottomToolsSheetPhotos), findsOneWidget);
+    expect(find.text(l10n.bottomToolsSheetCamera), findsOneWidget);
+    expect(find.text(l10n.bottomToolsSheetUpload), findsOneWidget);
+    expect(find.text('Draw'), findsOneWidget);
+  });
+
+  testWidgets('story tools replace chat-only secondary actions', (
+    tester,
+  ) async {
+    final l10n = await pumpSheet(
+      tester,
+      storyConversationId: 'story-1',
+      onSearch: () {},
+      onMcp: () {},
+      onQuickPhrase: () {},
+    );
+
+    expect(find.text('World Book'), findsOneWidget);
+    expect(find.text('Memory'), findsOneWidget);
+    expect(find.text('Characters'), findsOneWidget);
+    expect(find.text('Voices'), findsOneWidget);
+    expect(find.text('References'), findsOneWidget);
+    expect(find.text('Story Skills'), findsOneWidget);
+    expect(find.text(l10n.chatInputBarOnlineSearchTooltip), findsNothing);
+  });
 
   testWidgets('keeps session skills and drops the workspace block', (
     tester,

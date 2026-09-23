@@ -81,6 +81,8 @@ final class RestorePreviousAssetsPlan {
     'avatars',
     'fonts',
     'skills',
+    'story_skills',
+    'story_reference_library',
     'workspaces',
     'sessions',
   ];

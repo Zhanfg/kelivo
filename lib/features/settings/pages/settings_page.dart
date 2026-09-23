@@ -26,6 +26,9 @@ import '../../backup/pages/backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
+import '../../agent/ui/agent_settings_page.dart';
+import '../../story_runtime/ui/story_mode_runtime_page.dart';
+import '../../chat/pages/chat_settings_page.dart';
 import '../../../shared/widgets/section_card.dart';
 import 'network_proxy_page.dart';
 import 'storage_space_page.dart';
@@ -140,32 +143,100 @@ class SettingsPage extends StatelessWidget {
             Material(
               color: cs.errorContainer.withValues(alpha: 0.30),
               borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(
-                      Lucide.MessageCircleWarning,
-                      size: 18,
-                      color: cs.error,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.settingsPageWarningMessage,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurface.withValues(alpha: 0.8),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProvidersPage()),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Lucide.MessageCircleWarning,
+                        size: 18,
+                        color: cs.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l10n.settingsPageWarningMessage,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withValues(alpha: 0.8),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Icon(
+                        Lucide.ChevronRight,
+                        size: 18,
+                        color: cs.onSurface.withValues(alpha: 0.55),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
 
-          // 通用设置：使用iOS风格分组卡片，黑色（中性）图标与标题，无描述
-          header(l10n.settingsPageGeneralSection, first: true),
+          header(
+            Localizations.localeOf(context).languageCode == 'zh'
+                ? '模式'
+                : 'Modes',
+            first: true,
+          ),
+          SectionCard(
+            children: [
+              _iosNavRow(
+                context,
+                icon: Lucide.MessageCircle,
+                label: Localizations.localeOf(context).languageCode == 'zh'
+                    ? '聊天'
+                    : 'Chat',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ChatSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.BookOpen,
+                label: Localizations.localeOf(context).languageCode == 'zh'
+                    ? '故事'
+                    : 'Story',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const StoryModeRuntimePage(),
+                    ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Bot,
+                label: Localizations.localeOf(context).languageCode == 'zh'
+                    ? '代理'
+                    : 'Agent',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AgentSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          // 通用设置
+          header(l10n.settingsPageGeneralSection),
           SectionCard(
             children: [
               _iosNavRow(
@@ -188,19 +259,6 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Bot,
-                label: l10n.settingsPageAssistant,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const AssistantSettingsPage(),
-                    ),
-                  );
-                },
-              ),
             ],
           ),
 
@@ -208,6 +266,17 @@ class SettingsPage extends StatelessWidget {
           header(l10n.settingsPageModelsServicesSection),
           SectionCard(
             children: [
+              _iosNavRow(
+                context,
+                icon: Lucide.Boxes,
+                label: l10n.settingsPageProviders,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProvidersPage()),
+                  );
+                },
+              ),
+              _iosDivider(context),
               _iosNavRow(
                 context,
                 icon: Lucide.Heart,
@@ -221,11 +290,13 @@ class SettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosNavRow(
                 context,
-                icon: Lucide.Boxes,
-                label: l10n.settingsPageProviders,
+                icon: Lucide.Bot,
+                label: l10n.settingsPageAssistant,
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ProvidersPage()),
+                    MaterialPageRoute(
+                      builder: (_) => const AssistantSettingsPage(),
+                    ),
                   );
                 },
               ),
@@ -253,7 +324,17 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
-              _iosDivider(context),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          header(
+            Localizations.localeOf(context).languageCode == 'zh'
+                ? '共享能力与上下文'
+                : 'Capabilities & context',
+          ),
+          SectionCard(
+            children: [
               _iosNavRow(
                 context,
                 icon: Lucide.Terminal,
@@ -278,19 +359,6 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
               _iosDivider(context),
-              if (defaultTargetPlatform == TargetPlatform.android) ...[
-                _iosNavRow(
-                  context,
-                  icon: LucideIcons.clock,
-                  label: l10n.scheduledTasksTitle,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ScheduledTasksPage(),
-                    ),
-                  ),
-                ),
-                _iosDivider(context),
-              ],
               _iosNavRow(
                 context,
                 icon: Lucide.WandSparkles,
@@ -304,17 +372,6 @@ class SettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosNavRow(
                 context,
-                icon: Lucide.BookOpen,
-                label: l10n.settingsPageWorldBook,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const WorldBookPage()),
-                  );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
                 icon: Lucide.Brain,
                 label: l10n.settingsPageMemory,
                 onTap: () {
@@ -322,6 +379,17 @@ class SettingsPage extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => const MemorySettingsPage(),
                     ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.BookOpen,
+                label: l10n.settingsPageWorldBook,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const WorldBookPage()),
                   );
                 },
               ),
@@ -350,6 +418,42 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
               _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Wrench,
+                label: l10n.toolSchemaSettingsPageTitle,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ToolSchemaSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          header(
+            Localizations.localeOf(context).languageCode == 'zh'
+                ? '自动化与网络'
+                : 'Automation & network',
+          ),
+          SectionCard(
+            children: [
+              if (defaultTargetPlatform == TargetPlatform.android) ...[
+                _iosNavRow(
+                  context,
+                  icon: LucideIcons.clock,
+                  label: l10n.scheduledTasksTitle,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ScheduledTasksPage(),
+                    ),
+                  ),
+                ),
+                _iosDivider(context),
+              ],
               _iosNavRow(
                 context,
                 icon: Lucide.EthernetPort,
@@ -444,19 +548,7 @@ class SettingsPage extends StatelessWidget {
                   },
                 ),
               ],
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Wrench,
-                label: l10n.toolSchemaSettingsPageTitle,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ToolSchemaSettingsPage(),
-                    ),
-                  );
-                },
-              ),
+
               _iosDivider(context),
               _iosNavRow(
                 context,

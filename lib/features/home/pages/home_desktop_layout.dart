@@ -13,6 +13,12 @@ import '../widgets/side_drawer.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/workspace_binding.dart';
+import '../../story_runtime/orchestration/story_mode_transition_service.dart';
+import '../../story_runtime/ui/story_workspace_drawer.dart';
+import '../../agent/ui/agent_workspace_drawer.dart';
+import '../providers/workspace_mode_provider.dart';
+import '../models/workspace_mode.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -26,6 +32,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
+import '../../story_runtime/ui/story_conversation_mode_control.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -40,16 +47,16 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.assistantPickerCloseTick,
     required this.loadingConversationIds,
     required this.title,
+    this.titleOverride,
+    this.showChatActions = true,
     required this.providerName,
     required this.modelDisplay,
-    // Sidebar state
     required this.tabletSidebarOpen,
     required this.rightSidebarOpen,
     required this.embeddedSidebarWidth,
     required this.rightSidebarWidth,
     required this.sidebarMinWidth,
     required this.sidebarMaxWidth,
-    // Callbacks
     required this.onToggleSidebar,
     required this.onToggleRightSidebar,
     required this.onSelectConversation,
@@ -76,18 +83,16 @@ class HomeDesktopScaffold extends StatelessWidget {
   final ValueNotifier<int> assistantPickerCloseTick;
   final Set<String> loadingConversationIds;
   final String title;
+  final Widget? titleOverride;
+  final bool showChatActions;
   final String? providerName;
   final String? modelDisplay;
-
-  // Sidebar state
   final bool tabletSidebarOpen;
   final bool rightSidebarOpen;
   final double embeddedSidebarWidth;
   final double rightSidebarWidth;
   final double sidebarMinWidth;
   final double sidebarMaxWidth;
-
-  // Callbacks
   final VoidCallback onToggleSidebar;
   final VoidCallback onToggleRightSidebar;
   final void Function(String id) onSelectConversation;
@@ -130,9 +135,7 @@ class HomeDesktopScaffold extends StatelessWidget {
       child: SizedBox.expand(
         child: Row(
           children: [
-            // Left sidebar
             _buildLeftSidebar(context, cs, topicsOnRight),
-            // Left sidebar resize handle / divider
             if (_isDesktop)
               SidebarResizeHandle(
                 visible: tabletSidebarOpen,
@@ -152,7 +155,6 @@ class HomeDesktopScaffold extends StatelessWidget {
                       )
                     : const SizedBox.shrink(),
               ),
-            // Main content
             Expanded(
               child: Scaffold(
                 key: scaffoldKey,
@@ -184,29 +186,53 @@ class HomeDesktopScaffold extends StatelessWidget {
     ColorScheme cs,
     bool topicsOnRight,
   ) {
-    final sidebar = SideDrawer(
-      embedded: true,
-      embeddedWidth: embeddedSidebarWidth,
-      userName: context.watch<UserProvider>().name,
-      assistantName: _getAssistantName(context),
-      closePickerTicker: assistantPickerCloseTick,
-      loadingConversationIds: loadingConversationIds,
-      useDesktopTabs: _isDesktop && !topicsOnRight,
-      desktopAssistantsOnly: _isDesktop && topicsOnRight,
-      globalSearchMode: globalSearchMode,
-      globalSearchQuery: globalSearchQuery,
-      onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
-      onEnterGlobalSearch: () {
-        ChatActionBus.instance.fire(ChatAction.enterGlobalSearch);
-      },
-      onExitGlobalSearch: () {
-        ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
-      },
-      onOpenGlobalSearchResult: onOpenGlobalSearchResult,
-      onNewConversation: ({closeDrawer = true}) => onNewConversation(),
-      onSelectConversation: (id, {closeDrawer = true}) =>
-          onSelectConversation(id),
-    );
+    final mode = context.watch<WorkspaceModeProvider>().mode;
+    final Widget sidebar;
+    switch (mode) {
+      case WorkspaceMode.story:
+        sidebar = StoryWorkspaceDrawer(
+          onSelectStory: onSelectConversation,
+          onNewStory: () async {
+            await onCreateNewConversation();
+            if (!context.mounted) return;
+            final chat = context.read<ChatService>();
+            final id = chat.currentConversationId;
+            if (id != null) {
+              await StoryModeTransitionService(
+                preferences: context.read<BusinessPreferences>(),
+                chatService: chat,
+              ).setMode(conversationId: id, storyEnabled: true);
+              storyConversationModeRevision.value++;
+            }
+          },
+        );
+      case WorkspaceMode.agent:
+        sidebar = const AgentWorkspaceDrawer();
+      case WorkspaceMode.chat:
+        sidebar = SideDrawer(
+          embedded: true,
+          embeddedWidth: embeddedSidebarWidth,
+          userName: context.watch<UserProvider>().name,
+          assistantName: _getAssistantName(context),
+          closePickerTicker: assistantPickerCloseTick,
+          loadingConversationIds: loadingConversationIds,
+          useDesktopTabs: _isDesktop && !topicsOnRight,
+          desktopAssistantsOnly: _isDesktop && topicsOnRight,
+          globalSearchMode: globalSearchMode,
+          globalSearchQuery: globalSearchQuery,
+          onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
+          onEnterGlobalSearch: () {
+            ChatActionBus.instance.fire(ChatAction.enterGlobalSearch);
+          },
+          onExitGlobalSearch: () {
+            ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
+          },
+          onOpenGlobalSearchResult: onOpenGlobalSearchResult,
+          onNewConversation: ({closeDrawer = true}) => onNewConversation(),
+          onSelectConversation: (id, {closeDrawer = true}) =>
+              onSelectConversation(id),
+        );
+    }
 
     return AnimatedContainer(
       duration: _sidebarAnimDuration,
@@ -229,7 +255,10 @@ class HomeDesktopScaffold extends StatelessWidget {
     ColorScheme cs,
     bool topicsOnRight,
   ) {
-    if (!_isDesktop || !topicsOnRight) return const SizedBox.shrink();
+    final mode = context.watch<WorkspaceModeProvider>().mode;
+    if (!_isDesktop || !topicsOnRight || mode != WorkspaceMode.chat) {
+      return const SizedBox.shrink();
+    }
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -381,7 +410,7 @@ class HomeDesktopScaffold extends StatelessWidget {
         onTap: onToggleSidebar,
       ),
       titleSpacing: 2,
-      title: _buildTitle(context, cs),
+      title: titleOverride ?? _buildTitle(context, cs),
       actions: _buildActions(
         context,
         topicsOnRight,
@@ -654,39 +683,42 @@ class HomeDesktopScaffold extends StatelessWidget {
           icon: Lucide.panelRight,
           onTap: onToggleRightSidebar,
         ),
-      const SizedBox(width: 2),
-      IosIconButton(
-        size: 20,
-        padding: const EdgeInsets.all(8),
-        minSize: 40,
-        semanticLabel: canToggleTemporaryConversation
-            ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
-            : AppLocalizations.of(context)!.titleForLocale,
-        icon: canToggleTemporaryConversation && !temporaryConversationEnabled
-            ? Lucide.MessageCircleDashed
-            : Lucide.MessageCirclePlus,
-        builder: canToggleTemporaryConversation && temporaryConversationEnabled
-            ? (color) => SvgPicture.asset(
-                'assets/icons/temporary_chat_checked.svg',
-                width: 20,
-                height: 20,
-                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-              )
-            : null,
-        onTap: () async {
-          if (canToggleTemporaryConversation) {
-            await onToggleTemporaryConversation();
-          } else {
-            await onCreateNewConversation();
-          }
-        },
-      ),
-      const SizedBox(width: 6),
+      if (showChatActions) ...[
+        const StoryConversationModeAction(),
+        const SizedBox(width: 2),
+        IosIconButton(
+          size: 20,
+          padding: const EdgeInsets.all(8),
+          minSize: 40,
+          semanticLabel: canToggleTemporaryConversation
+              ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
+              : AppLocalizations.of(context)!.titleForLocale,
+          icon: canToggleTemporaryConversation && !temporaryConversationEnabled
+              ? Lucide.MessageCircleDashed
+              : Lucide.MessageCirclePlus,
+          builder:
+              canToggleTemporaryConversation && temporaryConversationEnabled
+              ? (color) => SvgPicture.asset(
+                  'assets/icons/temporary_chat_checked.svg',
+                  width: 20,
+                  height: 20,
+                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                )
+              : null,
+          onTap: () async {
+            if (canToggleTemporaryConversation) {
+              await onToggleTemporaryConversation();
+            } else {
+              await onCreateNewConversation();
+            }
+          },
+        ),
+        const SizedBox(width: 6),
+      ],
     ];
   }
 }
 
-/// Sidebar resize handle widget for desktop
 class SidebarResizeHandle extends StatefulWidget {
   const SidebarResizeHandle({
     super.key,
@@ -736,7 +768,6 @@ class _SidebarResizeHandleState extends State<SidebarResizeHandle> {
   }
 }
 
-/// Desktop background widget with assistant-specific image
 class DesktopBackgroundLayer extends StatelessWidget {
   const DesktopBackgroundLayer({super.key});
 
@@ -789,7 +820,6 @@ class DesktopBackgroundLayer extends StatelessWidget {
   }
 }
 
-/// Scroll navigation buttons for desktop (same as mobile but with different padding)
 class DesktopScrollNavigationButtons extends StatelessWidget {
   const DesktopScrollNavigationButtons({
     super.key,
@@ -816,7 +846,6 @@ class DesktopScrollNavigationButtons extends StatelessWidget {
 
     return Stack(
       children: [
-        // Scroll to bottom button
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(
@@ -845,7 +874,6 @@ class DesktopScrollNavigationButtons extends StatelessWidget {
             ),
           ),
         ),
-        // Scroll to previous message button
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(
@@ -934,7 +962,6 @@ class _DesktopScrollButton extends StatelessWidget {
   }
 }
 
-/// Selection mode toolbar overlay for desktop
 class DesktopSelectionToolbarOverlay extends StatelessWidget {
   const DesktopSelectionToolbarOverlay({
     super.key,

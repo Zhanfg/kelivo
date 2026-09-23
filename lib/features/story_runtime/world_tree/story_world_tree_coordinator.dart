@@ -1,0 +1,341 @@
+import 'package:uuid/uuid.dart';
+
+import 'story_world_tree_models.dart';
+import 'story_world_tree_store.dart';
+
+final class StoryWorldTreeCoordinator {
+  StoryWorldTreeCoordinator({
+    required StoryWorldTreeRepository repository,
+    Uuid uuid = const Uuid(),
+    DateTime Function()? now,
+  }) : // Keep the public constructor parameter names stable for callers while
+       // retaining private implementation fields.
+       // ignore: prefer_initializing_formals
+       _repository = repository,
+       // ignore: prefer_initializing_formals
+       _uuid = uuid,
+       _now = now ?? DateTime.now;
+
+  final StoryWorldTreeRepository _repository;
+  final Uuid _uuid;
+  final DateTime Function() _now;
+
+  Future<StoryWorldTreeState> bootstrap({
+    required String conversationId,
+    required String name,
+    required String rootContentHash,
+    String? currentNodeId,
+    String? currentMessageId,
+  }) async {
+    final existing = await _repository.readForConversation(conversationId);
+    if (existing != null) return existing;
+    final worldlineId = _uuid.v4();
+    final state = StoryWorldTreeState(
+      worldTreeId: _uuid.v4(),
+      name: name.trim().isEmpty ? 'Story' : name.trim(),
+      rootContentHash: rootContentHash,
+      headWorldlineId: worldlineId,
+      mainlineWorldlineId: worldlineId,
+      currentNodeId: currentNodeId,
+      currentMessageId: currentMessageId,
+      worldlines: <StoryWorldline>[
+        StoryWorldline(
+          id: worldlineId,
+          conversationId: _required(conversationId, 'conversationId'),
+          createdAt: _now(),
+        ),
+      ],
+    );
+    await _repository.upsert(state);
+    return state;
+  }
+
+  Future<StoryWorldTreeState> createCheckpoint({
+    required String worldTreeId,
+    required String worldlineId,
+    required String messageId,
+    String? nodeId,
+    String? snapshotId,
+    String? label,
+  }) async {
+    final state = await _requiredTree(worldTreeId);
+    _requiredWorldline(state, worldlineId);
+    final checkpoint = StoryWorldCheckpoint(
+      id: _uuid.v4(),
+      worldlineId: worldlineId,
+      messageId: _required(messageId, 'messageId'),
+      nodeId: _optional(nodeId),
+      snapshotId: _optional(snapshotId),
+      label: _optional(label),
+      createdAt: _now(),
+    );
+    final next = state.copyWith(
+      checkpoints: <StoryWorldCheckpoint>[...state.checkpoints, checkpoint],
+      runtimeStateVersion: state.runtimeStateVersion + 1,
+    );
+    await _repository.upsert(next);
+    return next;
+  }
+
+  Future<StoryWorldTreeState> fork({
+    required String worldTreeId,
+    required String sourceWorldlineId,
+    required String childConversationId,
+    required String branchPointMessageId,
+    required String baseSnapshotId,
+  }) async {
+    final state = await _requiredTree(worldTreeId);
+    final source = _requiredWorldline(state, sourceWorldlineId);
+    if (source.status == StoryWorldlineStatus.archived) {
+      throw StateError('Cannot fork an archived worldline.');
+    }
+    if (state.worldlineForConversation(childConversationId) != null) {
+      throw StateError('Conversation is already bound to this World Tree.');
+    }
+    final child = StoryWorldline(
+      id: _uuid.v4(),
+      conversationId: _required(childConversationId, 'childConversationId'),
+      createdAt: _now(),
+      parentWorldlineId: source.id,
+      branchPointMessageId: _required(
+        branchPointMessageId,
+        'branchPointMessageId',
+      ),
+      baseSnapshotId: _required(baseSnapshotId, 'baseSnapshotId'),
+    );
+    final next = state.copyWith(
+      headWorldlineId: child.id,
+      worldlines: <StoryWorldline>[...state.worldlines, child],
+      runtimeStateVersion: state.runtimeStateVersion + 1,
+    );
+    await _repository.upsert(next);
+    return next;
+  }
+
+  /// Rewinds from a stored checkpoint by creating a new child worldline.
+  /// Existing history is never mutated or deleted.
+  Future<StoryWorldTreeState> rewindFromCheckpoint({
+    required String worldTreeId,
+    required String checkpointId,
+    required String childConversationId,
+  }) async {
+    final state = await _requiredTree(worldTreeId);
+    final checkpoint = state.checkpointById(checkpointId);
+    if (checkpoint == null) {
+      throw StateError('Unknown checkpoint: $checkpointId');
+    }
+    final forked = await fork(
+      worldTreeId: worldTreeId,
+      sourceWorldlineId: checkpoint.worldlineId,
+      childConversationId: childConversationId,
+      branchPointMessageId: checkpoint.messageId,
+      baseSnapshotId: checkpoint.snapshotId ?? checkpoint.id,
+    );
+    final child = forked.worldlineForConversation(childConversationId)!;
+    final lines = <StoryWorldline>[
+      for (final line in forked.worldlines)
+        if (line.id == child.id)
+          line.copyWith(
+            metadata: <String, Object?>{
+              ...line.metadata,
+              'operation': 'rewind',
+              'checkpointId': checkpoint.id,
+            },
+          )
+        else
+          line,
+    ];
+    final next = forked.copyWith(worldlines: lines);
+    await _repository.upsert(next);
+    return next;
+  }
+
+  Future<StoryWorldTreeState> replay({
+    required String worldTreeId,
+    required String sourceWorldlineId,
+    required String childConversationId,
+    required String branchPointMessageId,
+    required String baseSnapshotId,
+  }) async {
+    final forked = await fork(
+      worldTreeId: worldTreeId,
+      sourceWorldlineId: sourceWorldlineId,
+      childConversationId: childConversationId,
+      branchPointMessageId: branchPointMessageId,
+      baseSnapshotId: baseSnapshotId,
+    );
+    final replayLine = forked.worldlineForConversation(childConversationId)!;
+    final lines = <StoryWorldline>[
+      for (final line in forked.worldlines)
+        if (line.id == replayLine.id)
+          line.copyWith(
+            metadata: <String, Object?>{
+              ...line.metadata,
+              'operation': 'replay',
+              'replayOfWorldlineId': sourceWorldlineId,
+            },
+          )
+        else
+          line,
+    ];
+    final next = forked.copyWith(worldlines: lines);
+    await _repository.upsert(next);
+    return next;
+  }
+
+  Future<StoryWorldTreeState> merge({
+    required String worldTreeId,
+    required String sourceWorldlineId,
+    required String targetWorldlineId,
+    String strategy = 'manual',
+  }) async {
+    if (sourceWorldlineId == targetWorldlineId) {
+      throw ArgumentError('A worldline cannot merge into itself.');
+    }
+    final state = await _requiredTree(worldTreeId);
+    final source = _requiredWorldline(state, sourceWorldlineId);
+    final target = _requiredWorldline(state, targetWorldlineId);
+    if (source.status == StoryWorldlineStatus.archived ||
+        target.status == StoryWorldlineStatus.archived) {
+      throw StateError('Archived worldlines cannot participate in a merge.');
+    }
+    final lines = <StoryWorldline>[
+      for (final line in state.worldlines)
+        if (line.id == sourceWorldlineId)
+          line.copyWith(status: StoryWorldlineStatus.merged)
+        else
+          line,
+    ];
+    final record = StoryWorldMergeRecord(
+      id: _uuid.v4(),
+      sourceWorldlineId: sourceWorldlineId,
+      targetWorldlineId: targetWorldlineId,
+      createdAt: _now(),
+      strategy: strategy,
+    );
+    final next = state.copyWith(
+      headWorldlineId: targetWorldlineId,
+      worldlines: lines,
+      merges: <StoryWorldMergeRecord>[...state.merges, record],
+      runtimeStateVersion: state.runtimeStateVersion + 1,
+    );
+    await _repository.upsert(next);
+    return next;
+  }
+
+  Future<StoryWorldTreeState> setMainline({
+    required String worldTreeId,
+    required String worldlineId,
+  }) async {
+    final state = await _requiredTree(worldTreeId);
+    final line = _requiredWorldline(state, worldlineId);
+    if (line.status == StoryWorldlineStatus.archived) {
+      throw StateError('Archived worldline cannot be the mainline.');
+    }
+    final next = state.copyWith(
+      mainlineWorldlineId: worldlineId,
+      runtimeStateVersion: state.runtimeStateVersion + 1,
+    );
+    await _repository.upsert(next);
+    return next;
+  }
+
+  /// Switches the active World Tree head. The host UI remains responsible for
+  /// selecting the Kelivo conversation associated with this worldline.
+  Future<StoryWorldTreeState> switchHead({
+    required String worldTreeId,
+    required String worldlineId,
+  }) async {
+    final state = await _requiredTree(worldTreeId);
+    final line = _requiredWorldline(state, worldlineId);
+    if (line.status == StoryWorldlineStatus.archived) {
+      throw StateError('Archived worldline cannot become active.');
+    }
+    final next = state.copyWith(
+      headWorldlineId: worldlineId,
+      clearCurrentNodeId: true,
+      clearCurrentMessageId: true,
+      runtimeStateVersion: state.runtimeStateVersion + 1,
+    );
+    await _repository.upsert(next);
+    return next;
+  }
+
+  Future<StoryWorldTreeState> archiveWorldline({
+    required String worldTreeId,
+    required String worldlineId,
+  }) async {
+    final state = await _requiredTree(worldTreeId);
+    _requiredWorldline(state, worldlineId);
+    if (state.headWorldlineId == worldlineId) {
+      throw StateError('Active head cannot be archived. Switch first.');
+    }
+    final lines = <StoryWorldline>[
+      for (final line in state.worldlines)
+        if (line.id == worldlineId)
+          line.copyWith(status: StoryWorldlineStatus.archived)
+        else
+          line,
+    ];
+    final next = state.copyWith(
+      worldlines: lines,
+      clearMainlineWorldlineId: state.mainlineWorldlineId == worldlineId,
+      runtimeStateVersion: state.runtimeStateVersion + 1,
+    );
+    await _repository.upsert(next);
+    return next;
+  }
+
+  StoryWorldlineComparison compare({
+    required StoryWorldTreeState state,
+    required String leftWorldlineId,
+    required String rightWorldlineId,
+  }) => state.compare(leftWorldlineId, rightWorldlineId);
+
+  Future<StoryWorldTreeState> syncSelection({
+    required String worldTreeId,
+    required String worldlineId,
+    required String? currentNodeId,
+    required String? currentMessageId,
+  }) async {
+    final state = await _requiredTree(worldTreeId);
+    _requiredWorldline(state, worldlineId);
+    final next = state.copyWith(
+      headWorldlineId: worldlineId,
+      currentNodeId: currentNodeId,
+      currentMessageId: currentMessageId,
+      clearCurrentNodeId: currentNodeId == null,
+      clearCurrentMessageId: currentMessageId == null,
+      runtimeStateVersion: state.runtimeStateVersion + 1,
+    );
+    await _repository.upsert(next);
+    return next;
+  }
+
+  StoryWorldline _requiredWorldline(
+    StoryWorldTreeState state,
+    String worldlineId,
+  ) {
+    final id = _required(worldlineId, 'worldlineId');
+    final line = state.worldlineById(id);
+    if (line == null) throw StateError('Unknown worldline: $id');
+    return line;
+  }
+
+  Future<StoryWorldTreeState> _requiredTree(String worldTreeId) async {
+    final state = await _repository.read(_required(worldTreeId, 'worldTreeId'));
+    if (state == null) throw StateError('Unknown World Tree: $worldTreeId');
+    return state;
+  }
+}
+
+String _required(String value, String name) {
+  final normalized = value.trim();
+  if (normalized.isEmpty) throw ArgumentError.value(value, name);
+  return normalized;
+}
+
+String? _optional(String? value) {
+  final normalized = value?.trim() ?? '';
+  return normalized.isEmpty ? null : normalized;
+}

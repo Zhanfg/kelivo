@@ -28,6 +28,9 @@ class ExtensionEntityStore {
 
   static const String kindWorkspace = 'workspace';
   static const String kindSkill = 'skill';
+  static const String kindAgentTask = 'agent_task';
+  static const String kindAgentEnvironment = 'agent_environment';
+  static const String kindAgentCheckpoint = 'agent_checkpoint';
 
   final AppDatabase _db;
 

@@ -22,6 +22,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/services/backup/data_sync.dart';
+import '../encrypted_full_backup_actions.dart';
 import '../backup_task_runner.dart';
 import 'local_snapshots_page.dart';
 import '../widgets/backup_progress_dialog.dart';
@@ -1255,6 +1256,24 @@ class _BackupPageState extends State<BackupPage> {
       header(l10n.backupPageLocalBackup),
       SectionCard(
         children: [
+          _iosNavRow(
+            context,
+            icon: Lucide.Export,
+            label: Localizations.localeOf(context).languageCode.startsWith('zh')
+                ? '导出完整加密备份'
+                : 'Export encrypted complete backup',
+            onTap: () => exportEncryptedFullBackupAction(context, vm),
+          ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.Import2,
+            label: Localizations.localeOf(context).languageCode.startsWith('zh')
+                ? '恢复完整加密备份'
+                : 'Restore encrypted complete backup',
+            onTap: () => importEncryptedFullBackupAction(context, vm),
+          ),
+          _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Export,

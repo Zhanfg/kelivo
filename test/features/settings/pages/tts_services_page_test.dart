@@ -134,8 +134,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('TTS Settings'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('Auto-play Assistant Replies'),
+      find.byType(ListView),
+      const Offset(0, -300),
+    );
     expect(find.text('Auto-play Assistant Replies'), findsOneWidget);
     expect(find.text('Reuse Audio for Replay'), findsOneWidget);
+
+    await tester.dragUntilVisible(
+      find.text('Text Selection'),
+      find.byType(ListView),
+      const Offset(0, -300),
+    );
     expect(find.text('Text Selection'), findsOneWidget);
   });
 

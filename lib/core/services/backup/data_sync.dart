@@ -286,6 +286,8 @@ class DataSync {
     'avatars',
     'fonts',
     'skills',
+    'story_skills',
+    'story_reference_library',
     'workspaces',
     'sessions',
   ];

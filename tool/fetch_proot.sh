@@ -42,9 +42,6 @@ ALL_ABIS=(
   "x86_64:x86_64"
 )
 
-# CI quick builds may request a subset, for example:
-#   KELIVO_ANDROID_ABIS=arm64-v8a
-# Normal release builds keep all three ABIs.
 ABIS=()
 if [[ -n "${KELIVO_ANDROID_ABIS:-}" ]]; then
   IFS=',' read -r -a requested_abis <<< "$KELIVO_ANDROID_ABIS"

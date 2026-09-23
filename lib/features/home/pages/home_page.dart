@@ -19,13 +19,16 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/conversation.dart';
 import '../../../core/models/compress_context_options.dart';
 import '../../../core/services/android_process_text.dart';
 import '../../../core/services/incoming_share_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
@@ -47,6 +50,11 @@ import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../../chat/widgets/chat_assistant_background.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
+import '../../story_runtime/ui/story_conversation_mode_control.dart';
+import '../../story_runtime/orchestration/story_mode_transition_service.dart';
+import '../../story_runtime/state/story_runtime_store.dart';
+import '../../story_runtime/context/story_context_resource_store.dart';
+import '../../story_runtime/ui/story_narrative_view.dart';
 import '../../provider/pages/providers_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
@@ -68,6 +76,10 @@ import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
 import '../controllers/home_page_controller.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
+import '../models/workspace_mode.dart';
+import '../providers/workspace_mode_provider.dart';
+import '../widgets/workspace_mode_selector.dart';
+import '../../agent/ui/agent_mode_page.dart';
 import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -751,6 +763,7 @@ class _HomePageState extends State<HomePage>
     _drawerController.addListener(_onDrawerValueChanged);
 
     _chatReady = _controller.initChat();
+    unawaited(_initializeWorkspaceIsolation());
     _initProcessText();
     _initIncomingShares();
 
@@ -814,6 +827,65 @@ class _HomePageState extends State<HomePage>
     _scrollController.dispose();
     routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  Future<void> _initializeWorkspaceIsolation() async {
+    try {
+      await _chatReady;
+      if (!mounted) return;
+      final modeProvider = context.read<WorkspaceModeProvider>();
+      await modeProvider.loaded;
+      if (!mounted) return;
+      await _ensureConversationForWorkspace(modeProvider.mode);
+    } catch (error) {
+      debugPrint('Workspace isolation bootstrap failed: $error');
+    }
+  }
+
+  Future<void> _handleWorkspaceModeChanged(WorkspaceMode mode) async {
+    if (!mounted) return;
+    await _ensureConversationForWorkspace(mode);
+  }
+
+  Future<void> _ensureConversationForWorkspace(WorkspaceMode mode) async {
+    if (mode == WorkspaceMode.agent || !mounted) return;
+
+    final chat = context.read<ChatService>();
+    bool belongsToMode(Conversation conversation) =>
+        workspaceModeFromConversationExtras(conversation.extras) == mode;
+
+    final current = _controller.currentConversation;
+    if (current == null || !belongsToMode(current)) {
+      String? targetId;
+      for (final conversation in chat.getAllConversations()) {
+        if (belongsToMode(conversation)) {
+          targetId = conversation.id;
+          break;
+        }
+      }
+      if (targetId == null) {
+        await _controller.createNewConversationAnimated();
+      } else {
+        await _controller.switchConversationAnimated(targetId);
+      }
+    }
+
+    if (!mounted || mode != WorkspaceMode.story) return;
+    final active = _controller.currentConversation;
+    if (active == null) return;
+    final preferences = context.read<BusinessPreferences>();
+    final session = await StoryRuntimeStore(
+      preferences,
+    ).readOrDefault(active.id);
+    if (session.enabled) return;
+    await StoryModeTransitionService(
+      preferences: preferences,
+      chatService: chat,
+    ).setMode(
+      conversationId: active.id,
+      storyEnabled: true,
+    );
+    _controller.syncCurrentConversationFromService();
   }
 
   void _onControllerChanged() {
@@ -957,6 +1029,11 @@ class _HomePageState extends State<HomePage>
     });
   }
 
+  void _startDrawingPrompt() {
+    final isZh = Localizations.localeOf(context).languageCode == 'zh';
+    _handleProcessText(isZh ? '请绘制：' : 'Draw: ');
+  }
+
   // ============================================================================
   // Build Methods
   // ============================================================================
@@ -967,6 +1044,8 @@ class _HomePageState extends State<HomePage>
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final agentMode =
+        context.watch<WorkspaceModeProvider>().mode == WorkspaceMode.agent;
 
     final modelInfo = getModelDisplayInfo(
       settings,
@@ -987,6 +1066,7 @@ class _HomePageState extends State<HomePage>
         providerName: modelInfo.providerName,
         modelDisplay: modelInfo.modelDisplay,
         cs: cs,
+        agentMode: agentMode,
       );
     }
 
@@ -996,6 +1076,7 @@ class _HomePageState extends State<HomePage>
       providerName: modelInfo.providerName,
       modelDisplay: modelInfo.modelDisplay,
       cs: cs,
+      agentMode: agentMode,
     );
   }
 
@@ -1005,6 +1086,7 @@ class _HomePageState extends State<HomePage>
     required String? providerName,
     required String? modelDisplay,
     required ColorScheme cs,
+    required bool agentMode,
   }) {
     final allSelected = _controller.allSelectableMessagesSelected;
 
@@ -1014,6 +1096,17 @@ class _HomePageState extends State<HomePage>
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
+      titleOverride: agentMode
+          ? WorkspaceModeTitle(onModeChanged: _handleWorkspaceModeChanged)
+          : WorkspaceModeHeader(
+              onModeChanged: _handleWorkspaceModeChanged,
+              compact: true,
+              modelDisplay: modelDisplay,
+              providerName: providerName,
+              onSelectModel: () =>
+                  showModelSelectSheet(context, controller: _controller),
+            ),
+      showChatActions: !agentMode,
       providerName: providerName,
       modelDisplay: modelDisplay,
       onToggleDrawer: () => _drawerController.toggle(),
@@ -1051,7 +1144,7 @@ class _HomePageState extends State<HomePage>
           _controller.exitGlobalSearchMode(clearQuery: true),
       onOpenGlobalSearchResult: (convId, msgId) => _controller
           .openGlobalSearchResult(conversationId: convId, messageId: msgId),
-      appBarOverride: _controller.selecting
+      appBarOverride: !agentMode && _controller.selecting
           ? ChatSelectionAppBar(
               selectedCount: _controller.selectedCount,
               allSelected: allSelected,
@@ -1064,7 +1157,9 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
-      body: _wrapWithDropTarget(_buildMobileBody(context, cs)),
+      body: agentMode
+          ? const AgentModePage()
+          : _wrapWithDropTarget(_buildMobileBody(context, cs)),
     );
   }
 
@@ -1084,19 +1179,39 @@ class _HomePageState extends State<HomePage>
       backgroundImageActive: backgroundImageActive,
       content: Builder(
         builder: (context) {
-          final content = KeyedSubtree(
-            key: ValueKey<String>(
-              _controller.currentConversation?.id ?? 'none',
-            ),
-            child: _buildMessageListView(
-              context,
-              topContentPadding: topContentPadding,
-              bottomContentPadding: bottomContentPadding,
-              dividerPadding: const EdgeInsets.symmetric(
-                vertical: 10,
-                horizontal: AppSpacing.md,
-              ),
-            ),
+          final content = ValueListenableBuilder<int>(
+            valueListenable: storyConversationModeRevision,
+            builder: (context, _, _) {
+              final storySelected = isStoryWorkspaceSelected(
+                context.read<BusinessPreferences>(),
+              );
+              return KeyedSubtree(
+                key: ValueKey<String>(
+                  _controller.currentConversation?.id ?? 'none',
+                ),
+                child: storySelected
+                    ? StoryNarrativeView(
+                        messages: _controller.chatController.collapsedMessages,
+                        scrollController: _scrollController,
+                        onUserScrollIntent: () => _controller.scrollCtrl
+                            .handleUserScrollIntent(revealNavigation: false),
+                        onJumpToLatest: () =>
+                            _controller.forceScrollToBottom(),
+                        topPadding: topContentPadding,
+                        bottomPadding: bottomContentPadding,
+                        title: _controller.currentConversation?.title,
+                      )
+                    : _buildMessageListView(
+                        context,
+                        topContentPadding: topContentPadding,
+                        bottomContentPadding: bottomContentPadding,
+                        dividerPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: AppSpacing.md,
+                        ),
+                      ),
+              );
+            },
           );
           return FadeTransition(
             opacity: _controller.convoFade,
@@ -1130,6 +1245,7 @@ class _HomePageState extends State<HomePage>
     required String? providerName,
     required String? modelDisplay,
     required ColorScheme cs,
+    required bool agentMode,
   }) {
     _controller.initDesktopUi();
 
@@ -1140,6 +1256,16 @@ class _HomePageState extends State<HomePage>
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
+      titleOverride: agentMode
+          ? WorkspaceModeTitle(onModeChanged: _handleWorkspaceModeChanged)
+          : WorkspaceModeHeader(
+              onModeChanged: _handleWorkspaceModeChanged,
+              modelDisplay: modelDisplay,
+              providerName: providerName,
+              onSelectModel: () =>
+                  showModelSelectSheet(context, controller: _controller),
+            ),
+      showChatActions: !agentMode,
       providerName: providerName,
       modelDisplay: modelDisplay,
       tabletSidebarOpen: _controller.tabletSidebarOpen,
@@ -1179,7 +1305,7 @@ class _HomePageState extends State<HomePage>
       onRightSidebarWidthChanged: _controller.updateRightSidebarWidth,
       onRightSidebarWidthChangeEnd: _controller.saveRightSidebarWidth,
       buildAssistantBackground: _buildAssistantBackground,
-      appBarOverride: _controller.selecting
+      appBarOverride: !agentMode && _controller.selecting
           ? ChatSelectionAppBar(
               selectedCount: _controller.selectedCount,
               allSelected: allSelected,
@@ -1192,7 +1318,9 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
-      body: _wrapWithDropTarget(_buildTabletBody(context, cs)),
+      body: agentMode
+          ? const AgentModePage()
+          : _wrapWithDropTarget(_buildTabletBody(context, cs)),
     );
   }
 
@@ -1602,6 +1730,8 @@ class _HomePageState extends State<HomePage>
           );
         }
       },
+      onReasoningBudgetChanged: _setComposerReasoningBudget,
+      onComposerModelChanged: _setComposerModel,
       onSend: (text) async {
         final result = await _controller.sendMessage(text);
         if (!mounted) return result;
@@ -1611,10 +1741,15 @@ class _HomePageState extends State<HomePage>
         }
         return result;
       },
+      onGuide: _controller.guideMessage,
       onStop: _controller.cancelStreaming,
       hasQueuedInput: _controller.currentQueuedInput != null,
       queuedPreviewText: _controller.currentQueuedInput?.input.text,
+      queuedInputs: _controller.currentQueuedInputs,
       onCancelQueuedInput: _controller.cancelQueuedMessage,
+      onRemoveQueuedInput: _controller.removeQueuedMessageAt,
+      onClearQueuedInputs: _controller.clearQueuedMessages,
+      onReorderQueuedInput: _controller.reorderQueuedMessage,
       onQuickPhrase: _showQuickPhraseMenu,
       onLongPressQuickPhrase: () {
         Navigator.of(
@@ -1635,6 +1770,7 @@ class _HomePageState extends State<HomePage>
       onClearContext: _controller.clearContext,
       onCompressContext: _handleDesktopCompressContext,
       backgroundImageActive: _assistantBackgroundActive(context),
+      storyMode: isStoryWorkspaceSelected(context.read<BusinessPreferences>()),
     );
   }
 
@@ -1642,6 +1778,10 @@ class _HomePageState extends State<HomePage>
     return Builder(
       builder: (context) {
         final settings = context.watch<SettingsProvider>();
+        final workspaceMode = context.watch<WorkspaceModeProvider>().mode;
+        if (workspaceMode == WorkspaceMode.story) {
+          return const SizedBox.shrink();
+        }
         if (_controller.selecting) return const SizedBox.shrink();
         if (_controller.messages.isEmpty) {
           return const SizedBox.shrink();
@@ -1844,6 +1984,37 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  Future<void> _setComposerReasoningBudget(int budget) async {
+    final settings = context.read<SettingsProvider>();
+    await settings.setThinkingBudget(budget);
+    if (!mounted) return;
+    final assistantProvider = context.read<AssistantProvider>();
+    final assistant = assistantProvider.currentAssistant;
+    if (assistant != null && assistant.thinkingBudget != budget) {
+      await assistantProvider.updateAssistant(
+        assistant.copyWith(thinkingBudget: budget),
+      );
+    }
+  }
+
+  Future<void> _setComposerModel(String providerKey, String modelId) async {
+    final assistantProvider = context.read<AssistantProvider>();
+    final assistant = assistantProvider.currentAssistant;
+    if (assistant != null) {
+      await assistantProvider.updateAssistant(
+        assistant.copyWith(
+          chatModelProvider: providerKey,
+          chatModelId: modelId,
+        ),
+      );
+      return;
+    }
+    await context.read<SettingsProvider>().setCurrentModel(
+      providerKey,
+      modelId,
+    );
+  }
+
   Future<void> _openReasoningSettings({
     int? initialBudget,
     ValueChanged<int>? onChanged,
@@ -1954,6 +2125,9 @@ class _HomePageState extends State<HomePage>
   void _toggleTools() async {
     _controller.dismissKeyboard();
     final assistantId = context.read<AssistantProvider>().currentAssistantId;
+    final storyMode = isStoryWorkspaceSelected(
+      context.read<BusinessPreferences>(),
+    );
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1980,12 +2154,19 @@ class _HomePageState extends State<HomePage>
                   Navigator.of(ctx).maybePop();
                   _controller.onPickFiles();
                 },
+                onDrawing: () {
+                  Navigator.of(ctx).maybePop();
+                  _startDrawingPrompt();
+                },
                 onClear: () async {
                   await Navigator.of(ctx).maybePop();
                   _showContextManagementSheet();
                 },
                 assistantId: assistantId,
                 conversationId: _controller.currentConversation?.id,
+                storyConversationId: storyMode
+                    ? _controller.currentConversation?.id
+                    : null,
                 onClose: () => Navigator.of(ctx).maybePop(),
               ),
             );
@@ -2088,7 +2269,38 @@ class _HomePageState extends State<HomePage>
         ? quickPhraseProvider.getForAssistant(assistant.id)
         : <QuickPhrase>[];
 
-    final allAvailable = [...globalPhrases, ...assistantPhrases];
+    final storyPhrases = <QuickPhrase>[];
+    final conversationId = _controller.currentConversation?.id;
+    final preferences = context.read<BusinessPreferences>();
+    if (conversationId != null && isStoryWorkspaceSelected(preferences)) {
+      final resources = await StoryContextResourceStore(
+        preferences,
+      ).readOrDefault(conversationId);
+      if (!mounted) return;
+      final replies =
+          resources.quickReplies.where((item) => item.enabled).toList()
+            ..sort((a, b) {
+              final order = a.order.compareTo(b.order);
+              return order != 0 ? order : a.id.compareTo(b.id);
+            });
+      storyPhrases.addAll(
+        replies.map(
+          (reply) => QuickPhrase(
+            id: 'story-quick:${reply.id}',
+            title: reply.label,
+            content: reply.submitText,
+            isGlobal: false,
+            assistantId: assistant?.id,
+          ),
+        ),
+      );
+    }
+
+    final allAvailable = [
+      ...storyPhrases,
+      ...globalPhrases,
+      ...assistantPhrases,
+    ];
     if (allAvailable.isEmpty) return;
 
     final RenderBox? inputBox =
@@ -2117,7 +2329,11 @@ class _HomePageState extends State<HomePage>
     }
 
     if (selected != null && mounted) {
-      await _controller.handleQuickPhraseSelection(selected);
+      if (selected.id.startsWith('story-quick:')) {
+        await _controller.sendSuggestion(selected.content);
+      } else {
+        await _controller.handleQuickPhraseSelection(selected);
+      }
     }
   }
 

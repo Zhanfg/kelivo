@@ -298,6 +298,12 @@ abstract class AppLocalizations {
   /// **'Calculating…'**
   String get settingsPageCalculating;
 
+  /// No description provided for @settingsPageFilesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files · {size}'**
+  String settingsPageFilesCount(int count, String size);
+
   /// No description provided for @storageSpacePageTitle.
   ///
   /// In en, this message translates to:

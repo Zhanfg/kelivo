@@ -444,6 +444,7 @@ class ToolHandlerService {
           toolCallId: approvalIdFor(name, toolCallId),
           toolName: name,
           arguments: args,
+          metadata: routes.sourceMetadataFor(name),
           conversationId: conversationId,
         );
         if (!result.approved) {

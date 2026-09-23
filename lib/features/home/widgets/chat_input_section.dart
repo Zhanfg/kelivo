@@ -4,17 +4,17 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/asr_provider.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
-import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../features/workspace/widgets/environment/environment_status_chip.dart';
@@ -49,6 +49,8 @@ class ChatInputSection extends StatelessWidget {
     required this.mediaController,
     required this.isTablet,
     required this.isLoading,
+    this.isGenerationPaused = false,
+    this.onToggleGenerationPaused,
     required this.isToolModel,
     required this.isReasoningModel,
     required this.isReasoningEnabled,
@@ -61,11 +63,18 @@ class ChatInputSection extends StatelessWidget {
     this.onOpenSkills,
     this.onOpenSearch,
     this.onConfigureReasoning,
+    this.onReasoningBudgetChanged,
+    this.onComposerModelChanged,
     this.onSend,
+    this.onGuide,
     this.onStop,
     this.hasQueuedInput = false,
     this.queuedPreviewText,
+    this.queuedInputs = const <QueuedChatInput>[],
     this.onCancelQueuedInput,
+    this.onRemoveQueuedInput,
+    this.onClearQueuedInputs,
+    this.onReorderQueuedInput,
     this.onQuickPhrase,
     this.onLongPressQuickPhrase,
     this.onToggleOcr,
@@ -74,13 +83,14 @@ class ChatInputSection extends StatelessWidget {
     this.onPickPhotos,
     this.onUploadFiles,
     this.onToggleLearningMode,
-    this.onOpenWorldBook, // 新增世界书支持桌面端
+    this.onOpenWorldBook,
     this.onLongPressLearning,
     this.onClearContext,
     this.onCompressContext,
     this.conversationId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
+    this.storyMode = false,
   });
 
   final GlobalKey inputBarKey;
@@ -89,13 +99,13 @@ class ChatInputSection extends StatelessWidget {
   final ChatInputBarController mediaController;
   final bool isTablet;
   final bool isLoading;
+  final bool isGenerationPaused;
+  final VoidCallback? onToggleGenerationPaused;
 
-  // Model capability checkers
   final IsToolModelCallback isToolModel;
   final IsReasoningModelCallback isReasoningModel;
   final IsReasoningEnabledCallback isReasoningEnabled;
 
-  // Callbacks
   final VoidCallback? onMore;
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
@@ -105,11 +115,19 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onOpenSkills;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
+  final Future<void> Function(int budget)? onReasoningBudgetChanged;
+  final Future<void> Function(String providerKey, String modelId)?
+  onComposerModelChanged;
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
+  final Future<ChatInputSubmissionResult> Function(ChatInputData)? onGuide;
   final VoidCallback? onStop;
   final bool hasQueuedInput;
   final String? queuedPreviewText;
+  final List<QueuedChatInput> queuedInputs;
   final VoidCallback? onCancelQueuedInput;
+  final ValueChanged<int>? onRemoveQueuedInput;
+  final VoidCallback? onClearQueuedInputs;
+  final void Function(int oldIndex, int newIndex)? onReorderQueuedInput;
   final VoidCallback? onQuickPhrase;
   final VoidCallback? onLongPressQuickPhrase;
   final VoidCallback? onToggleOcr;
@@ -140,6 +158,7 @@ class ChatInputSection extends StatelessWidget {
   final bool chatModelIsConversationOverride;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
+  final bool storyMode;
 
   @override
   Widget build(BuildContext context) {
@@ -199,6 +218,16 @@ class ChatInputSection extends StatelessWidget {
       mediaController: mediaController,
       asrProvider: asr,
       onConfigureReasoning: onConfigureReasoning,
+      onReasoningBudgetChanged: onReasoningBudgetChanged,
+      onComposerModelChanged: onComposerModelChanged,
+      currentModelProvider: pk,
+      currentModelId: mid,
+      supportsXhighReasoning: pk != null && mid != null
+          ? settings.supportsXhighReasoning(pk, mid)
+          : false,
+      supportsMaxReasoning: pk != null && mid != null
+          ? settings.supportsMaxReasoning(pk, mid)
+          : false,
       reasoningActive: isReasoningEnabled(
         (context.watch<AssistantProvider>().currentAssistant?.thinkingBudget) ??
             settings.thinkingBudget,
@@ -214,14 +243,21 @@ class ChatInputSection extends StatelessWidget {
           : false,
       onOpenSearch: onOpenSearch,
       onSend: onSend,
+      onGuide: onGuide,
       loading: isLoading,
+      generationPaused: isGenerationPaused,
+      onToggleGenerationPaused: onToggleGenerationPaused,
       sendButtonTooltip: sendButtonTooltip,
       hasQueuedInput: hasQueuedInput,
       queuedPreviewText: queuedPreviewText,
+      queuedInputs: queuedInputs,
       onCancelQueuedInput: onCancelQueuedInput,
+      onRemoveQueuedInput: onRemoveQueuedInput,
+      onClearQueuedInputs: onClearQueuedInputs,
+      onReorderQueuedInput: onReorderQueuedInput,
       showToolsButton: _shouldShowToolsButton(pk, mid),
       toolsActive: _isToolsActive(context, a, workspaceBound),
-      showQuickPhraseButton: _hasQuickPhrases(context, a),
+      showQuickPhraseButton: storyMode || _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
       // OCR button: show on desktop for mobile layout, always check settings for tablet layout
@@ -253,6 +289,7 @@ class ChatInputSection extends StatelessWidget {
       backgroundImageActive: backgroundImageActive,
       inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
+      storyMode: storyMode,
     );
 
     if (!showEnvChip || !workspaceBound) return bar;

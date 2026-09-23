@@ -35,6 +35,7 @@ class Lucide {
   static const IconData Search = lucide.LucideIcons.search;
   static const IconData SearchX = lucide.LucideIcons.searchX;
   static const IconData Play = lucide.LucideIcons.play;
+  static const IconData Pause = lucide.LucideIcons.pause;
   static const IconData ExternalLink = lucide.LucideIcons.externalLink;
   static const IconData Edit = lucide.LucideIcons.pencil;
   static const IconData Pin = lucide.LucideIcons.pin;
@@ -247,4 +248,12 @@ class Lucide {
   static const IconData SlidersHorizontal =
       lucide.LucideIcons.slidersHorizontal;
   static const IconData AudioLines = lucide.LucideIcons.audioLines;
+
+  // Story Runtime aliases intentionally resolve to Kelivo's native icon set.
+  static const IconData CircleCheck = CheckCircle;
+  static const IconData HardDriveDownload = Download;
+  static const IconData CircleOff = XCircle;
+  static const IconData Users = User;
+  static const IconData Cpu = Activity;
+  static const IconData Cloud = Network;
 }

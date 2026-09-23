@@ -1,0 +1,140 @@
+name: Fast Test APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      flutter_version:
+        description: 'Flutter version'
+        required: false
+        default: '3.44.9'
+        type: string
+  push:
+    branches:
+      - master
+      - 'feat/**'
+      - 'fix/**'
+      - 'test/**'
+    paths:
+      - .github/workflows/build-apk-fast.yml
+      - lib/**
+      - test/**
+      - integration_test/**
+      - android/**
+      - assets/**
+      - tool/**
+      - pubspec.yaml
+      - dependencies/**
+
+concurrency:
+  group: fast-test-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-arm64:
+    name: Build fast ARM64 test APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ inputs.flutter_version || '3.44.9' }}
+          cache: true
+
+      - name: Cache Pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Cache Cargo downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-android-arm64-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-android-arm64-
+            ${{ runner.os }}-cargo-
+
+      - name: Cache arm64 PRoot JNI
+        uses: actions/cache@v4
+        with:
+          path: android/app/src/main/jniLibs/arm64-v8a
+          key: ${{ runner.os }}-proot-jni-arm64-${{ hashFiles('tool/fetch_proot.sh', 'tool/proot_checksums.txt') }}
+
+      - name: Inject fallback stub
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '';
+          EOF
+
+      - name: Prepare embedded Agent runtime
+        shell: bash
+        run: bash tool/prepare_agent_runtime.sh
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Refresh Flutter Android plugin config
+        run: flutter build apk --config-only --target-platform android-arm64
+
+      - name: Generate l10n
+        run: flutter gen-l10n
+
+      - name: Preinstall Rust Android target
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup target add --toolchain stable aarch64-linux-android
+
+      - name: Build fast ARM64 debug APK
+        env:
+          KELIVO_ANDROID_ABIS: arm64-v8a
+        run: |
+          flutter build apk \
+            --debug \
+            --no-pub \
+            --target-platform android-arm64
+
+      - name: Package test APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          APK="build/app/outputs/flutter-apk/app-debug.apk"
+          test -f "$APK"
+          SHORT_SHA="$(git rev-parse --short=8 HEAD)"
+          OUT="dist/Kelivo_Fast_Test_${SHORT_SHA}_arm64.apk"
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" > dist/SHA256SUMS.txt
+          ls -lh "$OUT"
+
+      - name: Upload fast test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kelivo-Fast-Test-arm64
+          path: dist/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

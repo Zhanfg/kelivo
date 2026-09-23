@@ -1281,6 +1281,7 @@ class ChatService extends ChangeNotifier {
     String? conversationId,
     String? excludeConversationId,
     String? assistantId,
+    String? workspaceMode,
   }) async {
     if (!_initialized) return const <ConversationSearchMatch>[];
     return _repo.searchConversationMatches(
@@ -1290,6 +1291,7 @@ class ChatService extends ChangeNotifier {
       conversationId: conversationId,
       excludeConversationId: excludeConversationId,
       assistantId: assistantId,
+      workspaceMode: workspaceMode,
     );
   }
 
@@ -2739,18 +2741,45 @@ class ChatService extends ChangeNotifier {
   Future<void> updateConversationExtras(
     String conversationId,
     Map<String, dynamic> Function(Map<String, dynamic> current) update,
-  ) async {
+  ) {
+    return _updateConversationExtras(
+      conversationId,
+      update,
+      affectsConversationList: false,
+    );
+  }
+
+  /// Same as [updateConversationExtras], but also invalidates conversation-list
+  /// projections when the changed extras affect workspace/list membership.
+  Future<void> updateConversationExtrasAffectingList(
+    String conversationId,
+    Map<String, dynamic> Function(Map<String, dynamic> current) update,
+  ) {
+    return _updateConversationExtras(
+      conversationId,
+      update,
+      affectsConversationList: true,
+    );
+  }
+
+  Future<void> _updateConversationExtras(
+    String conversationId,
+    Map<String, dynamic> Function(Map<String, dynamic> current) update, {
+    required bool affectsConversationList,
+  }) async {
     final draft = _draftConversations[conversationId];
     if (draft != null) {
       _draftConversations[conversationId] = draft.copyWith(
         extras: update(Map<String, dynamic>.from(draft.extras)),
       );
+      if (affectsConversationList) _bumpConversationListRevision();
       notifyListeners();
       return;
     }
     if (!_initialized) return;
     await _repo.updateConversationExtras(conversationId, update);
     await _refreshConversation(conversationId);
+    if (affectsConversationList) _bumpConversationListRevision();
     notifyListeners();
   }
 

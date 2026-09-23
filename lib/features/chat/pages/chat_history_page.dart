@@ -11,6 +11,8 @@ import '../../../core/models/conversation.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../home/controllers/chat_actions.dart';
+import '../../home/models/workspace_mode.dart';
+import '../../home/providers/workspace_mode_provider.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class ChatHistoryPage extends StatefulWidget {
@@ -37,13 +39,16 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final chatService = context.watch<ChatService>();
+    final workspaceMode = context.watch<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
     final List<Conversation> all = chatService
         .getAllConversations()
         .where(
           (c) =>
-              widget.assistantId == null ||
-              c.assistantId == widget.assistantId ||
-              c.assistantId == null,
+              workspaceMode != WorkspaceMode.agent &&
+              workspaceModeFromConversationExtras(c.extras) == workspaceMode &&
+              (widget.assistantId == null ||
+                  c.assistantId == widget.assistantId ||
+                  c.assistantId == null),
         )
         .toList();
 
@@ -109,7 +114,12 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                 final idsToDelete = svc
                     .getAllConversations()
                     .where(
-                      (c) => c.assistantId == widget.assistantId && !c.isPinned,
+                      (c) =>
+                          workspaceMode != WorkspaceMode.agent &&
+                          workspaceModeFromConversationExtras(c.extras) ==
+                              workspaceMode &&
+                          c.assistantId == widget.assistantId &&
+                          !c.isPinned,
                     )
                     .map((c) => c.id)
                     .toList();

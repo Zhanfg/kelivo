@@ -22,6 +22,7 @@ void main() {
     required SettingsProvider settings,
     required AsrProvider asr,
     required TextEditingController controller,
+    Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend,
   }) {
     return MultiProvider(
       providers: [
@@ -39,7 +40,7 @@ void main() {
           body: ChatInputBar(
             controller: controller,
             asrProvider: asr,
-            onSend: (_) async => ChatInputSubmissionResult.rejected,
+            onSend: onSend ?? (_) async => ChatInputSubmissionResult.rejected,
           ),
         ),
       ),
@@ -62,6 +63,96 @@ void main() {
     await tester.pump();
 
     expect(find.byTooltip('Voice input'), findsNothing);
+  });
+
+  testWidgets(
+    'unavailable selected ASR keeps mic and tap opens recovery switcher',
+    (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+      final unavailable = SherpaOnnxAsrOptions(
+        id: 'offline-missing',
+        name: 'Missing Offline',
+        modelId: 'missing-model',
+      );
+      final fallback = SystemAsrOptions(id: 'system-fallback', name: 'System');
+      await settings.setAsrServices(<AsrServiceOptions>[unavailable, fallback]);
+      await settings.setSelectedAsrServiceId(unavailable.id);
+      final backend = _FakeSystemBackend();
+      final asr = AsrProvider(
+        systemService: SystemAsrService(backend: backend),
+        localModelInstalledChecker: (_) async => false,
+      );
+      final controller = TextEditingController();
+      addTearDown(asr.dispose);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        harness(settings: settings, asr: asr, controller: controller),
+      );
+      await tester.pump();
+
+      expect(asr.canUse(unavailable), isFalse);
+      expect(find.byTooltip('Voice input'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Voice input'));
+      await tester.pumpAndSettle();
+
+      expect(asr.isActive, isFalse);
+      expect(
+        find.byKey(const ValueKey('voice-settings-inline')),
+        findsOneWidget,
+      );
+      expect(find.text('Missing Offline'), findsOneWidget);
+      expect(find.text('System'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('voice-service-chip:system-fallback')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(settings.selectedAsrServiceId, fallback.id);
+      expect(find.byKey(const ValueKey('voice-settings-inline')), findsNothing);
+      expect(find.byTooltip('Voice input'), findsOneWidget);
+    },
+  );
+
+  testWidgets('long-press mic enters PTT and upward drag locks recording', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    final option = SystemAsrOptions(id: 'system-ptt', name: 'System PTT');
+    await settings.setAsrServices(<AsrServiceOptions>[option]);
+    await settings.setSelectedAsrServiceId(option.id);
+    final backend = _FakeSystemBackend();
+    final asr = AsrProvider(systemService: SystemAsrService(backend: backend));
+    final controller = TextEditingController();
+    addTearDown(asr.dispose);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      harness(settings: settings, asr: asr, controller: controller),
+    );
+    final mic = find.byKey(const ValueKey('voice-mic-trigger'));
+    final gesture = await tester.startGesture(tester.getCenter(mic));
+    await tester.pump(const Duration(milliseconds: 650));
+    backend.emitTranscript('ptt text', false);
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('composer-voice-shell')), findsOneWidget);
+    expect(find.byKey(const ValueKey('voice-ptt-hint')), findsOneWidget);
+
+    await gesture.moveBy(const Offset(0, -60));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('voice-state-locked')), findsOneWidget);
+    await gesture.up();
+    await tester.pump();
+    expect(asr.isActive, isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('voice-stop')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('voice-send')), findsOneWidget);
   });
 
   testWidgets('system ASR replaces partials from a stable draft base', (
@@ -93,8 +184,106 @@ void main() {
     await tester.tap(find.byTooltip('Stop and transcribe to input'));
     await tester.pumpAndSettle();
     expect(controller.text, 'draft hello world');
-    expect(find.byTooltip('Voice input'), findsOneWidget);
+    expect(find.byKey(const ValueKey('composer-voice-shell')), findsOneWidget);
+    expect(find.byKey(const ValueKey('voice-send')), findsOneWidget);
   });
+
+  testWidgets('live ASR remains editable and Stop never auto-sends', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    final option = SystemAsrOptions(id: 'system-edit-test');
+    await settings.setAsrServices(<AsrServiceOptions>[option]);
+    final backend = _FakeSystemBackend();
+    final asr = AsrProvider(systemService: SystemAsrService(backend: backend));
+    final controller = TextEditingController(text: 'draft');
+    var sendCalls = 0;
+    addTearDown(asr.dispose);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      harness(
+        settings: settings,
+        asr: asr,
+        controller: controller,
+        onSend: (_) async {
+          sendCalls++;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+    await tester.tap(find.byTooltip('Voice input'));
+    await tester.pump();
+
+    backend.emitTranscript('hello world', false);
+    await tester.pump();
+    expect(controller.text, 'draft hello world');
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isFalse);
+
+    await tester.enterText(find.byType(TextField), 'draft hello brave world');
+    await tester.pump();
+    backend.emitTranscript('hello world again', false);
+    await tester.pump();
+    expect(controller.text, 'draft hello brave world again');
+
+    await tester.tap(find.byTooltip('Stop and transcribe to input'));
+    await tester.pumpAndSettle();
+
+    expect(sendCalls, 0);
+    expect(controller.text, 'draft hello brave world again');
+    expect(find.byKey(const ValueKey('voice-send')), findsOneWidget);
+    expect(find.byKey(const ValueKey('composer-voice-shell')), findsOneWidget);
+  });
+
+  testWidgets(
+    'voice settings stay inside the same shell and fullscreen uses IME field',
+    (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+      final option = SystemAsrOptions(id: 'system-shell', name: 'System Shell');
+      await settings.setAsrServices(<AsrServiceOptions>[option]);
+      await settings.setSelectedAsrServiceId(option.id);
+      final backend = _FakeSystemBackend();
+      final asr = AsrProvider(
+        systemService: SystemAsrService(backend: backend),
+      );
+      final controller = TextEditingController();
+      addTearDown(asr.dispose);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        harness(settings: settings, asr: asr, controller: controller),
+      );
+      await tester.tap(find.byTooltip('Voice input'));
+      await tester.pump();
+      backend.emitTranscript('editable transcript', false);
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('voice-settings-button')));
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('voice-settings-inline')),
+        findsOneWidget,
+      );
+      expect(find.text('System Shell'), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('voice-fullscreen')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('voice-fullscreen-field')),
+        findsOneWidget,
+      );
+      expect(tester.testTextInput.isVisible, isTrue);
+      await tester.tap(find.byKey(const ValueKey('voice-editor-close')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('voice-stop')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('voice-send')), findsOneWidget);
+    },
+  );
 
   testWidgets('cancelling ASR restores the exact original editing value', (
     tester,
@@ -200,6 +389,7 @@ void main() {
     );
     await tester.tap(find.byTooltip('Voice input'));
     await tester.pump();
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
     capture.add(_pcm16(6000));
     await tester.pump(const Duration(milliseconds: 65));
 
@@ -215,7 +405,7 @@ void main() {
     expect(tester.getSize(localWaveformPaint).width, greaterThan(0));
     expect(tester.getSize(localWaveformPaint).height, 32);
 
-    await tester.tap(find.byTooltip('Stop and transcribe to input'));
+    await tester.tap(find.byKey(const ValueKey('voice-stop')));
     await tester.pump();
 
     expect(
@@ -225,8 +415,7 @@ void main() {
     expect(find.text('Recognizing…'), findsOneWidget);
     expect(transcriptionCalls, 1);
 
-    await tester.tap(find.byTooltip('Stop and transcribe to input'));
-    await tester.pump();
+    expect(find.byKey(const ValueKey('voice-stop')), findsNothing);
     expect(transcriptionCalls, 1);
 
     transcription.complete('local result');
@@ -243,6 +432,8 @@ void main() {
       find.byKey(const ValueKey('voice-transcribing-indicator')),
       findsNothing,
     );
+    expect(find.byKey(const ValueKey('voice-send')), findsOneWidget);
+    expect(find.byKey(const ValueKey('voice-capability')), findsOneWidget);
   });
 }
 

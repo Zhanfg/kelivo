@@ -9,6 +9,7 @@ import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/providers/workspace_provider.dart';
@@ -16,6 +17,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/logging/context_logger.dart';
+import '../../../core/services/logging/context_log_models.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
 import '../../../core/services/workspace/workspace_tools_service.dart';
@@ -23,6 +25,11 @@ import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
+import '../../story_runtime/context/story_context_resource_compiler.dart';
+import '../../story_runtime/context/story_context_resources.dart';
+import '../../story_runtime/orchestration/story_break_armor_mode.dart';
+import '../../story_runtime/orchestration/story_runtime_prompt_service.dart';
+import '../../story_runtime/serialization/story_serialization_tools.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/generation_controller.dart';
 import 'ask_user_interaction_service.dart';
@@ -122,6 +129,53 @@ class MessageGenerationService {
     return budget >= 1024;
   }
 
+  void _injectStoryRuntimeSystemPrompt(
+    List<Map<String, dynamic>> apiMessages,
+    String? storyPrompt,
+  ) {
+    final prompt = (storyPrompt ?? '').trim();
+    if (prompt.isEmpty) return;
+    final systemIndex = apiMessages.indexWhere(
+      (message) => (message['role'] ?? '').toString() == 'system',
+    );
+    if (systemIndex == -1) {
+      apiMessages.insert(0, <String, dynamic>{
+        'role': 'system',
+        'content': prompt,
+      });
+      return;
+    }
+    final existing = (apiMessages[systemIndex]['content'] ?? '')
+        .toString()
+        .trim();
+    apiMessages[systemIndex]['content'] = existing.isEmpty
+        ? prompt
+        : '$existing\n\n$prompt';
+  }
+
+  List<Map<String, dynamic>> _storySerializationToolDefinitions(
+    ProviderKind kind,
+  ) {
+    return StorySerializationTools.definitions()
+        .map((definition) {
+          final normalized = Map<String, dynamic>.from(definition);
+          final function = Map<String, dynamic>.from(
+            normalized['function'] as Map,
+          );
+          final parameters = Map<String, dynamic>.from(
+            function['parameters'] as Map,
+          );
+          function['parameters'] =
+              GenerationController.sanitizeToolParametersForProvider(
+                parameters,
+                kind,
+              );
+          normalized['function'] = function;
+          return normalized;
+        })
+        .toList(growable: false);
+  }
+
   /// Prepare API messages with all injections applied.
   /// [requiredAttachmentMessageId] identifies a new submission; retries and
   /// historical context can legitimately reference attachments since removed.
@@ -194,6 +248,54 @@ class MessageGenerationService {
       modelId,
       conversation: promptConversation,
     );
+
+    BusinessPreferences? storyPreferences;
+    StoryRuntimePromptResult? storyRuntime;
+    try {
+      storyPreferences = contextProvider.read<BusinessPreferences>();
+    } on ProviderNotFoundException {
+      storyPreferences = null;
+    }
+    if (storyPreferences != null) {
+      final storyAssistantId = (assistantId ?? assistant?.id ?? '').trim();
+      if (promptConversation != null && storyAssistantId.isNotEmpty) {
+        storyRuntime = await StoryRuntimePromptService(storyPreferences).build(
+          conversation: promptConversation,
+          messages: messages,
+          assistantId: storyAssistantId,
+        );
+        if (storyRuntime != null) {
+          const storyContextCompiler = StoryContextResourceCompiler();
+          for (final message in apiMessages) {
+            if ((message['role'] ?? '').toString() != 'user') continue;
+            final content = message['content'];
+            if (content is! String || content.isEmpty) continue;
+            final transformed = storyContextCompiler.applyRegex(
+              content,
+              target: StoryRegexTarget.userInput,
+              rules: storyRuntime.regexRules,
+            );
+            if (transformed == content) continue;
+            message['content'] = transformed;
+            if (ContextLogger.enabled) {
+              ContextSegmentTags.replaceWithSingle(
+                message,
+                source: ContextSource.chatHistory,
+                length: transformed.length,
+              );
+            }
+          }
+          StoryBreakArmorMode(
+            storyPreferences,
+          ).prependToSystemPrompt(apiMessages);
+          _injectStoryRuntimeSystemPrompt(
+            apiMessages,
+            storyRuntime.providerText,
+          );
+        }
+      }
+    }
+
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,
@@ -227,6 +329,8 @@ class MessageGenerationService {
         messages,
         versionSelections,
       ),
+      additionalActiveBookIds:
+          storyRuntime?.activeWorldBookIds ?? const <String>{},
     );
 
     WorkspaceToolContext? workspaceContext;
@@ -288,9 +392,14 @@ class MessageGenerationService {
     // reads, memory injection, templating) must never show the bar.
     // Tools are assembled first: whether a data file is read into the prompt
     // or left for the sandbox depends on which tools go with it.
-    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
-      assistant,
-    );
+    var mcpRouteSnapshot = generationController.captureMcpToolRoutes(assistant);
+    if (storyRuntime?.mcpProfileId != null) {
+      mcpRouteSnapshot = mcpRouteSnapshot.filtered(
+        allowedToolNames: storyRuntime!.allowedMcpToolNames,
+        allowedServerIds: storyRuntime.allowedMcpServerIds,
+        includeUnlisted: storyRuntime.includeAssistantMcpDefaults,
+      );
+    }
     final toolDefs = generationController.buildToolDefinitions(
       settings,
       assistant,
@@ -301,6 +410,14 @@ class MessageGenerationService {
       workspaceContext: workspaceContext,
       conversationId: currentConversation?.id,
     );
+    final storySerializationEnabled =
+        storyPreferences != null &&
+        storyRuntime != null &&
+        StorySerializationTools.enabledFor(storyRuntime.activeSkillIds) &&
+        generationController.isToolModel(providerKey, modelId);
+    if (storySerializationEnabled) {
+      toolDefs.addAll(_storySerializationToolDefinitions(kind));
+    }
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,
       modelId: modelId,
@@ -372,7 +489,7 @@ class MessageGenerationService {
     }
     messageBuilderService.stripInternalRevisionIds(apiMessages);
 
-    final onToolCall = toolDefs.isNotEmpty
+    final nativeOnToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
             settings,
             assistant,
@@ -383,6 +500,38 @@ class MessageGenerationService {
             workspaceContext: workspaceContext,
           )
         : null;
+    ToolCallHandler? onToolCall = nativeOnToolCall;
+    if (storySerializationEnabled) {
+      final preferences = storyPreferences;
+      onToolCall = (name, args, {toolCallId}) async {
+        if (StorySerializationTools.names.contains(name)) {
+          final result = await StorySerializationTools.tryHandle(
+            name: name,
+            arguments: args,
+            preferences: preferences,
+            approveRestore: () async {
+              final approval = approvalService;
+              if (approval == null) return false;
+              final providedId = toolCallId?.trim();
+              final decision = await approval.requestApproval(
+                toolCallId: providedId != null && providedId.isNotEmpty
+                    ? providedId
+                    : '${name}_${DateTime.now().microsecondsSinceEpoch}',
+                toolName: name,
+                arguments: args,
+                conversationId: currentConversation?.id,
+              );
+              return decision.approved;
+            },
+          );
+          if (result != null) return result;
+        }
+        if (nativeOnToolCall != null) {
+          return nativeOnToolCall(name, args, toolCallId: toolCallId);
+        }
+        return null;
+      };
+    }
 
     return PreparedGeneration(
       apiMessages: apiMessages,

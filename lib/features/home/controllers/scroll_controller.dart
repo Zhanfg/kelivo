@@ -373,16 +373,24 @@ class ChatScrollController {
 
   /// Records scroll intent from a real pointer, wheel, or keyboard input.
   /// Programmatic position changes must never call this method.
-  void handleUserScrollIntent() {
+  void handleUserScrollIntent({bool revealNavigation = true}) {
     _cancelProgrammaticNavigation();
     _isUserScrolling = true;
     _autoStickToBottom = false;
     _lastJumpUserMessageId = null;
-    if (!_showNavButtons) {
-      _showNavButtons = true;
-      _onStateChanged();
+    if (revealNavigation) {
+      if (!_showNavButtons) {
+        _showNavButtons = true;
+        _onStateChanged();
+      }
+      _resetNavButtonsHideTimer();
+    } else {
+      _navButtonsHideTimer?.cancel();
+      if (_showNavButtons) {
+        _showNavButtons = false;
+        _onStateChanged();
+      }
     }
-    _resetNavButtonsHideTimer();
     _userScrollTimer?.cancel();
     final secs = _getAutoScrollIdleSeconds();
     _userScrollTimer = Timer(Duration(seconds: secs), () {

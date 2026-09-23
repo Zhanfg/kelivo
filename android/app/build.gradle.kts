@@ -21,13 +21,10 @@ android {
         applicationId = "com.psyche.kelivo"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // Kelivo currently ships only English and Chinese app localizations.
-        // Keep transitive Android libraries from packaging unused locale
-        // resources for languages the app cannot select.
         resourceConfigurations += listOf("en", "zh")
         // Flutter controls APK ABI filtering, including --split-per-abi.
         externalNativeBuild {
@@ -46,6 +43,9 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // MOSS and sherpa Android are pinned to the same ONNX Runtime version.
+            // Package a single shared runtime to avoid duplicate native-library merge failures.
+            pickFirsts += setOf("**/libonnxruntime.so")
         }
     }
 
@@ -112,7 +112,6 @@ val requiredProotLibs = requestedProotAbis.flatMap { abi ->
         abi + "/libandroid-shmem.so",
     )
 }
-
 tasks.register<Exec>("fetchProot") {
     val repoRoot = rootProject.projectDir.parentFile
     commandLine("bash", repoRoot.resolve("tool/fetch_proot.sh").absolutePath)

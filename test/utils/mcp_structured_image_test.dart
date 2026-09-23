@@ -97,4 +97,32 @@ void main() {
       isEmpty,
     );
   });
+  test('ClientToolResult keeps durable MCP source metadata', () {
+    final parsed = ClientToolResult.fromHandler(
+      McpToolResult(
+        markdown: 'ok',
+        metadata: const <String, dynamic>{
+          kMcpSourceMetadataKey: <String, dynamic>{
+            'version': kMcpSourceMetadataVersion,
+            'serverId': 'github',
+            'serverName': 'GitHub',
+            'transport': 'http',
+            'toolName': 'get_issue',
+            'exposedName': 'get_issue',
+          },
+        },
+      ),
+    );
+
+    expect(parsed.content, 'ok');
+    expect(
+      (parsed.metadata?[kMcpSourceMetadataKey] as Map?)?['serverName'],
+      'GitHub',
+    );
+    expect(
+      mcpResultImageUris(readMcpResultMetadata(parsed.metadata)),
+      isEmpty,
+    );
+  });
+
 }

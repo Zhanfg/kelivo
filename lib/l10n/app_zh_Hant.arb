@@ -32,6 +32,7 @@
   "settingsPageHotkeys": "快捷鍵",
   "settingsPageChatStorage": "聊天記錄儲存",
   "settingsPageCalculating": "統計中…",
+  "settingsPageFilesCount": "共 {count} 個檔案 · {size}",
   "storageSpacePageTitle": "儲存空間",
   "storageSpaceRefreshTooltip": "重新整理",
   "storageSpaceLoadFailed": "載入失敗",

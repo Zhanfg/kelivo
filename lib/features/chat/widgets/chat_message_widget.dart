@@ -24,6 +24,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/providers/assistant_provider.dart';
 import 'package:intl/intl.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/safe_resize_image.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../../utils/avatar_cache.dart';
@@ -103,6 +104,23 @@ Uri? _tryNormalizeExternalUri(String raw) {
   String? content, {
   Map<String, dynamic>? metadata,
 }) => parseToolResultImages(content, metadata: metadata);
+
+@visibleForTesting
+String? mcpServerNameFromToolMetadata(Map<String, dynamic>? metadata) {
+  if (metadata == null) return null;
+  final raw = metadata[kMcpSourceMetadataKey];
+  if (raw is! Map) return null;
+  final name = (raw['serverName'] ?? '').toString().trim();
+  return name.isEmpty ? null : name;
+}
+
+String? _mcpSourceLabelFromMetadata(Map<String, dynamic>? metadata) {
+  final server = mcpServerNameFromToolMetadata(metadata);
+  return server == null ? null : 'MCP · $server';
+}
+
+String? _mcpSourceLabel(ToolUIPart part) =>
+    _mcpSourceLabelFromMetadata(part.metadata);
 
 @visibleForTesting
 const double kToolImageTimelineHeight = 120;
@@ -713,12 +731,14 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
   final resultText = cleanText.isNotEmpty
       ? _prettyToolJson(cleanText)
       : l10n.chatMessageWidgetNoResultYet;
-  final title = _toolTitleFor(
+  final toolTitle = _toolTitleFor(
     context,
     part.toolName,
     part.arguments,
     isResult: !part.loading,
   );
+  final sourceLabel = _mcpSourceLabel(part);
+  final title = sourceLabel == null ? toolTitle : '$sourceLabel · $toolTitle';
   final closeSemanticLabel = l10n.mcpPageClose;
   final screenTime = part.toolName == LocalToolNames.screenTime
       ? ScreenTimeResult.tryParse(cleanText)
@@ -2434,8 +2454,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           ? (isDark
                 ? cs.primary.withValues(alpha: 0.15)
                 : cs.primary.withValues(alpha: 0.08))
-          : null,
-      bareOnDefault: !isUser,
+          : cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.06),
       isUser: isUser,
       child: child,
     );
@@ -5316,18 +5335,39 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
       widget.part.arguments,
       isResult: !widget.part.loading && !isPendingApproval,
     );
+    final sourceLabel =
+        _mcpSourceLabel(widget.part) ??
+        _mcpSourceLabelFromMetadata(approvalRequest?.metadata);
     final label = ThinkingSheen(
       enabled: widget.part.loading && !_isAskUser,
       color: fg.strong,
-      child: Text(
-        title,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: AppFontWeights.semibold,
-          color: fg.strong,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: AppFontWeights.semibold,
+              color: fg.strong,
+            ),
+          ),
+          if (sourceLabel != null)
+            Text(
+              sourceLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1.25,
+                fontWeight: AppFontWeights.medium,
+                color: fg.muted,
+              ),
+            ),
+        ],
       ),
     );
 
@@ -5614,6 +5654,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
         : null;
     final isPendingApproval = pendingRequest != null;
     final pendingToolCallId = pendingRequest?.toolCallId;
+    final sourceLabel =
+        _mcpSourceLabel(widget.part) ??
+        _mcpSourceLabelFromMetadata(pendingRequest?.metadata);
 
     return IosCardPress(
       borderRadius: BorderRadius.circular(16),
@@ -5703,6 +5746,21 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                           ),
                         ),
                       ),
+                      if (sourceLabel != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            sourceLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              height: 1.2,
+                              fontWeight: AppFontWeights.medium,
+                              color: fg.muted,
+                            ),
+                          ),
+                        ),
                       // "Waiting for approval" subtitle
                       if (isPendingApproval && !isWorkspace) ...[
                         const SizedBox(height: 2),
