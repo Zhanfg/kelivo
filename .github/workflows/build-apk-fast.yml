@@ -11,9 +11,6 @@ on:
   push:
     branches:
       - master
-      - 'feat/**'
-      - 'fix/**'
-      - 'test/**'
     paths:
       - .github/workflows/build-apk-fast.yml
       - lib/**
