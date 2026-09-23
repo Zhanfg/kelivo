@@ -155,6 +155,16 @@ jobs:
       - name: 📦 获取 Flutter 依赖
         run: flutter pub get
 
+      - name: 🔄 刷新 Android 插件配置
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event.inputs.publish_release }}" = "true" ]; then
+            flutter build apk --config-only
+          else
+            flutter build apk --config-only --target-platform android-arm64
+          fi
+
       - name: 🦀 预安装 Android Rust targets
         shell: bash
         run: |
