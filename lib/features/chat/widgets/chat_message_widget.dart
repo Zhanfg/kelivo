@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import '../../../core/services/haptics.dart';
+import '../../../shared/widgets/optional_shader_mask.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
@@ -3269,6 +3270,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               OAuthMessageRecovery(error: error),
             // Action buttons (hidden while generating)
             AnimatedSwitcher(
+              // Retain the expensive assistant subtree across stream completion.
+              key: ValueKey(('assistant-actions', widget.message.isStreaming)),
               duration: const Duration(milliseconds: 220),
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
@@ -5098,46 +5101,33 @@ class _ChainOfThoughtReasoningStepState
     if (state == _ReasoningStepState.preview) {
       content = ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 100),
-        child: _hasOverflow
-            ? ShaderMask(
-                shaderCallback: (rect) {
-                  final h = rect.height;
-                  const double topFade = 12;
-                  const double bottomFade = 28;
-                  final double sTop = (topFade / h).clamp(0.0, 1.0);
-                  final double sBot = (1.0 - bottomFade / h).clamp(0.0, 1.0);
-                  return LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: const [
-                      Color(
-                        0x00FFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                      Color(
-                        0xFFFFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                      Color(
-                        0xFFFFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                      Color(
-                        0x00FFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                    ],
-                    stops: [0.0, sTop, sBot, 1.0],
-                  ).createShader(rect);
-                },
-                blendMode: BlendMode.dstIn,
-                child: SingleChildScrollView(
-                  controller: _scroll,
-                  physics: const BouncingScrollPhysics(),
-                  child: SelectionArea(child: reasoningContent(display)),
-                ),
-              )
-            : SingleChildScrollView(
-                controller: _scroll,
-                physics: const NeverScrollableScrollPhysics(),
-                child: SelectionArea(child: reasoningContent(display)),
-              ),
+        child: OptionalShaderMask(
+          enabled: _hasOverflow,
+          shaderCallback: (rect) {
+            final h = rect.height;
+            const double topFade = 12;
+            const double bottomFade = 28;
+            final double sTop = (topFade / h).clamp(0.0, 1.0);
+            final double sBot = (1.0 - bottomFade / h).clamp(0.0, 1.0);
+            return LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: const [
+                Color(0x00FFFFFF),
+                Color(0xFFFFFFFF),
+                Color(0xFFFFFFFF),
+                Color(0x00FFFFFF),
+              ],
+              stops: [0.0, sTop, sBot, 1.0],
+            ).createShader(rect);
+          },
+          blendMode: BlendMode.dstIn,
+          child: SingleChildScrollView(
+            controller: _scroll,
+            physics: const BouncingScrollPhysics(),
+            child: SelectionArea(child: reasoningContent(display)),
+          ),
+        ),
       );
     } else if (state == _ReasoningStepState.expanded) {
       content = SelectionArea(child: reasoningContent(display));
@@ -7178,54 +7168,41 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
         padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 80),
-          child: _hasOverflow
-              ? ShaderMask(
-                  shaderCallback: (rect) {
-                    final h = rect.height;
-                    const double topFade = 12.0;
-                    const double bottomFade = 28.0;
-                    final double sTop = (topFade / h).clamp(0.0, 1.0);
-                    final double sBot = (1.0 - bottomFade / h).clamp(0.0, 1.0);
-                    return LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: const [
-                        Color(
-                          0x00FFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                        Color(
-                          0xFFFFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                        Color(
-                          0xFFFFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                        Color(
-                          0x00FFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                      ],
-                      stops: [0.0, sTop, sBot, 1.0],
-                    ).createShader(rect);
-                  },
-                  blendMode: BlendMode.dstIn,
-                  child: NotificationListener<ScrollUpdateNotification>(
-                    onNotification: (_) {
-                      WidgetsBinding.instance.addPostFrameCallback(
-                        (_) => _checkOverflow(),
-                      );
-                      return false;
-                    },
-                    child: SingleChildScrollView(
-                      controller: _scroll,
-                      physics: const BouncingScrollPhysics(),
-                      child: reasoningContent(display),
-                    ),
-                  ),
-                )
-              : SingleChildScrollView(
-                  controller: _scroll,
-                  physics: const NeverScrollableScrollPhysics(),
-                  child: reasoningContent(display),
-                ),
+          child: OptionalShaderMask(
+            enabled: _hasOverflow,
+            shaderCallback: (rect) {
+              final h = rect.height;
+              const double topFade = 12.0;
+              const double bottomFade = 28.0;
+              final double sTop = (topFade / h).clamp(0.0, 1.0);
+              final double sBot = (1.0 - bottomFade / h).clamp(0.0, 1.0);
+              return LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: const [
+                  Color(0x00FFFFFF),
+                  Color(0xFFFFFFFF),
+                  Color(0xFFFFFFFF),
+                  Color(0x00FFFFFF),
+                ],
+                stops: [0.0, sTop, sBot, 1.0],
+              ).createShader(rect);
+            },
+            blendMode: BlendMode.dstIn,
+            child: NotificationListener<ScrollUpdateNotification>(
+              onNotification: (_) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => _checkOverflow(),
+                );
+                return false;
+              },
+              child: SingleChildScrollView(
+                controller: _scroll,
+                physics: const BouncingScrollPhysics(),
+                child: reasoningContent(display),
+              ),
+            ),
+          ),
         ),
       );
     }
