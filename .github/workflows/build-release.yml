@@ -1,4 +1,4 @@
-name: Flutter Multi-Platform Build
+name: Release APK / Multi-Platform
 
 on:
   # 手动触发
@@ -119,6 +119,17 @@ jobs:
             android/app/src/main/jniLibs/x86_64
           key: ${{ runner.os }}-proot-jni-${{ github.event.inputs.publish_release == 'true' && 'all' || 'arm64' }}-${{ hashFiles('tool/fetch_proot.sh', 'tool/proot_checksums.txt') }}
 
+      - name: 🧰 缓存 Cargo 下载
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-android-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-android-release-
+            ${{ runner.os }}-cargo-
+
       - name: 📝 Inject fallback
         shell: bash
         run: |
@@ -164,6 +175,9 @@ jobs:
           else
             flutter build apk --config-only --target-platform android-arm64
           fi
+
+      - name: 🔍 Release 静态检查
+        run: dart analyze --fatal-infos lib test integration_test
 
       - name: 🦀 预安装 Android Rust targets
         shell: bash
