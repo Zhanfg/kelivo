@@ -155,6 +155,16 @@ jobs:
       - name: 📦 获取 Flutter 依赖
         run: flutter pub get
 
+      - name: 🦀 预安装 Android Rust targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup target add --toolchain stable aarch64-linux-android
+          if [ "${{ github.event.inputs.publish_release }}" = "true" ]; then
+            rustup target add --toolchain stable armv7-linux-androideabi x86_64-linux-android
+          fi
+
       - name: 🏗️ 构建 APK
         shell: bash
         run: |
