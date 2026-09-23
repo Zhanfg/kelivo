@@ -1,25 +1,42 @@
 name: Fast Android APK
 
 on:
+  workflow_dispatch:
+    inputs:
+      flutter_version:
+        description: 'Flutter version'
+        required: false
+        default: '3.44.9'
+        type: string
   push:
     branches:
-      - feat/story-runtime-foundation
+      - master
+      - fix/agent-product-runtime-20260921
     paths:
       - .github/workflows/build-apk-fast.yml
-  workflow_dispatch:
+      - android/**
+      - tool/fetch_proot.sh
+      - tool/proot_checksums.txt
+      - tool/prepare_agent_runtime.sh
+      - assets/agent_runtime/**
+      - pubspec.yaml
+      - dependencies/**/pubspec.yaml
 
-env:
-  FLUTTER_VERSION: '3.44.9'
+concurrency:
+  group: fast-android-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   android-arm64:
     name: Build Android arm64 APK
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -31,9 +48,23 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
+          flutter-version: ${{ inputs.flutter_version || '3.44.9' }}
           cache: true
+
+      - name: Cache Pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Cache arm64 PRoot JNI
+        uses: actions/cache@v4
+        with:
+          path: android/app/src/main/jniLibs/arm64-v8a
+          key: ${{ runner.os }}-proot-jni-arm64-${{ hashFiles('tool/fetch_proot.sh', 'tool/proot_checksums.txt') }}
 
       - name: Inject fallback stub
         shell: bash
@@ -53,19 +84,52 @@ jobs:
       - name: Generate l10n
         run: flutter gen-l10n
 
-      - name: Build arm64 release APK
-        run: flutter build apk --release --target-platform android-arm64
+      - name: Build optimized arm64 release APK
+        env:
+          KELIVO_ANDROID_ABIS: arm64-v8a
+        run: |
+          flutter build apk \
+            --release \
+            --no-pub \
+            --target-platform android-arm64 \
+            --split-per-abi \
+            --split-debug-info=build/symbols/android
 
-      - name: Rename APK
+      - name: Report APK size
         shell: bash
         run: |
-          SHORT_SHA="$(git rev-parse --short HEAD)"
-          VERSION="$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | tr -d ' ')"
-          cp build/app/outputs/flutter-apk/app-release.apk "Kelivo_story_$VERSION_${SHORT_SHA}_arm64-v8a.apk"
+          APK="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*arm64-v8a*release.apk' -print -quit)"
+          test -n "$APK"
+          ls -lh "$APK"
+          du -h "$APK"
+          echo "Largest APK entries:"
+          unzip -l "$APK" \
+            | awk 'NF == 4 && $1 ~ /^[0-9]+$/ {print $1, $4}' \
+            | sort -nr \
+            | head -n 40 \
+            | tee build/android-apk-largest-files.txt
 
-      - name: Upload APK
+      - name: Upload arm64 APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kelivo-Story-Android-arm64
-          path: Kelivo_story_*_arm64-v8a.apk
+          name: Kelivo-Android-arm64-fast
+          path: build/app/outputs/flutter-apk/*arm64-v8a*release.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kelivo-Android-arm64-symbols
+          path: build/symbols/android
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload size report
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kelivo-Android-arm64-size-report
+          path: build/android-apk-largest-files.txt
+          if-no-files-found: error
           retention-days: 14
