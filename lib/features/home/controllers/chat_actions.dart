@@ -349,7 +349,7 @@ class ChatActions {
           ? BackgroundTaskPhase.retrying
           : activeTool != null
           ? BackgroundTaskPhase.tool
-          : state.fullContentRaw.isEmpty && state.reasoningStartAt != null
+          : !state.hasContent && state.reasoningStartAt != null
           ? BackgroundTaskPhase.thinking
           : BackgroundTaskPhase.generating,
       tokens: state.totalTokens,
@@ -852,6 +852,12 @@ class ChatActions {
   }
 
   @visibleForTesting
+  Future<void> debugHandleStreamChunk(
+    StreamChunk chunk,
+    stream_ctrl.StreamingState state,
+  ) => _handleStreamChunk(chunk, state);
+
+  @visibleForTesting
   static StreamSubscription<T> listenSequentiallyToStream<T>({
     required Stream<T> stream,
     required Future<void> Function(T chunk) onData,
@@ -863,6 +869,11 @@ class ChatActions {
     late final StreamSubscription<T> sourceSubscription;
     Future<void>? drainFuture;
     var terminalQueued = false;
+    var pausedForBacklog = false;
+    // Allow a short burst, then apply backpressure when processing falls behind.
+    const highWaterMark = 128;
+    const lowWaterMark = 64;
+    const processingBudget = Duration(milliseconds: 4);
 
     Future<void> reportError(Object error, StackTrace stackTrace) async {
       try {
@@ -881,6 +892,7 @@ class ChatActions {
     }
 
     Future<void> drain() async {
+      final budget = Stopwatch()..start();
       try {
         while (events.isNotEmpty) {
           final event = events.removeFirst();
@@ -896,6 +908,16 @@ class ChatActions {
             return;
           }
           await onData(event.data as T);
+          if (pausedForBacklog && events.length <= lowWaterMark) {
+            pausedForBacklog = false;
+            sourceSubscription.resume();
+          }
+          if (events.isNotEmpty && budget.elapsed >= processingBudget) {
+            // Yield a real event-loop turn so input/vsync/other conversations
+            // stay responsive even when handlers complete synchronously.
+            await Future<void>.delayed(Duration.zero);
+            budget.reset();
+          }
         }
       } catch (error, stackTrace) {
         terminalQueued = true;
@@ -917,6 +939,10 @@ class ChatActions {
       ({T? data, Object? error, StackTrace? stackTrace, bool done}) event,
     ) {
       events.add(event);
+      if (!pausedForBacklog && events.length >= highWaterMark) {
+        pausedForBacklog = true;
+        sourceSubscription.pause();
+      }
       scheduleDrain();
     }
 
@@ -2473,11 +2499,13 @@ class ChatActions {
   void _publishAssistantParts(stream_ctrl.StreamingState state) {
     if (!state.ctx.streamOutput || state.finishHandled) return;
     streamController.streamingContentNotifier.getNotifier(state.messageId);
-    streamController.streamingContentNotifier.updateContent(
+    streamController.schedulePartsUpdate(
       state.messageId,
-      _transformAssistantContent(state),
-      state.totalTokens,
-      parts: _assistantPartsForState(state),
+      state.conversationId,
+      contentBuilder: () => _transformAssistantContent(state),
+      partsBuilder: (visibleText) =>
+          _assistantPartsForState(state, visibleText: visibleText),
+      totalTokens: state.totalTokens,
     );
   }
 
@@ -2884,7 +2912,7 @@ class ChatActions {
 
   void _recordContent(stream_ctrl.StreamingState state, String chunkContent) {
     if (chunkContent.isNotEmpty) {
-      state.fullContentRaw += chunkContent;
+      state.appendContent(chunkContent);
     }
   }
 }
