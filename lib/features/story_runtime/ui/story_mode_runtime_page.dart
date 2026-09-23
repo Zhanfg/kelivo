@@ -129,6 +129,7 @@ class _StoryModeRuntimePageState extends State<StoryModeRuntimePage> {
       await transition.setMode(conversationId: id, storyEnabled: enabled);
       if (!enabled && chatService.currentConversationId == id) {
         await preferences.setBool(storyWorkspaceSelectedKey, false);
+        if (!mounted) return;
         final workspace = context.read<WorkspaceModeProvider>();
         if (workspace.mode == WorkspaceMode.story) {
           await workspace.setMode(WorkspaceMode.chat);
