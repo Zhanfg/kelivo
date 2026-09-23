@@ -62,7 +62,10 @@ String projectStoryReadableOrOriginal(
       storyEventsCommentEnd,
       start + storyEventsCommentStart.length,
     );
-    if (end < 0) return '';
+    if (end < 0) {
+      final visiblePrefix = raw.substring(0, start).trimRight();
+      return visiblePrefix;
+    }
     final eventJson = raw
         .substring(start + storyEventsCommentStart.length, end)
         .trim();
