@@ -10,6 +10,8 @@ import '../core/services/chat/chat_service.dart';
 import '../core/models/conversation.dart';
 import '../theme/app_font_weights.dart';
 import '../features/home/controllers/chat_actions.dart';
+import '../features/home/models/workspace_mode.dart';
+import '../features/home/providers/workspace_mode_provider.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 Future<String?> showChatHistoryDesktopDialog(
@@ -50,13 +52,16 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
     final cs = Theme.of(context).colorScheme;
 
     final chatService = context.watch<ChatService>();
+    final workspaceMode = context.watch<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
     final List<Conversation> all = chatService
         .getAllConversations()
         .where(
           (c) =>
-              widget.assistantId == null ||
-              c.assistantId == widget.assistantId ||
-              c.assistantId == null,
+              workspaceMode != WorkspaceMode.agent &&
+              workspaceModeFromConversationExtras(c.extras) == workspaceMode &&
+              (widget.assistantId == null ||
+                  c.assistantId == widget.assistantId ||
+                  c.assistantId == null),
         )
         .toList();
 
@@ -151,6 +156,11 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                                 .getAllConversations()
                                 .where(
                                   (c) =>
+                                      workspaceMode != WorkspaceMode.agent &&
+                                      workspaceModeFromConversationExtras(
+                                            c.extras,
+                                          ) ==
+                                          workspaceMode &&
                                       c.assistantId == widget.assistantId &&
                                       !c.isPinned,
                                 )

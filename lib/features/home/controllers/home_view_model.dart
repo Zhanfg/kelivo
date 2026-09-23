@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
@@ -17,6 +18,8 @@ import '../../../core/services/memory/memory_trace.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
+import '../../story_runtime/orchestration/story_mode_transition_service.dart';
+import '../models/workspace_mode.dart';
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/chat_suggestion_service.dart';
@@ -1212,10 +1215,13 @@ class HomeViewModel extends ChangeNotifier {
           .read<SettingsProvider>()
           .forkKeepMessageVersions,
     );
+    await _bootstrapForkWorkspace(sourceConversation, newConvo);
+    final resolvedNewConvo =
+        _chatService.getConversation(newConvo.id) ?? newConvo;
 
     // Switch to the new conversation
-    _chatService.setCurrentConversation(newConvo.id);
-    await _chatController.setCurrentConversationAndLoad(newConvo);
+    _chatService.setCurrentConversation(resolvedNewConvo.id);
+    await _chatController.setCurrentConversationAndLoad(resolvedNewConvo);
     _restoreMessageUiState();
     onConversationSwitched?.call();
     notifyListeners();
@@ -1420,11 +1426,12 @@ class HomeViewModel extends ChangeNotifier {
           assistantId: convo.assistantId,
           sourceMessages: [summaryMsg, ...keptMessages],
         );
+        await _bootstrapForkWorkspace(convo, newConvo);
+        final resolvedNewConvo =
+            _chatService.getConversation(newConvo.id) ?? newConvo;
 
-        _chatService.setCurrentConversation(newConvo.id);
-        await _chatController.setCurrentConversationAndLoad(
-          _chatService.getConversation(newConvo.id) ?? newConvo,
-        );
+        _chatService.setCurrentConversation(resolvedNewConvo.id);
+        await _chatController.setCurrentConversationAndLoad(resolvedNewConvo);
         _restoreMessageUiState();
         _streamController.clearAllState();
         onConversationSwitched?.call();
@@ -1445,12 +1452,13 @@ class HomeViewModel extends ChangeNotifier {
         role: 'user',
         content: summary,
       );
+      await _bootstrapForkWorkspace(convo, newConvo);
+      final resolvedNewConvo =
+          _chatService.getConversation(newConvo.id) ?? newConvo;
 
       // Switch to the new conversation
-      _chatService.setCurrentConversation(newConvo.id);
-      await _chatController.setCurrentConversationAndLoad(
-        _chatService.getConversation(newConvo.id) ?? newConvo,
-      );
+      _chatService.setCurrentConversation(resolvedNewConvo.id);
+      await _chatController.setCurrentConversationAndLoad(resolvedNewConvo);
       _streamController.clearAllState();
       onConversationSwitched?.call();
       notifyListeners();
@@ -1464,6 +1472,23 @@ class HomeViewModel extends ChangeNotifier {
       );
       return e.toString();
     }
+  }
+
+  Future<void> _bootstrapForkWorkspace(
+    Conversation source,
+    Conversation forked,
+  ) async {
+    if (workspaceModeFromConversationExtras(source.extras) !=
+        WorkspaceMode.story) {
+      return;
+    }
+    await StoryModeTransitionService(
+      preferences: _contextProvider.read<BusinessPreferences>(),
+      chatService: _chatService,
+    ).setMode(
+      conversationId: forked.id,
+      storyEnabled: true,
+    );
   }
 
   /// Update current conversation reference.

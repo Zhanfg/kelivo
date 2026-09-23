@@ -3148,6 +3148,7 @@ class ChatDatabaseRepository {
     String? conversationId,
     String? excludeConversationId,
     String? assistantId,
+    String? workspaceMode,
   }) {
     return _observer.measure(
       ChatDatabaseOperation.querySearch,
@@ -3159,6 +3160,7 @@ class ChatDatabaseRepository {
         conversationId: conversationId,
         excludeConversationId: excludeConversationId,
         assistantId: assistantId,
+        workspaceMode: workspaceMode,
       ),
       resultCount: (rows) => rows.length,
     );
@@ -3172,6 +3174,7 @@ class ChatDatabaseRepository {
     String? conversationId,
     String? excludeConversationId,
     String? assistantId,
+    String? workspaceMode,
   }) async {
     final cleanTokens = tokens
         .map((token) => token.trim().toLowerCase())
@@ -3263,6 +3266,15 @@ class ChatDatabaseRepository {
     if (assistantId != null && assistantId.isNotEmpty) {
       scopeSql += ' AND (c.assistant_id = ? OR c.assistant_id IS NULL)';
       scopeArgs.add(assistantId);
+    }
+    if (workspaceMode == 'story') {
+      scopeSql +=
+          " AND json_extract(c.extras_json, '\$.workspace_mode_v1') = ?";
+      scopeArgs.add('story');
+    } else if (workspaceMode == 'chat') {
+      scopeSql +=
+          " AND COALESCE(json_extract(c.extras_json, '\$.workspace_mode_v1'), 'chat') = ?";
+      scopeArgs.add('chat');
     }
 
     final candidateLimit = (limit * candidateMultiplier)

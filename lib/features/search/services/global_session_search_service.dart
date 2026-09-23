@@ -37,11 +37,15 @@ class GlobalSessionSearchService {
     r'<reasoning>[\s\S]*?<\/reasoning>',
     caseSensitive: false,
   );
+  static final RegExp _storyEventsRe = RegExp(
+    r'<!--KELIVO_STORY_EVENTS[\s\S]*?(?:KELIVO_STORY_EVENTS-->|$)',
+  );
 
   static Future<List<GlobalSessionSearchResult>> search({
     required ChatService chatService,
     required String query,
     int limit = 200,
+    String? workspaceMode,
   }) async {
     final normalized = query.trim();
     if (normalized.isEmpty) return const <GlobalSessionSearchResult>[];
@@ -53,6 +57,7 @@ class GlobalSessionSearchService {
     final candidates = await chatService.searchConversationMatches(
       tokens: tokens,
       limit: limit,
+      workspaceMode: workspaceMode,
     );
     final grouped = <String, List<ConversationSearchMatch>>{};
     for (final candidate in candidates) {
@@ -286,7 +291,8 @@ class GlobalSessionSearchService {
       content
           .replaceAll(_geminiThoughtSigRe, ' ')
           .replaceAll(_thinkBlockRe, ' ')
-          .replaceAll(_reasoningBlockRe, ' '),
+          .replaceAll(_reasoningBlockRe, ' ')
+          .replaceAll(_storyEventsRe, ' '),
     );
   }
 

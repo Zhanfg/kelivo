@@ -11,6 +11,10 @@ on:
       - "lib/features/agent/ui/agent_settings_page.dart"
       - "lib/features/home/widgets/workspace_mode_selector.dart"
       - "lib/features/home/pages/home_page.dart"
+      - "lib/features/home/controllers/scroll_controller.dart"
+      - "lib/features/home/models/workspace_mode.dart"
+      - "lib/features/story_runtime/ui/story_narrative_view.dart"
+      - "lib/features/story_runtime/parsing/story_readable_projection.dart"
       - "lib/features/home/widgets/chat_input_bar.dart"
       - "lib/features/model/widgets/model_select_sheet.dart"
       - "lib/features/settings/search/**"
@@ -18,6 +22,10 @@ on:
       - "test/features/settings/search/settings_search_index_test.dart"
       - "test/features/model/widgets/model_select_sheet_test.dart"
       - "test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart"
+      - "test/features/home/models/workspace_mode_test.dart"
+      - "test/features/story_runtime/story_narrative_view_test.dart"
+      - "test/features/story_runtime/ui/story_narrative_view_test.dart"
+      - "test/story_readable_projection_test.dart"
   pull_request:
     branches:
       - master
@@ -28,6 +36,10 @@ on:
       - "lib/features/agent/ui/agent_settings_page.dart"
       - "lib/features/home/widgets/workspace_mode_selector.dart"
       - "lib/features/home/pages/home_page.dart"
+      - "lib/features/home/controllers/scroll_controller.dart"
+      - "lib/features/home/models/workspace_mode.dart"
+      - "lib/features/story_runtime/ui/story_narrative_view.dart"
+      - "lib/features/story_runtime/parsing/story_readable_projection.dart"
       - "lib/features/home/widgets/chat_input_bar.dart"
       - "lib/features/model/widgets/model_select_sheet.dart"
       - "lib/features/settings/search/**"
@@ -35,6 +47,10 @@ on:
       - "test/features/settings/search/settings_search_index_test.dart"
       - "test/features/model/widgets/model_select_sheet_test.dart"
       - "test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart"
+      - "test/features/home/models/workspace_mode_test.dart"
+      - "test/features/story_runtime/story_narrative_view_test.dart"
+      - "test/features/story_runtime/ui/story_narrative_view_test.dart"
+      - "test/story_readable_projection_test.dart"
   workflow_dispatch:
 
 concurrency:
@@ -66,4 +82,8 @@ jobs:
             test/features/settings/search/settings_search_index_test.dart \
             test/features/model/widgets/model_select_sheet_test.dart \
             test/features/home/controllers/home_page_controller_switch_test.dart \
-            test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart
+            test/features/home/widgets/chat_input_bar_conversation_switch_send_test.dart \
+            test/features/home/models/workspace_mode_test.dart \
+            test/features/story_runtime/story_narrative_view_test.dart \
+            test/features/story_runtime/ui/story_narrative_view_test.dart \
+            test/story_readable_projection_test.dart

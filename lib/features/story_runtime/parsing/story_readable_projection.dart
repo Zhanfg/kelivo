@@ -62,7 +62,10 @@ String projectStoryReadableOrOriginal(
       storyEventsCommentEnd,
       start + storyEventsCommentStart.length,
     );
-    if (end < 0) return '';
+    if (end < 0) {
+      final visiblePrefix = raw.substring(0, start).trimRight();
+      return visiblePrefix;
+    }
     final eventJson = raw
         .substring(start + storyEventsCommentStart.length, end)
         .trim();
@@ -75,7 +78,7 @@ String projectStoryReadableOrOriginal(
 
   final projected = tryProjectStoryReadable(raw, turnId: turnId);
   if (projected != null) return projected.markdown;
-  if (streaming && looksLikeStoryEnvelopePrefix(raw)) return '';
+  if (looksLikeStoryEnvelopePrefix(raw)) return '';
   return raw;
 }
 

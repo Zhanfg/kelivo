@@ -1,14 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/database/business_preferences.dart';
-import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
 import '../models/workspace_mode.dart';
 import '../providers/workspace_mode_provider.dart';
-import '../../story_runtime/orchestration/story_mode_transition_service.dart';
 import '../../story_runtime/ui/story_conversation_mode_control.dart';
 
 /// Stable app-bar mode switcher.
@@ -21,6 +21,7 @@ import '../../story_runtime/ui/story_conversation_mode_control.dart';
 class WorkspaceModeTitle extends StatelessWidget {
   const WorkspaceModeTitle({
     super.key,
+    this.onModeChanged,
     this.availableModes = const <WorkspaceMode>[
       WorkspaceMode.chat,
       WorkspaceMode.story,
@@ -29,6 +30,7 @@ class WorkspaceModeTitle extends StatelessWidget {
     this.compact = false,
   });
 
+  final Future<void> Function(WorkspaceMode mode)? onModeChanged;
   final List<WorkspaceMode> availableModes;
   final bool compact;
 
@@ -48,7 +50,13 @@ class WorkspaceModeTitle extends StatelessWidget {
       ),
       enabled: !provider.busy,
       initialValue: selected,
-      onSelected: (mode) => _switchWorkspaceMode(context, mode),
+      onSelected: (mode) => unawaited(
+        _switchWorkspaceMode(
+          context,
+          mode,
+          onModeChanged: onModeChanged,
+        ),
+      ),
       position: PopupMenuPosition.under,
       constraints: const BoxConstraints(minWidth: 170),
       itemBuilder: (context) => [
@@ -91,6 +99,7 @@ class WorkspaceModeTitle extends StatelessWidget {
 class WorkspaceModeHeader extends StatelessWidget {
   const WorkspaceModeHeader({
     super.key,
+    this.onModeChanged,
     this.modelDisplay,
     this.providerName,
     this.onSelectModel,
@@ -102,6 +111,7 @@ class WorkspaceModeHeader extends StatelessWidget {
     this.compact = false,
   });
 
+  final Future<void> Function(WorkspaceMode mode)? onModeChanged;
   final String? modelDisplay;
   final String? providerName;
   final VoidCallback? onSelectModel;
@@ -115,6 +125,7 @@ class WorkspaceModeHeader extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         WorkspaceModeTitle(
+          onModeChanged: onModeChanged,
           availableModes: availableModes,
           compact: compact,
         ),
@@ -204,32 +215,34 @@ class _HeaderButton extends StatelessWidget {
   }
 }
 
+bool _workspaceModeSwitchInFlight = false;
+
 Future<void> _switchWorkspaceMode(
   BuildContext context,
-  WorkspaceMode mode,
-) async {
+  WorkspaceMode mode, {
+  Future<void> Function(WorkspaceMode mode)? onModeChanged,
+}) async {
   final provider = context.read<WorkspaceModeProvider>();
-  if (provider.busy || provider.mode == mode) return;
-
-  final preferences = context.read<BusinessPreferences>();
-  final chat = context.read<ChatService>();
-  final conversationId = chat.currentConversationId;
-  if (mode == WorkspaceMode.story && conversationId != null) {
-    await StoryModeTransitionService(
-      preferences: preferences,
-      chatService: chat,
-    ).setMode(
-      conversationId: conversationId,
-      storyEnabled: true,
-    );
+  if (_workspaceModeSwitchInFlight || provider.busy || provider.mode == mode) {
+    return;
   }
-  await preferences.setBool(
-    storyWorkspaceSelectedKey,
-    mode == WorkspaceMode.story,
-  );
-  await provider.setMode(mode);
-  storyConversationModeRevision.value++;
-  Haptics.light();
+
+  _workspaceModeSwitchInFlight = true;
+  try {
+    final preferences = context.read<BusinessPreferences>();
+    await preferences.setBool(
+      storyWorkspaceSelectedKey,
+      mode == WorkspaceMode.story,
+    );
+    await provider.setMode(mode);
+    if (onModeChanged != null) {
+      await onModeChanged(mode);
+    }
+    storyConversationModeRevision.value++;
+    Haptics.light();
+  } finally {
+    _workspaceModeSwitchInFlight = false;
+  }
 }
 
 String _modeLabel(WorkspaceMode mode, bool zh) => switch (mode) {

@@ -57,8 +57,12 @@ import '../services/file_upload_service.dart';
 import '../utils/chat_layout_constants.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/share_destination_sheet.dart';
+import '../models/workspace_mode.dart';
+import '../providers/workspace_mode_provider.dart';
 import '../../model/widgets/model_select_sheet.dart';
+import '../../story_runtime/orchestration/story_mode_transition_service.dart';
 import '../../story_runtime/orchestration/story_native_lifecycle_bridge.dart';
+import '../../story_runtime/parsing/story_readable_projection.dart';
 import '../../story_runtime/voice/story_voice_playback_service.dart';
 
 enum ChatSelectionMode { share, delete }
@@ -357,8 +361,18 @@ class HomePageController extends ChangeNotifier {
   bool get isTemporaryConversation =>
       _chatService.isTemporaryConversation(currentConversation?.id);
 
+  WorkspaceMode get _activeWorkspaceMode {
+    try {
+      return _context.read<WorkspaceModeProvider>().mode;
+    } catch (_) {
+      return WorkspaceMode.chat;
+    }
+  }
+
   bool get canToggleTemporaryConversation =>
-      currentConversation != null && messages.isEmpty;
+      _activeWorkspaceMode != WorkspaceMode.story &&
+      currentConversation != null &&
+      messages.isEmpty;
 
   @override
   void notifyListeners() {
@@ -1036,6 +1050,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> toggleTemporaryConversation() async {
+    if (!canToggleTemporaryConversation) return;
     await _viewModel.toggleTemporaryConversation();
   }
 
@@ -1309,12 +1324,42 @@ class HomePageController extends ChangeNotifier {
     _translations.clear();
     final previousId = currentConversation?.id;
     await _viewModel.createNewConversation();
+    await _adoptCurrentConversationForWorkspace();
     if (currentConversation?.id != null &&
         currentConversation!.id != previousId) {
       _clearSelectionState();
     }
     notifyListeners();
     _scrollToBottomSoon(animate: false);
+  }
+
+  Future<void> _adoptCurrentConversationForWorkspace() async {
+    if (!_context.mounted || _activeWorkspaceMode != WorkspaceMode.story) {
+      return;
+    }
+    final conversation = currentConversation;
+    if (conversation == null) return;
+
+    await StoryModeTransitionService(
+      preferences: _context.read<BusinessPreferences>(),
+      chatService: _chatService,
+    ).setMode(
+      conversationId: conversation.id,
+      storyEnabled: true,
+    );
+    final updated = _chatService.getConversation(conversation.id);
+    if (updated != null) {
+      _viewModel.updateCurrentConversation(updated);
+    }
+  }
+
+  void syncCurrentConversationFromService() {
+    final id = currentConversation?.id;
+    if (id == null) return;
+    final updated = _chatService.getConversation(id);
+    if (updated != null) {
+      _viewModel.updateCurrentConversation(updated);
+    }
   }
 
   /// Clears selection chrome without notifying.
@@ -1848,7 +1893,10 @@ class HomePageController extends ChangeNotifier {
       final preferences = _context.read<BusinessPreferences>();
       await StoryNativeLifecycleBridge(
         preferences,
-      ).commitFinalizedAssistant(message);
+      ).commitFinalizedAssistant(
+        message,
+        chatService: _context.read<ChatService>(),
+      );
     } catch (error) {
       debugPrint('Story finalize bridge failed: $error');
     }
@@ -1895,8 +1943,15 @@ class HomePageController extends ChangeNotifier {
     }
 
     final sp = _context.read<SettingsProvider>();
+    final readableContent = message.role == 'assistant'
+        ? projectStoryReadableOrOriginal(
+            message.content,
+            turnId: message.id,
+            streaming: message.isStreaming,
+          )
+        : message.content;
     final text = TtsTextSelection.apply(
-      message.content,
+      readableContent,
       mode: sp.ttsTextSelectionMode,
     );
     if (text.trim().isEmpty) return;
