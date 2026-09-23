@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-\${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -29,7 +29,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: \${{ env.FLUTTER_VERSION }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -37,9 +37,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          key: \${{ runner.os }}-pub-\${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
           restore-keys: |
-            \${{ runner.os }}-pub-
+            ${{ runner.os }}-pub-
 
       - name: Flutter pub get
         run: flutter pub get
@@ -48,18 +48,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          HEAD_SHA="\${{ github.sha }}"
+          HEAD_SHA="${{ github.sha }}"
 
-          if [ "\${{ github.event_name }}" = "pull_request" ]; then
-            BASE_SHA="\${{ github.event.pull_request.base.sha }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
           else
-            BASE_SHA="\${{ github.event.before }}"
+            BASE_SHA="${{ github.event.before }}"
           fi
 
-          if [ -z "\${BASE_SHA:-}" ] \
+          if [ -z "${BASE_SHA:-}" ] \
              || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] \
-             || ! git cat-file -e "\${BASE_SHA}^{commit}" 2>/dev/null; then
-            BASE_SHA="$(git rev-parse "\${HEAD_SHA}^" 2>/dev/null || echo "$HEAD_SHA")"
+             || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            BASE_SHA="$(git rev-parse "${HEAD_SHA}^" 2>/dev/null || echo "$HEAD_SHA")"
           fi
 
           files="$(git diff --diff-filter=ACMR --name-only "$BASE_SHA" "$HEAD_SHA" -- \
@@ -79,11 +79,11 @@ jobs:
           git diff --exit-code -- lib/l10n
 
       - name: No new untranslated messages
-        if: \${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' }}
         shell: bash
         run: |
           set -euo pipefail
-          BASE_SHA='\${{ github.event.pull_request.base.sha }}'
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
           BASE_DIR="$(mktemp -d)"
           cleanup() {
             git worktree remove --force "$BASE_DIR" >/dev/null 2>&1 || true
@@ -105,7 +105,7 @@ jobs:
         run: dart analyze --fatal-infos lib test integration_test
 
   tests:
-    name: Flutter tests / shard \${{ matrix.shard }}
+    name: Flutter tests / shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -120,7 +120,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: \${{ env.FLUTTER_VERSION }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -128,15 +128,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          key: \${{ runner.os }}-pub-\${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
           restore-keys: |
-            \${{ runner.os }}-pub-
+            ${{ runner.os }}-pub-
 
       - name: Flutter pub get
         run: flutter pub get
 
       - name: Run shard
         env:
-          SHARD: \${{ matrix.shard }}
+          SHARD: ${{ matrix.shard }}
           SHARD_COUNT: '4'
         run: bash .github/scripts/run_test_shard.sh
