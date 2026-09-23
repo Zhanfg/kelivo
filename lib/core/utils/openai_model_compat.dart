@@ -103,6 +103,7 @@ const OpenAIReasoningSupport _grok45Support = OpenAIReasoningSupport(
   supportedEfforts: <String>['low', 'medium', 'high'],
   offFallback: 'low',
 );
+// Grok 4.6 and 4.7 share the low/medium/high/xhigh reasoning ladder.
 const OpenAIReasoningSupport _grok46Support = OpenAIReasoningSupport(
   supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
   offFallback: 'low',
@@ -297,7 +298,7 @@ OpenAIReasoningSupport? openAIReasoningSupport(String modelId) {
   if (_matchesModel(normalized, r'(^|[/_:@])kimi-k3(?:$|[-.])')) {
     return _kimiK3Support;
   }
-  if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.6(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.(?:6|7)(?:$|[-.])')) {
     return _grok46Support;
   }
   if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.5(?:$|[-.])')) {
