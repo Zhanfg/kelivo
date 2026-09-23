@@ -3269,11 +3269,11 @@ class ChatDatabaseRepository {
     }
     if (workspaceMode == 'story') {
       scopeSql +=
-          " AND json_extract(c.extras_json, '$.workspace_mode_v1') = ?";
+          " AND json_extract(c.extras_json, '\$.workspace_mode_v1') = ?";
       scopeArgs.add('story');
     } else if (workspaceMode == 'chat') {
       scopeSql +=
-          " AND COALESCE(json_extract(c.extras_json, '$.workspace_mode_v1'), 'chat') = ?";
+          " AND COALESCE(json_extract(c.extras_json, '\$.workspace_mode_v1'), 'chat') = ?";
       scopeArgs.add('chat');
     }
 
