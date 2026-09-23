@@ -1119,10 +1119,13 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final chatService = context.read<ChatService>();
     final workspaceMode = context.read<WorkspaceModeProvider?>()?.mode ?? WorkspaceMode.chat;
     try {
-      final results = await GlobalSessionSearchService.search(
-        chatService: chatService,
-        query: query,
-      );
+      final results = workspaceMode == WorkspaceMode.agent
+          ? const <GlobalSessionSearchResult>[]
+          : await GlobalSessionSearchService.search(
+              chatService: chatService,
+              query: query,
+              workspaceMode: workspaceMode.name,
+            );
       if (!mounted ||
           requestId != _globalSearchRequestId ||
           query != _query.trim() ||
