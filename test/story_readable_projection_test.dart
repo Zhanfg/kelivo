@@ -70,6 +70,19 @@ void main() {
       isEmpty,
     );
   });
+  test('unterminated Story sidecar preserves visible prose', () {
+    const raw = '''
+The corridor is silent.
+
+<!--KELIVO_STORY_EVENTS
+{"version":1,"events":[
+''';
+
+    final rendered = projectStoryReadableOrOriginal(raw, turnId: 'turn-broken');
+    expect(rendered, 'The corridor is silent.');
+    expect(rendered, isNot(contains('KELIVO_STORY_EVENTS')));
+  });
+
   test('embedded Story sidecar never reaches readable output', () {
     const raw = '''
 The corridor is silent.
