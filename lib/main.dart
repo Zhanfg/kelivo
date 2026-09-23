@@ -130,7 +130,6 @@ void _wireWorkspaceServices(BuildContext ctx) {
     final chat = ctx.read<ChatService>();
     final workspaces = ctx.read<WorkspaceProvider>();
     final assistants = ctx.read<AssistantProvider>();
-    final workspaceMode = ctx.read<WorkspaceModeProvider>();
     chat.newConversationExtras = (assistantId) {
       final base = assistantId == null
           ? <String, dynamic>{}
