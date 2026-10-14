@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - tool/fetch_proot.sh
+      - tool/restore_pinned_proot.py
+      - tool/tests/**
+      - android/app/build.gradle.kts
       - tool/proot_checksums.txt
       - .github/workflows/proot-integrity.yml
   workflow_dispatch:
@@ -20,6 +23,8 @@ jobs:
       KELIVO_ANDROID_ABIS: armeabi-v7a,arm64-v8a,x86_64
     steps:
       - uses: actions/checkout@v4
+      - name: Unit test pinned binary restore without network
+        run: python3 -m unittest discover -s tool/tests -p "test_restore_pinned_proot.py" -v
       - name: Fetch Termux binaries and verify pinned ELF checksums
         shell: bash
         run: |
