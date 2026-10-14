@@ -31,7 +31,7 @@ JNI_LIBS="$REPO_ROOT/android/app/src/main/jniLibs"
 TERMUX_POOL="${TERMUX_POOL:-https://packages.termux.dev/apt/termux-main/pool/main}"
 
 # Rolling Termux versions. Override with env vars if the pool moves again.
-PROOT_VERSION="${PROOT_VERSION:-5.1.107.96}"
+PROOT_VERSION="${PROOT_VERSION:-5.1.107.92}"
 TALLOC_VERSION="${TALLOC_VERSION:-2.4.3}"
 SHMEM_VERSION="${SHMEM_VERSION:-0.7}"
 
@@ -196,6 +196,13 @@ verify_checksums() {
   done < "$CHECKSUMS_FILE"
 }
 
+# Validate native library hashes on *every* Gradle build, including cached builds.
+# Never trust file-existence alone to establish that a JNI binary is safe.
+if python3 "$SCRIPT_DIR/restore_pinned_proot.py" check >/dev/null 2>&1; then
+  echo "Using SHA-256 verified cached PRoot binaries."
+  exit 0
+fi
+
 TMPDIR_FETCH="$(mktemp -d "${TMPDIR:-/tmp}/kelivo-proot.XXXXXX")"
 cleanup() { rm -rf "$TMPDIR_FETCH"; }
 trap cleanup EXIT
@@ -205,13 +212,11 @@ echo "Pool: $TERMUX_POOL"
 
 # The historical OpenMinis pin is documented; fail clearly if someone overrides
 # to a version the pool no longer serves.
-if ! curl -fsI --retry 5 --retry-delay 2 --retry-all-errors \
+if ! curl -fsI --retry 2 --retry-delay 2 --retry-all-errors \
     "${TERMUX_POOL}/p/proot/proot_${PROOT_VERSION}_aarch64.deb" >/dev/null; then
-  echo "error: proot_${PROOT_VERSION} is not on the Termux pool." >&2
-  echo "  Tried: ${TERMUX_POOL}/p/proot/proot_${PROOT_VERSION}_aarch64.deb" >&2
-  echo "  OpenMinis used 5.1.107-70; that package has rolled off." >&2
-  echo "  Set PROOT_VERSION to a version listed at ${TERMUX_POOL}/p/proot/" >&2
-  exit 1
+  echo "Historical Termux PRoot package unavailable; restoring from SHA-256 verified Kelivo release."
+  python3 "$SCRIPT_DIR/restore_pinned_proot.py" restore
+  exit 0
 fi
 
 for pair in "${ABIS[@]}"; do
