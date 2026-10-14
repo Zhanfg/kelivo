@@ -1,0 +1,38 @@
+name: PRoot integrity
+
+on:
+  pull_request:
+    paths:
+      - tool/fetch_proot.sh
+      - tool/proot_checksums.txt
+      - .github/workflows/proot-integrity.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-native-binaries:
+    name: Verify pinned PRoot files (all Android ABIs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      KELIVO_ANDROID_ABIS: armeabi-v7a,arm64-v8a,x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch Termux binaries and verify pinned ELF checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tool/fetch_proot.sh
+      - name: Verify non-empty ELF outputs for every ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          for abi in armeabi-v7a arm64-v8a x86_64; do
+            for lib in libproot_exec.so libproot_loader.so libtalloc.so libandroid-shmem.so; do
+              path="android/app/src/main/jniLibs/$abi/$lib"
+              test -s "$path"
+              file "$path" | grep -q 'ELF'
+            done
+          done
