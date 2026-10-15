@@ -417,7 +417,6 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
-
             ],
           ),
 
