@@ -195,9 +195,7 @@ class SettingsPage extends StatelessWidget {
                     : 'Chat',
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ChatSettingsPage(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const ChatSettingsPage()),
                   );
                 },
               ),
