@@ -55,18 +55,14 @@ class _AgentModePageState extends State<AgentModePage> {
 
     final selected = await showModelSelector(
       context,
-      initialProviderKey:
-          agentSettings.hasModelOverride
-              ? agentSettings.modelProvider
-              : inherited.providerKey,
-      initialModelId:
-          agentSettings.hasModelOverride
-              ? agentSettings.modelId
-              : inherited.modelId,
+      initialProviderKey: agentSettings.hasModelOverride
+          ? agentSettings.modelProvider
+          : inherited.providerKey,
+      initialModelId: agentSettings.hasModelOverride
+          ? agentSettings.modelId
+          : inherited.modelId,
       allowInherit: agentSettings.hasModelOverride,
-      inheritLabel: _isZh(context)
-          ? '跟随当前聊天模型'
-          : 'Follow current chat model',
+      inheritLabel: _isZh(context) ? '跟随当前聊天模型' : 'Follow current chat model',
     );
     if (selected == null || !mounted) return;
     if (selected.isInherit) {
@@ -128,9 +124,7 @@ class _AgentModePageState extends State<AgentModePage> {
       unawaited(context.read<AgentTaskRunner>().run(task.id));
       _taskController.clear();
       await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => AgentTaskDetailPage(taskId: task.id),
-        ),
+        MaterialPageRoute(builder: (_) => AgentTaskDetailPage(taskId: task.id)),
       );
       if (mounted) _taskFocus.requestFocus();
     } catch (error) {
@@ -573,46 +567,50 @@ class _TaskCard extends StatelessWidget {
   }
 
   static String? _friendlyStep(String? raw, bool zh) {
-  final value = raw?.trim();
-  if (value == null || value.isEmpty) return null;
-  final lower = value.toLowerCase();
-  if (lower.contains('preparing pi') || lower.contains('runtime')) {
-    return zh ? '正在准备任务' : 'Preparing task';
+    final value = raw?.trim();
+    if (value == null || value.isEmpty) return null;
+    final lower = value.toLowerCase();
+    if (lower.contains('preparing pi') || lower.contains('runtime')) {
+      return zh ? '正在准备任务' : 'Preparing task';
+    }
+    if (lower.contains('pi is working') ||
+        lower.contains('tool:') ||
+        lower.startsWith('running ')) {
+      return zh ? '正在使用工具' : 'Using tools';
+    }
+    if (lower.contains('requested user input')) {
+      return zh ? '等待你的确认' : 'Waiting for your input';
+    }
+    if (lower.contains('verifying pi') || lower.contains('verifying')) {
+      return zh ? '正在检查结果' : 'Checking results';
+    }
+    if (lower == 'completed') return zh ? '已完成' : 'Completed';
+    if (lower == 'cancelled') return zh ? '已取消' : 'Cancelled';
+    if (lower == 'agent failed') return zh ? '执行失败' : 'Task failed';
+    return value;
   }
-  if (lower.contains('pi is working') ||
-      lower.contains('tool:') ||
-      lower.startsWith('running ')) {
-    return zh ? '正在使用工具' : 'Using tools';
-  }
-  if (lower.contains('requested user input')) {
-    return zh ? '等待你的确认' : 'Waiting for your input';
-  }
-  if (lower.contains('verifying pi') || lower.contains('verifying')) {
-    return zh ? '正在检查结果' : 'Checking results';
-  }
-  if (lower == 'completed') return zh ? '已完成' : 'Completed';
-  if (lower == 'cancelled') return zh ? '已取消' : 'Cancelled';
-  if (lower == 'agent failed') return zh ? '执行失败' : 'Task failed';
-  return value;
-}
 
-String? _friendlyError(String? raw, bool zh) {
-  final value = raw?.trim();
-  if (value == null || value.isEmpty) return null;
-  final lower = value.toLowerCase();
-  if (lower.contains('agent_model_not_configured')) {
-    return zh ? '尚未配置可用模型，请先选择默认模型。' : 'No model is configured. Choose a default model first.';
+  String? _friendlyError(String? raw, bool zh) {
+    final value = raw?.trim();
+    if (value == null || value.isEmpty) return null;
+    final lower = value.toLowerCase();
+    if (lower.contains('agent_model_not_configured')) {
+      return zh
+          ? '尚未配置可用模型，请先选择默认模型。'
+          : 'No model is configured. Choose a default model first.';
+    }
+    if (lower.contains('runtime') ||
+        lower.contains('rootfs') ||
+        lower.contains('proot') ||
+        lower.contains('pi_')) {
+      return zh
+          ? '代理运行环境启动失败，可以重试或查看日志。'
+          : 'Agent runtime could not start. Retry or check logs.';
+    }
+    return zh ? '任务执行失败，可以重试或查看日志。' : 'Task failed. Retry or check logs.';
   }
-  if (lower.contains('runtime') ||
-      lower.contains('rootfs') ||
-      lower.contains('proot') ||
-      lower.contains('pi_')) {
-    return zh ? '代理运行环境启动失败，可以重试或查看日志。' : 'Agent runtime could not start. Retry or check logs.';
-  }
-  return zh ? '任务执行失败，可以重试或查看日志。' : 'Task failed. Retry or check logs.';
-}
 
-String _phaseLabel(AgentTaskPhase phase, bool zh) => switch (phase) {
+  String _phaseLabel(AgentTaskPhase phase, bool zh) => switch (phase) {
     AgentTaskPhase.queued => zh ? '排队中' : 'Queued',
     AgentTaskPhase.preparing => zh ? '准备中' : 'Preparing',
     AgentTaskPhase.running => zh ? '执行中' : 'Running',

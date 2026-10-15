@@ -115,9 +115,7 @@ class AgentTaskRunner {
         await journal.append(
           taskId,
           AgentTaskEventKind.notice,
-          payload: const <String, dynamic>{
-            'kind': 'github_cli_unavailable',
-          },
+          payload: const <String, dynamic>{'kind': 'github_cli_unavailable'},
         );
       }
       final execution = await environment.loadExecutionConfig();
@@ -145,11 +143,13 @@ class AgentTaskRunner {
       );
       final pinnedModel = task.pinnedModel;
       final permissionMode = agentSettings.permissionMode;
-      final providerKey = pinnedModel?.providerKey ??
+      final providerKey =
+          pinnedModel?.providerKey ??
           (agentSettings.hasModelOverride
               ? agentSettings.modelProvider
               : inheritedModel.providerKey);
-      final modelId = pinnedModel?.modelId ??
+      final modelId =
+          pinnedModel?.modelId ??
           (agentSettings.hasModelOverride
               ? agentSettings.modelId
               : inheritedModel.modelId);
@@ -269,9 +269,7 @@ class AgentTaskRunner {
         onDone: () {
           if (!agentEnd.isCompleted && !_cancelled.contains(taskId)) {
             agentEnd.completeError(
-              StateError(
-                session?.exitDescription ?? 'agent_rpc_closed',
-              ),
+              StateError(session?.exitDescription ?? 'agent_rpc_closed'),
             );
           }
         },
@@ -335,9 +333,7 @@ class AgentTaskRunner {
       _sessionPermissions.remove(taskId);
       _sessionSecrets.remove(taskId);
       _running.remove(taskId);
-      _toolOutputSnapshots.removeWhere(
-        (key, _) => key.startsWith('$taskId:'),
-      );
+      _toolOutputSnapshots.removeWhere((key, _) => key.startsWith('$taskId:'));
       _subagentProgressSnapshots.removeWhere(
         (key, _) => key.startsWith('$taskId:'),
       );
@@ -368,7 +364,9 @@ class AgentTaskRunner {
     );
     final response = await session.bash(text, id: id);
     final data = response['data'];
-    final map = data is Map ? data.cast<String, dynamic>() : const <String, dynamic>{};
+    final map = data is Map
+        ? data.cast<String, dynamic>()
+        : const <String, dynamic>{};
     final output = map['output']?.toString() ?? '';
     await journal.append(
       taskId,
@@ -396,7 +394,8 @@ class AgentTaskRunner {
       await journal.append(
         taskId,
         AgentTaskEventKind.note,
-        payload: <String, dynamic>{'kind': 'steer',
+        payload: <String, dynamic>{
+          'kind': 'steer',
           'text': _redact(
             _limit(text, 4000),
             _sessionSecrets[taskId] ?? const <String>{},
@@ -552,7 +551,8 @@ class AgentTaskRunner {
       case 'tool_execution_end':
         final tool = event['toolName']?.toString() ?? 'tool';
         final toolCallId = event['toolCallId']?.toString() ?? '';
-        final hadStreamingOutput = toolCallId.isNotEmpty &&
+        final hadStreamingOutput =
+            toolCallId.isNotEmpty &&
             _toolOutputSnapshots.remove('$taskId:$toolCallId') != null;
         if (tool == 'kelivo_plan') break;
         final output = agentSettings.showToolOutput && !hadStreamingOutput
@@ -636,9 +636,7 @@ class AgentTaskRunner {
             ? raw.cast<String, dynamic>()
             : <String, dynamic>{};
         final nested = payload['event'];
-        final nestedType = nested is Map
-            ? nested['type']?.toString()
-            : null;
+        final nestedType = nested is Map ? nested['type']?.toString() : null;
         if ({
           'tool_execution_start',
           'tool_execution_end',
@@ -696,7 +694,10 @@ class AgentTaskRunner {
           payload: <String, dynamic>{
             'kind': 'extension_error',
             if (event['error'] != null)
-              'message': _redact(_limit(event['error'].toString(), 4000), secrets),
+              'message': _redact(
+                _limit(event['error'].toString(), 4000),
+                secrets,
+              ),
           },
         );
       case 'extension_ui_request':
@@ -896,4 +897,3 @@ class AgentTaskRunner {
     return output;
   }
 }
-
