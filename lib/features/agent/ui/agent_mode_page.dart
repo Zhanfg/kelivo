@@ -92,12 +92,36 @@ class _AgentModePageState extends State<AgentModePage> {
           ? null
           : chat.getConversation(conversationId);
 
+      // Store the model identity with the task. Changing the global model
+      // later must not silently reroute a resumable Agent task.
+      final appSettings = context.read<SettingsProvider>();
+      final agentSettings = context.read<AgentSettingsProvider>();
+      await appSettings.loaded;
+      await agentSettings.loaded;
+      if (!mounted) return;
+      final inheritedModel = resolveChatModel(
+        appSettings,
+        conversation: conversation,
+        assistant: assistant,
+      );
+      final providerKey = agentSettings.hasModelOverride
+          ? agentSettings.modelProvider
+          : inheritedModel.providerKey;
+      final modelId = agentSettings.hasModelOverride
+          ? agentSettings.modelId
+          : inheritedModel.modelId;
+      if (providerKey == null || modelId == null) {
+        throw StateError('agent_model_not_configured');
+      }
+
       final task = await context.read<AgentTaskProvider>().create(
         title: _titleForGoal(goal),
         goal: goal,
         workspaceId: workspace.id,
         conversationId: conversationId,
         assistantId: conversation?.assistantId ?? assistant?.id,
+        modelProviderKey: providerKey,
+        modelId: modelId,
       );
 
       if (!mounted) return;

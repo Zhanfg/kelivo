@@ -4,6 +4,12 @@ import '../../../core/database/business_preferences.dart';
 
 enum AgentPermissionMode { ask, auto, planFirst, readOnly }
 
+// Direct commands are a separate RPC execution path from model tools.
+// Enforce the same read-only boundary on both paths.
+extension AgentPermissionExecution on AgentPermissionMode {
+  bool get allowsDirectShell => this != AgentPermissionMode.readOnly;
+}
+
 extension AgentPermissionModeCodec on AgentPermissionMode {
   static AgentPermissionMode fromStorage(String? value) {
     return AgentPermissionMode.values.firstWhere(
