@@ -101,7 +101,7 @@ def restore_compact_archive(abis: list[str], expected: dict[str, str]) -> None:
                         raise ValueError(f"Unextractable archive ELF: {abi}/{name}")
                     with stream:
                         binary = stream.read(16 * 1024 * 1024 + 1)
-                    if not binary.startswith(b"\\x7fELF") or digest(binary) != expected_hash:
+                    if not binary.startswith(b"\x7fELF") or digest(binary) != expected_hash:
                         raise ValueError(f"Compact ELF checksum mismatch: {abi}/{name}")
                     staged.append((LIBDIR / abi / name, binary))
         # Install only after every requested file passes validation.
