@@ -14,6 +14,8 @@ void main() {
       conversationId: 'conversation-1',
       assistantId: 'assistant-1',
       worktreeId: 'worktree-1',
+      modelProviderKey: 'model-provider',
+      modelId: 'pinned-model-v1',
       phase: AgentTaskPhase.running,
       currentStep: 'flutter test',
       completedSteps: 3,
@@ -34,6 +36,24 @@ void main() {
     expect(restored.completedSteps, 3);
     expect(restored.totalSteps, 5);
     expect(restored.startedAt, createdAt);
+    expect(restored.pinnedModel?.providerKey, 'model-provider');
+    expect(restored.pinnedModel?.modelId, 'pinned-model-v1');
+  });
+
+  test('legacy agent task without model pin remains readable', () {
+    final now = DateTime.utc(2026, 10, 15);
+    final legacy = AgentTask(
+      id: 'old',
+      title: 'Legacy',
+      goal: 'Resume legacy task',
+      workspaceId: 'w',
+      environmentId: 'default',
+      phase: AgentTaskPhase.interrupted,
+      createdAt: now,
+      updatedAt: now,
+    );
+    expect(legacy.pinnedModel, isNull);
+    expect(AgentTask.fromJson(legacy.toJson()).pinnedModel, isNull);
   });
 
   test('only recoverable phases can resume', () {

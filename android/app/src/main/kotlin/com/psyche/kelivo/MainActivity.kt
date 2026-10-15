@@ -141,6 +141,7 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
 
     /**
      * Space the app may still use on the volume holding its data, or null when

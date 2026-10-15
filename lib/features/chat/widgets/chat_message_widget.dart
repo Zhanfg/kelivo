@@ -4766,11 +4766,11 @@ class _TimelineStepShell extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Reserve the icon gutter and gap with one RenderObject.
           const SizedBox(
-            width: _timelineIconColumnWidth,
+            width: _timelineIconColumnWidth + _timelineGap,
             height: _timelineIconSize,
           ),
-          const SizedBox(width: _timelineGap),
           Expanded(child: label),
           if (extra != null) ...[const SizedBox(width: 8), extra!],
           if (indicator != null) ...[const SizedBox(width: 6), indicator!],
