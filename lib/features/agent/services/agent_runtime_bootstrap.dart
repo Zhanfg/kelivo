@@ -8,6 +8,7 @@ import '../../../core/services/sandbox/channel_command_run.dart';
 import '../../../core/services/sandbox/workspace_channel.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
 import '../../../utils/app_directories.dart';
+import 'agent_rootfs_swap.dart';
 
 /// KELIVO-owned execution environment for Agent mode.
 ///
@@ -80,8 +81,16 @@ class AgentRuntimeBootstrap {
       throw StateError('agent_control_extension_missing');
     }
 
+    // A previous startup may have died after moving the old rootfs aside.
+    // Recover it before attempting to install or delete any staging files.
+    await AgentRootfsSwap.restoreInterrupted(
+      environmentDir: environmentDir,
+      rootfsDir: rootfsDir,
+    );
+
+    var replacedExistingRootfs = false;
     if (!await _validInstall(rootfsDir, marker)) {
-      await _installEmbeddedRuntime(
+      replacedExistingRootfs = await _installEmbeddedRuntime(
         environmentDir: environmentDir,
         rootfsDir: rootfsDir,
         marker: marker,
@@ -95,9 +104,19 @@ class AgentRuntimeBootstrap {
       homeDir: homeDir,
       tmpDir: tmpDir,
     );
-    final status = await runtime.status();
-    if (!status.ready) {
-      throw StateError(status.reason ?? 'agent_runtime_healthcheck_failed');
+    try {
+      final status = await runtime.status();
+      if (!status.ready) {
+        throw StateError(status.reason ?? 'agent_runtime_healthcheck_failed');
+      }
+    } catch (_) {
+      if (replacedExistingRootfs) {
+        await AgentRootfsSwap.rollBack(
+          environmentDir: environmentDir,
+          rootfsDir: rootfsDir,
+        );
+      }
+      rethrow;
     }
 
     return AgentRuntimeHandle(
@@ -117,7 +136,7 @@ class AgentRuntimeBootstrap {
         File(p.join(rootfsDir.path, 'usr', 'bin', 'env')).existsSync();
   }
 
-  Future<void> _installEmbeddedRuntime({
+  Future<bool> _installEmbeddedRuntime({
     required Directory environmentDir,
     required Directory rootfsDir,
     required File marker,
@@ -130,7 +149,11 @@ class AgentRuntimeBootstrap {
     final packageStore = await AppDirectories.getAgentPackageStoreDirectory();
     final runtimeStore = Directory(p.join(packageStore.path, 'runtime'));
     await runtimeStore.create(recursive: true);
-    final archive = File(p.join(runtimeStore.path, 'wolfi-arm64.tar.gz'));
+    // A runtime-version-scoped archive prevents a stale cached bundle from
+    // reinstalling an older rootfs after an application upgrade.
+    final archive = File(
+      p.join(runtimeStore.path, 'wolfi-arm64-$runtimeVersion.tar.gz'),
+    );
 
     if (!await archive.exists() || await archive.length() == 0) {
       ByteData data;
@@ -161,9 +184,15 @@ class AgentRuntimeBootstrap {
         throw StateError('agent_runtime_invalid_image');
       }
 
-      if (await rootfsDir.exists()) await rootfsDir.delete(recursive: true);
-      await staging.rename(rootfsDir.path);
-      await marker.writeAsString(runtimeVersion, flush: true);
+      // Write the version marker before publishing staging; the live rootfs is
+      // never exposed without its marker, even if Android kills this process.
+      await File(p.join(staging.path, p.basename(marker.path)))
+          .writeAsString(runtimeVersion, flush: true);
+      return AgentRootfsSwap.activate(
+        environmentDir: environmentDir,
+        rootfsDir: rootfsDir,
+        staging: staging,
+      );
     } catch (_) {
       if (await staging.exists()) await staging.delete(recursive: true);
       rethrow;
