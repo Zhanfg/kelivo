@@ -8,6 +8,17 @@ on:
         required: false
         default: '3.44.9'
         type: string
+  pull_request:
+    branches:
+      - master
+    paths:
+      - .github/workflows/build-apk-fast.yml
+      - android/**
+      - tool/**
+      - assets/agent_runtime/**
+      - pubspec.yaml
+      - dependencies/**
+      - lib/**
   push:
     branches:
       - master
@@ -21,6 +32,9 @@ on:
       - tool/**
       - pubspec.yaml
       - dependencies/**
+
+permissions:
+  contents: read
 
 concurrency:
   group: fast-test-apk-${{ github.ref }}
