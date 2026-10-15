@@ -1,4 +1,6 @@
 import hashlib
+import io
+import tarfile
 import importlib.util
 from pathlib import Path
 import shutil
@@ -41,6 +43,36 @@ class RestorePinnedProotTests(unittest.TestCase):
     def fake_download(self, cmd, *, check):
         self.assertTrue(check)
         shutil.copyfile(self.source, cmd[cmd.index("-o") + 1])
+
+    def make_compact_archive(self):
+        source = self.root / "compact.tar.xz"
+        with tarfile.open(source, "w:xz") as archive:
+            for name, data in self.payloads.items():
+                info = tarfile.TarInfo(f"{self.abi}/{name}")
+                info.size = len(data)
+                archive.addfile(info, io.BytesIO(data))
+        return source
+
+    def test_compact_archive_validates_and_restores_elf(self):
+        source = self.make_compact_archive()
+        def fake(cmd, *, check):
+            self.assertTrue(check)
+            shutil.copyfile(source, cmd[cmd.index("-o") + 1])
+        with patch.object(module.subprocess, "run", side_effect=fake):
+            module.restore_compact_archive([self.abi], self.expected)
+        module.verify_files([self.abi], self.expected)
+
+    def test_compact_archive_rejects_corrupt_elf_atomically(self):
+        source = self.make_compact_archive()
+        bad = dict(self.expected)
+        bad[f"android/app/src/main/jniLibs/{self.abi}/libtalloc.so"] = "f" * 64
+        def fake(cmd, *, check):
+            shutil.copyfile(source, cmd[cmd.index("-o") + 1])
+        with patch.object(module.subprocess, "run", side_effect=fake):
+            with self.assertRaisesRegex(ValueError, "Compact ELF checksum mismatch"):
+                module.restore_compact_archive([self.abi], bad)
+        for name in module.LIBS:
+            self.assertFalse((module.LIBDIR / self.abi / name).exists())
 
     def test_restore_checks_both_apk_and_elf_hashes(self):
         with patch.object(module.subprocess, "run", side_effect=self.fake_download):

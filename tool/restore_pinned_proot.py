@@ -8,6 +8,7 @@ ELF is SHA-256 verified before being installed into jniLibs.
 from __future__ import annotations
 
 import hashlib
+import tarfile
 import os
 from pathlib import Path
 import subprocess
@@ -25,6 +26,12 @@ DIGESTS = {
     "x86_64": "2a20caa22d2f2344bb503e77b114ee3a5a87e427e41bbd88867ef7996fac1b08",
 }
 LIBS = ("libproot_exec.so", "libproot_loader.so", "libtalloc.so", "libandroid-shmem.so")
+COMPACT_ARCHIVE_URL = (
+    "https://raw.githubusercontent.com/Chevey339/kelivo/"
+    "4742d2e2861d963a65d8f642eeba9782566cd426/"
+    "dependencies/termux/proot-5.1.107.92.tar.xz"
+)
+
 
 
 def digest(data: bytes) -> str:
@@ -56,6 +63,58 @@ def verify_files(abis: list[str], expected: dict[str, str]) -> None:
             path = ROOT / rel
             if not expected_hash or not path.is_file() or digest(path.read_bytes()) != expected_hash:
                 raise ValueError(f"Missing or mismatched PRoot ELF: {abi}/{name}")
+
+
+def restore_compact_archive(abis: list[str], expected: dict[str, str]) -> None:
+    """Recover a 270 KB upstream archive, validating every required ELF.
+
+    The Git commit is immutable and all ELF checksums are pinned locally.
+    Never use tar.extractall or follow links from a downloaded archive.
+    """
+    with tempfile.TemporaryDirectory(prefix="kelivo-proot-compact-") as directory:
+        archive_path = Path(directory) / "proot.tar.xz"
+        subprocess.run(
+            ["curl", "-fLSs", "--retry", "3", "--retry-delay", "2",
+             "--max-time", "90", "-o", str(archive_path), COMPACT_ARCHIVE_URL],
+            check=True,
+        )
+        if archive_path.stat().st_size > 8 * 1024 * 1024:
+            raise ValueError("Compact PRoot archive too large")
+        staged: list[tuple[Path, bytes]] = []
+        with tarfile.open(archive_path, "r:xz") as archive:
+            members = {}
+            for member in archive:
+                name = member.name[2:] if member.name.startswith("./") else member.name
+                if (member.isfile() and len(name.split("/")) == 2
+                        and ".." not in name.split("/")):
+                    members[name] = member
+            for abi in abis:
+                for name in LIBS:
+                    rel = f"android/app/src/main/jniLibs/{abi}/{name}"
+                    member = members.get(f"{abi}/{name}")
+                    expected_hash = expected.get(rel)
+                    if (member is None or not expected_hash
+                            or member.size > 16 * 1024 * 1024):
+                        raise ValueError(f"Missing or unsafe archive ELF: {abi}/{name}")
+                    stream = archive.extractfile(member)
+                    if stream is None:
+                        raise ValueError(f"Unextractable archive ELF: {abi}/{name}")
+                    with stream:
+                        binary = stream.read(16 * 1024 * 1024 + 1)
+                    if not binary.startswith(b"\\x7fELF") or digest(binary) != expected_hash:
+                        raise ValueError(f"Compact ELF checksum mismatch: {abi}/{name}")
+                    staged.append((LIBDIR / abi / name, binary))
+        # Install only after every requested file passes validation.
+        for path, binary in staged:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as target:
+                target.write(binary)
+                target.flush()
+                os.fchmod(target.fileno(), 0o755)
+                temporary = Path(target.name)
+            os.replace(temporary, path)
+    verify_files(abis, expected)
+    print("Compact PRoot archive verified and restored.", flush=True)
 
 
 def restore(abis: list[str], expected: dict[str, str]) -> None:
@@ -96,18 +155,20 @@ def restore(abis: list[str], expected: dict[str, str]) -> None:
 
 
 def main() -> int:
-    if len(sys.argv) != 2 or sys.argv[1] not in {"check", "restore"}:
-        print("Usage: restore_pinned_proot.py check|restore", file=sys.stderr)
+    if len(sys.argv) != 2 or sys.argv[1] not in {"check", "restore", "restore-archive"}:
+        print("Usage: restore_pinned_proot.py check|restore|restore-archive", file=sys.stderr)
         return 2
     try:
         abis = selected_abis()
         expected = expected_hashes()
         if sys.argv[1] == "check":
             verify_files(abis, expected)
+        elif sys.argv[1] == "restore-archive":
+            restore_compact_archive(abis, expected)
         else:
             restore(abis, expected)
         return 0
-    except (ValueError, OSError, KeyError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
+    except (ValueError, OSError, KeyError, zipfile.BadZipFile, tarfile.TarError, subprocess.CalledProcessError) as error:
         print(f"PRoot integrity: {error}", file=sys.stderr)
         return 1
 

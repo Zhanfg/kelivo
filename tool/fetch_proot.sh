@@ -214,7 +214,11 @@ echo "Pool: $TERMUX_POOL"
 # to a version the pool no longer serves.
 if ! curl -fsI --retry 2 --retry-delay 2 --retry-all-errors \
     "${TERMUX_POOL}/p/proot/proot_${PROOT_VERSION}_aarch64.deb" >/dev/null; then
-  echo "Historical Termux PRoot package unavailable; restoring from SHA-256 verified Kelivo release."
+  echo "Pinned Termux pool package unavailable; checking compact immutable upstream archive."
+  if python3 "$SCRIPT_DIR/restore_pinned_proot.py" restore-archive; then
+    exit 0
+  fi
+  echo "Compact source unavailable or mismatched; falling back to checksum-verified Kelivo APKs."
   python3 "$SCRIPT_DIR/restore_pinned_proot.py" restore
   exit 0
 fi

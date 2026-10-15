@@ -43,3 +43,23 @@ Some logged Provider/asset errors occurred in intentionally simulated error path
 ## Pending verification
 
 PR creation did not cause a visible Actions run in the checked repository history. Review repository Actions enablement/permissions and use the PR checks view to determine why. The connector used for this audit does not provide workflow-dispatch or enablement controls.
+
+## Validated 2026-10-15 (commit 153cef9f)
+
+- [CI run 38734569778](https://github.com/Zhanfg/kelivo/actions/runs/38734569778):
+  analyzer/format/l10n and all four test shards passed.
+- [PRoot run 38734569705](https://github.com/Zhanfg/kelivo/actions/runs/38734569705):
+  all three Android ABIs and offline recovery tests passed.
+- [Fast APK run 38734569675](https://github.com/Zhanfg/kelivo/actions/runs/38734569675):
+  ARM64 debug APK built and artifact Kelivo-Fast-Test-arm64 uploaded.
+- APK download is a 7-day GitHub Actions artifact (available until 2026-10-22).
+- Physical-device launch/Agent sandbox/Story persistence/MCP/backup restore smoke
+  tests have NOT been performed, so PR remains draft and unmerged.
+
+## Next build-size improvement
+
+An upstream-commit-pinned `proot-5.1.107.92.tar.xz` archive is about 270 KB.
+When the rolling Termux pool no longer carries our pinned version, try this
+compact source first, validate each ELF against our existing SHA-256 manifest,
+and retain the earlier Kelivo APK fallback. Both sources are untrusted until
+verified; CI must repeat checks after this code change.
