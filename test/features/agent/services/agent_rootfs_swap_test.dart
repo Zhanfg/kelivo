@@ -34,7 +34,10 @@ void main() {
       ),
       isFalse,
     );
-    expect(await File(p.join(rootfs.path, '.kelivo-agent-runtime')).readAsString(), 'wolfi-v1');
+    expect(
+      await File(p.join(rootfs.path, '.kelivo-agent-runtime')).readAsString(),
+      'wolfi-v1',
+    );
     expect(await AgentRootfsSwap.previous(temp).exists(), isFalse);
   });
 
@@ -50,40 +53,68 @@ void main() {
       isTrue,
     );
     expect(
-      await File(p.join(AgentRootfsSwap.previous(temp).path, 'user-installed-package')).readAsString(),
+      await File(
+        p.join(AgentRootfsSwap.previous(temp).path, 'user-installed-package'),
+      ).readAsString(),
       'important data',
     );
-    expect(await File(p.join(rootfs.path, '.kelivo-agent-runtime')).readAsString(), 'wolfi-v2');
-  });
-
-  test('power loss during rename restores previous rootfs on next startup', () async {
-    await put(AgentRootfsSwap.previous(temp), 'user-installed-package', 'important data');
     expect(
-      await AgentRootfsSwap.restoreInterrupted(
-        environmentDir: temp,
-        rootfsDir: rootfs,
-      ),
-      isTrue,
+      await File(p.join(rootfs.path, '.kelivo-agent-runtime')).readAsString(),
+      'wolfi-v2',
     );
-    expect(await File(p.join(rootfs.path, 'user-installed-package')).readAsString(), 'important data');
-    expect(await AgentRootfsSwap.previous(temp).exists(), isFalse);
   });
 
-  test('another upgrade refuses to discard the preserved old installation', () async {
-    await put(rootfs, 'current', 'current files');
-    await put(staging, 'upgrade', 'new files');
-    await put(AgentRootfsSwap.previous(temp), 'old', 'keep me');
-    await expectLater(
-      AgentRootfsSwap.activate(
-        environmentDir: temp,
-        rootfsDir: rootfs,
-        staging: staging,
-      ),
-      throwsA(isA<StateError>()),
-    );
-    expect(await File(p.join(rootfs.path, 'current')).readAsString(), 'current files');
-    expect(await File(p.join(AgentRootfsSwap.previous(temp).path, 'old')).readAsString(), 'keep me');
-  });
+  test(
+    'power loss during rename restores previous rootfs on next startup',
+    () async {
+      await put(
+        AgentRootfsSwap.previous(temp),
+        'user-installed-package',
+        'important data',
+      );
+      expect(
+        await AgentRootfsSwap.restoreInterrupted(
+          environmentDir: temp,
+          rootfsDir: rootfs,
+        ),
+        isTrue,
+      );
+      expect(
+        await File(
+          p.join(rootfs.path, 'user-installed-package'),
+        ).readAsString(),
+        'important data',
+      );
+      expect(await AgentRootfsSwap.previous(temp).exists(), isFalse);
+    },
+  );
+
+  test(
+    'another upgrade refuses to discard the preserved old installation',
+    () async {
+      await put(rootfs, 'current', 'current files');
+      await put(staging, 'upgrade', 'new files');
+      await put(AgentRootfsSwap.previous(temp), 'old', 'keep me');
+      await expectLater(
+        AgentRootfsSwap.activate(
+          environmentDir: temp,
+          rootfsDir: rootfs,
+          staging: staging,
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        await File(p.join(rootfs.path, 'current')).readAsString(),
+        'current files',
+      );
+      expect(
+        await File(
+          p.join(AgentRootfsSwap.previous(temp).path, 'old'),
+        ).readAsString(),
+        'keep me',
+      );
+    },
+  );
 
   test('failed health check rolls back and preserves failed image', () async {
     await put(rootfs, 'installed-package', 'previous environment');
@@ -94,8 +125,16 @@ void main() {
       staging: staging,
     );
     await AgentRootfsSwap.rollBack(environmentDir: temp, rootfsDir: rootfs);
-    expect(await File(p.join(rootfs.path, 'installed-package')).readAsString(), 'previous environment');
-    expect(await File(p.join(AgentRootfsSwap.failed(temp).path, 'new')).readAsString(), 'broken environment');
+    expect(
+      await File(p.join(rootfs.path, 'installed-package')).readAsString(),
+      'previous environment',
+    );
+    expect(
+      await File(
+        p.join(AgentRootfsSwap.failed(temp).path, 'new'),
+      ).readAsString(),
+      'broken environment',
+    );
     expect(await AgentRootfsSwap.previous(temp).exists(), isFalse);
   });
 
@@ -109,7 +148,15 @@ void main() {
       ),
       isFalse,
     );
-    expect(await File(p.join(rootfs.path, 'current')).readAsString(), 'keep current');
-    expect(await File(p.join(AgentRootfsSwap.previous(temp).path, 'previous')).readAsString(), 'keep previous');
+    expect(
+      await File(p.join(rootfs.path, 'current')).readAsString(),
+      'keep current',
+    );
+    expect(
+      await File(
+        p.join(AgentRootfsSwap.previous(temp).path, 'previous'),
+      ).readAsString(),
+      'keep previous',
+    );
   });
 }

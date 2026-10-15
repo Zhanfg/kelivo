@@ -18,24 +18,21 @@ import 'agent_rootfs_swap.dart';
 /// not depend on PRoot and can be moved to a faster backend later.
 class AgentRuntimeBootstrap {
   AgentRuntimeBootstrap({WorkspaceChannel? channel})
-      : channel = channel ?? WorkspaceChannel();
+    : channel = channel ?? WorkspaceChannel();
 
   static const String runtimeVersion = 'wolfi-v1';
-  static const String arm64Asset =
-      'assets/agent_runtime/wolfi-arm64.tar.gz';
+  static const String arm64Asset = 'assets/agent_runtime/wolfi-arm64.tar.gz';
 
   final WorkspaceChannel channel;
   final Map<String, Future<AgentRuntimeHandle>> _pending =
       <String, Future<AgentRuntimeHandle>>{};
 
-  Future<AgentRuntimeHandle> ensureReady({
-    String environmentId = 'default',
-  }) {
+  Future<AgentRuntimeHandle> ensureReady({String environmentId = 'default'}) {
     return _pending.putIfAbsent(
       environmentId,
-      () => _prepare(environmentId).whenComplete(
-        () => _pending.remove(environmentId),
-      ),
+      () => _prepare(
+        environmentId,
+      ).whenComplete(() => _pending.remove(environmentId)),
     );
   }
 
@@ -53,8 +50,9 @@ class AgentRuntimeBootstrap {
       _ => throw UnsupportedError('agent_runtime_unsupported_abi:${probe.abi}'),
     };
 
-    final environmentDir =
-        await AppDirectories.agentEnvironmentDir(environmentId);
+    final environmentDir = await AppDirectories.agentEnvironmentDir(
+      environmentId,
+    );
     final rootfsDir = Directory(p.join(environmentDir.path, 'rootfs'));
     final homeDir = Directory(p.join(environmentDir.path, 'home'));
     final tmpDir = Directory(p.join(environmentDir.path, 'tmp'));
@@ -186,8 +184,9 @@ class AgentRuntimeBootstrap {
 
       // Write the version marker before publishing staging; the live rootfs is
       // never exposed without its marker, even if Android kills this process.
-      await File(p.join(staging.path, p.basename(marker.path)))
-          .writeAsString(runtimeVersion, flush: true);
+      await File(
+        p.join(staging.path, p.basename(marker.path)),
+      ).writeAsString(runtimeVersion, flush: true);
       return AgentRootfsSwap.activate(
         environmentDir: environmentDir,
         rootfsDir: rootfsDir,
@@ -269,20 +268,20 @@ class AgentAndroidRuntime implements WorkspaceStdioRuntime {
   }
 
   List<Mount> _mounts(List<Mount> mounts) => <Mount>[
-        Mount(host: homeDir.path, guest: '/home/kelivo'),
-        ...mounts,
-      ];
+    Mount(host: homeDir.path, guest: '/home/kelivo'),
+    ...mounts,
+  ];
 
   Map<String, String> _env(Map<String, String> env) => <String, String>{
-        'HOME': '/home/kelivo',
-        'USER': 'kelivo',
-        'LOGNAME': 'kelivo',
-        'SHELL': '/bin/sh',
-        'PATH':
-            '/home/kelivo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-        'LANG': 'C.UTF-8',
-        ...env,
-      };
+    'HOME': '/home/kelivo',
+    'USER': 'kelivo',
+    'LOGNAME': 'kelivo',
+    'SHELL': '/bin/sh',
+    'PATH':
+        '/home/kelivo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    'LANG': 'C.UTF-8',
+    ...env,
+  };
 
   @override
   Stream<CommandEvent> run(CommandRequest request) async* {
