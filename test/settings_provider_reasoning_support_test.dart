@@ -3,12 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/core/database/business_settings_router.dart';
-import 'package:Kelivo/core/models/assistant.dart';
-import 'package:Kelivo/core/models/model_spec.dart';
-import 'package:Kelivo/core/models/reasoning_request.dart';
+import 'package:Kelivo/core/providers/model_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/model_spec/model_defaults_guesser.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -59,10 +55,18 @@ void main() {
     });
 
     test('latest model ids infer only their documented capabilities', () {
-      final glm = ModelDefaultsGuesser.guess('glm-5.2');
-      final kimiK2 = ModelDefaultsGuesser.guess('kimi-k2.7-code');
-      final kimiK3 = ModelDefaultsGuesser.guess('kimi-k3');
-      final muse = ModelDefaultsGuesser.guess('muse-spark-1.1');
+      final glm = ModelRegistry.infer(
+        ModelInfo(id: 'glm-5.2', displayName: 'glm-5.2'),
+      );
+      final kimiK2 = ModelRegistry.infer(
+        ModelInfo(id: 'kimi-k2.7-code', displayName: 'kimi-k2.7-code'),
+      );
+      final kimiK3 = ModelRegistry.infer(
+        ModelInfo(id: 'kimi-k3', displayName: 'kimi-k3'),
+      );
+      final muse = ModelRegistry.infer(
+        ModelInfo(id: 'muse-spark-1.1', displayName: 'muse-spark-1.1'),
+      );
 
       expect(glm.input, const [Modality.text]);
       expect(glm.output, const [Modality.text]);
@@ -78,86 +82,31 @@ void main() {
           containsAll([ModelAbility.tool, ModelAbility.reasoning]),
         );
       }
+      expect(kimiK2.id, 'kimi-k2.7-code');
+      expect(kimiK3.id, 'kimi-k3');
+      expect(muse.id, 'muse-spark-1.1');
     });
 
-    test('spec ladders drive xhigh / max support', () async {
-      final harness = await createBusinessTestHarness(initial: {});
-      final settings = SettingsProvider(harness.preferences);
-      await settings.loaded;
-      await settings.setProviderConfig(
-        'Claude',
-        ProviderConfig(
-          id: 'Claude',
-          enabled: true,
-          name: 'Claude',
-          apiKey: 'test-key',
-          baseUrl: 'https://api.anthropic.com/v1',
-          providerType: ProviderKind.claude,
-        ),
-      );
+    test(
+      'OpenAI-compatible latest models expose documented effort caps',
+      () async {
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
 
-      const cases = <({String provider, String model, bool xhigh, bool max})>[
-        (provider: 'OpenAI', model: 'gpt-5.6-sol', xhigh: true, max: true),
-        (
-          provider: 'OpenRouter',
-          model: 'openai/gpt-5.6-sol',
-          xhigh: true,
-          max: true,
-        ),
-        (provider: 'OpenAI', model: 'kimi-k3', xhigh: false, max: true),
-        (
-          provider: 'OpenRouter',
-          model: 'moonshotai/kimi-k3',
-          xhigh: false,
-          max: true,
-        ),
-        (provider: 'OpenAI', model: 'grok-4.5', xhigh: false, max: false),
-        (provider: 'OpenAI', model: 'grok-4.6', xhigh: true, max: false),
-        (provider: 'OpenAI', model: 'deepseek-v4-pro', xhigh: false, max: true),
-        (provider: 'OpenAI', model: 'muse-spark-1.1', xhigh: true, max: false),
-        (provider: 'OpenAI', model: 'muse-spark-1.3', xhigh: true, max: true),
-        (provider: 'OpenAI', model: 'gpt-6-astra', xhigh: true, max: true),
-        (provider: 'OpenAI', model: 'glm-5.3', xhigh: false, max: true),
-        (provider: 'OpenAI', model: 'glm-5.3-flash', xhigh: false, max: true),
-        (provider: 'OpenAI', model: 'glm-5.2', xhigh: true, max: true),
-        (provider: 'OpenAI', model: 'gpt-5.3-codex', xhigh: true, max: false),
-        (provider: 'OpenAI', model: 'gpt-5.1-codex', xhigh: false, max: false),
-        (
-          provider: 'OpenAI',
-          model: 'gpt-5.1-codex-max',
-          xhigh: true,
-          max: false,
-        ),
-        (provider: 'Claude', model: 'claude-fable-5-1', xhigh: true, max: true),
-        (provider: 'Claude', model: 'claude-fable-5', xhigh: true, max: true),
-        (provider: 'Claude', model: 'claude-mythos-5', xhigh: true, max: true),
-        (provider: 'Claude', model: 'claude-opus-4-8', xhigh: true, max: true),
-        (provider: 'Claude', model: 'claude-opus-5', xhigh: true, max: true),
-        (provider: 'Claude', model: 'claude-sonnet-5', xhigh: true, max: true),
-        (
-          provider: 'Claude',
-          model: 'claude-haiku-4-5',
-          xhigh: false,
-          max: false,
-        ),
-        (
-          provider: 'Claude',
-          model: 'claude-sonnet-4-6',
-          xhigh: false,
-          max: true,
-        ),
-      ];
+        await settings.loaded;
 
-      for (final c in cases) {
         expect(
-          settings.supportsXhighReasoning(c.provider, c.model),
-          c.xhigh,
-          reason: '${c.provider}/${c.model} xhigh',
+          settings.supportsXhighReasoning('OpenAI', 'gpt-5.6-sol'),
+          isTrue,
+        );
+        expect(settings.supportsMaxReasoning('OpenAI', 'gpt-5.6-sol'), isTrue);
+        expect(
+          settings.supportsXhighReasoning('OpenRouter', 'openai/gpt-5.6-sol'),
+          isTrue,
         );
         expect(
-          settings.supportsMaxReasoning(c.provider, c.model),
-          c.max,
-          reason: '${c.provider}/${c.model} max',
+          settings.supportsMaxReasoning('OpenRouter', 'openai/gpt-5.6-sol'),
+          isTrue,
         );
         expect(settings.supportsMaxReasoning('OpenAI', 'kimi-k3'), isTrue);
         expect(
@@ -273,55 +222,42 @@ void main() {
       },
     );
 
-    group('background generation reasoning', () {
-      const assistantReasoning = ReasoningRequest(
-        ReasoningLevel.high,
-        budgetTokens: 32000,
-      );
-      const assistant = Assistant(
-        id: 'a',
-        name: 'A',
-        reasoning: assistantReasoning,
-      );
-
-      test('defaults to disabled / off', () async {
-        final harness = await createBusinessTestHarness(initial: {});
+    group('title generation thinking', () {
+      test('defaults to disabled', () async {
+        final harness = await createBusinessTestHarness(
+          initial: {'thinking_budget_v1': 16000},
+        );
         final settings = SettingsProvider(harness.preferences);
 
         await settings.loaded;
 
         expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(
-          settings.titleGenerationReasoningFor(null),
-          ReasoningRequest.off,
-        );
-        expect(
-          settings.titleGenerationReasoningFor(assistant),
-          ReasoningRequest.off,
-        );
+        expect(settings.titleGenerationThinkingBudgetFor(null), 0);
+        expect(settings.titleGenerationThinkingBudgetFor(1024), 0);
       });
 
-      test('disabled title generation thinking resolves to off', () async {
-        final harness = await createBusinessTestHarness(initial: {});
-        final settings = SettingsProvider(harness.preferences);
+      test(
+        'disabled title generation thinking resolves to off budget',
+        () async {
+          final harness = await createBusinessTestHarness(initial: {});
+          final settings = SettingsProvider(harness.preferences);
 
-        await settings.loaded;
-        await settings.setTitleGenerationThinkingEnabled(true);
-        await settings.setTitleGenerationThinkingEnabled(false);
+          await settings.loaded;
+          await settings.setThinkingBudget(16000);
+          await settings.setTitleGenerationThinkingEnabled(true);
+          await settings.setTitleGenerationThinkingEnabled(false);
 
-        expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(
-          settings.titleGenerationReasoningFor(null),
-          ReasoningRequest.off,
-        );
-        expect(
-          settings.titleGenerationReasoningFor(assistant),
-          ReasoningRequest.off,
-        );
+          expect(settings.titleGenerationThinkingEnabled, isFalse);
+          expect(settings.titleGenerationThinkingBudgetFor(null), 0);
+          expect(settings.titleGenerationThinkingBudgetFor(1024), 0);
 
-        final prefs = harness.preferences;
-        expect(prefs.getBool('title_generation_thinking_enabled_v1'), isFalse);
-      });
+          final prefs = harness.preferences;
+          expect(
+            prefs.getBool('title_generation_thinking_enabled_v1'),
+            isFalse,
+          );
+        },
+      );
 
       test('loads persisted disabled state', () async {
         final harness = await createBusinessTestHarness(
@@ -332,15 +268,15 @@ void main() {
         await settings.loaded;
 
         expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(
-          settings.titleGenerationReasoningFor(assistant),
-          ReasoningRequest.off,
-        );
+        expect(settings.titleGenerationThinkingBudgetFor(32000), 0);
       });
 
       test('reset restores disabled default', () async {
         final harness = await createBusinessTestHarness(
-          initial: {'title_generation_thinking_enabled_v1': true},
+          initial: {
+            'title_generation_thinking_enabled_v1': true,
+            'thinking_budget_v1': 64000,
+          },
         );
         final settings = SettingsProvider(harness.preferences);
 
@@ -348,10 +284,7 @@ void main() {
         await settings.resetTitleGenerationThinkingEnabled();
 
         expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(
-          settings.titleGenerationReasoningFor(null),
-          ReasoningRequest.off,
-        );
+        expect(settings.titleGenerationThinkingBudgetFor(null), 0);
 
         final prefs = harness.preferences;
         expect(prefs.getBool('title_generation_thinking_enabled_v1'), isFalse);
@@ -360,67 +293,30 @@ void main() {
       test(
         'all utility model thinking toggles default off and persist',
         () async {
-          final harness = await createBusinessTestHarness(initial: {});
+          final harness = await createBusinessTestHarness(
+            initial: {'thinking_budget_v1': 16000},
+          );
           final settings = SettingsProvider(harness.preferences);
 
           await settings.loaded;
 
-          expect(
-            settings.summaryGenerationReasoningFor(assistant),
-            ReasoningRequest.off,
-          );
-          expect(
-            settings.suggestionGenerationReasoningFor(assistant),
-            ReasoningRequest.off,
-          );
-          expect(
-            settings.compressGenerationReasoningFor(assistant),
-            ReasoningRequest.off,
-          );
-          expect(
-            settings.translateGenerationReasoningFor(assistant),
-            ReasoningRequest.off,
-          );
-          expect(
-            settings.ocrGenerationReasoningFor(assistant),
-            ReasoningRequest.off,
-          );
+          expect(settings.summaryGenerationThinkingBudgetFor(1024), 0);
+          expect(settings.suggestionGenerationThinkingBudgetFor(1024), 0);
+          expect(settings.compressGenerationThinkingBudgetFor(1024), 0);
+          expect(settings.translateGenerationThinkingBudgetFor(1024), 0);
+          expect(settings.ocrGenerationThinkingBudgetFor(1024), 0);
 
           await settings.setSummaryGenerationThinkingEnabled(true);
           await settings.setSuggestionGenerationThinkingEnabled(true);
           await settings.setCompressGenerationThinkingEnabled(true);
           await settings.setTranslateGenerationThinkingEnabled(true);
           await settings.setOcrGenerationThinkingEnabled(true);
-          await settings.setTitleGenerationThinkingEnabled(true);
 
-          expect(
-            settings.titleGenerationReasoningFor(null),
-            ReasoningRequest.auto,
-          );
-          expect(
-            settings.titleGenerationReasoningFor(assistant),
-            assistantReasoning,
-          );
-          expect(
-            settings.summaryGenerationReasoningFor(null),
-            ReasoningRequest.auto,
-          );
-          expect(
-            settings.suggestionGenerationReasoningFor(assistant),
-            assistantReasoning,
-          );
-          expect(
-            settings.compressGenerationReasoningFor(assistant),
-            assistantReasoning,
-          );
-          expect(
-            settings.translateGenerationReasoningFor(assistant),
-            assistantReasoning,
-          );
-          expect(
-            settings.ocrGenerationReasoningFor(assistant),
-            assistantReasoning,
-          );
+          expect(settings.summaryGenerationThinkingBudgetFor(null), 16000);
+          expect(settings.suggestionGenerationThinkingBudgetFor(1024), 1024);
+          expect(settings.compressGenerationThinkingBudgetFor(1024), 1024);
+          expect(settings.translateGenerationThinkingBudgetFor(1024), 1024);
+          expect(settings.ocrGenerationThinkingBudgetFor(1024), 1024);
           expect(
             harness.preferences.getBool(
               'summary_generation_thinking_enabled_v1',
@@ -453,49 +349,54 @@ void main() {
       );
     });
 
-    test('per-model reasoning choices persist and can be cleared', () async {
-      final harness = await createBusinessTestHarness(initial: {});
-      final settings = SettingsProvider(harness.preferences);
-      await settings.loaded;
+    test(
+      'Claude latest models expose xhigh and max reasoning without presets',
+      () async {
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
 
-      const choice = ReasoningRequest(
-        ReasoningLevel.medium,
-        budgetTokens: 16000,
-      );
-      await settings.setReasoningChoice('OpenAI', 'gpt-5.1', choice);
+        await settings.loaded;
+        await settings.setProviderConfig(
+          'Claude',
+          ProviderConfig(
+            id: 'Claude',
+            enabled: true,
+            name: 'Claude',
+            apiKey: 'test-key',
+            baseUrl: 'https://api.anthropic.com/v1',
+            providerType: ProviderKind.claude,
+            models: const [
+              'claude-fable-5-1',
+              'claude-fable-5',
+              'claude-mythos-5',
+              'claude-opus-4-8',
+              'claude-opus-5',
+              'claude-sonnet-5',
+            ],
+          ),
+        );
 
-      expect(settings.reasoningChoiceFor('OpenAI', 'gpt-5.1'), choice);
-      expect(settings.reasoningChoiceFor('OpenAI', 'other'), isNull);
-      expect(
-        SettingsProvider.reasoningChoiceKey('OpenAI', 'gpt-5.1'),
-        'OpenAI::gpt-5.1',
-      );
-
-      final raw = harness.preferences.getString('reasoning_choice_by_model_v1');
-      expect(raw, isNotNull);
-      expect(jsonDecode(raw!), {
-        'OpenAI::gpt-5.1': {'level': 'medium', 'budgetTokens': 16000},
-      });
-      expect(
-        BusinessKeyRegistry.classify('reasoning_choice_by_model_v1'),
-        BusinessKeyDisposition.preference,
-      );
-      expect(
-        BusinessKeyRegistry.preferenceKeys,
-        contains('reasoning_choice_by_model_v1'),
-      );
-
-      final reloaded = SettingsProvider(harness.preferences);
-      await reloaded.loaded;
-      expect(reloaded.reasoningChoiceFor('OpenAI', 'gpt-5.1'), choice);
-
-      await reloaded.setReasoningChoice('OpenAI', 'gpt-5.1', null);
-      expect(reloaded.reasoningChoiceFor('OpenAI', 'gpt-5.1'), isNull);
-      expect(
-        harness.preferences.getString('reasoning_choice_by_model_v1'),
-        isNull,
-      );
-    });
+        for (final model in const [
+          'claude-fable-5-1',
+          'claude-fable-5',
+          'claude-mythos-5',
+          'claude-opus-4-8',
+          'claude-opus-5',
+          'claude-sonnet-5',
+        ]) {
+          expect(settings.supportsXhighReasoning('Claude', model), isTrue);
+          expect(settings.supportsMaxReasoning('Claude', model), isTrue);
+        }
+        expect(settings.getProviderConfig('Claude').models, [
+          'claude-fable-5-1',
+          'claude-fable-5',
+          'claude-mythos-5',
+          'claude-opus-4-8',
+          'claude-opus-5',
+          'claude-sonnet-5',
+        ]);
+      },
+    );
 
     test('OpenRouter Anthropic format exposes Claude max reasoning', () async {
       final harness = await createBusinessTestHarness(initial: {});
