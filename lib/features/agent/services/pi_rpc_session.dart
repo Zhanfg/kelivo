@@ -45,6 +45,7 @@ class PiRpcSession {
     required String cwd,
     required String sessionDir,
     required String sessionName,
+    bool resumeExisting = false,
     String approvalMode = 'always-ask',
     String? appendSystemPrompt,
     List<String> skills = const <String>[],
@@ -70,6 +71,7 @@ class PiRpcSession {
       'rpc',
       '--session-dir',
       sessionDir,
+      if (resumeExisting) '--continue',
       '--approval-mode',
       approvalMode,
       if (appendSystemPrompt != null && appendSystemPrompt.isNotEmpty) ...[
