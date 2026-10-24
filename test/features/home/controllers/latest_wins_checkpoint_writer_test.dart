@@ -164,6 +164,7 @@ void main() {
         final firstWriteStarted = Completer<void>();
         final releaseFirstWrite = Completer<void>();
         final allChunksConsumed = Completer<void>();
+        final finalizationRequested = Completer<void>();
         final streamDone = Completer<void>();
         final writes = <int>[];
         final writer = LatestWinsCheckpointWriter<int>(
@@ -191,6 +192,7 @@ void main() {
           },
           onError: (error, stackTrace) async => fail('$error'),
           onDone: () async {
+            finalizationRequested.complete();
             await writer.finalize(() async => writes.add(consumed));
             streamDone.complete();
           },
@@ -205,6 +207,10 @@ void main() {
 
         await firstWriteStarted.future.timeout(const Duration(seconds: 1));
         await allChunksConsumed.future.timeout(const Duration(seconds: 1));
+        // Stream completion can be queued after the last onData callback.
+        // Wait until finalize has dropped pending checkpoints before releasing
+        // the in-flight write, otherwise the test measures a scheduling race.
+        await finalizationRequested.future.timeout(const Duration(seconds: 1));
         expect(controller.isPaused, isFalse);
         expect(consumed, 1 << 20);
         expect(writes, hasLength(1));

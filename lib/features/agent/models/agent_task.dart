@@ -84,6 +84,20 @@ class AgentTask {
   final DateTime? startedAt;
   final DateTime? finishedAt;
 
+  /// Model identity is frozen when a task is created. Older stored tasks without
+  /// both fields may still fall back to the current model configuration.
+  ({String providerKey, String modelId})? get pinnedModel {
+    final providerKey = modelProviderKey?.trim();
+    final savedModelId = modelId?.trim();
+    if (providerKey == null ||
+        providerKey.isEmpty ||
+        savedModelId == null ||
+        savedModelId.isEmpty) {
+      return null;
+    }
+    return (providerKey: providerKey, modelId: savedModelId);
+  }
+
   bool get canResume => phase.canResume;
 
   AgentTask copyWith({

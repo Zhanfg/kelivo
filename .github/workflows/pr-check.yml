@@ -71,7 +71,12 @@ jobs:
 
           echo "Format-checking files:"
           echo "$files"
-          dart format --output=none --set-exit-if-changed $files
+          if ! dart format --output=none --set-exit-if-changed $files; then
+            echo 'Dart formatting mismatch; showing the canonical formatter diff:'
+            dart format $files
+            git diff -- $files
+            exit 1
+          fi
 
       - name: Generate l10n and ensure committed outputs
         run: |

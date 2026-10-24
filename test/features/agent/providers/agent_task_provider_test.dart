@@ -27,6 +27,8 @@ void main() {
       goal: 'Keep state across app restarts',
       workspaceId: 'workspace-1',
       environmentId: 'environment-1',
+      modelProviderKey: 'provider-original',
+      modelId: 'original-model',
     );
     await first.setPhase(
       created.id,
@@ -43,6 +45,8 @@ void main() {
     expect(restored.environmentId, 'environment-1');
     expect(restored.phase, AgentTaskPhase.running);
     expect(restored.currentStep, 'install dependencies');
+    expect(restored.pinnedModel?.providerKey, 'provider-original');
+    expect(restored.pinnedModel?.modelId, 'original-model');
   });
 
   test('unfinished unowned tasks become resumable after restart', () async {
