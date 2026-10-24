@@ -30,8 +30,10 @@ abstract final class AgentResumeSafety {
           if (payload['kind'] == 'prompt_dispatch_started') {
             promptMayHaveRun = true;
           }
+          break;
         case AgentTaskEventKind.turnStarted:
           promptMayHaveRun = true;
+          break;
         case AgentTaskEventKind.toolStarted:
           promptMayHaveRun = true;
           final id = payload['toolCallId']?.toString();
@@ -40,6 +42,7 @@ abstract final class AgentResumeSafety {
           } else {
             pendingTools.add(id);
           }
+          break;
         case AgentTaskEventKind.toolFinished:
           final id = payload['toolCallId']?.toString();
           if (id == null || id.isEmpty) {
@@ -47,11 +50,14 @@ abstract final class AgentResumeSafety {
           } else {
             pendingTools.remove(id);
           }
+          break;
         case AgentTaskEventKind.approvalRequested:
           promptMayHaveRun = true;
           unresolvedApprovals++;
+          break;
         case AgentTaskEventKind.approvalResolved:
           if (unresolvedApprovals > 0) unresolvedApprovals--;
+          break;
         default:
           break;
       }
