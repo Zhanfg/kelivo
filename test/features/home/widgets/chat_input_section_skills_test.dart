@@ -190,6 +190,10 @@ void main() {
         tester.widget<ChatInputBar>(find.byType(ChatInputBar)).skillsActive,
         isFalse,
       );
+      // Restore the desktop viewport before reopening the primary Skills icon:
+      // at 700px the composer moves this action into its overflow menu.
+      tester.view.physicalSize = const Size(1000, 700);
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Skills'));
       await tester.pumpAndSettle();
       await tester.tapAt(const Offset(20, 20));
