@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'agent_task_journal.dart';
@@ -95,10 +96,24 @@ abstract final class AgentResumeSafety {
         recursive: true,
         followLinks: false,
       )) {
-        if (entity is File &&
-            entity.path.endsWith('.jsonl') &&
-            await entity.length() > 0) {
-          return true;
+        if (entity is! File || !entity.path.endsWith('.jsonl')) continue;
+        if (await entity.length() == 0) continue;
+        // OMP may materialize a title slot and a session header before any
+        // user turn. A header-only file cannot recover the interrupted prompt.
+        await for (final line in entity
+            .openRead()
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
+          try {
+            final data = jsonDecode(line);
+            if (data is Map &&
+                data['type'] == 'message' &&
+                data['message'] is Map) {
+              return true;
+            }
+          } on FormatException {
+            // Ignore a torn final JSONL record after process death.
+          }
         }
       }
     } on FileSystemException {
