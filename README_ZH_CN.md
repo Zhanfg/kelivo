@@ -29,6 +29,9 @@
 
 </div>
 
+> **Zhanfg 定制分支 — Android ARM64 Preview 2（2026-10-24）。** [下载已通过自动化验证的 APK](https://github.com/Zhanfg/kelivo/releases/download/kelivo-preview-20261024-d27fdc0c/Kelivo_1.3.0_preview_20261024_d27fdc0c_arm64_debug.apk) · [发行说明、签名及 SHA-256](https://github.com/Zhanfg/kelivo/releases/tag/kelivo-preview-20261024-d27fdc0c) · [上游同步账本](docs/kelivo-upstream-sync-ledger-20261024.md)。此版为 ARM64 **Debug 签名预览版**，并非正式稳定版，也尚未完成上游全量合并。安装前请备份；如果旧版使用不同证书，通常无法直接覆盖安装。
+
+
 ## 💡 简介
 
 Kelivo 是基于 Flutter 构建的跨平台 LLM 客户端，支持 Android、iOS、macOS、Windows 和 Linux。你可以填入自己的 API Key，也可以直接登录已支持的订阅账号，在同一个应用里使用 OpenAI、Gemini、Claude、DeepSeek、OpenRouter 以及任何 OpenAI 兼容服务。
