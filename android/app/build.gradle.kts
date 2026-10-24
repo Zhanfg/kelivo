@@ -96,35 +96,13 @@ flutter {
     source = "../.."
 }
 
-val supportedProotAbis = listOf("armeabi-v7a", "arm64-v8a", "x86_64")
-val requestedProotAbis = System.getenv("KELIVO_ANDROID_ABIS")
-    ?.split(",")
-    ?.map { it.trim() }
-    ?.filter { it in supportedProotAbis }
-    ?.takeIf { it.isNotEmpty() }
-    ?: supportedProotAbis
-
-val requiredProotLibs = requestedProotAbis.flatMap { abi ->
-    listOf(
-        abi + "/libproot_exec.so",
-        abi + "/libproot_loader.so",
-        abi + "/libtalloc.so",
-        abi + "/libandroid-shmem.so",
-    )
-}
+// Run the native integrity check on every build, even when JNI binaries are
+// already present. The helper exits quickly for a fully verified local cache.
 tasks.register<Exec>("fetchProot") {
     val repoRoot = rootProject.projectDir.parentFile
     commandLine("bash", repoRoot.resolve("tool/fetch_proot.sh").absolutePath)
     workingDir = repoRoot
-    onlyIf {
-        val jniLibs = layout.projectDirectory.dir("src/main/jniLibs")
-        requiredProotLibs.any { name ->
-            val so = jniLibs.file(name).asFile
-            !so.isFile || so.length() == 0L
-        }
-    }
 }
-
 tasks.whenTaskAdded {
     if (name == "preBuild") {
         dependsOn("fetchProot")
