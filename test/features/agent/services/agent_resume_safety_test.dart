@@ -150,6 +150,11 @@ void main() {
     await file.create();
     expect(await AgentResumeSafety.hasPersistedSession(root), isFalse);
     await file.writeAsString('{"type":"session"}\n');
+    expect(await AgentResumeSafety.hasPersistedSession(root), isFalse);
+    await file.writeAsString(
+      '{"type":"message","message":{"role":"user","content":"work"}}\n',
+      mode: FileMode.append,
+    );
     expect(await AgentResumeSafety.hasPersistedSession(root), isTrue);
   });
 }
