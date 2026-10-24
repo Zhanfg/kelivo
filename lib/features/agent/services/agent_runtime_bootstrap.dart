@@ -8,6 +8,7 @@ import '../../../core/services/sandbox/channel_command_run.dart';
 import '../../../core/services/sandbox/workspace_channel.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
 import '../../../utils/app_directories.dart';
+import 'agent_rootfs_swap.dart';
 
 /// KELIVO-owned execution environment for Agent mode.
 ///
@@ -17,24 +18,21 @@ import '../../../utils/app_directories.dart';
 /// not depend on PRoot and can be moved to a faster backend later.
 class AgentRuntimeBootstrap {
   AgentRuntimeBootstrap({WorkspaceChannel? channel})
-      : channel = channel ?? WorkspaceChannel();
+    : channel = channel ?? WorkspaceChannel();
 
   static const String runtimeVersion = 'wolfi-v1';
-  static const String arm64Asset =
-      'assets/agent_runtime/wolfi-arm64.tar.gz';
+  static const String arm64Asset = 'assets/agent_runtime/wolfi-arm64.tar.gz';
 
   final WorkspaceChannel channel;
   final Map<String, Future<AgentRuntimeHandle>> _pending =
       <String, Future<AgentRuntimeHandle>>{};
 
-  Future<AgentRuntimeHandle> ensureReady({
-    String environmentId = 'default',
-  }) {
+  Future<AgentRuntimeHandle> ensureReady({String environmentId = 'default'}) {
     return _pending.putIfAbsent(
       environmentId,
-      () => _prepare(environmentId).whenComplete(
-        () => _pending.remove(environmentId),
-      ),
+      () => _prepare(
+        environmentId,
+      ).whenComplete(() => _pending.remove(environmentId)),
     );
   }
 
@@ -52,8 +50,9 @@ class AgentRuntimeBootstrap {
       _ => throw UnsupportedError('agent_runtime_unsupported_abi:${probe.abi}'),
     };
 
-    final environmentDir =
-        await AppDirectories.agentEnvironmentDir(environmentId);
+    final environmentDir = await AppDirectories.agentEnvironmentDir(
+      environmentId,
+    );
     final rootfsDir = Directory(p.join(environmentDir.path, 'rootfs'));
     final homeDir = Directory(p.join(environmentDir.path, 'home'));
     final tmpDir = Directory(p.join(environmentDir.path, 'tmp'));
@@ -80,8 +79,16 @@ class AgentRuntimeBootstrap {
       throw StateError('agent_control_extension_missing');
     }
 
+    // A previous startup may have died after moving the old rootfs aside.
+    // Recover it before attempting to install or delete any staging files.
+    await AgentRootfsSwap.restoreInterrupted(
+      environmentDir: environmentDir,
+      rootfsDir: rootfsDir,
+    );
+
+    var replacedExistingRootfs = false;
     if (!await _validInstall(rootfsDir, marker)) {
-      await _installEmbeddedRuntime(
+      replacedExistingRootfs = await _installEmbeddedRuntime(
         environmentDir: environmentDir,
         rootfsDir: rootfsDir,
         marker: marker,
@@ -95,9 +102,19 @@ class AgentRuntimeBootstrap {
       homeDir: homeDir,
       tmpDir: tmpDir,
     );
-    final status = await runtime.status();
-    if (!status.ready) {
-      throw StateError(status.reason ?? 'agent_runtime_healthcheck_failed');
+    try {
+      final status = await runtime.status();
+      if (!status.ready) {
+        throw StateError(status.reason ?? 'agent_runtime_healthcheck_failed');
+      }
+    } catch (_) {
+      if (replacedExistingRootfs) {
+        await AgentRootfsSwap.rollBack(
+          environmentDir: environmentDir,
+          rootfsDir: rootfsDir,
+        );
+      }
+      rethrow;
     }
 
     return AgentRuntimeHandle(
@@ -117,7 +134,7 @@ class AgentRuntimeBootstrap {
         File(p.join(rootfsDir.path, 'usr', 'bin', 'env')).existsSync();
   }
 
-  Future<void> _installEmbeddedRuntime({
+  Future<bool> _installEmbeddedRuntime({
     required Directory environmentDir,
     required Directory rootfsDir,
     required File marker,
@@ -130,7 +147,11 @@ class AgentRuntimeBootstrap {
     final packageStore = await AppDirectories.getAgentPackageStoreDirectory();
     final runtimeStore = Directory(p.join(packageStore.path, 'runtime'));
     await runtimeStore.create(recursive: true);
-    final archive = File(p.join(runtimeStore.path, 'wolfi-arm64.tar.gz'));
+    // A runtime-version-scoped archive prevents a stale cached bundle from
+    // reinstalling an older rootfs after an application upgrade.
+    final archive = File(
+      p.join(runtimeStore.path, 'wolfi-arm64-$runtimeVersion.tar.gz'),
+    );
 
     if (!await archive.exists() || await archive.length() == 0) {
       ByteData data;
@@ -161,9 +182,16 @@ class AgentRuntimeBootstrap {
         throw StateError('agent_runtime_invalid_image');
       }
 
-      if (await rootfsDir.exists()) await rootfsDir.delete(recursive: true);
-      await staging.rename(rootfsDir.path);
-      await marker.writeAsString(runtimeVersion, flush: true);
+      // Write the version marker before publishing staging; the live rootfs is
+      // never exposed without its marker, even if Android kills this process.
+      await File(
+        p.join(staging.path, p.basename(marker.path)),
+      ).writeAsString(runtimeVersion, flush: true);
+      return AgentRootfsSwap.activate(
+        environmentDir: environmentDir,
+        rootfsDir: rootfsDir,
+        staging: staging,
+      );
     } catch (_) {
       if (await staging.exists()) await staging.delete(recursive: true);
       rethrow;
@@ -240,20 +268,20 @@ class AgentAndroidRuntime implements WorkspaceStdioRuntime {
   }
 
   List<Mount> _mounts(List<Mount> mounts) => <Mount>[
-        Mount(host: homeDir.path, guest: '/home/kelivo'),
-        ...mounts,
-      ];
+    Mount(host: homeDir.path, guest: '/home/kelivo'),
+    ...mounts,
+  ];
 
   Map<String, String> _env(Map<String, String> env) => <String, String>{
-        'HOME': '/home/kelivo',
-        'USER': 'kelivo',
-        'LOGNAME': 'kelivo',
-        'SHELL': '/bin/sh',
-        'PATH':
-            '/home/kelivo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-        'LANG': 'C.UTF-8',
-        ...env,
-      };
+    'HOME': '/home/kelivo',
+    'USER': 'kelivo',
+    'LOGNAME': 'kelivo',
+    'SHELL': '/bin/sh',
+    'PATH':
+        '/home/kelivo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    'LANG': 'C.UTF-8',
+    ...env,
+  };
 
   @override
   Stream<CommandEvent> run(CommandRequest request) async* {
