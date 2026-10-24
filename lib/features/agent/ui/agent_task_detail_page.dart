@@ -9,6 +9,7 @@ import '../models/agent_task.dart';
 import '../providers/agent_interaction_broker.dart';
 import '../providers/agent_task_provider.dart';
 import '../services/agent_task_journal.dart';
+import '../services/agent_resume_safety.dart';
 import '../services/agent_task_runner.dart';
 
 class AgentTaskDetailPage extends StatefulWidget {
@@ -63,6 +64,47 @@ class _AgentTaskDetailPageState extends State<AgentTaskDetailPage> {
     }
   }
 
+  Future<void> _resumeTask(AgentTask task) async {
+    final runner = context.read<AgentTaskRunner>();
+    final events = await context.read<AgentTaskJournal>().read(task.id);
+    final decision = AgentResumeSafety.inspect(events);
+    if (decision.action == AgentResumeAction.blocked) {
+      if (!mounted) return;
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(_zh ? '检查未完成操作' : 'Review unfinished operations'),
+          content: Text(
+            _zh
+                ? '上次中断时可能有命令、文件修改或外部操作尚未完成。'
+                      '请先检查上方活动记录和实际工作区，确认之前的操作是否已经生效。'
+                      '确认后将从已保存会话继续，并对后续写入操作重新要求批准；'
+                      '这不能保证外部操作恰好执行一次。'
+                : 'A tool call, file edit or external operation may have been '
+                      'in flight when the task stopped. Review the activity '
+                      'history and the actual workspace before continuing. '
+                      'The saved session will be continued with approvals for '
+                      'new mutations; this is not exactly-once execution.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(_zh ? '取消' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(_zh ? '我已检查，继续' : 'Reviewed, continue'),
+            ),
+          ],
+        ),
+      );
+      if (approved != true || !mounted) return;
+      final acknowledged = await runner.authorizeRecoveryAfterReview(task.id);
+      if (!acknowledged) return;
+    }
+    await runner.run(task.id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final task = context.watch<AgentTaskProvider>().byId(widget.taskId);
@@ -98,17 +140,14 @@ class _AgentTaskDetailPageState extends State<AgentTaskDetailPage> {
           if (active)
             IconButton(
               tooltip: _zh ? '取消任务' : 'Cancel task',
-              onPressed: () => unawaited(
-                context.read<AgentTaskRunner>().cancel(task.id),
-              ),
+              onPressed: () =>
+                  unawaited(context.read<AgentTaskRunner>().cancel(task.id)),
               icon: const Icon(Lucide.Square),
             )
           else if (task.canResume)
             IconButton(
               tooltip: _zh ? '继续任务' : 'Resume task',
-              onPressed: () => unawaited(
-                context.read<AgentTaskRunner>().run(task.id),
-              ),
+              onPressed: () => unawaited(_resumeTask(task)),
               icon: const Icon(Lucide.RotateCcw),
             ),
         ],
@@ -124,6 +163,18 @@ class _AgentTaskDetailPageState extends State<AgentTaskDetailPage> {
                   padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
                   children: [
                     _GoalCard(task: task, zh: _zh),
+                    if (task.lastError != null &&
+                        task.lastError!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        task.lastError!.contains('agent_resume_')
+                            ? (_zh
+                                  ? '恢复已暂停：需要确认上次操作和已保存的会话。'
+                                  : 'Recovery paused: review the last operation and saved session.')
+                            : task.lastError!,
+                        style: TextStyle(color: cs.error, fontSize: 12),
+                      ),
+                    ],
                     if (interaction != null) ...[
                       const SizedBox(height: 10),
                       _ApprovalCard(request: interaction, zh: _zh),
@@ -302,71 +353,66 @@ class _EventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (event.kind) {
-      AgentTaskEventKind.planUpdated => _PlanEventCard(
-          event: event,
-          zh: zh,
-        ),
+      AgentTaskEventKind.planUpdated => _PlanEventCard(event: event, zh: zh),
       AgentTaskEventKind.assistantMessage => _TextEventCard(
-          icon: Lucide.Bot,
-          title: zh ? '代理' : 'Agent',
-          text: event.payload['text']?.toString() ?? '',
-        ),
+        icon: Lucide.Bot,
+        title: zh ? '代理' : 'Agent',
+        text: event.payload['text']?.toString() ?? '',
+      ),
       AgentTaskEventKind.toolStarted => _ToolEventCard(
-          event: event,
-          zh: zh,
-          running: true,
-        ),
-      AgentTaskEventKind.toolProgress => _OutputEventCard(
-          event: event,
-          zh: zh,
-        ),
+        event: event,
+        zh: zh,
+        running: true,
+      ),
+      AgentTaskEventKind.toolProgress => _OutputEventCard(event: event, zh: zh),
       AgentTaskEventKind.toolFinished => _ToolEventCard(
-          event: event,
-          zh: zh,
-          running: false,
-        ),
+        event: event,
+        zh: zh,
+        running: false,
+      ),
       AgentTaskEventKind.approvalRequested => _NoticeEventCard(
-          icon: Lucide.Shield,
-          text: zh ? '等待你的批准' : 'Waiting for approval',
-        ),
+        icon: Lucide.Shield,
+        text: zh ? '等待你的批准' : 'Waiting for approval',
+      ),
       AgentTaskEventKind.approvalResolved => _NoticeEventCard(
-          icon: Lucide.CheckCircle,
-          text: zh ? '批准请求已处理' : 'Approval resolved',
-        ),
+        icon: Lucide.CheckCircle,
+        text: zh ? '批准请求已处理' : 'Approval resolved',
+      ),
       AgentTaskEventKind.subagentLifecycle => _SubagentLifecycleCard(
-          event: event,
-          zh: zh,
-        ),
+        event: event,
+        zh: zh,
+      ),
       AgentTaskEventKind.subagentProgress => _SubagentProgressCard(
-          event: event,
-          zh: zh,
-        ),
+        event: event,
+        zh: zh,
+      ),
       AgentTaskEventKind.subagentEvent => _SubagentEventCard(
-          event: event,
-          zh: zh,
-        ),
+        event: event,
+        zh: zh,
+      ),
       AgentTaskEventKind.retry => _NoticeEventCard(
-          icon: Lucide.RotateCcw,
-          text: event.payload['state'] == 'start'
-              ? (zh ? '请求失败，正在自动重试' : 'Retrying after a transient failure')
-              : (zh ? '自动重试结束' : 'Retry finished'),
-        ),
+        icon: Lucide.RotateCcw,
+        text: event.payload['state'] == 'start'
+            ? (zh ? '请求失败，正在自动重试' : 'Retrying after a transient failure')
+            : (zh ? '自动重试结束' : 'Retry finished'),
+      ),
       AgentTaskEventKind.compaction => _NoticeEventCard(
-          icon: Lucide.FoldVertical,
-          text: event.payload['state'] == 'start'
-              ? (zh ? '正在压缩上下文' : 'Compacting context')
-              : (zh ? '上下文压缩完成' : 'Context compaction finished'),
-        ),
+        icon: Lucide.FoldVertical,
+        text: event.payload['state'] == 'start'
+            ? (zh ? '正在压缩上下文' : 'Compacting context')
+            : (zh ? '上下文压缩完成' : 'Context compaction finished'),
+      ),
       AgentTaskEventKind.queueChanged => _NoticeEventCard(
-          icon: Lucide.ListPlus,
-          text: zh ? '后续指令队列已更新' : 'Queued instructions updated',
-        ),
+        icon: Lucide.ListPlus,
+        text: zh ? '后续指令队列已更新' : 'Queued instructions updated',
+      ),
       AgentTaskEventKind.note => _NoteEventCard(event: event, zh: zh),
       AgentTaskEventKind.notice => _NoticeEventCard(
-          icon: Lucide.info,
-          text: event.payload['message']?.toString() ??
-              (zh ? '代理通知' : 'Agent notice'),
-        ),
+        icon: Lucide.info,
+        text:
+            event.payload['message']?.toString() ??
+            (zh ? '代理通知' : 'Agent notice'),
+      ),
       _ => const SizedBox.shrink(),
     };
   }
@@ -393,9 +439,7 @@ class _PlanEventCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.primaryContainer.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: cs.primary.withValues(alpha: 0.16),
-        ),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.16)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,9 +472,7 @@ class _PlanEventCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 7),
-                Expanded(
-                  child: Text(step['text']?.toString() ?? ''),
-                ),
+                Expanded(child: Text(step['text']?.toString() ?? '')),
               ],
             ),
             const SizedBox(height: 6),
@@ -469,8 +511,7 @@ class _ToolEventCard extends StatelessWidget {
     final command = args is Map && args['command'] != null
         ? args['command'].toString()
         : null;
-    final subagentTasks =
-        tool == 'task' && args is Map && args['tasks'] is List
+    final subagentTasks = tool == 'task' && args is Map && args['tasks'] is List
         ? (args['tasks'] as List).whereType<Map>().toList(growable: false)
         : const <Map>[];
     final path = args is Map
@@ -607,7 +648,9 @@ class _SubagentLifecycleCard extends StatelessWidget {
     final agent = event.payload['agent']?.toString() ?? 'subagent';
     final description = event.payload['description']?.toString();
     final index = event.payload['index'];
-    final label = index == null ? agent : '#${(index as num?)?.toInt() ?? index} · $agent';
+    final label = index == null
+        ? agent
+        : '#${(index as num?)?.toInt() ?? index} · $agent';
     final statusText = switch (status) {
       'started' => zh ? '已启动' : 'Started',
       'completed' => zh ? '已完成' : 'Completed',
@@ -639,13 +682,15 @@ class _SubagentProgressCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final progressRaw = event.payload['progress'];
-    final progress = progressRaw is Map ? progressRaw : const <dynamic, dynamic>{};
-    final agent = progress['agent']?.toString() ??
+    final progress = progressRaw is Map
+        ? progressRaw
+        : const <dynamic, dynamic>{};
+    final agent =
+        progress['agent']?.toString() ??
         event.payload['agent']?.toString() ??
         'subagent';
-    final task = event.payload['task']?.toString() ??
-        progress['task']?.toString() ??
-        '';
+    final task =
+        event.payload['task']?.toString() ?? progress['task']?.toString() ?? '';
     final status = progress['status']?.toString() ?? 'running';
     final currentTool = progress['currentTool']?.toString();
     final currentArgs = progress['currentToolArgs']?.toString();
@@ -661,9 +706,7 @@ class _SubagentProgressCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow.withValues(alpha: 0.76),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.18),
-        ),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -704,7 +747,10 @@ class _SubagentProgressCard extends StatelessWidget {
                         : '$currentTool · $currentArgs',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11.5,
+                    ),
                   ),
                 ),
               ],
@@ -722,8 +768,7 @@ class _SubagentProgressCard extends StatelessWidget {
                   zh ? '工具 $toolCount' : '$toolCount tools',
                 if (requests != null)
                   zh ? '请求 $requests' : '$requests requests',
-                if (tokens != null)
-                  '$tokens tok',
+                if (tokens != null) '$tokens tok',
               ].join(' · '),
               style: TextStyle(
                 fontSize: 10.5,
@@ -768,7 +813,8 @@ class _SubagentEventCard extends StatelessWidget {
     if (text.trim().isEmpty) return const SizedBox.shrink();
     return _NoticeEventCard(
       icon: type.startsWith('tool_') ? Lucide.Wrench : Lucide.MessageSquare,
-      text: '${zh ? '子代理' : 'Subagent'} ${agentId.isEmpty ? '' : agentId}: $text',
+      text:
+          '${zh ? '子代理' : 'Subagent'} ${agentId.isEmpty ? '' : agentId}: $text',
     );
   }
 }
@@ -890,7 +936,10 @@ class _TextEventCard extends StatelessWidget {
             children: [
               Icon(icon, size: 16),
               const SizedBox(width: 7),
-              Text(title, style: TextStyle(fontWeight: AppFontWeights.semibold)),
+              Text(
+                title,
+                style: TextStyle(fontWeight: AppFontWeights.semibold),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -1023,9 +1072,7 @@ class _ApprovalCardState extends State<_ApprovalCard> {
       decoration: BoxDecoration(
         color: cs.secondaryContainer.withValues(alpha: 0.32),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: cs.secondary.withValues(alpha: 0.24),
-        ),
+        border: Border.all(color: cs.secondary.withValues(alpha: 0.24)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1052,65 +1099,63 @@ class _ApprovalCardState extends State<_ApprovalCard> {
           const SizedBox(height: 10),
           switch (widget.request.method) {
             AgentInteractionMethod.select => Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final option in widget.request.options)
-                    OutlinedButton(
-                      onPressed: () => broker.select(widget.request.id, option),
-                      child: Text(_optionLabel(option)),
-                    ),
-                ],
-              ),
-            AgentInteractionMethod.confirm => Row(
-                children: [
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final option in widget.request.options)
                   OutlinedButton(
-                    onPressed: () => broker.confirm(widget.request.id, false),
-                    child: Text(widget.zh ? '拒绝' : 'Deny'),
+                    onPressed: () => broker.select(widget.request.id, option),
+                    child: Text(_optionLabel(option)),
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: () => broker.confirm(widget.request.id, true),
-                    child: Text(widget.zh ? '允许' : 'Allow'),
+              ],
+            ),
+            AgentInteractionMethod.confirm => Row(
+              children: [
+                OutlinedButton(
+                  onPressed: () => broker.confirm(widget.request.id, false),
+                  child: Text(widget.zh ? '拒绝' : 'Deny'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () => broker.confirm(widget.request.id, true),
+                  child: Text(widget.zh ? '允许' : 'Allow'),
+                ),
+              ],
+            ),
+            AgentInteractionMethod.input ||
+            AgentInteractionMethod.editor => Column(
+              children: [
+                TextField(
+                  controller: _text,
+                  minLines:
+                      widget.request.method == AgentInteractionMethod.editor
+                      ? 3
+                      : 1,
+                  maxLines:
+                      widget.request.method == AgentInteractionMethod.editor
+                      ? 8
+                      : 3,
+                  decoration: InputDecoration(
+                    hintText: widget.request.placeholder,
                   ),
-                ],
-              ),
-            AgentInteractionMethod.input || AgentInteractionMethod.editor =>
-              Column(
-                children: [
-                  TextField(
-                    controller: _text,
-                    minLines:
-                        widget.request.method == AgentInteractionMethod.editor
-                        ? 3
-                        : 1,
-                    maxLines:
-                        widget.request.method == AgentInteractionMethod.editor
-                        ? 8
-                        : 3,
-                    decoration: InputDecoration(
-                      hintText: widget.request.placeholder,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => broker.cancel(widget.request.id),
+                      child: Text(widget.zh ? '取消' : 'Cancel'),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => broker.cancel(widget.request.id),
-                        child: Text(widget.zh ? '取消' : 'Cancel'),
-                      ),
-                      FilledButton(
-                        onPressed: () => broker.submitText(
-                          widget.request.id,
-                          _text.text,
-                        ),
-                        child: Text(widget.zh ? '提交' : 'Submit'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    FilledButton(
+                      onPressed: () =>
+                          broker.submitText(widget.request.id, _text.text),
+                      child: Text(widget.zh ? '提交' : 'Submit'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           },
         ],
       ),

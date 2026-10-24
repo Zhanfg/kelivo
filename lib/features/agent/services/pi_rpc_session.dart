@@ -45,6 +45,7 @@ class PiRpcSession {
     required String cwd,
     required String sessionDir,
     required String sessionName,
+    bool resumeExisting = false,
     String approvalMode = 'always-ask',
     String? appendSystemPrompt,
     List<String> skills = const <String>[],
@@ -64,20 +65,14 @@ class PiRpcSession {
           },
         );
 
-    final arguments = <String>[
-      executable,
-      '--mode',
-      'rpc',
-      '--session-dir',
-      sessionDir,
-      '--approval-mode',
-      approvalMode,
-      if (appendSystemPrompt != null && appendSystemPrompt.isNotEmpty) ...[
-        '--append-system-prompt',
-        appendSystemPrompt,
-      ],
-      ...extraArgs,
-    ];
+    final arguments = buildLaunchArguments(
+      executable: executable,
+      sessionDir: sessionDir,
+      approvalMode: approvalMode,
+      resumeExisting: resumeExisting,
+      appendSystemPrompt: appendSystemPrompt,
+      extraArgs: extraArgs,
+    );
     final launch =
         'mkdir -p ${_quote(sessionDir)}; exec ${arguments.map(_quote).join(' ')}';
 
@@ -144,6 +139,34 @@ class PiRpcSession {
     }
   }
 
+  /// Pure launch-plan builder shared by the real launcher and regression
+  /// tests. A recovering task must explicitly keep both the prior transcript
+  /// and tool UI interaction surface.
+  static List<String> buildLaunchArguments({
+    required String executable,
+    required String sessionDir,
+    required String approvalMode,
+    bool resumeExisting = false,
+    String? appendSystemPrompt,
+    List<String> extraArgs = const <String>[],
+  }) {
+    return <String>[
+      executable,
+      '--mode',
+      'rpc-ui',
+      '--session-dir',
+      sessionDir,
+      if (resumeExisting) '--continue',
+      '--approval-mode',
+      approvalMode,
+      if (appendSystemPrompt != null && appendSystemPrompt.isNotEmpty) ...[
+        '--append-system-prompt',
+        appendSystemPrompt,
+      ],
+      ...extraArgs,
+    ];
+  }
+
   Future<Map<String, dynamic>> send(
     Map<String, dynamic> command, {
     Duration timeout = const Duration(seconds: 30),
@@ -188,17 +211,18 @@ class PiRpcSession {
   }
 
   Future<Map<String, dynamic>> setSessionName(String name) {
-    return send(<String, dynamic>{
-      'type': 'set_session_name',
-      'name': name,
-    });
+    return send(<String, dynamic>{'type': 'set_session_name', 'name': name});
   }
 
   Future<Map<String, dynamic>> setSubagentSubscription({
     String level = 'events',
   }) {
     if (!{'off', 'progress', 'events'}.contains(level)) {
-      throw ArgumentError.value(level, 'level', 'Invalid subagent subscription');
+      throw ArgumentError.value(
+        level,
+        'level',
+        'Invalid subagent subscription',
+      );
     }
     return send(<String, dynamic>{
       'type': 'set_subagent_subscription',
@@ -222,18 +246,12 @@ class PiRpcSession {
     return send(const <String, dynamic>{'type': 'clear_queue'});
   }
 
-  Future<Map<String, dynamic>> bash(
-    String command, {
-    String? id,
-  }) {
-    return send(
-      <String, dynamic>{
-        'type': 'bash',
-        'command': command,
-        if (id != null) 'id': id,
-      },
-      timeout: const Duration(minutes: 10),
-    );
+  Future<Map<String, dynamic>> bash(String command, {String? id}) {
+    return send(<String, dynamic>{
+      'type': 'bash',
+      'command': command,
+      if (id != null) 'id': id,
+    }, timeout: const Duration(minutes: 10));
   }
 
   Future<Map<String, dynamic>> getSessionStats() {
