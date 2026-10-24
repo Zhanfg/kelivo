@@ -1,0 +1,179 @@
+name: Publish Verified Android Preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-android-preview.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kelivo-preview-arm64-20261024
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    if: github.repository == 'Zhanfg/kelivo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout tested main source
+        uses: actions/checkout@v4
+        with:
+          ref: c74edb3eabcfba431eff0222c50d028227ba4125
+          fetch-depth: 1
+
+      - name: Assert source identity
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = c74edb3eabcfba431eff0222c50d028227ba4125
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+          cache: gradle
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml', 'dependencies/**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-arm64-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-arm64-
+            ${{ runner.os }}-cargo-
+
+      - uses: actions/cache@v4
+        with:
+          path: android/app/src/main/jniLibs/arm64-v8a
+          key: ${{ runner.os }}-proot-jni-arm64-${{ hashFiles('tool/fetch_proot.sh', 'tool/proot_checksums.txt') }}
+
+      - name: Prepare Agent, sources and localizations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p lib/secrets
+          printf "const String siliconflowFallbackKey = '';\n" > lib/secrets/fallback.dart
+          bash tool/prepare_agent_runtime.sh
+          flutter pub get
+          flutter gen-l10n
+
+      - name: Validate code and critical tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart analyze --fatal-infos lib test integration_test
+          flutter test test/features/agent
+          flutter test test/features/chat/widgets/chat_assistant_background_test.dart
+
+      - name: Prepare Android Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup target add --toolchain stable aarch64-linux-android
+          flutter build apk --config-only --target-platform android-arm64
+
+      - name: Build ARM64 signed debug preview APK
+        env:
+          KELIVO_ANDROID_ABIS: arm64-v8a
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --debug --no-pub --target-platform android-arm64 --build-name=1.3.0 --build-number=80
+
+      - name: Validate APK identity, native libs and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          FROM=build/app/outputs/flutter-apk/app-debug.apk
+          APK=dist/Kelivo_1.3.0_preview_20261024_c74edb3e_arm64_debug.apk
+          test -s "$FROM"
+          cp "$FROM" "$APK"
+          unzip -t "$APK" >/dev/null
+          unzip -Z1 "$APK" > dist/APK_CONTENTS.txt
+          grep -Fx 'lib/arm64-v8a/libflutter.so' dist/APK_CONTENTS.txt
+          grep -Fx 'lib/arm64-v8a/libproot_exec.so' dist/APK_CONTENTS.txt
+          grep -Fx 'lib/arm64-v8a/libproot_loader.so' dist/APK_CONTENTS.txt
+          grep -Fx 'lib/arm64-v8a/libtalloc.so' dist/APK_CONTENTS.txt
+          grep -Fx 'lib/arm64-v8a/libandroid-shmem.so' dist/APK_CONTENTS.txt
+          APKSIGNER="$(find "${ANDROID_HOME}/build-tools" -mindepth 2 -maxdepth 2 -name apksigner | sort -V | tail -1)"
+          AAPT="$(find "${ANDROID_HOME}/build-tools" -mindepth 2 -maxdepth 2 -name aapt | sort -V | tail -1)"
+          test -n "$APKSIGNER" && test -n "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > dist/APK_SIGNATURE.txt
+          "$AAPT" dump badging "$APK" > dist/APK_BADGING.txt
+          grep -q "name='com.psyche.kelivo'" dist/APK_BADGING.txt
+          sha256sum "$APK" > dist/SHA256SUMS.txt
+          printf 'Repository: Zhanfg/kelivo\nBranch: main\nSource revision: c74edb3eabcfba431eff0222c50d028227ba4125\nFlutter: 3.44.9\nABI: arm64-v8a\nVersion: 1.3.0+80\nSigning: CI debug key\nTests: source analysis, Agent and Chat tests\n' > dist/BUILD_PROVENANCE.txt
+          cat dist/SHA256SUMS.txt
+          ls -lh "$APK"
+
+      - name: Write prerelease notes
+        shell: bash
+        run: |
+          cat > dist/RELEASE_NOTES.md <<'EOF'
+          # Kelivo 2026.10.24 ARM64 Preview
+          
+          Source: Zhanfg/kelivo main revision c74edb3e (2026-10-24).
+          Installable signed debug APK for Android arm64, Android 8.0 / API 26+.
+          Includes already-merged upstream compatibility/PRoot fixes (PR #20) and Agent stability, permission, journal and rootfs rollback hardening (PR #21). Chat, Story and Agent modes remain present.
+          
+          This is a preview, NOT a production-stable release. True Agent task continuation, package migration, credential isolation and on-device end-to-end acceptance are pending. Official full-upstream merge is still quarantined as Draft PR #22.
+          
+          APK is signed by the ephemeral CI debug key, not a persistent production key. Existing installations signed by a different certificate may not support an in-place update. BACK UP FIRST. Uninstalling the previous app may delete local data. Do not use this preview for irreplaceable data.
+          
+          Verify APK integrity using SHA256SUMS.txt; see APK_SIGNATURE.txt and BUILD_PROVENANCE.txt for evidence.
+          EOF
+
+      - name: Publish permanent GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=kelivo-preview-20261024-c74edb3e
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists; refusing overwrite" >&2
+            exit 1
+          fi
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target c74edb3eabcfba431eff0222c50d028227ba4125 \
+            --title "Kelivo 2026.10.24 Android ARM64 Preview" \
+            --notes-file dist/RELEASE_NOTES.md \
+            --prerelease \
+            dist/Kelivo_1.3.0_preview_20261024_c74edb3e_arm64_debug.apk \
+            dist/SHA256SUMS.txt dist/APK_SIGNATURE.txt dist/APK_BADGING.txt dist/BUILD_PROVENANCE.txt
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
+
+      - name: Save verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kelivo-Preview-20261024-Evidence
+          path: |
+            dist/SHA256SUMS.txt
+            dist/APK_SIGNATURE.txt
+            dist/APK_BADGING.txt
+            dist/BUILD_PROVENANCE.txt
+            dist/RELEASE_NOTES.md
+          if-no-files-found: warn
+          retention-days: 30
