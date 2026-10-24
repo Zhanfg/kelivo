@@ -68,7 +68,9 @@ class PiRpcSession {
     final arguments = <String>[
       executable,
       '--mode',
-      'rpc',
+      // OMP's rpc-ui transport exposes ask/approval dialogs to the Android
+      // interaction broker; plain rpc leaves tool UI unavailable.
+      'rpc-ui',
       '--session-dir',
       sessionDir,
       if (resumeExisting) '--continue',
