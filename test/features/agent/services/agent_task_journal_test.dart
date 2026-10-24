@@ -50,7 +50,7 @@ void main() {
       '..',
       '.',
       '',
-      'x' * 129,
+      List<String>.filled(129, 'x').join(),
     ]) {
       await expectLater(
         journal.append(invalid, AgentTaskEventKind.note),
