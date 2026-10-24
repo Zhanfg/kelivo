@@ -72,6 +72,26 @@ class AgentTaskRunner {
     await tasks.markUnownedRunningTasksInterrupted();
   }
 
+  /// Explicit consent after a human reviews potentially in-flight side
+  /// effects. It never replays the old goal; OMP still resumes from disk and
+  /// new mutating actions are subject to the ask permission mode.
+  Future<bool> authorizeRecoveryAfterReview(String taskId) async {
+    await recovery;
+    if (_running.contains(taskId)) return false;
+    final task = tasks.byId(taskId);
+    if (task == null || !task.canResume) return false;
+    final decision = AgentResumeSafety.inspect(await journal.read(taskId));
+    if (decision.action != AgentResumeAction.blocked) return false;
+    await journal.append(
+      taskId,
+      AgentTaskEventKind.checkpoint,
+      payload: const <String, dynamic>{
+        'kind': 'resume_uncertain_operations_acknowledged',
+      },
+    );
+    return true;
+  }
+
   Future<void> run(String taskId) async {
     await recovery;
     if (_running.contains(taskId)) return;
