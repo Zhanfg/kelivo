@@ -105,6 +105,42 @@ void main() {
     );
   });
 
+  test('manual review clears only prior uncertain operations', () {
+    final reviewed = AgentResumeSafety.inspect(<AgentTaskEvent>[
+      record(AgentTaskEventKind.turnStarted),
+      record(
+        AgentTaskEventKind.toolStarted,
+        payload: const <String, dynamic>{'toolCallId': 'tool-prior'},
+      ),
+      record(
+        AgentTaskEventKind.checkpoint,
+        payload: const <String, dynamic>{
+          'kind': 'resume_uncertain_operations_acknowledged',
+        },
+      ),
+    ]);
+    expect(reviewed.action, AgentResumeAction.continueSession);
+
+    final interruptedAgain = AgentResumeSafety.inspect(<AgentTaskEvent>[
+      record(AgentTaskEventKind.turnStarted),
+      record(
+        AgentTaskEventKind.toolStarted,
+        payload: const <String, dynamic>{'toolCallId': 'tool-prior'},
+      ),
+      record(
+        AgentTaskEventKind.checkpoint,
+        payload: const <String, dynamic>{
+          'kind': 'resume_uncertain_operations_acknowledged',
+        },
+      ),
+      record(
+        AgentTaskEventKind.toolStarted,
+        payload: const <String, dynamic>{'toolCallId': 'tool-new'},
+      ),
+    ]);
+    expect(interruptedAgain.action, AgentResumeAction.blocked);
+  });
+
   test('persistent transcript is required before --continue', () async {
     final root = await Directory.systemTemp.createTemp('agent-session-test-');
     addTearDown(() => root.delete(recursive: true));
