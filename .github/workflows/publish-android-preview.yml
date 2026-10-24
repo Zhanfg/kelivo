@@ -23,13 +23,13 @@ jobs:
       - name: Checkout tested main source
         uses: actions/checkout@v4
         with:
-          ref: c74edb3eabcfba431eff0222c50d028227ba4125
+          ref: d27fdc0c97f8e5e4092269baa96bbe006e289a7c
           fetch-depth: 1
 
       - name: Assert source identity
         shell: bash
         run: |
-          test "$(git rev-parse HEAD)" = c74edb3eabcfba431eff0222c50d028227ba4125
+          test "$(git rev-parse HEAD)" = d27fdc0c97f8e5e4092269baa96bbe006e289a7c
 
       - uses: actions/setup-java@v4
         with:
@@ -97,7 +97,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter build apk --debug --no-pub --target-platform android-arm64 --build-name=1.3.0 --build-number=80
+          flutter build apk --debug --no-pub --target-platform android-arm64 --build-name=1.3.0 --build-number=81
 
       - name: Validate APK identity, native libs and signature
         shell: bash
@@ -105,7 +105,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           FROM=build/app/outputs/flutter-apk/app-debug.apk
-          APK=dist/Kelivo_1.3.0_preview_20261024_c74edb3e_arm64_debug.apk
+          APK=dist/Kelivo_1.3.0_preview_20261024_d27fdc0c_arm64_debug.apk
           test -s "$FROM"
           cp "$FROM" "$APK"
           unzip -t "$APK" >/dev/null
@@ -122,7 +122,7 @@ jobs:
           "$AAPT" dump badging "$APK" > dist/APK_BADGING.txt
           grep -q "name='com.psyche.kelivo'" dist/APK_BADGING.txt
           sha256sum "$APK" > dist/SHA256SUMS.txt
-          printf 'Repository: Zhanfg/kelivo\nBranch: main\nSource revision: c74edb3eabcfba431eff0222c50d028227ba4125\nFlutter: 3.44.9\nABI: arm64-v8a\nVersion: 1.3.0+80\nSigning: CI debug key\nTests: source analysis, Agent and Chat tests\n' > dist/BUILD_PROVENANCE.txt
+          printf 'Repository: Zhanfg/kelivo\nBranch: main\nSource revision: d27fdc0c97f8e5e4092269baa96bbe006e289a7c\nFlutter: 3.44.9\nABI: arm64-v8a\nVersion: 1.3.0+81\nSigning: CI debug key\nTests: source analysis, Agent and Chat tests\n' > dist/BUILD_PROVENANCE.txt
           cat dist/SHA256SUMS.txt
           ls -lh "$APK"
 
@@ -130,11 +130,11 @@ jobs:
         shell: bash
         run: |
           cat > dist/RELEASE_NOTES.md <<'EOF'
-          # Kelivo 2026.10.24 ARM64 Preview
+          # Kelivo 2026.10.24 ARM64 Preview 2
           
-          Source: Zhanfg/kelivo main revision c74edb3e (2026-10-24).
+          Source: Zhanfg/kelivo main revision d27fdc0c (2026-10-24).
           Installable signed debug APK for Android arm64, Android 8.0 / API 26+.
-          Includes already-merged upstream compatibility/PRoot fixes (PR #20) and Agent stability, permission, journal and rootfs rollback hardening (PR #21). Chat, Story and Agent modes remain present.
+          Includes PR #20 upstream and PRoot repairs, PR #21 Agent permissions and rootfs rollback, and PR #23 official upstream workspace capability fix: Android in-app PTY on wide layouts and no unsupported host-file-manager access. Chat, Story and Agent modes remain present.
           
           This is a preview, NOT a production-stable release. True Agent task continuation, package migration, credential isolation and on-device end-to-end acceptance are pending. Official full-upstream merge is still quarantined as Draft PR #22.
           
@@ -149,18 +149,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG=kelivo-preview-20261024-c74edb3e
+          TAG=kelivo-preview-20261024-d27fdc0c
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release already exists; refusing overwrite" >&2
             exit 1
           fi
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --target c74edb3eabcfba431eff0222c50d028227ba4125 \
-            --title "Kelivo 2026.10.24 Android ARM64 Preview" \
+            --target d27fdc0c97f8e5e4092269baa96bbe006e289a7c \
+            --title "Kelivo 2026.10.24 Android ARM64 Preview 2" \
             --notes-file dist/RELEASE_NOTES.md \
             --prerelease \
-            dist/Kelivo_1.3.0_preview_20261024_c74edb3e_arm64_debug.apk \
+            dist/Kelivo_1.3.0_preview_20261024_d27fdc0c_arm64_debug.apk \
             dist/SHA256SUMS.txt dist/APK_SIGNATURE.txt dist/APK_BADGING.txt dist/BUILD_PROVENANCE.txt
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
 
