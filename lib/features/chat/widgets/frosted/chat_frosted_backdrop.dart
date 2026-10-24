@@ -455,6 +455,7 @@ class ChatFrostedBackdropScope extends InheritedWidget {
   });
 
   final ChatFrostedBackdropController controller;
+
   /// Full backdrop artwork bounds, independent of chat panel insets.
   final Size size;
 
