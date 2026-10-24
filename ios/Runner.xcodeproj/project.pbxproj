@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		W5A0000000000000000000E1 /* RootfsPatch.bundle in Resources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000E2 /* RootfsPatch.bundle */; };
 		BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */; };
+		CBCC0F40B115447D832DF102 /* ScheduledTaskNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */; };
 		W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000E003 /* KelivoISHEnvironment.m */; };
 		W5A0000000000000000F001 /* KelivoISHFilesystem.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000F003 /* KelivoISHFilesystem.m */; };
 		W5D0000000000000000F001 /* KelivoISHMountTarget.m in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000F003 /* KelivoISHMountTarget.m */; };
@@ -20,6 +21,10 @@
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
+		B610A5500000000000000001 /* BrowserGlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000002 /* BrowserGlassView.swift */; };
+		B610A5500000000000000003 /* BrowserLegacyGlassRuntime.m in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000004 /* BrowserLegacyGlassRuntime.m */; };
+		B610A5500000000000000005 /* BrowserScrollBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000006 /* BrowserScrollBridge.swift */; };
+		B610A5500000000000000007 /* IosSelectionMenuHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B610A5500000000000000008 /* IosSelectionMenuHandler.swift */; };
 		A2DT00000000000000000001 /* DeviceLocalToolsHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */; };
 		A2DT00000000000000000002 /* LocationToolHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000012 /* LocationToolHandler.swift */; };
 		A2DT00000000000000000003 /* WeatherToolHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000013 /* WeatherToolHandler.swift */; };
@@ -102,6 +107,7 @@
 /* Begin PBXFileReference section */
 		W5A0000000000000000000E2 /* RootfsPatch.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.cfbundle; name = RootfsPatch.bundle; path = sandbox/resources/RootfsPatch.bundle; sourceTree = SOURCE_ROOT; };
 		BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileBackgroundHandler.swift; sourceTree = "<group>"; };
+		CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskNotifications.swift; sourceTree = "<group>"; };
 		W5A0000000000000000E002 /* KelivoISHEnvironment.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHEnvironment.h; sourceTree = "<group>"; };
 		W5A0000000000000000F002 /* KelivoISHFilesystem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHFilesystem.h; sourceTree = "<group>"; };
 		W5D0000000000000000F002 /* KelivoISHMountTarget.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHMountTarget.h; sourceTree = "<group>"; };
@@ -130,6 +136,10 @@
 		6AFE7891365C1A6043202DEE /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		B610A5500000000000000002 /* BrowserGlassView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserGlassView.swift; sourceTree = "<group>"; };
+		B610A5500000000000000004 /* BrowserLegacyGlassRuntime.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BrowserGlass/BrowserLegacyGlassRuntime.m; sourceTree = "<group>"; };
+		B610A5500000000000000006 /* BrowserScrollBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserScrollBridge.swift; sourceTree = "<group>"; };
+		B610A5500000000000000008 /* IosSelectionMenuHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosSelectionMenuHandler.swift; sourceTree = "<group>"; };
 		A2DT00000000000000000011 /* DeviceLocalToolsHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLocalToolsHandler.swift; sourceTree = "<group>"; };
 		A2DT00000000000000000012 /* LocationToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationToolHandler.swift; sourceTree = "<group>"; };
 		A2DT00000000000000000013 /* WeatherToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherToolHandler.swift; sourceTree = "<group>"; };
@@ -315,7 +325,12 @@
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
+				B610A5500000000000000002 /* BrowserGlassView.swift */,
+				B610A5500000000000000004 /* BrowserLegacyGlassRuntime.m */,
+				B610A5500000000000000006 /* BrowserScrollBridge.swift */,
+				B610A5500000000000000008 /* IosSelectionMenuHandler.swift */,
 				BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */,
+				CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */,
 				A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */,
 				A2DT00000000000000000020 /* DeviceTools */,
 				W5A0000000000000000000C1 /* Workspace */,
@@ -667,7 +682,9 @@
 				"$(SRCROOT)/sandbox/patches/0002-fs-fake-bind-stat-device.patch",
 				"$(SRCROOT)/sandbox/patches/0003-kernel-host-managed-lifetime.patch",
 				"$(SRCROOT)/sandbox/patches/0004-kernel-node-random-seed.patch",
+				"$(SRCROOT)/sandbox/patches/0005-kernel-init-exit-status.patch",
 				"$(SRCROOT)/sandbox/prepare_alpine_rootfs.sh",
+				"$(SRCROOT)/sandbox/overlay/usr/local/bin/kelivo-repair-rootfs",
 				"$(SRCROOT)/sandbox/resources/VERSION",
 			);
 			name = "Ensure Workspace Sandbox Artifacts";
@@ -677,6 +694,7 @@
 				"$(SRCROOT)/sandbox/build/$(PLATFORM_NAME)/libfakefs.a",
 				"$(SRCROOT)/sandbox/build/$(PLATFORM_NAME)/.kelivo-ish-build",
 				"$(SRCROOT)/sandbox/build/fakefsify",
+				"$(SRCROOT)/sandbox/build/ish",
 				"$(SRCROOT)/sandbox/build/include/ish/cpu-offsets.h",
 				"$(SRCROOT)/sandbox/resources/alpine-rootfs.zip",
 				"$(SRCROOT)/sandbox/resources/libvdso.so.elf",
@@ -737,7 +755,12 @@
 			files = (
 				A10000000000000000000001 /* KelivoGenerationActivityAttributes.swift in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
+				B610A5500000000000000001 /* BrowserGlassView.swift in Sources */,
+				B610A5500000000000000003 /* BrowserLegacyGlassRuntime.m in Sources */,
+				B610A5500000000000000005 /* BrowserScrollBridge.swift in Sources */,
+				B610A5500000000000000007 /* IosSelectionMenuHandler.swift in Sources */,
 				BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */,
+				CBCC0F40B115447D832DF102 /* ScheduledTaskNotifications.swift in Sources */,
 				A2DT00000000000000000001 /* DeviceLocalToolsHandler.swift in Sources */,
 				A2DT00000000000000000006 /* DeviceToolsSupport.swift in Sources */,
 				A2DT00000000000000000002 /* LocationToolHandler.swift in Sources */,

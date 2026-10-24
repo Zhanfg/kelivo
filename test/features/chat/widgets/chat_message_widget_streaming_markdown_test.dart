@@ -6,9 +6,12 @@ import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/markdown/citation_syntax.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:markstream/markstream.dart';
+import '../../../support/markdown_render_helpers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,10 +39,9 @@ Widget _buildHarness({required Widget child}) {
 }
 
 String _allRichTextPlainText(WidgetTester tester) {
-  return tester
-      .widgetList<RichText>(find.byType(RichText))
-      .map((widget) => widget.text.toPlainText())
-      .join('\n');
+  return markdownParagraphs(
+    tester,
+  ).map((paragraph) => paragraph.text.toPlainText()).join('\n');
 }
 
 void main() {
@@ -89,64 +91,66 @@ void main() {
   testWidgets('ChatMessageWidget preserves table scroll when streaming ends', (
     tester,
   ) async {
-    markdownTableTargetPlatformOverride = TargetPlatform.iOS;
-    addTearDown(() => markdownTableTargetPlatformOverride = null);
-    final streaming = ValueNotifier(true);
-    addTearDown(streaming.dispose);
-    await tester.pumpWidget(
-      _buildHarness(
-        child: Align(
-          alignment: Alignment.topLeft,
-          child: SizedBox(
-            width: 360,
-            child: ValueListenableBuilder<bool>(
-              valueListenable: streaming,
-              builder: (context, value, _) => ChatMessageWidget(
-                message: ChatMessage(
-                  id: 'table-scroll',
-                  role: 'assistant',
-                  content:
-                      '| A | B | C | D | E |\n'
-                      '| --- | --- | --- | --- | --- |\n'
-                      '| apple | banana | cherry | date | elderberry |',
-                  conversationId: 'conversation-1',
-                  isStreaming: value,
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      final streaming = ValueNotifier(true);
+      addTearDown(streaming.dispose);
+      await tester.pumpWidget(
+        _buildHarness(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 360,
+              child: ValueListenableBuilder<bool>(
+                valueListenable: streaming,
+                builder: (context, value, _) => ChatMessageWidget(
+                  message: ChatMessage(
+                    id: 'table-scroll',
+                    role: 'assistant',
+                    content:
+                        '| A | B | C | D | E |\n'
+                        '| --- | --- | --- | --- | --- |\n'
+                        '| apple | banana | cherry | date | elderberry |',
+                    conversationId: 'conversation-1',
+                    isStreaming: value,
+                  ),
+                  enableStreamingTextMotion: true,
+                  showModelIcon: false,
                 ),
-                enableStreamingTextMotion: true,
-                showModelIcon: false,
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
-    final viewport = find.byKey(
-      const ValueKey('markdown-table-horizontal-scroll'),
-    );
-    final scroll = find.descendant(
-      of: viewport,
-      matching: find.byType(Scrollable),
-    );
-    final state = tester.state<ScrollableState>(scroll);
-    await tester.drag(viewport, const Offset(-100, 0));
-    await tester.pump(const Duration(milliseconds: 300));
-    final offset = state.position.pixels;
-    expect(offset, greaterThan(50));
+      );
+      await tester.pump();
+      final viewport = find.byKey(const ValueKey('markstream-table-scroll'));
+      final scroll = find.descendant(
+        of: viewport,
+        matching: find.byType(Scrollable),
+      );
+      final state = tester.state<ScrollableState>(scroll);
+      await tester.drag(viewport, const Offset(-100, 0));
+      await tester.pump(const Duration(milliseconds: 300));
+      final offset = state.position.pixels;
+      expect(offset, greaterThan(50));
 
-    final gesture = await tester.startGesture(tester.getCenter(viewport));
-    await gesture.moveBy(const Offset(-40, 0));
-    await tester.pump();
-    final beforeComplete = state.position.pixels;
-    streaming.value = false;
-    await tester.pumpAndSettle();
-    expect(tester.state<ScrollableState>(scroll), same(state));
-    expect(state.position.pixels, beforeComplete);
-    await gesture.moveBy(const Offset(-40, 0));
-    await tester.pump();
-    expect(state.position.pixels, greaterThan(beforeComplete));
-    await gesture.up();
-    await tester.pumpAndSettle();
+      final gesture = await tester.startGesture(tester.getCenter(viewport));
+      await gesture.moveBy(const Offset(-40, 0));
+      await tester.pump();
+      final beforeComplete = state.position.pixels;
+      streaming.value = false;
+      await tester.pumpAndSettle();
+      expect(tester.state<ScrollableState>(scroll), same(state));
+      expect(state.position.pixels, beforeComplete);
+      await gesture.moveBy(const Offset(-40, 0));
+      await tester.pump();
+      expect(state.position.pixels, greaterThan(beforeComplete));
+      await gesture.up();
+      await tester.pumpAndSettle();
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
   });
 
   testWidgets(
@@ -172,7 +176,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(Table), findsOneWidget);
-      expect(find.textContaining('葡萄 🍇'), findsOneWidget);
+      expect(markdownParagraph(tester, '葡萄 🍇').text.toPlainText(), '葡萄 🍇');
       expect(_allRichTextPlainText(tester), isNot(contains('| 葡萄 🍇')));
     },
   );

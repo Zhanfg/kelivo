@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import '../../../desktop/macos_window_drag_area.dart';
 import '../../../l10n/app_localizations.dart';
 import '../widgets/side_drawer.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -25,11 +28,15 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../workspace/widgets/desktop_workspace_bar.dart';
+import '../../browser/browser_navigation.dart';
+import '../../browser/browser_panel_controller.dart';
+import '../../browser/pages/browser_page.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
+import '../../../desktop/sidebar_resize_capture.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../../story_runtime/ui/story_conversation_mode_control.dart';
@@ -171,11 +178,13 @@ class HomeDesktopScaffold extends StatelessWidget {
                     ),
                 body: body,
               ),
-            ),
-            _buildWorkspaceBar(context, cs, workspaceBound: workspaceBound),
-            // Right sidebar (desktop only with topics on right)
-            _buildRightSidebar(context, cs, topicsOnRight),
-          ],
+              // Right sidebar (desktop only with topics on right)
+              Offstage(
+                offstage: BrowserPanelController.instance.isOpen,
+                child: _buildRightSidebar(context, cs, topicsOnRight),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -381,6 +390,7 @@ class HomeDesktopScaffold extends StatelessWidget {
     required bool workspaceBound,
   }) {
     return AppBar(
+      flexibleSpace: const MacosWindowDragArea(child: SizedBox.expand()),
       centerTitle: false,
       systemOverlayStyle: (Theme.of(context).brightness == Brightness.dark)
           ? const SystemUiOverlayStyle(
@@ -735,25 +745,133 @@ class SidebarResizeHandle extends StatefulWidget {
   State<SidebarResizeHandle> createState() => _SidebarResizeHandleState();
 }
 
-class _SidebarResizeHandleState extends State<SidebarResizeHandle> {
+class _SidebarResizeHandleState extends State<SidebarResizeHandle>
+    with WidgetsBindingObserver {
   bool _hovered = false;
+  bool _appActive = true;
+  int? _pointer;
+  double _lastX = 0;
+  late final _capture = SidebarResizeCapture(onEnd: _finish);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didUpdateWidget(SidebarResizeHandle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.visible) {
+      _finish();
+      _capture.updateCursor(null);
+    } else if (_hovered || _pointer != null) {
+      _scheduleCursorBounds();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appActive = state == AppLifecycleState.resumed;
+    if (!_appActive) {
+      _finish();
+      _capture.updateCursor(null);
+    } else if (_hovered) {
+      _scheduleCursorBounds();
+    }
+  }
+
+  void _down(PointerDownEvent event) {
+    if (_pointer != null || event.buttons != kPrimaryButton) return;
+    _pointer = event.pointer;
+    _lastX = event.position.dx;
+    if (event.kind == PointerDeviceKind.mouse &&
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      // Capture only reroutes AppKit events back to Flutter's controller.
+      // The same pointer stream works before and after the async acknowledgement.
+      unawaited(_capture.begin(event.timeStamp));
+    }
+  }
+
+  void _pointerMove(PointerMoveEvent event) {
+    if (event.pointer != _pointer) return;
+    if (event.buttons & kPrimaryButton == 0) {
+      _finish();
+      return;
+    }
+    _move(event.position.dx);
+  }
+
+  void _move(double x) {
+    if (_pointer == null) return;
+    final delta = x - _lastX;
+    _lastX = x;
+    if (delta != 0) widget.onDrag(delta);
+  }
+
+  void _finish() {
+    if (_pointer == null) return;
+    _pointer = null;
+    _capture.cancel();
+    widget.onDragEnd?.call();
+    _scheduleCursorBounds();
+  }
+
+  void _scheduleCursorBounds() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = context.findRenderObject();
+      _capture.updateCursor(
+        widget.visible &&
+                _appActive &&
+                (_hovered || _pointer != null) &&
+                box is RenderBox &&
+                box.hasSize
+            ? box.localToGlobal(Offset.zero) & box.size
+            : null,
+      );
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _capture.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     if (!widget.visible) return const SizedBox.shrink();
-    return GestureDetector(
+    return Listener(
       behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: (details) => widget.onDrag(details.delta.dx),
-      onHorizontalDragEnd: (_) => widget.onDragEnd?.call(),
+      onPointerDown: _down,
+      onPointerMove: _pointerMove,
+      onPointerUp: (event) {
+        if (event.pointer == _pointer) _finish();
+      },
+      onPointerCancel: (event) {
+        if (event.pointer == _pointer) _finish();
+      },
+      onPointerHover: (_) => _finish(),
       child: MouseRegion(
         cursor: SystemMouseCursors.resizeColumn,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+        onEnter: (_) {
+          setState(() => _hovered = true);
+          _scheduleCursorBounds();
+        },
+        onExit: (_) {
+          setState(() => _hovered = false);
+          _scheduleCursorBounds();
+        },
         child: Container(
           width: 6,
           height: double.infinity,
-          color: Colors.transparent,
+          // Native overlay hit testing follows painted bounds, not Flutter's
+          // opaque listener. Paint the entire grip without a visible fill.
+          color: const Color(0x01000000),
           alignment: Alignment.center,
           child: Container(
             width: 1,

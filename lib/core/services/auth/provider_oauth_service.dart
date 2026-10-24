@@ -6,9 +6,11 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../models/model_spec.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/model_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../model_spec/model_spec_resolver.dart';
 import '../network/dio_http_client.dart';
 import 'codex_request.dart';
 import 'claude_oauth_request.dart';
@@ -27,6 +29,7 @@ class ProviderOAuthService extends ChangeNotifier {
   final http.Client Function(ProviderConfig) _clientFactory;
   SettingsProvider? _settings;
   final _refreshes = <String, Future<ProviderConfig>>{};
+  final _modelSyncs = <(SettingsProvider, String), Future<void>>{};
   final _usage = <String, ProviderUsageSnapshot>{};
   final _usageRequests = <String, Future<ProviderUsageSnapshot>>{};
   OAuthCancellation? _login;
@@ -188,7 +191,10 @@ class ProviderOAuthService extends ChangeNotifier {
         throw const ProviderOAuthException(ProviderOAuthFailure.cancelled);
       }
       final saved = (providerId == null ? config : _current(providerId)!)
-          .copyWith(oauthCredentials: credentials);
+          .copyWith(
+            oauthCredentials: credentials,
+            oauthModelsClientVersion: null,
+          );
       await settings.setProviderConfig(saved.id, saved);
       if (providerId == null) {
         await settings.setProvidersOrder([
@@ -227,7 +233,7 @@ class ProviderOAuthService extends ChangeNotifier {
     }
     await _settings!.setProviderConfig(
       id,
-      config.copyWith(oauthCredentials: null),
+      config.copyWith(oauthCredentials: null, oauthModelsClientVersion: null),
     );
     notifyListeners();
   }
@@ -420,58 +426,88 @@ class ProviderOAuthService extends ChangeNotifier {
     },
   );
 
+  /// Like OMP's versioned Codex cache, refresh each account after a client
+  /// version change. Keep its saved models usable if discovery is unavailable.
+  Future<void> syncOutdatedModels(SettingsProvider settings) async {
+    await settings.loaded;
+    if (!identical(settings, _settings)) return;
+    // Startup discovery can run before the first rebuild applies the proxy.
+    settings.applyGlobalProxyOverridesIfNeeded();
+    for (final id in settings.providerConfigs.keys.toList()) {
+      if (!identical(settings, _settings)) return;
+      final config = _current(id);
+      if (config == null ||
+          !config.enabled ||
+          config.oauthProvider != OAuthProvider.chatgpt ||
+          config.oauthCredentials == null ||
+          config.oauthCredentials!.requiresLogin ||
+          config.oauthModelsClientVersion == codexClientVersion) {
+        continue;
+      }
+      try {
+        await syncModels(id);
+      } catch (_) {
+        // Leave the version unchanged so the next launch or manual sync retries.
+      }
+    }
+  }
+
   Future<void> syncModels(String id) async {
+    final settings = _settings;
     final before = _current(id);
-    if (before == null) return;
+    if (settings == null || before == null) return;
+    final key = (settings, _sessionKey(before));
+    final pending = _modelSyncs[key];
+    if (pending != null) return pending;
+    final request = _syncModels(settings, before);
+    _modelSyncs[key] = request;
+    try {
+      await request;
+    } finally {
+      _modelSyncs.remove(key);
+    }
+  }
+
+  Future<void> _syncModels(
+    SettingsProvider settings,
+    ProviderConfig before,
+  ) async {
     final list = await models(before);
-    final current = _current(id);
-    if (current == null ||
+    final current = _current(before.id);
+    if (!identical(settings, _settings) ||
+        current == null ||
+        current.oauthProvider != before.oauthProvider ||
         current.oauthCredentials?.sessionId !=
             before.oauthCredentials?.sessionId) {
       return;
     }
     final overrides = Map<String, dynamic>.from(current.modelOverrides);
+    final provider = current.oauthProvider!;
     for (final model in list) {
-      overrides[model.id] = {
-        ...oauthMap(overrides[model.id]),
-        'name': model.displayName,
-        'type': model.type.name,
-        'input': model.input.map((e) => e.name).toList(),
-        'output': model.output.map((e) => e.name).toList(),
-        'abilities': model.abilities.map((e) => e.name).toList(),
-        if (current.oauthProvider == OAuthProvider.kimi &&
-            model is _OAuthModelInfo) ...{
-          'oauthThinkingMode':
-              oauthMap(model.row['think_efforts'])['support'] == true
-              ? 'adaptive'
-              : 'enabled',
-          'oauthThinkingRequired':
-              model.row['supports_thinking_type'] == 'only',
-          'oauthThinkingEfforts':
-              oauthMap(model.row['think_efforts'])['support'] == true &&
-                  oauthMap(model.row['think_efforts'])['valid_efforts'] is List
-              ? (oauthMap(model.row['think_efforts'])['valid_efforts'] as List)
-                    .whereType<String>()
-                    .toList()
-              : <String>[],
-          'oauthThinkingDefaultEffort': oauthString(
-            oauthMap(model.row['think_efforts'])['default_effort'],
-          ),
+      final row = model is _OAuthModelSpec
+          ? model.row
+          : const <String, dynamic>{};
+      overrides[model.id] = mergeOAuthModelOverride(
+        existing: overrides[model.id],
+        // Model edits can land while discovery is in flight.
+        model: model is _OAuthModelSpec ? _modelFromRow(current, row) : model,
+        reasoning: oauthDiscoveredReasoning(provider, row),
+        contextWindow: _oauthContextWindow(row),
+        extra: {
+          if (provider == OAuthProvider.kimi)
+            'oauthProtocol': kimiOAuthProtocol(row),
         },
-        if (current.oauthProvider == OAuthProvider.kimi &&
-            model is _OAuthModelInfo)
-          'oauthProtocol':
-              model.row['protocol'] == null && model.row.containsKey('protocol')
-              ? 'openai'
-              : 'anthropic',
-      };
+      );
     }
-    await _settings!.setProviderConfig(
-      id,
+    await settings.setProviderConfig(
+      current.id,
       current.copyWith(
         models: list.map((e) => e.id).toList(),
         modelOverrides: overrides,
         oauthModelsSyncedAt: DateTime.now(),
+        oauthModelsClientVersion: provider == OAuthProvider.chatgpt
+            ? codexClientVersion
+            : null,
       ),
     );
   }
@@ -507,15 +543,222 @@ class ProviderOAuthService extends ChangeNotifier {
       config.isOAuth ? _ProviderOAuthHttpClient(client, config, this) : client;
 }
 
-class _OAuthModelInfo extends ModelInfo {
-  _OAuthModelInfo({required this.row, required ModelInfo base})
+const _deletedOAuthThinkingKeys = {
+  'oauthThinkingMode',
+  'oauthThinkingRequired',
+  'oauthThinkingEfforts',
+  'oauthThinkingDefaultEffort',
+};
+
+const _kimiDefaultLevels = ['low', 'medium', 'high'];
+
+String kimiOAuthProtocol(Map<String, dynamic> row) {
+  return row['protocol'] == null && row.containsKey('protocol')
+      ? 'openai'
+      : 'anthropic';
+}
+
+/// True/false when the catalog row states reasoning support; null if omitted.
+bool? oauthRowReasoningSupport(Map<String, dynamic> row) {
+  if (row.containsKey('supports_reasoning')) {
+    return row['supports_reasoning'] == true;
+  }
+  if (row.containsKey('supports_thinking_type')) {
+    return const {'only', 'both'}.contains(row['supports_thinking_type']);
+  }
+  final efforts = oauthMap(row['think_efforts']);
+  if (efforts.containsKey('support')) {
+    return efforts['support'] == true;
+  }
+  if (row.containsKey('supported_reasoning_levels')) {
+    return _oauthRawEfforts(row['supported_reasoning_levels']).isNotEmpty;
+  }
+  if (row.containsKey('supported_reasoning_efforts')) {
+    return _oauthRawEfforts(row['supported_reasoning_efforts']).isNotEmpty;
+  }
+  return null;
+}
+
+/// Maps an OAuth catalog row onto [ReasoningSpecOverride].
+ReasoningSpecOverride? oauthDiscoveredReasoning(
+  OAuthProvider provider,
+  Map<String, dynamic> row,
+) {
+  if (oauthRowReasoningSupport(row) != true) return null;
+  final required = row['supports_thinking_type'] == 'only';
+  switch (provider) {
+    case OAuthProvider.kimi:
+      if (kimiOAuthProtocol(row) == 'anthropic') {
+        final adaptive = oauthMap(row['think_efforts'])['support'] == true;
+        return ReasoningSpecOverride.fromJson({
+          'dialect': adaptive
+              ? ReasoningDialect.anthropicAdaptiveEffort.name
+              : ReasoningDialect.anthropicBudget.name,
+          'levels': _kimiDefaultLevels,
+          'canDisable': !required,
+        });
+      }
+      final levels = _oauthLevelNames(row);
+      return ReasoningSpecOverride.fromJson({
+        'dialect': ReasoningDialect.kimiThinking.name,
+        'levels': levels.isEmpty ? _kimiDefaultLevels : levels,
+        'canDisable': !required,
+        if (_oauthDefaultLevel(row) case final defaultLevel?)
+          'defaultLevel': defaultLevel,
+      });
+    case OAuthProvider.chatgpt:
+    case OAuthProvider.grok:
+      final levels = _oauthLevelNames(row);
+      final raw = _oauthEffortNames(row);
+      return ReasoningSpecOverride.fromJson({
+        'dialect': ReasoningDialect.openaiResponsesReasoning.name,
+        if (levels.isNotEmpty) 'levels': levels,
+        if (raw.contains('none')) 'canDisable': true,
+      });
+    case OAuthProvider.claude:
+      return ReasoningSpecOverride.fromJson({
+        'dialect': ReasoningDialect.anthropicBudget.name,
+        'canDisable': !required,
+      });
+  }
+}
+
+Map<String, dynamic> mergeOAuthModelOverride({
+  required Object? existing,
+  required ModelSpec model,
+  ReasoningSpecOverride? reasoning,
+  int? contextWindow,
+  Map<String, dynamic> extra = const {},
+}) {
+  final current = existing is Map
+      ? ModelSpecOverride.fromJson(existing)
+      : const ModelSpecOverride();
+  final nextExtra = <String, dynamic>{...current.extra, ...extra};
+  nextExtra.removeWhere((key, _) => _deletedOAuthThinkingKeys.contains(key));
+  return current
+      .copyWith(
+        displayName: model.displayName,
+        type: model.type,
+        input: List<Modality>.from(model.input),
+        output: List<Modality>.from(model.output),
+        abilities: List<ModelAbility>.from(model.abilities),
+        reasoning: _mergeReasoningOverride(current.reasoning, reasoning),
+        contextWindow: contextWindow,
+        extra: nextExtra,
+      )
+      .toJson();
+}
+
+ReasoningSpecOverride? _mergeReasoningOverride(
+  ReasoningSpecOverride? existing,
+  ReasoningSpecOverride? discovered,
+) {
+  if (discovered == null) return existing;
+  if (existing == null || existing.isEmpty) return discovered;
+  return existing.copyWith(
+    levels: discovered.levels,
+    canDisable: discovered.canDisable,
+    defaultLevel: discovered.defaultLevel,
+    dialect: discovered.dialect,
+    budgets: discovered.budgets,
+    customPatches: discovered.customPatches,
+    replay: discovered.replay,
+    replayField: discovered.replayField,
+  );
+}
+
+List<String> _oauthRawEfforts(Object? raw) {
+  if (raw is! List) return const [];
+  return [
+    for (final item in raw)
+      if (item != null && item.toString().trim().isNotEmpty)
+        item.toString().trim().toLowerCase(),
+  ];
+}
+
+List<String> _oauthEffortNames(Map<String, dynamic> row) {
+  final think = oauthMap(row['think_efforts']);
+  if (think['valid_efforts'] is List) {
+    return _oauthRawEfforts(think['valid_efforts']);
+  }
+  if (row['supported_reasoning_levels'] is List) {
+    return _oauthRawEfforts(row['supported_reasoning_levels']);
+  }
+  if (row['supported_reasoning_efforts'] is List) {
+    return _oauthRawEfforts(row['supported_reasoning_efforts']);
+  }
+  return const [];
+}
+
+List<String> _oauthLevelNames(Map<String, dynamic> row) {
+  final names = <String>[];
+  final seen = <String>{};
+  for (final effort in _oauthEffortNames(row)) {
+    if (effort == 'none' || effort == 'auto' || effort == 'off') continue;
+    for (final level in ReasoningLevel.values) {
+      if (level.name == effort && seen.add(level.name)) {
+        names.add(level.name);
+        break;
+      }
+    }
+  }
+  return names;
+}
+
+String? _oauthDefaultLevel(Map<String, dynamic> row) {
+  final raw = oauthString(oauthMap(row['think_efforts'])['default_effort']);
+  if (raw == null) return null;
+  final name = raw.toLowerCase();
+  for (final level in ReasoningLevel.values) {
+    if (level.name == name) return level.name;
+  }
+  return null;
+}
+
+int? _oauthContextWindow(Map<String, dynamic> row) {
+  final value = oauthNumber(row['context_window']);
+  if (value == null || value <= 0 || value != value.truncateToDouble()) {
+    return null;
+  }
+  return value.toInt();
+}
+
+ModelSpec _oauthDiscoveredSpec(ModelSpec resolved, Map<String, dynamic> row) {
+  final imageIn =
+      row['supports_image_in'] == true ||
+      (row['input_modalities'] as List? ?? const []).contains('image');
+  final support = oauthRowReasoningSupport(row);
+  return resolved.copyWith(
+    contextWindow: _oauthContextWindow(row),
+    input: <Modality>[...resolved.input, if (imageIn) Modality.image],
+    abilities: <ModelAbility>[
+      ...resolved.abilities.where(
+        (ability) => support != false || ability != ModelAbility.reasoning,
+      ),
+      ModelAbility.tool,
+      if (support == true) ModelAbility.reasoning,
+    ],
+  );
+}
+
+class _OAuthModelSpec extends ModelSpec {
+  _OAuthModelSpec({required this.row, required ModelSpec base})
     : super(
         id: base.id,
+        apiModelId: base.apiModelId,
         displayName: base.displayName,
         type: base.type,
         input: base.input,
         output: base.output,
         abilities: base.abilities,
+        reasoning: base.reasoning,
+        sampling: base.sampling,
+        contextWindow: base.contextWindow,
+        maxOutput: base.maxOutput,
+        pricing: base.pricing,
+        headers: base.headers,
+        body: base.body,
+        builtInTools: base.builtInTools,
       );
   final Map<String, dynamic> row;
 }
@@ -582,15 +825,11 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
       final existingBeta = result.headers['anthropic-beta'];
       final existingContentType = result.headers['content-type'];
       for (final name in authHeaders.keys) {
-        result.headers.removeWhere(
-          (key, _) => key.toLowerCase() == name.toLowerCase(),
-        );
+        result.headers.remove(name);
       }
       result.headers.addAll(authHeaders);
       if (isClaude) {
-        result.headers.removeWhere(
-          (key, _) => key.toLowerCase() == 'x-api-key',
-        );
+        result.headers.remove('x-api-key');
         setClaudeOAuthHeader(
           result.headers,
           'anthropic-beta',
@@ -641,13 +880,6 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
           if (reasoning.isNotEmpty) {
             final value = Map<String, dynamic>.from(reasoning)
               ..remove('summary');
-            final model = '${payload['model']}';
-            if (model == 'grok-build' ||
-                model.endsWith('reasoning') ||
-                (model.startsWith('grok-4') &&
-                    !RegExp(r'grok-4\.(?:[3-9]|20)').hasMatch(model))) {
-              value.remove('effort');
-            }
             if (value.isEmpty) {
               payload.remove('reasoning');
             } else {
@@ -696,7 +928,6 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
         statusCode: statusCode,
       );
     }
-    return response;
   }
 
   @override

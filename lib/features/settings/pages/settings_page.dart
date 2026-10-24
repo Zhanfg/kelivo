@@ -31,6 +31,8 @@ import '../../story_runtime/ui/story_mode_runtime_page.dart';
 import '../../chat/pages/chat_settings_page.dart';
 import '../../../shared/widgets/section_card.dart';
 import 'network_proxy_page.dart';
+import 'phone_control_settings_page.dart';
+import '../../home/services/local_tools_service.dart';
 import 'storage_space_page.dart';
 import '../../stats/pages/stats_page.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
@@ -381,6 +383,15 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
               _iosDivider(context),
+              if (DeviceLocalTools.phoneControlSupported) ...[
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Smartphone,
+                  label: l10n.phoneControlTitle,
+                  onTap: () => PhoneControlSettingsPage.open(context),
+                ),
+                _iosDivider(context),
+              ],
               _iosNavRow(
                 context,
                 icon: Lucide.BookOpen,

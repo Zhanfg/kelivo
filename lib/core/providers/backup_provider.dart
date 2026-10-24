@@ -8,6 +8,7 @@ import '../database/business_repository.dart';
 import '../models/backup.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/backup_cancel_token.dart';
+import '../services/backup/backup_encryption.dart';
 import '../services/backup/backup_task_progress.dart';
 import '../services/backup/data_sync.dart';
 import '../services/backup/encrypted_full_backup.dart';
@@ -57,6 +58,7 @@ class BackupProvider extends ChangeNotifier {
   }
 
   Future<bool> backup({
+    String? password,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
@@ -66,6 +68,7 @@ class BackupProvider extends ChangeNotifier {
     try {
       await _dataSync.backupToWebDav(
         _cfg,
+        password: password,
         onProgress: onProgress,
         cancelToken: cancelToken,
       );
@@ -88,6 +91,7 @@ class BackupProvider extends ChangeNotifier {
     BackupCancelToken? cancelToken,
     bool allowUnverifiedForwardCompatible = false,
     ForwardCompatibilityPrompt? onForwardCompatibility,
+    BackupPasswordPrompt? onPassword,
   }) async {
     _busy = true;
     _message = null;
@@ -101,6 +105,7 @@ class BackupProvider extends ChangeNotifier {
         cancelToken: cancelToken,
         allowUnverifiedForwardCompatible: allowUnverifiedForwardCompatible,
         onForwardCompatibility: onForwardCompatibility,
+        onPassword: onPassword,
       );
       _message = 'Restored';
     } catch (e) {
@@ -129,10 +134,12 @@ class BackupProvider extends ChangeNotifier {
   }
 
   Future<File> exportToFile({
+    String? password,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) => _dataSync.exportToFile(
     _cfg,
+    password: password,
     onProgress: onProgress,
     cancelToken: cancelToken,
   );
@@ -213,6 +220,7 @@ class BackupProvider extends ChangeNotifier {
     BackupCancelToken? cancelToken,
     bool allowUnverifiedForwardCompatible = false,
     ForwardCompatibilityPrompt? onForwardCompatibility,
+    BackupPasswordPrompt? onPassword,
   }) => _dataSync.restoreFromLocalFile(
     file,
     _cfg,
@@ -221,5 +229,6 @@ class BackupProvider extends ChangeNotifier {
     cancelToken: cancelToken,
     allowUnverifiedForwardCompatible: allowUnverifiedForwardCompatible,
     onForwardCompatibility: onForwardCompatibility,
+    onPassword: onPassword,
   );
 }

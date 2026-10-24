@@ -9,7 +9,9 @@ import 'package:uuid/uuid.dart';
 import '../../../features/home/services/tool_approval_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/mcp_structured_image.dart';
+import '../../../utils/sandbox_path_resolver.dart';
 import '../api/tool_call_cancellation.dart';
+import '../tool_image.dart';
 import '../../models/workspace_binding.dart';
 import '../../models/external_mount.dart';
 import '../../models/environment_variable.dart';
@@ -44,6 +46,7 @@ class WorkspaceToolsService {
     ToolRunRegistry? registry,
     WorkspaceRuntimeProvider? runtimeProvider,
     this.updateConversationExtras,
+    this.readWorkspaceBinding,
     this.touchLastUsed,
     this.onSkillRead,
     this.onShellCompleted,
@@ -55,6 +58,7 @@ class WorkspaceToolsService {
   static const Set<String> toolNames = {
     'shell',
     'read_file',
+    'view_image',
     'write_file',
     'edit_file',
     'list_dir',
@@ -64,10 +68,20 @@ class WorkspaceToolsService {
 
   static const int _previewLimit = WorkspaceToolMetadata.previewMaxChars;
   static const int _changedFilesCap = 50;
+  static const String _androidShellHint =
+      'Uses the Shell path configured in Environment > PRoot settings; '
+      'when unset, prefers /bin/bash if available, otherwise /bin/sh. '
+      'This is not an interactive shell; do not assume ~/.bashrc is loaded.';
+
+  static String get _shellInvocation =>
+      defaultTargetPlatform == TargetPlatform.android
+      ? 'configured shell -lc'
+      : 'sh -lc';
 
   final ToolRunRegistry registry;
   final WorkspaceRuntimeProvider runtimeProvider;
   final ConversationExtrasUpdater? updateConversationExtras;
+  final WorkspaceBinding? Function(String conversationId)? readWorkspaceBinding;
   final Future<void> Function(String workspaceId)? touchLastUsed;
   final Future<void> Function(String skillId)? onSkillRead;
   final Future<void> Function()? onShellCompleted;
@@ -194,14 +208,16 @@ class WorkspaceToolsService {
       _fn(
         'shell',
         [
-          'Fresh non-interactive sh -lc per call; no cwd/env persists. Chain with &&.',
+          'Fresh non-interactive $_shellInvocation per call; no cwd/env persists. Chain with &&.',
+          if (defaultTargetPlatform == TargetPlatform.android)
+            _androidShellHint,
           'Use non-interactive flags (e.g. -y). Output is capped; long output is saved',
           'to $outputHint. Network is available on mobile sandboxes.',
         ],
         {
           'command': {
             'type': 'string',
-            'description': 'Shell command to run with sh -lc.',
+            'description': 'Shell command to run with $_shellInvocation.',
           },
           'cwd': {
             'type': 'string',
@@ -210,10 +226,13 @@ class WorkspaceToolsService {
           },
           'timeout_seconds': {
             'type': 'integer',
-            'description': 'Timeout in seconds (default 120, max 600).',
-            'default': 120,
+            'description':
+                'Command timeout in seconds (default 900, range 1-3600). '
+                'Choose a longer timeout for package installs, downloads, builds, '
+                'or other long-running commands. Values outside this range are clamped.',
+            'default': 900,
             'minimum': 1,
-            'maximum': 600,
+            'maximum': 3600,
           },
         },
         ['command'],
@@ -233,6 +252,21 @@ class WorkspaceToolsService {
           'limit': {
             'type': 'integer',
             'description': 'Maximum number of lines to return.',
+          },
+        },
+        ['path'],
+      ),
+      _fn(
+        'view_image',
+        [
+          'View a local image file when visual inspection is needed. Use this for images already on disk.',
+          'Paths: ${vocab.join(', ')}. Supports PNG, JPEG, GIF, WebP, and BMP; animated images use the first frame.',
+          'Returns image content to inspect. Large images are resized to at most 2048 pixels on the longest edge.',
+        ],
+        {
+          'path': {
+            'type': 'string',
+            'description': 'Local filesystem path to an image file.',
           },
         },
         ['path'],
@@ -387,7 +421,7 @@ class WorkspaceToolsService {
       ..writeln();
     if (ctx.workspace.isToolEnabled('shell')) {
       buf.writeln(
-        'shell is one-shot: a fresh non-interactive sh -lc each call. '
+        'shell is one-shot: a fresh non-interactive $_shellInvocation each call. '
         'No cd or env persists. Chain with &&. Use non-interactive flags (-y). '
         'Output is capped; long output is saved to $outputsHint.',
       );
@@ -490,6 +524,8 @@ class WorkspaceToolsService {
           );
         case 'read_file':
           return await _handleReadFile(ctx, args);
+        case 'view_image':
+          return await _handleViewImage(ctx, args);
         case 'write_file':
           return await _handleWriteFile(
             ctx,
@@ -664,22 +700,29 @@ class WorkspaceToolsService {
     }
 
     final sandboxed = status.sandboxed;
+    final id = conversationId ?? ctx.conversationId;
+    // A generation retains its workspace context while the user changes grants.
+    final binding = readWorkspaceBinding != null && id != null
+        ? readWorkspaceBinding!(id)
+        : ctx.binding;
+    final allowAll =
+        binding?.workspaceId == ctx.workspace.id && binding?.allowAll == true;
     final needsApproval =
-        (ctx.workspace.shellNeedsApproval || !sandboxed) &&
-        !ctx.binding.allowAll;
+        (ctx.workspace.shellNeedsApproval || !sandboxed) && !allowAll;
     final denied = await _maybeApprove(
       approvalService,
       needed: needsApproval,
       toolCallId: toolCallId,
       toolName: tool,
       args: args,
-      conversationId: conversationId ?? ctx.conversationId,
+      conversationId: id,
+      workspaceId: ctx.workspace.id,
     );
     if (denied != null) return denied;
 
-    final timeoutSeconds = (_intArg(args, 'timeout_seconds') ?? 120).clamp(
+    final timeoutSeconds = (_intArg(args, 'timeout_seconds') ?? 900).clamp(
       1,
-      600,
+      3600,
     );
     final cwd = ctx.paths.normalizeCwd(
       _stringArg(args, 'cwd', fallback: ctx.cwd),
@@ -874,6 +917,63 @@ class WorkspaceToolsService {
       status: metaStatus,
     );
     return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
+  }
+
+  Future<Object?> _handleViewImage(
+    WorkspaceToolContext ctx,
+    Map<String, dynamic> args,
+  ) async {
+    const tool = 'view_image';
+    final path = args['path'];
+    if (path is! String || path.trim().isEmpty) {
+      return _errorResult(
+        tool: tool,
+        error: 'invalid_arguments',
+        message: 'path must be a non-empty string',
+      );
+    }
+    try {
+      final resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+      ToolCallCancellation.current?.throwIfCancelled();
+      if (ctx.paths.sandboxed && resolved.zone == WorkspaceZone.outside) {
+        throw const PathResolutionException('Path is outside sandbox zones');
+      }
+      final image = await ToolImage.read(resolved.hostPath);
+      ToolCallCancellation.current?.throwIfCancelled();
+      final imagesDir = await AppDirectories.getImagesDirectory();
+      await imagesDir.create(recursive: true);
+      final extension = image.mime == 'image/png' ? 'png' : 'jpg';
+      final snapshot = File(
+        p.join(imagesDir.path, 'view_image_${const Uuid().v4()}.$extension'),
+      );
+      await snapshot.writeAsBytes(image.bytes);
+      final uri = SandboxPathResolver.canonicalize(snapshot.path);
+      await _markToolsUsed(
+        ctx,
+        conversationId: ctx.conversationId,
+        status: 'ok',
+      );
+      return ClientToolResult(
+        'Image (${image.width} x ${image.height}).\n![](${encodeMarkdownImageDestination(uri)})',
+        metadata: {
+          ...WorkspaceToolMetadata(
+            tool: tool,
+            status: 'ok',
+            path: resolved.modelPath,
+            files: [_fileFor(ctx, resolved)],
+          ).toJson(),
+          kMcpResultMetadataKey: mcpResultMetadata([uri]),
+        },
+      );
+    } on ToolImageException catch (e) {
+      return _errorResult(
+        tool: tool,
+        error: 'view_image_failed',
+        message: e.message,
+      );
+    } on PathResolutionException catch (e) {
+      return _errorResult(tool: tool, error: 'path_error', message: e.message);
+    }
   }
 
   Future<Object?> _handleReadFile(
@@ -1315,6 +1415,7 @@ class WorkspaceToolsService {
         toolName: tool,
         args: args,
         conversationId: conversationId ?? ctx.conversationId,
+        workspaceId: ctx.workspace.id,
         path: resolved.modelPath,
       );
     }
@@ -1328,6 +1429,7 @@ class WorkspaceToolsService {
     required String toolName,
     required Map<String, dynamic> args,
     String? conversationId,
+    String? workspaceId,
     String? path,
   }) async {
     ToolCallCancellation.current?.throwIfCancelled();
@@ -1348,6 +1450,7 @@ class WorkspaceToolsService {
       toolName: toolName,
       arguments: args,
       conversationId: conversationId,
+      workspaceId: workspaceId,
     );
     if (result.approved) return null;
     return _deniedResult(
@@ -1458,10 +1561,12 @@ class WorkspaceToolsService {
       'type': 'function',
       'function': <String, dynamic>{
         'name': name,
+        if (name == 'view_image') 'strict': false,
         'description': description.join(' '),
         'parameters': <String, dynamic>{
           'type': 'object',
           'properties': properties,
+          if (name == 'view_image') 'additionalProperties': false,
           if (required.isNotEmpty) 'required': required,
         },
       },

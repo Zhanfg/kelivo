@@ -1,4 +1,5 @@
 import 'core/services/scheduled_tasks_service.dart';
+import 'core/services/auth/provider_oauth_service.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
@@ -15,7 +16,9 @@ import 'desktop/desktop_home_page.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'desktop/desktop_window_controller.dart';
+import 'core/services/linux_window_service.dart';
 import 'desktop/desktop_tray_controller.dart';
+import 'desktop/windows_paste_fix.dart';
 // import 'package:logging/logging.dart' as logging;
 // Theme is now managed in SettingsProvider
 import 'theme/theme_factory.dart';
@@ -62,16 +65,19 @@ import 'core/services/workspace/workspace_runtime_bootstrap.dart';
 import 'features/workspace/terminal/terminal_session_manager.dart';
 import 'core/database/extension_entity_store.dart';
 import 'core/database/database_installation_gate.dart';
+import 'core/database/empty_database_recovery_guard.dart';
+import 'core/database/private_data_storage.dart';
 import 'core/database/app_database.dart';
 import 'core/database/business_migration_engine.dart';
 import 'core/database/business_preferences.dart';
 import 'core/database/business_repository.dart';
 import 'core/database/business_startup_gate.dart';
 import 'core/database/chat_database_gateway.dart';
-import 'core/database/startup_failure_report.dart';
 import 'core/services/backup/backup_activity.dart';
 import 'core/services/backup/local_snapshot_schedule.dart';
 import 'core/services/chat/chat_service.dart';
+import 'features/home/services/context_usage_service.dart';
+import 'core/services/model_catalog/model_catalog_service.dart';
 import 'core/services/app_exit_flush.dart';
 import 'core/services/backup/restore_archive_pruner.dart';
 import 'core/services/backup/restore_business_lease.dart';
@@ -79,7 +85,6 @@ import 'core/services/backup/restore_startup_gate.dart';
 import 'core/services/backup/restore_receipt.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
-import 'core/services/storage/storage_usage_service.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
 import 'features/agent/providers/agent_interaction_broker.dart';
@@ -98,6 +103,7 @@ import 'utils/app_directories.dart';
 import 'utils/platform_utils.dart';
 import 'utils/sandbox_path_resolver.dart';
 import 'shared/widgets/app_overlays.dart';
+import 'shared/widgets/floating_ipad_padding.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
 import 'shared/widgets/restore_progress_screen.dart';
@@ -108,7 +114,6 @@ import 'dart:io'
     show
         Directory,
         File,
-        FileMode,
         Platform,
         stderr; // kept for global override usage inside provider
 import 'core/services/mobile_background.dart';
@@ -161,6 +166,7 @@ Future<void> main() async {
   await runZoned(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      WindowsPasteFix.instance.install();
       // Register notification tap handling for every Android launch. This is
       // independent of the current background-chat mode: an older completion
       // notification can still launch the app after the mode has changed.
@@ -172,7 +178,38 @@ Future<void> main() async {
       }
       FlutterLogger.installGlobalHandlers();
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
-      final RestoreReceipt? restoreOutcome;
+      final retained = await AppDirectories.documentsDirectoryFor(
+        appDataDirectory,
+      );
+      if (retained != null) {
+        try {
+          await PrivateDataStorage.prepare(
+            source: retained,
+            target: appDataDirectory,
+            onCopying: () => runApp(
+              _RestoreProgressApp(
+                stage: ValueNotifier(RestoreStartupStage.protectingData),
+              ),
+            ),
+          );
+        } catch (error, stackTrace) {
+          runApp(
+            _RestoreFailureApp(
+              report: StartupFailureReport.capture(
+                stage: StartupFailureStage.databaseAdmission,
+                error: error,
+                step: 'private_storage_activation',
+                stackTrace: stackTrace,
+              ),
+              appDataDirectory: appDataDirectory,
+              privateStorageSource: retained,
+            ),
+          );
+          return;
+        }
+      }
+      late final RestoreReceipt? restoreOutcome;
+      final restoreDiagnostics = RestoreStartupDiagnostics();
       RestoreBusinessLease? businessLease;
       // A restore large enough to take seconds would otherwise spend all of
       // them before the first frame, which is indistinguishable from a hang.
@@ -187,36 +224,56 @@ Future<void> main() async {
       if (restoreStage != null) {
         runApp(_RestoreProgressApp(stage: restoreStage));
       }
-      try {
-        // The lease remains process-owned through its internal registry until
-        // process exit, preventing another instance from racing business I/O.
-        businessLease = await RestoreBusinessLease.acquire(
-          appDataDirectory: appDataDirectory,
-        );
-        restoreOutcome =
-            await RestoreStartupGate.recoverAndRequireBusinessReady(
+      while (true) {
+        try {
+          // The lease remains process-owned through its internal registry until
+          // process exit, preventing another instance from racing business I/O.
+          businessLease ??= await RestoreBusinessLease.acquire(
+            appDataDirectory: appDataDirectory,
+          );
+          restoreOutcome =
+              await RestoreStartupGate.recoverAndRequireBusinessReady(
+                appDataDirectory: appDataDirectory,
+                businessLease: businessLease,
+                diagnostics: restoreDiagnostics,
+                onStage: restoreStage == null
+                    ? null
+                    : (stage) => restoreStage.value = stage,
+              );
+          break;
+        } catch (error, stackTrace) {
+          stderr.writeln('[RestoreStartupGate] $error\n$stackTrace');
+          await _initRestoreFailureWindow();
+          final report = StartupFailureReport.capture(
+            stage: StartupFailureStage.restoreGate,
+            error: error,
+            step: 'recover_and_require_business_ready',
+            stackTrace: stackTrace,
+            restoreDetails: restoreDiagnostics.details,
+          );
+          final retry = report.blockedRestoreDirectory == null
+              ? null
+              : Completer<void>();
+          runApp(
+            _RestoreFailureApp(
+              key: ObjectKey(report),
+              report: report,
               appDataDirectory: appDataDirectory,
               businessLease: businessLease,
-              onStage: restoreStage == null
+              retryRestore: retry == null
                   ? null
-                  : (stage) => restoreStage.value = stage,
-            );
-      } catch (error, stackTrace) {
-        stderr.writeln('[RestoreStartupGate] $error\n$stackTrace');
-        await _initRestoreFailureWindow();
-        runApp(
-          _RestoreFailureApp(
-            report: StartupFailureReport.capture(
-              stage: StartupFailureStage.restoreGate,
-              error: error,
-              step: 'recover_and_require_business_ready',
-              stackTrace: stackTrace,
+                  : () async {
+                      if (!retry.isCompleted) retry.complete();
+                    },
             ),
-            appDataDirectory: appDataDirectory,
-            businessLease: businessLease,
-          ),
-        );
-        return;
+          );
+          if (retry == null) return;
+          await retry.future;
+          if (restoreStage != null) {
+            restoreStage.value = RestoreStartupStage.checkingBackup;
+            runApp(_RestoreProgressApp(stage: restoreStage));
+          }
+        }
       }
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -230,7 +287,9 @@ Future<void> main() async {
             48 << 20; // ~48MB
       } catch (_) {}
       // Desktop (Windows) window setup: hide native title bar for custom Flutter bar
-      await _initDesktopWindow();
+      if (defaultTargetPlatform != TargetPlatform.linux) {
+        await _initDesktopWindow();
+      }
       // Avoid preloading all system fonts at launch (huge memory on desktop)
       // Debug logging and global error handlers were enabled previously for diagnosis.
       // They are commented out now per request to reduce log noise.
@@ -254,21 +313,37 @@ Future<void> main() async {
           if (migrationDecision.needsMigration) {
             runApp(
               MigrationApp(
-                service: HiveToSqliteMigrationService(migrationDecision),
+                service: HiveToSqliteMigrationService(
+                  migrationDecision,
+                  businessLease: businessLease,
+                ),
                 restoreOutcome: restoreOutcome?.state,
               ),
             );
             return;
           }
           admissionStep = 'installation_gate';
-          await DatabaseInstallationGate.ensureReady(
-            appDataDirectory: appDataDirectory,
-            allowDatabaseIdentityChange:
-                restoreOutcome?.selectedComponents.contains(
-                  RestoreComponent.database,
-                ) ??
-                false,
-          );
+          final installationReceipt =
+              await DatabaseInstallationGate.ensureReady(
+                appDataDirectory: appDataDirectory,
+                allowDatabaseIdentityChange:
+                    restoreOutcome?.selectedComponents.contains(
+                      RestoreComponent.database,
+                    ) ??
+                    false,
+              );
+          admissionStep = 'empty_database_recovery_check';
+          if (restoreOutcome?.state == RestoreReceiptState.committed &&
+              restoreOutcome!.selectedComponents.contains(
+                RestoreComponent.database,
+              )) {
+            await EmptyDatabaseRecoveryGuard.acknowledge(appDataDirectory);
+          } else {
+            await EmptyDatabaseRecoveryGuard.check(
+              appDataDirectory: appDataDirectory,
+              databaseId: installationReceipt.databaseId,
+            );
+          }
           final databaseFile = File(
             '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
           );
@@ -305,14 +380,12 @@ Future<void> main() async {
                 MigrationApp(
                   service: HiveToSqliteMigrationService(
                     _legacyMigrationDecision(appDataDirectory),
+                    businessLease: businessLease,
                   ),
                   restoreOutcome: restoreOutcome?.state,
                 ),
               );
               return;
-            }
-            if (recovery == _AdmissionRecovery.rebuilt) {
-              continue;
             }
           }
           await _initRestoreFailureWindow();
@@ -333,9 +406,10 @@ Future<void> main() async {
       }
       // Desktop exit hook: drain queued preference writes before process exit.
       _installExitFlush(businessPreferences);
-      ScheduledTasksService.configureDesktop(businessPreferences);
+      ScheduledTasksService.configureDevice(businessPreferences);
       // Best-effort trim of archived restore runs after a few cold starts.
       unawaited(_pruneRestoreArchive(appDataDirectory));
+      unawaited(ModelCatalogService.instance.maybeAutoRefresh());
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       // Start app (Flutter log capture is toggleable and off by default)
@@ -381,62 +455,12 @@ Future<_AdmissionRecovery> _recoverFailedAdmission(
     legacyHiveDataPresent: _legacyHiveSourcesExist(appDataDirectory),
   );
   switch (action) {
-    case DatabaseRecoveryAction.rebuildAutomatically:
-      try {
-        // The only route that destroys state without anyone confirming it, so
-        // it is the only one that has to leave a record of itself. A user who
-        // finds the app empty otherwise has nothing to report but the symptom.
-        await _recordAutomaticRebuild(appDataDirectory, error);
-        await DatabaseInstallationGate.rebuildFresh(
-          appDataDirectory: appDataDirectory,
-        );
-        return _AdmissionRecovery.rebuilt;
-      } catch (rebuildError, rebuildStack) {
-        stderr.writeln(
-          '[DatabaseAdmission] rebuild failed: $rebuildError\n$rebuildStack',
-        );
-        return _AdmissionRecovery.none;
-      }
     case DatabaseRecoveryAction.promptRemigration:
       return _AdmissionRecovery.remigrate;
     case DatabaseRecoveryAction.promptUpgrade:
     case DatabaseRecoveryAction.none:
       return _AdmissionRecovery.none;
   }
-}
-
-/// Appends a record of an unattended rebuild to `logs/`.
-///
-/// Deliberately independent of the Flutter log capture toggle, which is off by
-/// default: this is the one startup outcome that silently destroys state, and
-/// a user who finds the app empty has nothing else to report. The listing is
-/// taken before the rebuild, so it still describes the files it is about to
-/// clear. Best-effort throughout — a rebuild must not fail for want of a note.
-Future<void> _recordAutomaticRebuild(
-  Directory appDataDirectory,
-  Object error,
-) async {
-  try {
-    var report = StartupFailureReport.capture(
-      stage: StartupFailureStage.databaseAdmission,
-      error: error,
-      step: 'automatic_rebuild',
-    );
-    try {
-      report = report.withEnvironment(
-        await StartupFailureEnvironment.collect(
-          appDataDirectory: appDataDirectory,
-        ),
-      );
-    } catch (_) {}
-    final logs = Directory('${appDataDirectory.path}/logs');
-    await logs.create(recursive: true);
-    await File('${logs.path}/$startupRecoveryLogFileName').writeAsString(
-      '${report.toText()}\n\n',
-      mode: FileMode.append,
-      flush: true,
-    );
-  } catch (_) {}
 }
 
 HiveToSqliteMigrationDecision _legacyMigrationDecision(
@@ -509,14 +533,19 @@ class _RestoreProgressApp extends StatelessWidget {
 
 class _RestoreFailureApp extends StatelessWidget {
   const _RestoreFailureApp({
+    super.key,
     required this.report,
     this.appDataDirectory,
     this.businessLease,
+    this.privateStorageSource,
+    this.retryRestore,
   });
 
   final StartupFailureReport report;
   final Directory? appDataDirectory;
+  final Directory? privateStorageSource;
   final RestoreBusinessLease? businessLease;
+  final Future<void> Function()? retryRestore;
 
   @override
   Widget build(BuildContext context) {
@@ -533,7 +562,9 @@ class _RestoreFailureApp extends StatelessWidget {
           : RestoreFailureScreen(
               report: report,
               restart: PlatformUtils.restartApp,
+              retryRestore: retryRestore,
               appDataDirectory: appDataDirectory,
+              privateStorageSource: privateStorageSource,
               businessLease: businessLease,
             ),
     );
@@ -547,9 +578,25 @@ Future<void> _initDesktopWindow() async {
       await windowManager.ensureInitialized();
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
     }
+    final linuxHideTitleBar =
+        LinuxWindowService.isSupported &&
+        ((await SharedPreferences.getInstance()).getBool(
+              LinuxWindowService.hideTitleBarKey,
+            ) ??
+            false);
     // Initialize and show desktop window with persisted size/position
-    await DesktopWindowController.instance.initializeAndShow(title: 'Kelivo');
+    await DesktopWindowController.instance.initializeAndShow(
+      title: 'Kelivo',
+      linuxHideTitleBar: linuxHideTitleBar,
+    );
   } catch (_) {
+    // A failed preference/geometry restore must not leave Linux invisible.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
+      try {
+        await windowManager.show();
+        await windowManager.focus();
+      } catch (_) {}
+    }
     // Ignore on unsupported platforms.
   }
 }
@@ -668,15 +715,6 @@ class MyApp extends StatelessWidget {
           create: (_) => UserProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
-          create: (_) {
-            final settings = SettingsProvider(businessPreferences);
-            unawaited(
-              settings.loaded.then((_) => settings.incrementAppLaunchCount()),
-            );
-            return settings;
-          },
-        ),
-        ChangeNotifierProvider(
           create: (_) =>
               ChatService(existingRepository: databaseLease.chatRepository),
         ),
@@ -687,6 +725,46 @@ class MyApp extends StatelessWidget {
           create: (ctx) => AssistantProvider(
             preferences: businessPreferences,
             chatService: ctx.read<ChatService>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final assistants = ctx.read<AssistantProvider>();
+            final settings = SettingsProvider(
+              businessPreferences,
+              onProviderModelsRetired:
+                  assistants.clearModelSelectionsForProvider,
+            );
+            unawaited(
+              settings.loaded.then((_) => settings.incrementAppLaunchCount()),
+            );
+            unawaited(
+              ProviderOAuthService.instance.syncOutdatedModels(settings),
+            );
+            return settings;
+          },
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              InstructionInjectionProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => WorldBookProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MemoryProviderV2(
+            repository: MemoryRepository(businessPreferences),
+            chatRepository: databaseLease.chatRepository,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => ContextUsageService(
+            chatService: ctx.read<ChatService>(),
+            settings: ctx.read<SettingsProvider>(),
+            assistants: ctx.read<AssistantProvider>(),
+            instructions: ctx.read<InstructionInjectionProvider>(),
+            worldBooks: ctx.read<WorldBookProvider>(),
+            memories: ctx.read<MemoryProviderV2>(),
           ),
         ),
         ChangeNotifierProvider(
@@ -704,25 +782,12 @@ class MyApp extends StatelessWidget {
           create: (_) => QuickPhraseProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
-          create: (_) =>
-              InstructionInjectionProvider(preferences: businessPreferences),
-        ),
-        ChangeNotifierProvider(
           create: (_) => InstructionInjectionGroupProvider(
             preferences: businessPreferences,
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => WorldBookProvider(preferences: businessPreferences),
-        ),
-        ChangeNotifierProvider(
           create: (_) => MemoryProvider(preferences: businessPreferences),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => MemoryProviderV2(
-            repository: MemoryRepository(businessPreferences),
-            chatRepository: databaseLease.chatRepository,
-          ),
         ),
         Provider<ExtensionEntityStore>.value(
           value: databaseLease.extensionEntityStore,
@@ -761,7 +826,12 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => EnvironmentProvider(preferences: businessPreferences),
+          create: (ctx) => EnvironmentProvider(
+            preferences: businessPreferences,
+            proxySettings: WorkspaceChannel.isSupportedPlatform
+                ? ctx.read<SettingsProvider>()
+                : null,
+          ),
         ),
         ChangeNotifierProvider(create: (_) => _WorkspaceStackHolder()),
         ChangeNotifierProvider(
@@ -1181,25 +1251,7 @@ class MyApp extends StatelessWidget {
                     });
                   }
 
-                  final mq = MediaQuery.of(ctx);
-                  final display = View.of(ctx).display;
-                  final displaySize = display.size / display.devicePixelRatio;
-                  final isFloatingIpad =
-                      defaultTargetPlatform == TargetPlatform.iOS &&
-                      displaySize.shortestSide >= 600 &&
-                      (mq.size.shortestSide < displaySize.shortestSide - 1 ||
-                          mq.size.longestSide < displaySize.longestSide - 1);
-                  final systemTop = mq.viewPadding.top;
-                  final controlsTop = systemTop < 56 ? 56.0 : systemTop;
-                  final appWithOverlays = MediaQuery(
-                    data: isFloatingIpad
-                        ? mq.copyWith(
-                            padding: mq.padding.copyWith(top: controlsTop),
-                            viewPadding: mq.viewPadding.copyWith(
-                              top: controlsTop,
-                            ),
-                          )
-                        : mq,
+                  final appWithOverlays = FloatingIpadPadding(
                     child: LocalSnapshotScheduler(
                       child: AppOverlays(
                         child: child ?? const SizedBox.shrink(),

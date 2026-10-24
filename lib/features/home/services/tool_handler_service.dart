@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/workspace_binding.dart';
+import '../../../core/models/model_spec.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
@@ -12,12 +15,17 @@ import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/builtin_tools.dart' as native_tools;
 import '../../../core/services/api/json_schema_utils.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/browser/browser_tools_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
 import '../../../core/services/memory/memory_tools.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../../core/services/search/web_fetch_service.dart';
+import '../../../core/services/search/web_fetch_tool_service.dart';
 import '../../../core/services/tools/tool_schema_overrides.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../core/services/workspace/tool_run_registry.dart';
@@ -56,6 +64,12 @@ class ToolHandlerService {
         registry: contextProvider.read<ToolRunRegistry>(),
         runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),
         updateConversationExtras: chat.updateConversationExtras,
+        readWorkspaceBinding: (id) {
+          final conversation = chat.getConversation(id);
+          return conversation == null
+              ? null
+              : WorkspaceBinding.fromExtras(conversation.extras);
+        },
         touchLastUsed: workspaces.touchLastUsed,
         onSkillRead: onSkillRead,
         onShellCompleted: onShellCompleted,
@@ -84,20 +98,18 @@ class ToolHandlerService {
     ProviderKind kind,
   ) {
     Map<String, dynamic> clone = _deepCloneMap(schema);
-    // Inline local $ref targets first: the allow-list below drops $ref/$defs,
-    // so an unresolved reference would reach the model as an empty schema and
-    // the whole nested object would silently vanish from the tool call.
+    // Inline local references before translating provider-specific schema fields.
     clone = resolveJsonSchemaRefs(
       clone,
-      expandAdditionalProperties: kind != ProviderKind.google,
+      preserveJsonSchema: kind != ProviderKind.google,
     );
-    clone = _sanitizeNode(clone, kind) as Map<String, dynamic>;
-    return clone;
+    if (kind != ProviderKind.google) return clone;
+    return _sanitizeGoogleNode(clone) as Map<String, dynamic>;
   }
 
-  static dynamic _sanitizeNode(dynamic node, ProviderKind kind) {
+  static dynamic _sanitizeGoogleNode(dynamic node) {
     if (node is List) {
-      return node.map((e) => _sanitizeNode(e, kind)).toList();
+      return node.map(_sanitizeGoogleNode).toList();
     }
     if (node is! Map) return node;
 
@@ -105,7 +117,7 @@ class ToolHandlerService {
     // Remove $schema as it's not needed for tool definitions
     m.remove(r'$schema');
 
-    // Convert 'const' to 'enum' for compatibility
+    // Google's native Schema does not have const.
     if (m.containsKey('const')) {
       final v = m['const'];
       if (v is String || v is num || v is bool) {
@@ -127,7 +139,7 @@ class ToolHandlerService {
       m.remove('const');
     }
 
-    // Flatten anyOf/oneOf/allOf to first variant for simplicity
+    // Keep Google's existing conversion to the native Schema subset.
     for (final key in [
       'anyOf',
       'oneOf',
@@ -136,9 +148,11 @@ class ToolHandlerService {
       'one_of',
       'all_of',
     ]) {
-      if (m[key] is List && (m[key] as List).isNotEmpty) {
-        final first = (m[key] as List).first;
-        final flattened = _sanitizeNode(first, kind);
+      final variants = m[key];
+      if (variants is! List) continue;
+      if (variants.isNotEmpty) {
+        final first = variants.first;
+        final flattened = _sanitizeGoogleNode(first);
         m.remove(key);
         if (flattened is Map<String, dynamic>) {
           m
@@ -150,59 +164,38 @@ class ToolHandlerService {
       }
     }
 
-    // Normalize type array to single type
+    // Google's native Schema needs a single type.
     final t = m['type'];
-    if (t is List && t.isNotEmpty) m['type'] = t.first.toString();
+    if (t is List && t.isNotEmpty) {
+      m['type'] = t.first.toString();
+    }
 
-    // Normalize items array to single item
+    // Keep Google's existing conversion of tuple-form items.
     final items = m['items'];
-    if (items is List && items.isNotEmpty) m['items'] = items.first;
-    if (m['items'] is Map) m['items'] = _sanitizeNode(m['items'], kind);
+    if (items is List && items.isNotEmpty) {
+      m['items'] = items.first;
+    }
+    if (m['items'] is Map || m['items'] is List) {
+      m['items'] = _sanitizeGoogleNode(m['items']);
+    }
 
-    // Recursively sanitize properties
     if (m['properties'] is Map) {
       final props = Map<String, dynamic>.from(m['properties']);
       final norm = <String, dynamic>{};
       props.forEach((k, v) {
-        norm[k] = _sanitizeNode(v, kind);
+        norm[k] = _sanitizeGoogleNode(v);
       });
       m['properties'] = norm;
     }
 
-    // additionalProperties can itself be a schema.
-    if (m['additionalProperties'] is Map) {
-      m['additionalProperties'] = _sanitizeNode(
-        m['additionalProperties'],
-        kind,
-      );
-    }
-
-    // Keep only allowed keys based on provider
-    Set<String> allowed;
-    switch (kind) {
-      case ProviderKind.google:
-        allowed = {
-          'type',
-          'description',
-          'properties',
-          'required',
-          'items',
-          'enum',
-        };
-        break;
-      case ProviderKind.openai:
-      case ProviderKind.claude:
-        allowed = {
-          'type',
-          'description',
-          'properties',
-          'required',
-          'items',
-          'enum',
-          'additionalProperties',
-        };
-        break;
-    }
+    const allowed = {
+      'type',
+      'description',
+      'properties',
+      'required',
+      'items',
+      'enum',
+    };
     m.removeWhere((k, v) => !allowed.contains(k));
     return m;
   }
@@ -278,6 +271,13 @@ class ToolHandlerService {
         !hasBuiltInSearch &&
         supportsTools) {
       toolDefs.add(SearchToolService.getToolDefinition());
+      if (settings.webFetchMode != WebFetchMode.off &&
+          !native_tools.BuiltInToolsHelper.isBuiltInFetchEnabled(
+            cfg: settings.getProviderConfig(providerKey),
+            modelId: modelId,
+          )) {
+        toolDefs.add(WebFetchToolService.getToolDefinition());
+      }
     }
 
     // Memory tools (§10.1)
@@ -304,6 +304,11 @@ class ToolHandlerService {
       LocalToolsService.buildToolDefinitions(
         assistant: assistant,
         supportsTools: supportsTools,
+      ).where(
+        (definition) =>
+            (definition['function'] as Map)['name'] !=
+                BrowserToolsService.toolName ||
+            conversationId != null,
       ),
     );
 
@@ -318,7 +323,19 @@ class ToolHandlerService {
     toolDefs.addAll(mcpTools);
 
     if (supportsTools && workspaceContext != null) {
-      toolDefs.addAll(_workspaceTools().buildToolDefinitions(workspaceContext));
+      final canImageInput = ModelSpecResolver.instance
+          .spec(settings.getProviderConfig(providerKey), modelId)
+          .input
+          .contains(Modality.image);
+      toolDefs.addAll(
+        _workspaceTools()
+            .buildToolDefinitions(workspaceContext)
+            .where(
+              (definition) =>
+                  canImageInput ||
+                  (definition['function'] as Map)['name'] != 'view_image',
+            ),
+      );
     }
 
     final overrides = settings.toolSchemaOverrides;
@@ -471,6 +488,22 @@ class ToolHandlerService {
 
     return (name, args, {toolCallId}) async {
       try {
+        if (name == BrowserToolsService.toolName) {
+          final current = assistant == null
+              ? null
+              : assistantProvider.getById(assistant.id);
+          if (current == null ||
+              !current.localToolIds.contains(LocalToolNames.browser) ||
+              conversationId == null) {
+            return _toolError(
+              error: 'permission_denied',
+              message:
+                  'Browser control is disabled for this assistant or conversation.',
+              tool: name,
+            );
+          }
+          return await BrowserToolsService().handle(conversationId, args);
+        }
         if (workspaceContext != null &&
             workspaceTools != null &&
             WorkspaceToolsService.toolNames.contains(name)) {
@@ -493,6 +526,10 @@ class ToolHandlerService {
             assistant?.searchEnabled == true) {
           final q = (args['query'] ?? '').toString();
           return await SearchToolService.executeSearch(q, settings);
+        }
+        if (name == WebFetchToolService.toolName &&
+            assistant?.searchEnabled == true) {
+          return await WebFetchToolService.executeFetch(args, settings);
         }
 
         // Memory tools
@@ -522,6 +559,21 @@ class ToolHandlerService {
             return _toolError(
               error: 'approval_denied',
               message: approval.denyReason ?? 'User denied the tool call',
+              tool: name,
+            );
+          }
+        }
+
+        // Re-read phone-control permission on every call so disabling it also
+        // stops a tool loop that was built with an older assistant snapshot.
+        if (name == LocalToolNames.phoneControl) {
+          final current = assistant == null
+              ? null
+              : assistantProvider.getById(assistant.id);
+          if (current == null || !current.localToolIds.contains(name)) {
+            return _toolError(
+              error: 'permission_denied',
+              message: 'Phone control is disabled for this assistant.',
               tool: name,
             );
           }
@@ -636,15 +688,15 @@ class ToolHandlerService {
     final mdlId = settings.memoryModelId;
     if (provKey != null && mdlId != null) {
       final cfg = settings.getProviderConfig(provKey);
-      final budget = settings.memoryModelThinkingEnabled
-          ? (assistant.thinkingBudget ?? settings.thinkingBudget)
-          : 0;
+      final reasoning = settings.memoryModelThinkingEnabled
+          ? (assistant.reasoning ?? ReasoningRequest.auto)
+          : ReasoningRequest.off;
       memoryLlmCall = (prompt) => ChatApiService.generateText(
         conversationId: conversationId,
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
       );
     }
 

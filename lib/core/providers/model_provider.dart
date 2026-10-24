@@ -1,17 +1,16 @@
 import '../services/auth/provider_oauth_service.dart';
-export '../models/model_types.dart';
+export '../models/model_spec.dart';
 
 import 'dart:convert';
 import 'dart:io' show HttpException;
-import 'package:http/http.dart' as http;
 import 'settings_provider.dart';
-import '../services/network/dio_http_client.dart';
+import '../services/network/provider_http_client.dart';
 import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
 import '../services/api/providers/openai/openai_protocol_compat.dart';
 import '../services/model_override_payload_parser.dart';
 import '../services/custom_request_merger.dart';
-import 'package:Kelivo/secrets/fallback.dart';
+import '../services/api/embedding/embedding_api_service.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_types.dart';
 import '../utils/kimi_model_compat.dart';
@@ -178,7 +177,7 @@ class ModelRegistry {
 }
 
 abstract class BaseProvider {
-  Future<List<ModelInfo>> listModels(ProviderConfig cfg);
+  Future<List<ModelSpec>> listModels(ProviderConfig cfg);
 }
 
 class _Http {
@@ -193,35 +192,13 @@ class _Http {
       ),
     );
   }
-
-  static http.Client clientFor(ProviderConfig cfg) {
-    final enabled = cfg.proxyEnabled == true;
-    final host = (cfg.proxyHost ?? '').trim();
-    final portStr = (cfg.proxyPort ?? '').trim();
-    final user = (cfg.proxyUsername ?? '').trim();
-    final pass = (cfg.proxyPassword ?? '').trim();
-    if (enabled && host.isNotEmpty && portStr.isNotEmpty) {
-      final port = int.tryParse(portStr) ?? 8080;
-      return DioHttpClient(
-        proxy: NetworkProxyConfig(
-          enabled: true,
-          type: ProviderConfig.resolveProxyType(cfg.proxyType),
-          host: host,
-          port: port,
-          username: user.isEmpty ? null : user,
-          password: pass.isEmpty ? null : pass,
-        ),
-      );
-    }
-    return DioHttpClient();
-  }
 }
 
 class OpenAIProvider extends BaseProvider {
   @override
-  Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
+  Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
-    final client = _Http.clientFor(cfg);
+    final client = providerHttpClient(cfg);
     try {
       final uri = Uri.parse('${cfg.baseUrl}/models');
       final headers = <String, String>{};
@@ -235,12 +212,13 @@ class OpenAIProvider extends BaseProvider {
         return [
           for (final e in data)
             if (e is Map && e['id'] is String)
-              ModelRegistry.infer(
-                ModelInfo(
-                  id: e['id'] as String,
-                  displayName: e['id'] as String,
-                ),
-              ),
+              ModelSpecResolver.instance
+                  .resolve(
+                    cfg,
+                    e['id'] as String,
+                    displayName: e['id'] as String,
+                  )
+                  .spec,
         ];
       }
       return [];
@@ -253,9 +231,9 @@ class OpenAIProvider extends BaseProvider {
 class ClaudeProvider extends BaseProvider {
   static const String anthropicVersion = '2023-06-01';
   @override
-  Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
+  Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
-    final client = _Http.clientFor(cfg);
+    final client = providerHttpClient(cfg);
     try {
       final uri = Uri.parse('${cfg.baseUrl}/models');
       final headers = <String, String>{'anthropic-version': anthropicVersion};
@@ -270,13 +248,14 @@ class ClaudeProvider extends BaseProvider {
         return [
           for (final e in data)
             if (e is Map && e['id'] is String)
-              ModelRegistry.infer(
-                ModelInfo(
-                  id: e['id'] as String,
-                  displayName:
-                      (e['display_name'] as String?) ?? (e['id'] as String),
-                ),
-              ),
+              ModelSpecResolver.instance
+                  .resolve(
+                    cfg,
+                    e['id'] as String,
+                    displayName:
+                        (e['display_name'] as String?) ?? (e['id'] as String),
+                  )
+                  .spec,
         ];
       }
       return [];
@@ -302,8 +281,8 @@ class GoogleProvider extends BaseProvider {
   }
 
   @override
-  Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
-    final client = _Http.clientFor(cfg);
+  Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
+    final client = providerHttpClient(cfg);
     try {
       final url = _buildUrl(cfg);
       final headers = <String, String>{};
@@ -331,7 +310,7 @@ class GoogleProvider extends BaseProvider {
           headers['x-goog-api-key'] = key;
         }
       }
-      final out = <ModelInfo>[];
+      final out = <ModelSpec>[];
       try {
         final res = await client.get(
           Uri.parse(url),
@@ -357,50 +336,33 @@ class GoogleProvider extends BaseProvider {
                 continue;
               }
               out.add(
-                ModelRegistry.infer(
-                  ModelInfo(
-                    id: id,
-                    displayName: displayName,
-                    type: methods.contains('generateContent')
-                        ? ModelType.chat
-                        : ModelType.embedding,
-                  ),
-                ),
+                ModelSpecResolver.instance
+                    .resolve(cfg, id, displayName: displayName)
+                    .spec,
               );
             }
           }
         }
       } catch (_) {}
 
-      // If this is Vertex AI, augment with known Anthropic models
-      // Since Google listModels API often only returns Gemini models under publishers/google,
-      // we manually inject known supported Claude models for convenience.
+      // Vertex listModels only returns Gemini under publishers/google.
+      // Merge Anthropic ids from the models.dev Vertex Anthropic catalog.
       if (cfg.vertexAI == true) {
-        final knownClaude = [
-          'claude-fable-5-1',
-          'claude-fable-5',
-          'claude-opus-5',
-          'claude-opus-4-8',
-          'claude-opus-4-7',
-          'claude-opus-4-6',
-          'claude-opus-4-5@20251101',
-          'claude-opus-4-1@20250805',
-          'claude-opus-4@20250514',
-          'claude-sonnet-5',
-          'claude-sonnet-4-6',
-          'claude-sonnet-4-5@20250929',
-          'claude-sonnet-4@20250514',
-          'claude-3-7-sonnet@20250219',
-          'claude-3-5-sonnet-v2@20241022',
-          'claude-haiku-4-5@20251001',
-          'claude-3-5-haiku@20241022',
-          'claude-3-5-sonnet@20240620',
-          'claude-3-opus@20240229',
-          'claude-3-haiku@20240307',
-        ];
-        for (final id in knownClaude) {
-          if (!out.any((m) => m.id == id)) {
-            out.add(ModelRegistry.infer(ModelInfo(id: id, displayName: id)));
+        final catalog = ModelCatalogService.instance;
+        await catalog.ensureLoaded();
+        for (final model in catalog.modelsOfProvider(
+          'google-vertex-anthropic',
+        )) {
+          if (!out.any((m) => m.id == model.id)) {
+            out.add(
+              ModelSpecResolver.instance
+                  .resolve(
+                    cfg,
+                    model.id,
+                    displayName: model.name.isEmpty ? null : model.name,
+                  )
+                  .spec,
+            );
           }
         }
       }
@@ -413,13 +375,7 @@ class GoogleProvider extends BaseProvider {
 
 class ProviderManager {
   static String _effectiveApiKey(ProviderConfig cfg) {
-    try {
-      if (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) {
-        final sel = ApiKeyManager().selectForProvider(cfg);
-        if (sel.key != null) return sel.key!.key;
-      }
-    } catch (_) {}
-    return cfg.apiKey;
+    return ApiKeyManager().effectiveKeyForProvider(cfg);
   }
 
   // Per-model override helpers (duplicated logic from ChatApiService)
@@ -470,7 +426,7 @@ class ProviderManager {
     }
   }
 
-  static Future<List<ModelInfo>> listModels(ProviderConfig cfg) {
+  static Future<List<ModelSpec>> listModels(ProviderConfig cfg) {
     if (cfg.isOAuth) return ProviderOAuthService.instance.models(cfg);
     return forConfig(cfg).listModels(cfg);
   }
@@ -480,6 +436,14 @@ class ProviderManager {
     String modelId, {
     bool useStream = false,
   }) async {
+    if (ModelSpecResolver.instance.spec(cfg, modelId).isEmbedding) {
+      await EmbeddingApiService.embed(
+        config: cfg,
+        modelId: modelId,
+        inputs: const ['hello'],
+      );
+      return;
+    }
     cfg = await ProviderOAuthService.instance.resolve(cfg);
     if (cfg.oauthProvider == OAuthProvider.chatgpt) useStream = true;
     if (cfg.oauthProvider == OAuthProvider.kimi &&
@@ -534,7 +498,7 @@ class ProviderManager {
     }
     final sessionHeaders = providerSessionHeaders(cfg);
     final client = ProviderOAuthService.instance.authenticatedClient(
-      _Http.clientFor(cfg),
+      providerHttpClient(cfg),
       cfg,
     );
     try {
@@ -576,22 +540,9 @@ class ProviderManager {
               };
         // Merge custom body overrides
         final extra = _customBody(cfg, modelId);
-        if (extra.isNotEmpty) body.addAll(extra);
+        CustomRequestMerger.applyBody(body, extra);
         // Merge custom headers overrides
-        // SiliconFlow fallback key for built-in free models when no API key provided
-        String apiKey = _effectiveApiKey(cfg);
-        try {
-          if ((cfg.id) == 'SiliconFlow') {
-            final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
-            if (host.contains('siliconflow') && apiKey.trim().isEmpty) {
-              final m = upstreamId.toLowerCase();
-              final allowed =
-                  m == 'thudm/glm-4-9b-0414' || m == 'qwen/qwen3-8b';
-              final fb = siliconflowFallbackKey.trim();
-              if (allowed && fb.isNotEmpty) apiKey = fb;
-            }
-          }
-        } catch (_) {}
+        final apiKey = _effectiveApiKey(cfg);
         final headers = <String, String>{
           if (apiKey.trim().isNotEmpty) 'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
@@ -703,18 +654,10 @@ class ProviderManager {
               : cfg.baseUrl;
           url = '$base/models/$upstreamId:$endpoint';
         }
-        // Determine if model outputs images (override wins; otherwise inference)
-        bool wantsImageOutput = false;
-        if (ov['output'] is List) {
-          final outList = (ov['output'] as List)
-              .map((e) => e.toString().toLowerCase())
-              .toList();
-          wantsImageOutput = outList.contains('image');
-        } else {
-          wantsImageOutput = ModelRegistry.infer(
-            ModelInfo(id: upstreamId, displayName: upstreamId),
-          ).output.contains(Modality.image);
-        }
+        final wantsImageOutput = ModelSpecResolver.instance
+            .spec(cfg, modelId)
+            .output
+            .contains(Modality.image);
         final Map<String, dynamic> body = isVertexClaude
             ? <String, dynamic>{
                 'anthropic_version': 'vertex-2023-10-16',
@@ -767,7 +710,7 @@ class ProviderManager {
         }
         headers.addAll(_customHeaders(cfg, modelId));
         final extra = _customBody(cfg, modelId);
-        if (extra.isNotEmpty) body.addAll(extra);
+        CustomRequestMerger.applyBody(body, extra);
         final res = await client.post(
           Uri.parse(url),
           headers: headers,

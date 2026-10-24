@@ -290,7 +290,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        expect(find.text('62%'), findsOneWidget);
+        expect(find.text('Used 62%'), findsOneWidget);
         expect(find.text('Available usage resets: 2'), findsOneWidget);
         expect(find.text('—'), findsOneWidget);
         await tester.tap(find.text('Usage details'));
@@ -676,7 +676,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('account@example.com'), findsOneWidget);
-      expect(find.text('62%'), findsOneWidget);
+      expect(find.text('Used 62%'), findsOneWidget);
       expect(find.text('API Key'), findsNothing);
       expect(tester.takeException(), isNull);
       await snapshot(
@@ -702,8 +702,11 @@ void main() {
       modelOverrides: {
         'grok-4.20-0309-reasoning': {
           'oauthProtocol': 'openai',
-          'oauthThinkingMode': 'forced',
           'abilities': ['tool', 'reasoning'],
+          'reasoning': {
+            'dialect': 'openaiResponsesReasoning',
+            'levels': ['low', 'high'],
+          },
         },
       },
       oauthCredentials: ProviderOAuthCredentials(
@@ -1002,24 +1005,44 @@ void main() {
     );
     await tester.tap(find.text('Synced Kimi'));
     await tester.pumpAndSettle();
-    expect(find.text('Confirm'), findsOneWidget);
-    expect(find.byType(BottomSheet), desktop ? findsNothing : findsOneWidget);
+    if (desktop) {
+      expect(find.text('Confirm'), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+    } else {
+      expect(find.byKey(const ValueKey('model-spec-save')), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+    }
     expect(tester.takeException(), isNull);
+  }
+
+  Future<void> confirmModelEditor(
+    WidgetTester tester, {
+    required bool desktop,
+  }) async {
+    await tester.tap(
+      desktop
+          ? find.text('Confirm')
+          : find.byKey(const ValueKey('model-spec-save')),
+    );
+    await tester.pumpAndSettle();
   }
 
   const anthropicMetadata = <String, dynamic>{
     'oauthProtocol': 'anthropic',
-    'oauthThinkingMode': 'enabled',
-    'oauthThinkingRequired': true,
-    'oauthThinkingEfforts': <String>[],
-    'oauthThinkingDefaultEffort': null,
+    'reasoning': {
+      'dialect': 'anthropicBudget',
+      'levels': ['low', 'medium', 'high'],
+      'canDisable': false,
+    },
   };
   const openaiMetadata = <String, dynamic>{
     'oauthProtocol': 'openai',
-    'oauthThinkingMode': 'adaptive',
-    'oauthThinkingRequired': false,
-    'oauthThinkingEfforts': ['low', 'high'],
-    'oauthThinkingDefaultEffort': 'high',
+    'reasoning': {
+      'dialect': 'kimiThinking',
+      'levels': ['low', 'high'],
+      'canDisable': true,
+      'defaultLevel': 'high',
+    },
   };
 
   void expectMetadata(Map saved, Map<String, dynamic> metadata) {
@@ -1034,8 +1057,7 @@ void main() {
         'model Confirm preserves ${metadata['oauthProtocol']} OAuth metadata desktop=$desktop',
         (tester) async {
           await openModelEditor(tester, desktop: desktop, metadata: metadata);
-          await tester.tap(find.text('Confirm'));
-          await tester.pumpAndSettle();
+          await confirmModelEditor(tester, desktop: desktop);
 
           final config = settings.providerConfigs['oauth-test']!;
           final saved = config.modelOverrides['kimi-test-alias'] as Map;
@@ -1074,8 +1096,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Confirm'));
-        await tester.pumpAndSettle();
+        await confirmModelEditor(tester, desktop: desktop);
 
         final saved =
             settings
@@ -1099,8 +1120,7 @@ void main() {
         await tester.ensureVisible(find.text('Embedding'));
         await tester.tap(find.text('Embedding'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Confirm'));
-        await tester.pumpAndSettle();
+        await confirmModelEditor(tester, desktop: desktop);
 
         final saved =
             settings
@@ -1261,7 +1281,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Extra usage'), findsOneWidget);
-      expect(find.text('\$2.49'), findsOneWidget);
+      expect(find.text('Used \$2.49'), findsOneWidget);
       expect(find.text('0%'), findsNothing);
       expect(tester.takeException(), isNull);
     },

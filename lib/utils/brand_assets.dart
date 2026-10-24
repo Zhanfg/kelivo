@@ -46,6 +46,7 @@ class BrandAssets {
         MapEntry(RegExp(r'tinyfish'), 'tinyfish-color.svg'),
         MapEntry(RegExp(r'fish.?audio|fishaudio'), 'fish-audio.svg'),
         MapEntry(RegExp(r'openrouter'), 'openrouter.svg'),
+        MapEntry(RegExp(r'vercel'), 'vercel.svg'),
         MapEntry(RegExp(r'metaso|秘塔'), 'metaso-color.svg'),
         MapEntry(RegExp(r'meta'), 'meta-color.svg'),
         MapEntry(RegExp(r'tencent'), 'hunyuan-color.svg'),
@@ -66,6 +67,7 @@ class BrandAssets {
         MapEntry(RegExp(r'bing|必应'), 'bing-color.svg'),
         MapEntry(RegExp(r'tavily'), 'tavily-color.svg'),
         MapEntry(RegExp(r'anysearch'), 'anysearch.svg'),
+        MapEntry(RegExp(r'kagi'), 'kagi-color.svg'),
         MapEntry(RegExp(r'parallel'), 'parallel.svg'),
         MapEntry(RegExp(r'^you(?:\.com)?(?:\s+search)?$'), 'you.svg'),
         MapEntry(RegExp(r'exa'), 'exa-color.svg'),
@@ -296,6 +298,11 @@ class BrandAssets {
       id: 'anysearch',
       label: 'AnySearch',
       asset: 'assets/icons/anysearch.svg',
+    ),
+    BrandIconOption(
+      id: 'kagi',
+      label: 'Kagi',
+      asset: 'assets/icons/kagi-color.svg',
     ),
     BrandIconOption(
       id: 'parallel',

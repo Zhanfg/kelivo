@@ -1,4 +1,5 @@
  import Flutter
+ import flutter_inappwebview_ios
  import UIKit
  import AuthenticationServices
  import UserNotifications
@@ -13,17 +14,47 @@
    private let oauthHandler = IosOAuthHandler()
    private let deviceLocalToolsHandler = DeviceLocalToolsHandler()
    private let iosTranslationHandler = IosTranslationHandler()
+   private let scheduledTaskNotifications = ScheduledTaskNotifications()
    private let incomingShareHandler = IosIncomingShareHandler()
+   private let browserViewportInsets = BrowserViewportInsetsBridge()
+   private let browserScroll = BrowserScrollBridge()
+   // The presenter is only constructed on iOS 26 and later.
+   private var iosSelectionMenuHandler: AnyObject?
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+    if let registrar = registrar(forPlugin: "BrowserGlass") {
+      registrar.register(
+        BrowserGlassViewFactory(messenger: registrar.messenger()),
+        withId: "app.browser_glass"
+      )
+    }
     // FlutterAppDelegate forwards foreground presentation and cold/warm taps
     // to flutter_local_notifications. Assigning a delegate requests no access.
     UNUserNotificationCenter.current().delegate = self
     if let controller = window?.rootViewController as? FlutterViewController {
+      let selectionMenuChannel = FlutterMethodChannel(name: "app.ios_selection_menu", binaryMessenger: controller.binaryMessenger)
+      if #available(iOS 26.0, *) {
+        let handler = IosSelectionMenuHandler(view: controller.view, channel: selectionMenuChannel)
+        iosSelectionMenuHandler = handler
+        selectionMenuChannel.setMethodCallHandler { [weak handler] call, result in
+          guard let handler else { result(false); return }
+          handler.handle(call, result: result)
+        }
+      } else {
+        selectionMenuChannel.setMethodCallHandler { call, result in
+          result(call.method == "isAvailable" ? false : FlutterMethodNotImplemented)
+        }
+      }
+      browserViewportInsets.register(messenger: controller.binaryMessenger, window: window) {
+        ($0 as? InAppWebView)?.browserNativeViewId
+      }
+      browserScroll.register(messenger: controller.binaryMessenger, window: window) {
+        ($0 as? InAppWebView)?.browserNativeViewId
+      }
       incomingShareHandler.register(messenger: controller.binaryMessenger)
       let clipboardChannel = FlutterMethodChannel(name: "app.clipboard", binaryMessenger: controller.binaryMessenger)
       clipboardChannel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
@@ -59,6 +90,7 @@
       }
 
       backgroundGenerationHandler.configure(messenger: controller.binaryMessenger)
+      scheduledTaskNotifications.configure(messenger: controller.binaryMessenger)
 
       let oauthChannel = FlutterMethodChannel(name: "app.oauth", binaryMessenger: controller.binaryMessenger)
       oauthHandler.presentationAnchor = window
@@ -133,7 +165,24 @@
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    // In the foreground the shared scheduler can execute the due task. Avoid
+    // displaying its fallback reminder immediately before its result arrives.
+    if notification.request.identifier.hasPrefix("scheduled-task:"),
+       notification.request.content.userInfo["scheduledPrepared"] as? Bool == false {
+      completionHandler([])
+      return
+    }
+    super.userNotificationCenter(center, willPresent: notification, withCompletionHandler: completionHandler)
+  }
+
   override func applicationWillTerminate(_ application: UIApplication) {
+    browserViewportInsets.dispose()
+    browserScroll.dispose()
     backgroundGenerationHandler.prepareForTermination()
     super.applicationWillTerminate(application)
   }
@@ -348,7 +397,7 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
       return
     }
 
-    let rawSourcePath = (args["sourcePath"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let rawSourcePath = (args["sourcePath"] as? String) ?? ""
     guard !rawSourcePath.isEmpty else {
       result(FlutterError(code: "invalid_args", message: "Missing sourcePath.", details: nil))
       return

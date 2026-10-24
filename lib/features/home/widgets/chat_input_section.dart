@@ -31,7 +31,7 @@ typedef IsReasoningModelCallback =
     bool Function(String providerKey, String modelId);
 
 /// Callback for checking if reasoning is enabled.
-typedef IsReasoningEnabledCallback = bool Function(int? budget);
+typedef IsReasoningEnabledCallback = bool Function(ReasoningRequest request);
 
 /// Widget that wraps ChatInputBar with all the necessary logic and callbacks.
 ///
@@ -82,6 +82,7 @@ class ChatInputSection extends StatelessWidget {
     this.onPickCamera,
     this.onPickPhotos,
     this.onUploadFiles,
+    this.onOpenBrowser,
     this.onToggleLearningMode,
     this.onOpenWorldBook,
     this.onLongPressLearning,
@@ -135,6 +136,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onPickCamera;
   final VoidCallback? onPickPhotos;
   final VoidCallback? onUploadFiles;
+  final VoidCallback? onOpenBrowser;
   final VoidCallback? onToggleLearningMode;
   final VoidCallback? onOpenWorldBook;
   final VoidCallback? onLongPressLearning;
@@ -169,6 +171,18 @@ class ChatInputSection extends StatelessWidget {
 
     final pk = chatModelProviderKey;
     final mid = chatModelId;
+    final supportsModelTools =
+        pk != null && mid != null && isToolModel(pk, mid);
+    final selectedReasoning = _selectedReasoning(settings, a, pk, mid);
+    final reasoningSpec = (pk != null && mid != null)
+        ? ModelSpecResolver.instance.spec(settings.getProviderConfig(pk), mid)
+        : null;
+    final effectiveReasoning = reasoningSpec == null
+        ? selectedReasoning
+        : ReasoningRequest(
+            resolveReasoning(reasoningSpec, selectedReasoning).effective,
+            budgetTokens: selectedReasoning.budgetTokens,
+          );
 
     // Enforce model capabilities: disable MCP selection if model doesn't
     // support tools. Skipped while the conversation overrides the model —
@@ -274,6 +288,7 @@ class ChatInputSection extends StatelessWidget {
       onPickCamera: isTablet ? (isDesktop ? null : onPickCamera) : null,
       onPickPhotos: isTablet ? (isDesktop ? null : onPickPhotos) : null,
       onUploadFiles: isTablet ? onUploadFiles : null,
+      onOpenBrowser: isTablet ? onOpenBrowser : null,
       onToggleLearningMode: isTablet ? onToggleLearningMode : null,
       onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
       onLongPressLearning: isTablet ? onLongPressLearning : null,
@@ -309,7 +324,7 @@ class ChatInputSection extends StatelessWidget {
               onTap: () => WorkspaceNavigation.openEnvironmentPage(context),
             ),
           ),
-        bar,
+        Flexible(child: bar),
       ],
     );
   }
@@ -390,28 +405,23 @@ class ChatInputSection extends StatelessWidget {
         }
       });
     }
-
-    final supportsReasoning = isReasoningModel(pk, mid);
-    if (!supportsReasoning && a != null) {
-      final enabledNow = isReasoningEnabled(
-        a.thinkingBudget ?? settings.thinkingBudget,
-      );
-      if (enabledNow) {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          final aa = ap.currentAssistant;
-          if (aa != null) {
-            await ap.updateAssistant(aa.copyWith(thinkingBudget: 0));
-          }
-        });
-      }
-    }
   }
 
-  /// The button hosts local tools and the workspace as well as MCP, so it
-  /// shows for every tool-capable model rather than only when MCP is set up.
-  bool _shouldShowToolsButton(String? pk, String? mid) {
-    if (pk == null || mid == null) return false;
-    return isToolModel(pk, mid);
+  ReasoningRequest _selectedReasoning(
+    SettingsProvider settings,
+    Assistant? assistant,
+    String? providerKey,
+    String? modelId,
+  ) {
+    if (providerKey == null || modelId == null) {
+      return assistant?.reasoning ?? ReasoningRequest.auto;
+    }
+    return selectReasoningRequest(
+      settings: settings,
+      config: settings.getProviderConfig(providerKey),
+      modelId: modelId,
+      assistant: assistant,
+    );
   }
 
   bool _isToolsActive(BuildContext context, Assistant? a, bool workspaceBound) {

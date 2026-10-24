@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/search/search_service_usage_service.dart';
+import '../../../core/services/search/web_fetch.dart';
+import '../../../core/services/search/web_fetch_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
@@ -17,6 +21,7 @@ import 'search_api_keys_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 
 class SearchServiceEditorResult {
   const SearchServiceEditorResult.saved(this.service) : deleted = false;
@@ -31,6 +36,8 @@ typedef SearchServiceUsageFetcher =
     Future<SearchServiceUsageInfo> Function(SearchServiceOptions options);
 typedef SearchServiceTestFetcher =
     Future<SearchResult> Function(String query, SearchServiceOptions options);
+typedef SearchServicePageFetcher =
+    Future<WebFetchPage> Function(String url, SearchServiceOptions options);
 
 typedef _SearchUsageCacheKey = ({
   String id,
@@ -48,6 +55,7 @@ class SearchServiceEditorPage extends StatefulWidget {
     this.autoQueryUsage = true,
     this.usageFetcher,
     this.searchFetcher,
+    this.pageFetcher,
   });
 
   final SearchServiceOptions? initialService;
@@ -56,6 +64,7 @@ class SearchServiceEditorPage extends StatefulWidget {
   final bool autoQueryUsage;
   final SearchServiceUsageFetcher? usageFetcher;
   final SearchServiceTestFetcher? searchFetcher;
+  final SearchServicePageFetcher? pageFetcher;
 
   @override
   State<SearchServiceEditorPage> createState() =>
@@ -69,6 +78,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
   final _formKey = GlobalKey<FormState>();
   final _controllers = <String, TextEditingController>{};
   final _queryController = TextEditingController();
+  final _urlController = TextEditingController();
   List<String> _extraApiKeys = [];
 
   late final String _serviceId;
@@ -80,6 +90,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
   int _usageRequestGeneration = 0;
   SearchResult? _testResult;
   String? _testError;
+  bool _fetchTestMode = false;
+  WebFetchPage? _fetchResult;
+  Duration? _fetchElapsed;
   SearchServiceUsageInfo? _usage;
   String? _usageError;
 
@@ -109,6 +122,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       controller.dispose();
     }
     _queryController.dispose();
+    _urlController.dispose();
     super.dispose();
   }
 
@@ -191,6 +205,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
                                 _ProviderTypeChip(
                                   label: _serviceTypeName(context, spec.type),
                                   brand: spec.brand,
+                                  canFetch: WebFetchService.supportsType(
+                                    spec.type,
+                                  ),
                                   selected: spec.type == _selectedType,
                                   onTap: () => _changeType(spec.type),
                                 ),
@@ -370,6 +387,22 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           key: 'url',
           label: l10n.searchServicesFieldCustomUrlOptional,
           hint: ExaOptions.defaultUrl,
+          keyboardType: TextInputType.url,
+        ),
+      ];
+    }
+    if (service is ExaMcpOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKeyOptional,
+          obscure: true,
+        ),
+        _buildMultiKeyEntry(context),
+        field(
+          key: 'url',
+          label: l10n.searchServicesFieldCustomUrlOptional,
+          hint: ExaMcpOptions.defaultUrl,
           keyboardType: TextInputType.url,
         ),
       ];
@@ -613,6 +646,30 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         ),
       ];
     }
+    if (service is KimiOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+          validator: requiredApiKey,
+        ),
+        _buildMultiKeyEntry(context),
+        _SearchEditorDropdown(
+          key: const ValueKey('search-service-field-mode'),
+          label: l10n.searchServicesDialogSearchMode,
+          value: KimiOptions.normalizeMode(_text('mode')),
+          items: [
+            for (final mode in KimiOptions.modes)
+              (value: mode, label: KimiOptions.modeLabel(mode)),
+          ],
+          onChanged: (value) {
+            _controller('mode').text = value;
+            _markDirty();
+          },
+        ),
+      ];
+    }
     if (service is YouSearchOptions) {
       return [
         field(
@@ -799,23 +856,57 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
   Widget _buildTestCard(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final canRun = !_testing && _queryController.text.trim().isNotEmpty;
+    final canFetch = WebFetchService.supports(_currentService());
+    final fetchMode = canFetch && _fetchTestMode;
+    final controller = fetchMode ? _urlController : _queryController;
+    final canRun = !_testing && controller.text.trim().isNotEmpty;
+    final run = fetchMode ? _runTestFetch : _runTestSearch;
+    final runLabel = fetchMode
+        ? l10n.searchServiceEditorTestFetchRun
+        : l10n.searchServiceEditorTestRun;
     return SectionCard(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (canFetch) ...[
+              SegmentedTabs(
+                key: const ValueKey('search-service-test-mode'),
+                height: 36,
+                index: fetchMode ? 1 : 0,
+                tabs: [
+                  SegmentedTab(
+                    icon: Lucide.Search,
+                    label: l10n.searchServiceEditorTestModeSearch,
+                  ),
+                  SegmentedTab(
+                    icon: Lucide.FileText,
+                    label: l10n.searchServiceEditorTestModeFetch,
+                  ),
+                ],
+                onChanged: (index) => _onTestModeChanged(index == 1),
+              ),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _queryController,
-                    textInputAction: TextInputAction.search,
-                    key: const ValueKey('search-service-test-query'),
+                    controller: controller,
+                    textInputAction: fetchMode
+                        ? TextInputAction.go
+                        : TextInputAction.search,
+                    keyboardType: fetchMode ? TextInputType.url : null,
+                    autocorrect: !fetchMode,
+                    key: ValueKey(
+                      fetchMode
+                          ? 'search-service-test-url'
+                          : 'search-service-test-query',
+                    ),
                     onChanged: _onTestQueryChanged,
                     onSubmitted: (_) {
-                      if (canRun) _runTestSearch();
+                      if (canRun) run();
                     },
                     style: TextStyle(
                       fontSize: 15,
@@ -824,17 +915,19 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
                     ),
                     decoration: _inputDecoration(
                       context,
-                      hint: l10n.searchServiceEditorTestQueryHint,
+                      hint: fetchMode
+                          ? l10n.searchServiceEditorTestUrlHint
+                          : l10n.searchServiceEditorTestQueryHint,
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Tooltip(
-                  message: l10n.searchServiceEditorTestRun,
+                  message: runLabel,
                   child: _SquareActionButton(
                     enabled: canRun,
-                    semanticLabel: l10n.searchServiceEditorTestRun,
-                    onTap: _runTestSearch,
+                    semanticLabel: runLabel,
+                    onTap: run,
                     child: _testing
                         ? SizedBox.square(
                             dimension: 19,
@@ -851,12 +944,151 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
             AnimatedSize(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOutCubic,
-              child: _buildTestResult(context),
+              child: fetchMode
+                  ? _buildFetchResult(context)
+                  : _buildTestResult(context),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildFetchResult(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    if (_testing) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Text(
+          l10n.searchServiceEditorTestFetchRunning,
+          style: TextStyle(
+            fontSize: 13,
+            color: cs.onSurface.withValues(alpha: 0.68),
+          ),
+        ),
+      );
+    }
+    if (_testError != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Lucide.TriangleAlert, size: 18, color: cs.error),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SelectableText(
+                l10n.searchServiceEditorTestFetchFailed(_testError!),
+                style: TextStyle(fontSize: 13, height: 1.4, color: cs.error),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final page = _fetchResult;
+    if (page == null) return const SizedBox.shrink();
+    final host = Uri.tryParse(page.url)?.host ?? '';
+    final seconds = ((_fetchElapsed?.inMilliseconds ?? 0) / 1000)
+        .toStringAsFixed(1);
+    final characters = NumberFormat.decimalPattern(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(page.content.length);
+    return Padding(
+      key: const ValueKey('search-service-fetch-result'),
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            page.title.isEmpty ? (host.isEmpty ? page.url : host) : page.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.3,
+              fontWeight: AppFontWeights.semibold,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            [
+              if (host.isNotEmpty) host,
+              l10n.searchServiceEditorTestFetchStats(characters, seconds),
+            ].join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.58),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            page.content.length > 600
+                ? '${page.content.substring(0, 600)}…'
+                : page.content,
+            maxLines: 8,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.45,
+              color: cs.onSurface.withValues(alpha: 0.72),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onTestModeChanged(bool fetchMode) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _fetchTestMode = fetchMode;
+      _testRequestGeneration++;
+      _testing = false;
+      _testResult = null;
+      _fetchResult = null;
+      _testError = null;
+    });
+  }
+
+  Future<void> _runTestFetch() async {
+    final url = _urlController.text.trim();
+    if (_testing || url.isEmpty) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    FocusScope.of(context).unfocus();
+    final options = _currentService();
+    final requestGeneration = ++_testRequestGeneration;
+    final stopwatch = Stopwatch()..start();
+    setState(() {
+      _testing = true;
+      _fetchResult = null;
+      _testError = null;
+    });
+    try {
+      final page = widget.pageFetcher != null
+          ? await widget.pageFetcher!(url, options)
+          : await WebFetchService.fetch(
+              ProviderWebFetchSource(options),
+              url,
+              commonOptions: widget.commonOptions,
+            );
+      if (!mounted || requestGeneration != _testRequestGeneration) return;
+      setState(() {
+        _fetchResult = page;
+        _fetchElapsed = stopwatch.elapsed;
+      });
+    } catch (error) {
+      if (!mounted || requestGeneration != _testRequestGeneration) return;
+      setState(() => _testError = _cleanError(error));
+    } finally {
+      if (mounted && requestGeneration == _testRequestGeneration) {
+        setState(() => _testing = false);
+      }
+    }
   }
 
   Widget _buildTestResult(BuildContext context) {
@@ -972,12 +1204,18 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     setState(() {
       _testing = true;
       _testResult = null;
+      _fetchResult = null;
       _testError = null;
     });
     try {
       final result = widget.searchFetcher != null
           ? await widget.searchFetcher!(query, options)
-          : await SearchService.getService(options).search(
+          : await SearchService.getService(
+              options,
+              locale:
+                  context.read<SettingsProvider?>()?.effectiveLocale ??
+                  Localizations.localeOf(context),
+            ).search(
               query: query,
               commonOptions: widget.commonOptions,
               serviceOptions: options,
@@ -999,6 +1237,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _testRequestGeneration++;
       _testing = false;
       _testResult = null;
+      _fetchResult = null;
       _testError = null;
     });
   }
@@ -1061,6 +1300,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _testing = false;
       _usageLoading = false;
       _testResult = null;
+      _fetchResult = null;
       _testError = null;
       _usage = _cachedUsage(next);
       _usageError = null;
@@ -1074,6 +1314,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _testing = false;
       _usageLoading = false;
       _testResult = null;
+      _fetchResult = null;
       _testError = null;
       _usage = _cachedUsage(_currentService());
       _usageError = null;
@@ -1159,6 +1400,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     } else if (service is ExaOptions) {
       _putController('apiKey', service.apiKey);
       _putController('url', service.url);
+    } else if (service is ExaMcpOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('url', service.url);
     } else if (service is ZhipuOptions) {
       _putController('apiKey', service.apiKey);
     } else if (service is SearXNGOptions) {
@@ -1180,6 +1424,8 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _putController('apiKey', service.apiKey);
     } else if (service is OllamaOptions) {
       _putController('apiKey', service.apiKey);
+    } else if (service is DeepSeekOptions) {
+      _putController('apiKey', service.apiKey);
     } else if (service is JinaOptions) {
       _putController('apiKey', service.apiKey);
     } else if (service is PerplexityOptions) {
@@ -1187,6 +1433,8 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     } else if (service is BochaOptions) {
       _putController('apiKey', service.apiKey);
     } else if (service is DoubaoOptions) {
+      _putController('apiKey', service.apiKey);
+    } else if (service is KagiOptions) {
       _putController('apiKey', service.apiKey);
     } else if (service is SerperOptions) {
       _putController('apiKey', service.apiKey);
@@ -1229,6 +1477,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     } else if (service is ParallelOptions) {
       _putController('apiKey', service.apiKey);
       _putController('mode', service.mode);
+    } else if (service is KimiOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('mode', service.mode);
     } else if (service is YouSearchOptions) {
       _putController('apiKey', service.apiKey);
       _putController('contentMode', service.contentMode);
@@ -1248,12 +1499,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     final initial = widget.initialService;
     switch (_selectedType) {
       case 'bing_local':
-        return BingLocalOptions(
-          id: _serviceId,
-          acceptLanguage: initial is BingLocalOptions
-              ? initial.acceptLanguage
-              : 'en-US,en;q=0.9',
-        );
+        return BingLocalOptions(id: _serviceId);
       case 'duckduckgo':
         return DuckDuckGoOptions(
           id: _serviceId,
@@ -1268,6 +1514,13 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         );
       case 'exa':
         return ExaOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          url: _text('url'),
+          extraApiKeys: _extraApiKeys,
+        );
+      case 'exa_mcp':
+        return ExaMcpOptions(
           id: _serviceId,
           apiKey: _text('apiKey'),
           url: _text('url'),
@@ -1316,6 +1569,12 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
         );
+      case 'deepseek':
+        return DeepSeekOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+        );
       case 'jina':
         return JinaOptions(
           id: _serviceId,
@@ -1347,6 +1606,12 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         );
       case 'doubao':
         return DoubaoOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+        );
+      case 'kagi':
+        return KagiOptions(
           id: _serviceId,
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
@@ -1426,6 +1691,13 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
           mode: ParallelOptions.normalizeMode(_text('mode')),
+        );
+      case 'kimi':
+        return KimiOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+          mode: KimiOptions.normalizeMode(_text('mode')),
         );
       case 'you':
         return YouSearchOptions(
@@ -1966,12 +2238,14 @@ class _ProviderTypeChip extends StatefulWidget {
   const _ProviderTypeChip({
     required this.label,
     required this.brand,
+    required this.canFetch,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
   final String brand;
+  final bool canFetch;
   final bool selected;
   final VoidCallback onTap;
 
@@ -2034,6 +2308,18 @@ class _ProviderTypeChipState extends State<_ProviderTypeChip> {
                     color: widget.selected ? cs.primary : cs.onSurface,
                   ),
                 ),
+                if (widget.canFetch) ...[
+                  const SizedBox(width: 5),
+                  Icon(
+                    Lucide.FileText,
+                    size: 13,
+                    color: (widget.selected ? cs.primary : cs.onSurface)
+                        .withValues(alpha: 0.5),
+                    semanticLabel: AppLocalizations.of(
+                      context,
+                    )!.searchServicesPageWebFetchSupported,
+                  ),
+                ],
               ],
             ),
           ),
@@ -2441,6 +2727,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is DuckDuckGoOptions) return 'duckduckgo';
   if (service is TavilyOptions) return 'tavily';
   if (service is ExaOptions) return 'exa';
+  if (service is ExaMcpOptions) return 'exa_mcp';
   if (service is ZhipuOptions) return 'zhipu';
   if (service is SearXNGOptions) return 'searxng';
   if (service is LinkUpOptions) return 'linkup';
@@ -2448,9 +2735,11 @@ String _typeForService(SearchServiceOptions service) {
   if (service is MetasoOptions) return 'metaso';
   if (service is JinaOptions) return 'jina';
   if (service is OllamaOptions) return 'ollama';
+  if (service is DeepSeekOptions) return 'deepseek';
   if (service is PerplexityOptions) return 'perplexity';
   if (service is BochaOptions) return 'bocha';
   if (service is DoubaoOptions) return 'doubao';
+  if (service is KagiOptions) return 'kagi';
   if (service is SerperOptions) return 'serper';
   if (service is QueritOptions) return 'querit';
   if (service is GrokOptions) return 'grok';
@@ -2459,6 +2748,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is TinyFishOptions) return 'tinyfish';
   if (service is AnySearchOptions) return 'anysearch';
   if (service is ParallelOptions) return 'parallel';
+  if (service is KimiOptions) return 'kimi';
   if (service is YouSearchOptions) return 'you';
   if (service is KelivoOptions) return 'kelivo';
   return 'bing_local';
@@ -2479,6 +2769,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return TavilyOptions(id: id, apiKey: '');
     case 'exa':
       return ExaOptions(id: id, apiKey: '');
+    case 'exa_mcp':
+      return ExaMcpOptions(id: id);
     case 'zhipu':
       return ZhipuOptions(id: id, apiKey: '');
     case 'searxng':
@@ -2493,12 +2785,16 @@ SearchServiceOptions _defaultService(String type, String id) {
       return JinaOptions(id: id, apiKey: '');
     case 'ollama':
       return OllamaOptions(id: id, apiKey: '');
+    case 'deepseek':
+      return DeepSeekOptions(id: id, apiKey: '');
     case 'perplexity':
       return PerplexityOptions(id: id, apiKey: '');
     case 'bocha':
       return BochaOptions(id: id, apiKey: '');
     case 'doubao':
       return DoubaoOptions(id: id, apiKey: '');
+    case 'kagi':
+      return KagiOptions(id: id, apiKey: '');
     case 'serper':
       return SerperOptions(id: id, apiKey: '');
     case 'querit':
@@ -2515,6 +2811,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return AnySearchOptions(id: id, apiKey: '');
     case 'parallel':
       return ParallelOptions(id: id, apiKey: '');
+    case 'kimi':
+      return KimiOptions(id: id, apiKey: '');
     case 'you':
       return YouSearchOptions(id: id, apiKey: '');
     case 'kelivo':
@@ -2535,6 +2833,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameTavily;
     case 'exa':
       return l10n.searchServiceNameExa;
+    case 'exa_mcp':
+      return l10n.searchServiceNameExaMcp;
     case 'zhipu':
       return l10n.searchServiceNameZhipu;
     case 'searxng':
@@ -2549,12 +2849,16 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameJina;
     case 'ollama':
       return l10n.searchServiceNameOllama;
+    case 'deepseek':
+      return l10n.searchServiceNameDeepSeek;
     case 'perplexity':
       return l10n.searchServiceNamePerplexity;
     case 'bocha':
       return l10n.searchServiceNameBocha;
     case 'doubao':
       return l10n.searchServiceNameDoubao;
+    case 'kagi':
+      return l10n.searchServiceNameKagi;
     case 'serper':
       return l10n.searchServiceNameSerper;
     case 'querit':
@@ -2571,6 +2875,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameAnySearch;
     case 'parallel':
       return l10n.searchServiceNameParallel;
+    case 'kimi':
+      return l10n.searchServiceNameKimi;
     case 'you':
       return l10n.searchServiceNameYou;
     case 'kelivo':
@@ -2585,6 +2891,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'duckduckgo', brand: 'duckduckgo'),
   (type: 'tavily', brand: 'tavily'),
   (type: 'exa', brand: 'exa'),
+  (type: 'exa_mcp', brand: 'exa'),
   (type: 'zhipu', brand: 'zhipu'),
   (type: 'searxng', brand: 'searxng'),
   (type: 'linkup', brand: 'linkup'),
@@ -2592,9 +2899,11 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'metaso', brand: 'metaso'),
   (type: 'jina', brand: 'jina'),
   (type: 'ollama', brand: 'ollama'),
+  (type: 'deepseek', brand: 'deepseek'),
   (type: 'perplexity', brand: 'perplexity'),
   (type: 'bocha', brand: 'bocha'),
   (type: 'doubao', brand: 'doubao'),
+  (type: 'kagi', brand: 'kagi'),
   (type: 'serper', brand: 'serper'),
   (type: 'querit', brand: 'querit'),
   (type: 'grok', brand: 'grok'),
@@ -2603,6 +2912,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'tinyfish', brand: 'tinyfish'),
   (type: 'anysearch', brand: 'anysearch'),
   (type: 'parallel', brand: 'parallel'),
+  (type: 'kimi', brand: 'kimi'),
   (type: 'you', brand: 'you'),
 ];
 

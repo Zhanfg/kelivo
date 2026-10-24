@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/workspace/workspace_binding_actions.dart';
 import 'package:Kelivo/core/services/workspace/shell_output_buffer.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
@@ -150,6 +151,7 @@ String workspaceToolTitle(AppLocalizations l10n, String toolName) {
   return switch (toolName) {
     'shell' => l10n.workspaceToolTitleShell,
     'read_file' => l10n.workspaceToolTitleReadFile,
+    'view_image' => l10n.workspaceToolTitleViewImage,
     'write_file' => l10n.workspaceToolTitleWriteFile,
     'edit_file' => l10n.workspaceToolTitleEditFile,
     'list_dir' => l10n.workspaceToolTitleListDir,
@@ -163,6 +165,7 @@ IconData workspaceToolIcon(String toolName) {
   return switch (toolName) {
     'shell' => Lucide.Terminal,
     'read_file' => Lucide.FileText,
+    'view_image' => Lucide.Image,
     'write_file' => Lucide.FilePlus,
     'edit_file' => Lucide.FilePen,
     'list_dir' => Lucide.FolderOpen,
@@ -275,12 +278,7 @@ String workspaceShellOutput({
   );
 }
 
-Color _workspaceQuietFill(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return Theme.of(
-    context,
-  ).colorScheme.onSurface.withValues(alpha: isDark ? 0.06 : 0.04);
-}
+Color _workspaceQuietFill(BuildContext context) => chatQuietFill(context);
 
 String workspaceCodeFontFamily(BuildContext context) {
   try {
@@ -951,7 +949,7 @@ class WorkspaceToolCardBody extends StatelessWidget {
     final extra = pending == null ? _extra(context, liveRun, meta) : null;
     final showEnv =
         meta?.status == 'error' && meta?.code == 'environment_not_ready';
-    final summary = pending == null
+    final summary = pending == null && part.toolName != 'view_image'
         ? _WorkspaceToolSummary(part: part, meta: meta, run: liveRun)
         : null;
     final pendingBlock = pending == null
@@ -1119,15 +1117,14 @@ Future<void> allowAllWorkspaceToolsInChat(
       final conversation = chat.getConversation(id);
       if (conversation != null) {
         final binding = WorkspaceBinding.fromExtras(conversation.extras);
-        if (binding.isBound) {
-          await chat.updateConversationExtras(id, (extras) {
-            return WorkspaceBinding(
-              workspaceId: binding.workspaceId,
-              cwd: binding.cwd,
-              toolsUsed: binding.toolsUsed,
-              allowAll: true,
-            ).applyTo(extras);
-          });
+        if (binding.isBound && binding.workspaceId == request.workspaceId) {
+          await setConversationWorkspaceAllowAll(
+            chat,
+            conversationId: id,
+            workspaceId: binding.workspaceId!,
+            allowAll: true,
+            approvals: approval,
+          );
         }
       }
     } catch (_) {}
