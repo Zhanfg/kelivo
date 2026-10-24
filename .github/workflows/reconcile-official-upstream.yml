@@ -1,0 +1,110 @@
+name: Reconcile Official Upstream (Guarded)
+
+on:
+  push:
+    branches:
+      - sync/upstream-full-20261024
+    paths:
+      - .github/workflows/reconcile-official-upstream.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: upstream-reconcile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    if: github.repository == 'Zhanfg/kelivo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout isolated integration candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch official upstream without modifying main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add official https://github.com/Chevey339/kelivo.git
+          git fetch --no-tags official master
+          mkdir -p build/upstream-integration
+          TARGET="199647a5d718ed47783dde405007e4c080efdec5"
+          git cat-file -e "$TARGET^{commit}"
+          git merge-base --is-ancestor "$TARGET" official/master
+          printf "Fork candidate: %s\nUpstream target: %s\n" "$(git rev-parse HEAD)" "$TARGET" > build/upstream-integration/baselines.txt
+          git rev-list --left-right --count "HEAD...$TARGET" > build/upstream-integration/ahead-behind.txt
+
+      - name: Merge upstream conservatively on runner
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="199647a5d718ed47783dde405007e4c080efdec5"
+          if git merge --no-commit --no-ff -s ort -X ours "$TARGET" > build/upstream-integration/merge.log 2>&1; then
+            printf '%s\n' "merge completed; review and validation required" > build/upstream-integration/status.txt
+          else
+            printf '%s\n' "merge has unresolved conflicts; no publication" > build/upstream-integration/status.txt
+            git diff --name-only --diff-filter=U > build/upstream-integration/unresolved-paths.txt
+            cat build/upstream-integration/status.txt
+            cat build/upstream-integration/unresolved-paths.txt
+            exit 1
+          fi
+          git diff --cached --name-only > build/upstream-integration/changed-paths.txt
+          # The fork must keep these product modules; an upstream removal is not acceptable.
+          test -f lib/features/agent/services/agent_task_runner.dart
+          test -f lib/features/agent/services/agent_runtime_bootstrap.dart
+          test -d lib/features/story
+          test -d lib/features/chat
+          test -f assets/agent_runtime/kelivo-control.ts
+          git diff --cached --check
+          git commit -m "merge(upstream): reconcile official Kelivo through 2026-10-24"
+          echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Flutter verification
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+
+      - name: Analyze and test full integrated candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p lib/secrets
+          printf "const String siliconflowFallbackKey = '';\n" > lib/secrets/fallback.dart
+          flutter pub get
+          flutter gen-l10n
+          dart analyze --fatal-infos lib test integration_test
+          flutter test test/features/agent
+          flutter test test/features/story
+          # Four test shards use the repository's established CI test runner.
+          for shard in 0 1 2 3; do
+            SHARD="$shard" SHARD_COUNT=4 bash .github/scripts/run_test_shard.sh
+          done
+
+      - name: Publish only tested candidate to isolated branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git push origin HEAD:refs/heads/sync/upstream-full-20261024
+
+      - name: Publish diagnostic artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kelivo-upstream-merge-diagnostics
+          path: build/upstream-integration/
+          if-no-files-found: warn
+          retention-days: 14
