@@ -123,7 +123,9 @@ class AgentTaskRunner {
       await tasks.setPhase(
         taskId,
         continuing ? AgentTaskPhase.recovering : AgentTaskPhase.preparing,
-        currentStep: continuing ? 'Restoring saved Agent session' : 'Preparing task',
+        currentStep: continuing
+            ? 'Restoring saved Agent session'
+            : 'Preparing task',
       );
 
       final runtimeHandle = await runtimeBootstrap.ensureReady(
@@ -184,8 +186,8 @@ class AgentTaskRunner {
       final permissionMode = agentSettings.permissionMode;
       // A recovered model must request approval before new mutations, even
       // when the original task was created in automatic execution mode.
-      final executionPermission = continuing &&
-              permissionMode != AgentPermissionMode.readOnly
+      final executionPermission =
+          continuing && permissionMode != AgentPermissionMode.readOnly
           ? AgentPermissionMode.ask
           : permissionMode;
       final providerKey =
@@ -331,9 +333,7 @@ class AgentTaskRunner {
       await journal.append(
         taskId,
         AgentTaskEventKind.checkpoint,
-        payload: const <String, dynamic>{
-          'kind': 'prompt_dispatch_started',
-        },
+        payload: const <String, dynamic>{'kind': 'prompt_dispatch_started'},
       );
       final promptResponse = await session.prompt(
         continuing

@@ -190,17 +190,18 @@ class PiRpcSession {
   }
 
   Future<Map<String, dynamic>> setSessionName(String name) {
-    return send(<String, dynamic>{
-      'type': 'set_session_name',
-      'name': name,
-    });
+    return send(<String, dynamic>{'type': 'set_session_name', 'name': name});
   }
 
   Future<Map<String, dynamic>> setSubagentSubscription({
     String level = 'events',
   }) {
     if (!{'off', 'progress', 'events'}.contains(level)) {
-      throw ArgumentError.value(level, 'level', 'Invalid subagent subscription');
+      throw ArgumentError.value(
+        level,
+        'level',
+        'Invalid subagent subscription',
+      );
     }
     return send(<String, dynamic>{
       'type': 'set_subagent_subscription',
@@ -224,18 +225,12 @@ class PiRpcSession {
     return send(const <String, dynamic>{'type': 'clear_queue'});
   }
 
-  Future<Map<String, dynamic>> bash(
-    String command, {
-    String? id,
-  }) {
-    return send(
-      <String, dynamic>{
-        'type': 'bash',
-        'command': command,
-        if (id != null) 'id': id,
-      },
-      timeout: const Duration(minutes: 10),
-    );
+  Future<Map<String, dynamic>> bash(String command, {String? id}) {
+    return send(<String, dynamic>{
+      'type': 'bash',
+      'command': command,
+      if (id != null) 'id': id,
+    }, timeout: const Duration(minutes: 10));
   }
 
   Future<Map<String, dynamic>> getSessionStats() {

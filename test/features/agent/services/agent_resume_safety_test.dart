@@ -39,9 +39,7 @@ void main() {
     final result = AgentResumeSafety.inspect(<AgentTaskEvent>[
       record(
         AgentTaskEventKind.checkpoint,
-        payload: const <String, dynamic>{
-          'kind': 'prompt_dispatch_started',
-        },
+        payload: const <String, dynamic>{'kind': 'prompt_dispatch_started'},
       ),
     ]);
     expect(result.action, AgentResumeAction.continueSession);
