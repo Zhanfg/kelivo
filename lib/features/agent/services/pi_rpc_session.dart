@@ -65,23 +65,14 @@ class PiRpcSession {
           },
         );
 
-    final arguments = <String>[
-      executable,
-      '--mode',
-      // OMP's rpc-ui transport exposes ask/approval dialogs to the Android
-      // interaction broker; plain rpc leaves tool UI unavailable.
-      'rpc-ui',
-      '--session-dir',
-      sessionDir,
-      if (resumeExisting) '--continue',
-      '--approval-mode',
-      approvalMode,
-      if (appendSystemPrompt != null && appendSystemPrompt.isNotEmpty) ...[
-        '--append-system-prompt',
-        appendSystemPrompt,
-      ],
-      ...extraArgs,
-    ];
+    final arguments = buildLaunchArguments(
+      executable: executable,
+      sessionDir: sessionDir,
+      approvalMode: approvalMode,
+      resumeExisting: resumeExisting,
+      appendSystemPrompt: appendSystemPrompt,
+      extraArgs: extraArgs,
+    );
     final launch =
         'mkdir -p ${_quote(sessionDir)}; exec ${arguments.map(_quote).join(' ')}';
 
@@ -146,6 +137,34 @@ class PiRpcSession {
       await session.close();
       rethrow;
     }
+  }
+
+  /// Pure launch-plan builder shared by the real launcher and regression
+  /// tests. A recovering task must explicitly keep both the prior transcript
+  /// and tool UI interaction surface.
+  static List<String> buildLaunchArguments({
+    required String executable,
+    required String sessionDir,
+    required String approvalMode,
+    bool resumeExisting = false,
+    String? appendSystemPrompt,
+    List<String> extraArgs = const <String>[],
+  }) {
+    return <String>[
+      executable,
+      '--mode',
+      'rpc-ui',
+      '--session-dir',
+      sessionDir,
+      if (resumeExisting) '--continue',
+      '--approval-mode',
+      approvalMode,
+      if (appendSystemPrompt != null && appendSystemPrompt.isNotEmpty) ...[
+        '--append-system-prompt',
+        appendSystemPrompt,
+      ],
+      ...extraArgs,
+    ];
   }
 
   Future<Map<String, dynamic>> send(
