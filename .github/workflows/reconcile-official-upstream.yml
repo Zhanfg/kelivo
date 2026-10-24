@@ -91,7 +91,9 @@ jobs:
           git diff --cached --check -- . ':(exclude)dependencies/**' ':(exclude)ios/sandbox/patches/**'
           test -f lib/features/agent/services/agent_task_runner.dart
           test -f lib/features/agent/services/agent_runtime_bootstrap.dart
-          test -d lib/features/story
+          test -f lib/core/providers/world_book_provider.dart
+          test -d assets/story_skills
+          grep -q 'storyMode' lib/features/home/widgets/chat_input_section.dart
           test -d lib/features/chat
           test -f assets/agent_runtime/kelivo-control.ts
           git commit -m "merge(upstream): reconcile official Kelivo through 2026-10-24"
