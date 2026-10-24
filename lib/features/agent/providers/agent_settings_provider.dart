@@ -4,6 +4,12 @@ import '../../../core/database/business_preferences.dart';
 
 enum AgentPermissionMode { ask, auto, planFirst, readOnly }
 
+// Direct commands are a separate RPC execution path from model tools.
+// Enforce the same read-only boundary on both paths.
+extension AgentPermissionExecution on AgentPermissionMode {
+  bool get allowsDirectShell => this != AgentPermissionMode.readOnly;
+}
+
 extension AgentPermissionModeCodec on AgentPermissionMode {
   static AgentPermissionMode fromStorage(String? value) {
     return AgentPermissionMode.values.firstWhere(
@@ -50,10 +56,11 @@ class AgentSettingsProvider extends ChangeNotifier {
       preferences.getString(permissionModeKey),
     );
     _showToolOutput = preferences.getBool(showToolOutputKey) ?? true;
-    _maxParallelAgents =
-        (preferences.getInt(maxParallelAgentsKey) ?? 3).clamp(1, 4);
-    _subagentIsolation =
-        preferences.getBool(subagentIsolationKey) ?? true;
+    _maxParallelAgents = (preferences.getInt(maxParallelAgentsKey) ?? 3).clamp(
+      1,
+      4,
+    );
+    _subagentIsolation = preferences.getBool(subagentIsolationKey) ?? true;
     _modelProvider = preferences.getString(modelProviderKey);
     _modelId = preferences.getString(modelIdKey);
     notifyListeners();
@@ -96,7 +103,10 @@ class AgentSettingsProvider extends ChangeNotifier {
     await loaded;
     _modelProvider = providerKey;
     _modelId = modelId;
-    await preferences.setString(AgentSettingsProvider.modelProviderKey, providerKey);
+    await preferences.setString(
+      AgentSettingsProvider.modelProviderKey,
+      providerKey,
+    );
     await preferences.setString(AgentSettingsProvider.modelIdKey, modelId);
     notifyListeners();
   }

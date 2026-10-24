@@ -136,6 +136,11 @@ class AgentTaskJournal extends ChangeNotifier {
   }
 
   Future<File> _journalFile(String taskId, {bool create = true}) async {
+    // Journal task IDs must remain a single private directory component.
+    if (taskId.length > 128 ||
+        !RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$').hasMatch(taskId)) {
+      throw ArgumentError.value(taskId, 'taskId', 'Invalid agent task ID');
+    }
     final root =
         _injectedRootDirectory ?? await AppDirectories.getAgentTasksDirectory();
     final dir = Directory('${root.path}/$taskId');

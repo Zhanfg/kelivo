@@ -56,6 +56,9 @@ class AgentTaskRunner {
 
   late final Future<void> recovery;
   final Map<String, PiRpcSession> _sessions = <String, PiRpcSession>{};
+  final Map<String, AgentPermissionMode> _sessionPermissions =
+      <String, AgentPermissionMode>{};
+  final Map<String, Set<String>> _sessionSecrets = <String, Set<String>>{};
   final Set<String> _running = <String>{};
   final Set<String> _cancelled = <String>{};
   final Map<String, String> _toolOutputSnapshots = <String, String>{};
@@ -112,9 +115,7 @@ class AgentTaskRunner {
         await journal.append(
           taskId,
           AgentTaskEventKind.notice,
-          payload: const <String, dynamic>{
-            'kind': 'github_cli_unavailable',
-          },
+          payload: const <String, dynamic>{'kind': 'github_cli_unavailable'},
         );
       }
       final execution = await environment.loadExecutionConfig();
@@ -140,12 +141,18 @@ class AgentTaskRunner {
         conversation: conversation,
         assistant: assistant,
       );
-      final providerKey = agentSettings.hasModelOverride
-          ? agentSettings.modelProvider
-          : inheritedModel.providerKey;
-      final modelId = agentSettings.hasModelOverride
-          ? agentSettings.modelId
-          : inheritedModel.modelId;
+      final pinnedModel = task.pinnedModel;
+      final permissionMode = agentSettings.permissionMode;
+      final providerKey =
+          pinnedModel?.providerKey ??
+          (agentSettings.hasModelOverride
+              ? agentSettings.modelProvider
+              : inheritedModel.providerKey);
+      final modelId =
+          pinnedModel?.modelId ??
+          (agentSettings.hasModelOverride
+              ? agentSettings.modelId
+              : inheritedModel.modelId);
       if (providerKey == null || modelId == null) {
         throw StateError('agent_model_not_configured');
       }
@@ -156,13 +163,17 @@ class AgentTaskRunner {
         conversationId: task.conversationId,
       );
       final modelEndpoint = await modelBridge.start();
+      final executionSecrets = <String>{
+        ...secretValues.values,
+        modelEndpoint.token,
+      };
       final modelConfigFiles = await modelBridge.writePiConfig(
         taskDirectory: taskDir,
         endpoint: modelEndpoint,
       );
       final engineConfigFile = await _writeEngineConfig(
         taskDir,
-        permissionMode: agentSettings.permissionMode,
+        permissionMode: permissionMode,
         maxParallelAgents: agentSettings.maxParallelAgents,
         subagentIsolation: agentSettings.subagentIsolation,
         githubEnabled: githubCli != null,
@@ -202,13 +213,13 @@ class AgentTaskRunner {
         cwd: '/workspace',
         sessionDir: '/kelivo-agent-task/pi-session',
         sessionName: task.title.isEmpty ? 'KELIVO Agent' : task.title,
-        approvalMode: _ompApprovalMode(agentSettings.permissionMode),
+        approvalMode: _ompApprovalMode(permissionMode),
         appendSystemPrompt: materializedContext.guestPromptFile,
         extraArgs: <String>[
           '--model',
           'kelivo/current',
           '--tools',
-          _ompTools(agentSettings.permissionMode),
+          _ompTools(permissionMode),
         ],
         mounts: mounts,
         environment: <String, String>{
@@ -216,7 +227,7 @@ class AgentTaskRunner {
           'PI_CODING_AGENT_DIR': '/home/kelivo/.pi/agent',
           'PI_TELEMETRY': '0',
           'PI_SKIP_VERSION_CHECK': '1',
-          'KELIVO_AGENT_PERMISSION_MODE': agentSettings.permissionMode.name,
+          'KELIVO_AGENT_PERMISSION_MODE': permissionMode.name,
           'KELIVO_AGENT_BRIDGE_KEY': modelEndpoint.token,
           'OMP_WORKTREE_DIR': '/kelivo-agent-task/worktrees',
           if (githubCli != null)
@@ -225,6 +236,8 @@ class AgentTaskRunner {
         },
       );
       _sessions[taskId] = session;
+      _sessionPermissions[taskId] = permissionMode;
+      _sessionSecrets[taskId] = executionSecrets;
       final subagentSubscription = await session.setSubagentSubscription(
         level: 'events',
       );
@@ -242,7 +255,7 @@ class AgentTaskRunner {
                   taskId,
                   session!,
                   event,
-                  secrets: secretValues.values,
+                  secrets: executionSecrets,
                 );
                 if (ended && !agentEnd.isCompleted) agentEnd.complete();
               })
@@ -256,9 +269,7 @@ class AgentTaskRunner {
         onDone: () {
           if (!agentEnd.isCompleted && !_cancelled.contains(taskId)) {
             agentEnd.completeError(
-              StateError(
-                session?.exitDescription ?? 'agent_rpc_closed',
-              ),
+              StateError(session?.exitDescription ?? 'agent_rpc_closed'),
             );
           }
         },
@@ -319,10 +330,10 @@ class AgentTaskRunner {
       }
       await modelBridge?.close();
       _sessions.remove(taskId);
+      _sessionPermissions.remove(taskId);
+      _sessionSecrets.remove(taskId);
       _running.remove(taskId);
-      _toolOutputSnapshots.removeWhere(
-        (key, _) => key.startsWith('$taskId:'),
-      );
+      _toolOutputSnapshots.removeWhere((key, _) => key.startsWith('$taskId:'));
       _subagentProgressSnapshots.removeWhere(
         (key, _) => key.startsWith('$taskId:'),
       );
@@ -333,7 +344,13 @@ class AgentTaskRunner {
     final text = command.trim();
     if (text.isEmpty) return false;
     final session = _sessions[taskId];
-    if (session == null) return false;
+    // A direct UI command bypasses OMP's advertised tool list: guard it in
+    // the host, using the permission snapshot from session creation.
+    if (session == null ||
+        _sessionPermissions[taskId]?.allowsDirectShell != true) {
+      return false;
+    }
+    final secrets = _sessionSecrets[taskId] ?? const <String>{};
     final id = 'shell-${DateTime.now().microsecondsSinceEpoch}';
     await journal.append(
       taskId,
@@ -342,12 +359,14 @@ class AgentTaskRunner {
         'tool': 'bash',
         'toolCallId': id,
         'direct': true,
-        'args': <String, dynamic>{'command': text},
+        'args': <String, dynamic>{'command': _redact(text, secrets)},
       },
     );
     final response = await session.bash(text, id: id);
     final data = response['data'];
-    final map = data is Map ? data.cast<String, dynamic>() : const <String, dynamic>{};
+    final map = data is Map
+        ? data.cast<String, dynamic>()
+        : const <String, dynamic>{};
     final output = map['output']?.toString() ?? '';
     await journal.append(
       taskId,
@@ -357,7 +376,8 @@ class AgentTaskRunner {
         'toolCallId': id,
         'direct': true,
         'isError': (map['exitCode'] as num?)?.toInt() != 0,
-        if (output.isNotEmpty) 'output': _limit(output, 16000),
+        if (output.isNotEmpty)
+          'output': _redact(_limit(output, 16000), secrets),
         if (map['exitCode'] != null) 'exitCode': map['exitCode'],
       },
     );
@@ -374,7 +394,13 @@ class AgentTaskRunner {
       await journal.append(
         taskId,
         AgentTaskEventKind.note,
-        payload: <String, dynamic>{'kind': 'steer', 'text': _limit(text, 4000)},
+        payload: <String, dynamic>{
+          'kind': 'steer',
+          'text': _redact(
+            _limit(text, 4000),
+            _sessionSecrets[taskId] ?? const <String>{},
+          ),
+        },
       );
       return true;
     }
@@ -393,7 +419,10 @@ class AgentTaskRunner {
         AgentTaskEventKind.note,
         payload: <String, dynamic>{
           'kind': 'follow_up',
-          'text': _limit(text, 4000),
+          'text': _redact(
+            _limit(text, 4000),
+            _sessionSecrets[taskId] ?? const <String>{},
+          ),
         },
       );
       return true;
@@ -522,7 +551,8 @@ class AgentTaskRunner {
       case 'tool_execution_end':
         final tool = event['toolName']?.toString() ?? 'tool';
         final toolCallId = event['toolCallId']?.toString() ?? '';
-        final hadStreamingOutput = toolCallId.isNotEmpty &&
+        final hadStreamingOutput =
+            toolCallId.isNotEmpty &&
             _toolOutputSnapshots.remove('$taskId:$toolCallId') != null;
         if (tool == 'kelivo_plan') break;
         final output = agentSettings.showToolOutput && !hadStreamingOutput
@@ -606,9 +636,7 @@ class AgentTaskRunner {
             ? raw.cast<String, dynamic>()
             : <String, dynamic>{};
         final nested = payload['event'];
-        final nestedType = nested is Map
-            ? nested['type']?.toString()
-            : null;
+        final nestedType = nested is Map ? nested['type']?.toString() : null;
         if ({
           'tool_execution_start',
           'tool_execution_end',
@@ -666,7 +694,10 @@ class AgentTaskRunner {
           payload: <String, dynamic>{
             'kind': 'extension_error',
             if (event['error'] != null)
-              'message': _redact(_limit(event['error'].toString(), 4000), secrets),
+              'message': _redact(
+                _limit(event['error'].toString(), 4000),
+                secrets,
+              ),
           },
         );
       case 'extension_ui_request':
@@ -866,4 +897,3 @@ class AgentTaskRunner {
     return output;
   }
 }
-
