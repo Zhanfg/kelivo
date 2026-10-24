@@ -1,0 +1,121 @@
+name: Kelivo Upstream Integration Probe
+
+on:
+  push:
+    branches:
+      - sync/upstream-agent-20261024
+    paths:
+      - .github/workflows/kelivo-upstream-sync.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kelivo-upstream-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    if: github.repository == 'Zhanfg/kelivo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch pinned official upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote add official https://github.com/Chevey339/kelivo.git
+          git fetch --no-tags official master
+          TARGET=199647a5d718ed47783dde405007e4c080efdec5
+          git cat-file -e "$TARGET^{commit}"
+          git merge-base --is-ancestor "$TARGET" refs/remotes/official/master
+          mkdir -p build/upstream-probe
+          printf 'Fork baseline: %s\nOfficial pinned target: %s\n' "$(git rev-parse HEAD)" "$TARGET" > build/upstream-probe/baseline.txt
+
+      - name: Opportunistically port isolated upstream fixes
+        id: cherry
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'kelivo-upstream-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          ported=false
+          for sha in \
+            0169e760c0c369eaebfc1c55539f113a16992a25 \
+            9969ec9f9c6f5b548bfb1801e84ef53b1133b7ef
+          do
+            before="$(git rev-parse HEAD)"
+            if git cherry-pick -x "$sha" > build/upstream-probe/cherry-last.log 2>&1; then
+              echo "$sha PORTED $(git rev-parse HEAD)" >> build/upstream-probe/cherry-picks.txt
+              ported=true
+            else
+              git cherry-pick --abort 2>/dev/null || true
+              git reset --hard "$before"
+              echo "$sha DEFERRED (requires manual conflict/dependency review)" >> build/upstream-probe/cherry-picks.txt
+              cat build/upstream-probe/cherry-last.log >> build/upstream-probe/cherry-errors.txt
+            fi
+          done
+          echo "ported=$ported" >> "$GITHUB_OUTPUT"
+
+      - name: Probe full upstream merge without publishing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET=199647a5d718ed47783dde405007e4c080efdec5
+          if git merge --no-commit --no-ff "$TARGET" > build/upstream-probe/merge.log 2>&1; then
+            echo 'MERGE CLEAN (not published; CI and review required)' > build/upstream-probe/merge-status.txt
+          else
+            echo 'MERGE REQUIRES MANUAL RESOLUTION' > build/upstream-probe/merge-status.txt
+            git diff --name-only --diff-filter=U > build/upstream-probe/conflicts.txt
+          fi
+          if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+            git merge --abort
+          fi
+          if test -s build/upstream-probe/merge-status.txt; then
+            cat build/upstream-probe/merge-status.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if test -s build/upstream-probe/conflicts.txt; then
+            printf '\nUnresolved paths: %s\n' "$(wc -l < build/upstream-probe/conflicts.txt)" >> "$GITHUB_STEP_SUMMARY"
+            head -120 build/upstream-probe/conflicts.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Setup Flutter for candidate verification
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+
+      - name: Validate candidate source
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          dart analyze --fatal-infos lib test integration_test
+          flutter test test/features/agent/services/agent_task_journal_test.dart
+
+      - name: Publish only verified cherry-picks to review branch
+        if: steps.cherry.outputs.ported == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git push origin HEAD:refs/heads/sync/upstream-agent-20261024
+
+      - name: Upload merge and cherry-pick diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kelivo-upstream-probe-20261024
+          path: build/upstream-probe/
+          if-no-files-found: warn
+          retention-days: 14
