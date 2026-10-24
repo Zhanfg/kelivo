@@ -9,6 +9,7 @@ import '../models/agent_task.dart';
 import '../providers/agent_interaction_broker.dart';
 import '../providers/agent_task_provider.dart';
 import '../services/agent_task_journal.dart';
+import '../services/agent_resume_safety.dart';
 import '../services/agent_task_runner.dart';
 
 class AgentTaskDetailPage extends StatefulWidget {
@@ -63,6 +64,47 @@ class _AgentTaskDetailPageState extends State<AgentTaskDetailPage> {
     }
   }
 
+  Future<void> _resumeTask(AgentTask task) async {
+    final runner = context.read<AgentTaskRunner>();
+    final events = await context.read<AgentTaskJournal>().read(task.id);
+    final decision = AgentResumeSafety.inspect(events);
+    if (decision.action == AgentResumeAction.blocked) {
+      if (!mounted) return;
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(_zh ? '检查未完成操作' : 'Review unfinished operations'),
+          content: Text(
+            _zh
+                ? '上次中断时可能有命令、文件修改或外部操作尚未完成。'
+                      '请先检查上方活动记录和实际工作区，确认之前的操作是否已经生效。'
+                      '确认后将从已保存会话继续，并对后续写入操作重新要求批准；'
+                      '这不能保证外部操作恰好执行一次。'
+                : 'A tool call, file edit or external operation may have been '
+                      'in flight when the task stopped. Review the activity '
+                      'history and the actual workspace before continuing. '
+                      'The saved session will be continued with approvals for '
+                      'new mutations; this is not exactly-once execution.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(_zh ? '取消' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(_zh ? '我已检查，继续' : 'Reviewed, continue'),
+            ),
+          ],
+        ),
+      );
+      if (approved != true || !mounted) return;
+      final acknowledged = await runner.authorizeRecoveryAfterReview(task.id);
+      if (!acknowledged) return;
+    }
+    await runner.run(task.id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final task = context.watch<AgentTaskProvider>().byId(widget.taskId);
@@ -106,9 +148,7 @@ class _AgentTaskDetailPageState extends State<AgentTaskDetailPage> {
           else if (task.canResume)
             IconButton(
               tooltip: _zh ? '继续任务' : 'Resume task',
-              onPressed: () => unawaited(
-                context.read<AgentTaskRunner>().run(task.id),
-              ),
+              onPressed: () => unawaited(_resumeTask(task)),
               icon: const Icon(Lucide.RotateCcw),
             ),
         ],
@@ -124,6 +164,18 @@ class _AgentTaskDetailPageState extends State<AgentTaskDetailPage> {
                   padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
                   children: [
                     _GoalCard(task: task, zh: _zh),
+                    if (task.lastError != null &&
+                        task.lastError!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        task.lastError!.contains('agent_resume_')
+                            ? (_zh
+                                  ? '恢复已暂停：需要确认上次操作和已保存的会话。'
+                                  : 'Recovery paused: review the last operation and saved session.')
+                            : task.lastError!,
+                        style: TextStyle(color: cs.error, fontSize: 12),
+                      ),
+                    ],
                     if (interaction != null) ...[
                       const SizedBox(height: 10),
                       _ApprovalCard(request: interaction, zh: _zh),
