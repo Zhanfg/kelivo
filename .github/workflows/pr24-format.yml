@@ -1,0 +1,46 @@
+name: PR24 Canonical Agent Dart Format
+
+on:
+  push:
+    branches: [feature/agent-safe-session-resume-20261024]
+    paths:
+      - .github/workflows/pr24-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.repository == 'Zhanfg/kelivo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/agent-safe-session-resume-20261024
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+      - name: Apply Dart formatter and commit canonical output
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart format --output=write \
+            lib/features/agent/services/agent_resume_safety.dart \
+            lib/features/agent/services/agent_task_runner.dart \
+            lib/features/agent/services/pi_rpc_session.dart \
+            lib/features/agent/ui/agent_task_detail_page.dart \
+            test/features/agent/services/agent_resume_safety_test.dart
+          git diff --check
+          if git diff --quiet -- lib/features/agent test/features/agent; then
+            echo "Files already formatted"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/features/agent test/features/agent
+          git commit -m "style(agent): apply canonical Flutter Dart formatting"
+          git push origin HEAD:refs/heads/feature/agent-safe-session-resume-20261024
