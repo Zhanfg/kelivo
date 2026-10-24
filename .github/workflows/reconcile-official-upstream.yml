@@ -46,50 +46,53 @@ jobs:
           printf "Fork candidate: %s\nUpstream target: %s\n" "$(git rev-parse HEAD)" "$TARGET" > build/upstream-integration/baselines.txt
           git rev-list --left-right --count "HEAD...$TARGET" > build/upstream-integration/ahead-behind.txt
 
-      - name: Integrate full upstream or verified standalone fixes
+      - name: Reconcile pinned upstream with reviewed conflict policy
         id: merge
         shell: bash
         run: |
           set -euo pipefail
           TARGET="199647a5d718ed47783dde405007e4c080efdec5"
-          if git merge --no-commit --no-ff -s ort -X ours "$TARGET" > build/upstream-integration/merge.log 2>&1; then
-            printf '%s\n' "full upstream merge candidate staged; verification required" > build/upstream-integration/status.txt
-            git diff --cached --name-only > build/upstream-integration/changed-paths.txt
-            git diff --cached --check
-            git commit -m "merge(upstream): reconcile official Kelivo through 2026-10-24"
-          else
-            printf '%s\n' "full merge has unresolved conflicts; attempt isolated patches only" > build/upstream-integration/status.txt
-            echo "Full merge diagnostics:"
-            cat build/upstream-integration/merge.log
-            git diff --name-only --diff-filter=U > build/upstream-integration/unresolved-paths.txt || true
-            git merge --abort 2>/dev/null || true
-            ported=0
-            for sha in \
-              0169e760c0c369eaebfc1c55539f113a16992a25 \
-              9969ec9f9c6f5b548bfb1801e84ef53b1133b7ef \
-              38f75ba9b8bc5892afcac299c4aaa3b650fc0969
-            do
-              if git cherry-pick -x -X ours "$sha" > build/upstream-integration/cherry-last.log 2>&1; then
-                echo "$sha PORTED" >> build/upstream-integration/cherry-status.txt
-                ported=$((ported + 1))
-              else
-                git cherry-pick --abort 2>/dev/null || true
-                echo "$sha DEFERRED" >> build/upstream-integration/cherry-status.txt
-                cat build/upstream-integration/cherry-last.log >> build/upstream-integration/cherry-errors.txt
-              fi
-            done
-            if [ "$ported" -eq 0 ]; then
-              echo "No upstream commit integrated safely; branch remains unchanged" >&2
-              cat build/upstream-integration/cherry-errors.txt 2>/dev/null || true
-              exit 1
-            fi
+          git merge --no-commit --no-ff -s ort -X ours "$TARGET" > build/upstream-integration/merge.log 2>&1 || true
+          git diff --name-only --diff-filter=U > build/upstream-integration/unresolved-paths.txt
+          if [ -s build/upstream-integration/unresolved-paths.txt ]; then
+            echo "Explicitly resolving previously audited publish-workflow and compat-file conflicts:"
+            cat build/upstream-integration/unresolved-paths.txt
+            while IFS= read -r conflict; do
+              case "$conflict" in
+                .github/workflows/build-stable-38.yml|\
+                .github/workflows/build-stable-47.yml|\
+                .github/workflows/build-stable.yml|\
+                .github/workflows/build.yml)
+                  # These legacy release workflows were deliberately removed
+                  # from our fork; never silently re-enable their write privileges.
+                  git rm -f --ignore-unmatch -- "$conflict"
+                  ;;
+                lib/core/utils/openai_model_compat.dart)
+                  # Keep the fork's custom OpenAI/MiMo compatibility shim.
+                  git add -- "$conflict"
+                  ;;
+                *)
+                  echo "UNREVIEWED UPSTREAM CONFLICT: $conflict" >&2
+                  cat build/upstream-integration/merge.log >&2
+                  exit 1
+                  ;;
+              esac
+            done < build/upstream-integration/unresolved-paths.txt
           fi
-          # Preserve the product layers explicitly; CI alone is not a UX acceptance test.
+          if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+            echo "Unresolved merge conflicts remain" >&2
+            git diff --name-only --diff-filter=U >&2
+            exit 1
+          fi
+          git diff --cached --name-only > build/upstream-integration/changed-paths.txt
+          git diff --cached --check
           test -f lib/features/agent/services/agent_task_runner.dart
           test -f lib/features/agent/services/agent_runtime_bootstrap.dart
           test -d lib/features/story
           test -d lib/features/chat
           test -f assets/agent_runtime/kelivo-control.ts
+          git commit -m "merge(upstream): reconcile official Kelivo through 2026-10-24"
+          echo "FULL PINNED UPSTREAM MERGE STAGED — tests and review required" > build/upstream-integration/status.txt
           echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Flutter verification
