@@ -5,14 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/utils/openai_model_compat.dart';
 import 'support/collect_generation.dart';
-import 'support/legacy_reasoning.dart';
 
 ProviderConfig _openAIConfig(
   String baseUrl, {
   bool useResponseApi = false,
   String providerId = 'LatestModelCompatTest',
-  Map<String, dynamic> modelOverrides = const {},
 }) {
   return ProviderConfig(
     id: providerId,
@@ -22,19 +21,16 @@ ProviderConfig _openAIConfig(
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
     useResponseApi: useResponseApi,
-    modelOverrides: modelOverrides,
   );
 }
 
 Future<Map<String, dynamic>> _captureChatBody({
   required String modelId,
-  int? thinkingBudget,
+  required int thinkingBudget,
   double? temperature,
   double? topP,
   List<Map<String, dynamic>>? tools,
-  Map<String, dynamic>? extraBody,
   String providerId = 'LatestModelCompatTest',
-  bool useResponseApi = false,
 }) async {
   late Map<String, dynamic> requestBody;
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -46,44 +42,23 @@ Future<Map<String, dynamic>> _captureChatBody({
     requestBody = (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
         .cast<String, dynamic>();
     request.response.statusCode = HttpStatus.ok;
-    if (useResponseApi) {
-      request.response.headers.contentType = ContentType(
-        'text',
-        'event-stream',
-        charset: 'utf-8',
-      );
-      request.response.write(
-        'data: ${jsonEncode({'type': 'response.output_text.delta', 'delta': 'ok'})}\n\n',
-      );
-      request.response.write(
-        'data: ${jsonEncode({
-          'type': 'response.completed',
-          'response': {
-            'output': const [],
-            'usage': {'input_tokens': 1, 'output_tokens': 1},
+    request.response.headers.contentType = ContentType(
+      'text',
+      'event-stream',
+      charset: 'utf-8',
+    );
+    request.response.write(
+      'data: ${jsonEncode({
+        'choices': [
+          {
+            'index': 0,
+            'delta': {'role': 'assistant', 'content': 'ok'},
+            'finish_reason': 'stop',
           },
-        })}\n\n',
-      );
-      request.response.write('data: [DONE]\n\n');
-    } else {
-      request.response.headers.contentType = ContentType(
-        'text',
-        'event-stream',
-        charset: 'utf-8',
-      );
-      request.response.write(
-        'data: ${jsonEncode({
-          'choices': [
-            {
-              'index': 0,
-              'delta': {'role': 'assistant', 'content': 'ok'},
-              'finish_reason': 'stop',
-            },
-          ],
-        })}\n\n',
-      );
-      request.response.write('data: [DONE]\n\n');
-    }
+        ],
+      })}\n\n',
+    );
+    request.response.write('data: [DONE]\n\n');
     await request.response.close();
   });
 
@@ -91,17 +66,15 @@ Future<Map<String, dynamic>> _captureChatBody({
     config: _openAIConfig(
       'http://${server.address.address}:${server.port}/v1',
       providerId: providerId,
-      useResponseApi: useResponseApi,
     ),
     modelId: modelId,
     messages: const [
       {'role': 'user', 'content': 'hello'},
     ],
-    reasoning: legacyBudget(thinkingBudget),
+    thinkingBudget: thinkingBudget,
     temperature: temperature,
     topP: topP,
     tools: tools,
-    extraBody: extraBody,
   ).toList();
 
   expect(chunks.isGenerationDone, isTrue);
@@ -109,23 +82,25 @@ Future<Map<String, dynamic>> _captureChatBody({
 }
 
 void main() {
-  const tools = [
-    {
-      'type': 'function',
-      'function': {
-        'name': 'lookup',
-        'description': 'Look something up',
-        'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
-      },
-    },
-  ];
+  group('latest OpenAI-compatible model compatibility', () {
+    test('normalizes only officially supported reasoning efforts', () {
+      for (final modelId in const [
+        'gpt-5.6-sol',
+        'gpt-5.6-terra',
+        'gpt-5.6-luna',
+        'openai/gpt-5.6-sol',
+      ]) {
+        expect(openAINormalizeReasoningEffort('off', modelId), 'none');
+        expect(openAINormalizeReasoningEffort('xhigh', modelId), 'xhigh');
+        expect(openAINormalizeReasoningEffort('max', modelId), 'max');
+      }
 
-  group('latest OpenAI-compatible request bodies', () {
-    test('auto writes no effort and leaves unrelated extraBody keys', () async {
-      final body = await _captureChatBody(
-        modelId: 'gpt-5.2',
-        thinkingBudget: -1,
-        extraBody: const {'foo': 'bar', 'reasoning_effort': 'high'},
+      expect(openAINormalizeReasoningEffort('off', 'kimi-k3'), 'low');
+      expect(openAINormalizeReasoningEffort('medium', 'kimi-k3'), 'high');
+      expect(openAINormalizeReasoningEffort('max', 'kimi-k3'), 'max');
+      expect(
+        openAINormalizeReasoningEffort('off', 'moonshotai/kimi-k3'),
+        'low',
       );
       expect(openAISupportsMaxReasoning('moonshotai/kimi-k3'), isTrue);
       expect(openAINormalizeReasoningEffort('off', 'grok-4.5'), 'low');
@@ -209,7 +184,7 @@ void main() {
     });
 
     test(
-      'OpenRouter off on always-on models writes effort not enabled:false',
+      'OpenRouter keeps mandatory reasoning enabled for namespaced models',
       () async {
         final kimiOff = await _captureChatBody(
           modelId: 'moonshotai/kimi-k3',
@@ -226,24 +201,28 @@ void main() {
           thinkingBudget: 0,
           providerId: 'OpenRouter',
         );
-        final codexOff = await _captureChatBody(
-          modelId: 'openai/gpt-5.3-codex',
-          thinkingBudget: 0,
-          providerId: 'OpenRouter',
-        );
 
         expect(kimiOff['reasoning'], {'effort': 'low'});
         expect(kimiMax['reasoning'], {'effort': 'max'});
         expect(grokOff['reasoning'], {'effort': 'low'});
-        expect(codexOff['reasoning'], {'effort': 'low'});
-        for (final body in [kimiOff, kimiMax, grokOff, codexOff]) {
+        for (final body in [kimiOff, kimiMax, grokOff]) {
           expect(body.containsKey('reasoning_effort'), isFalse);
           expect(body['reasoning'], isNot({'enabled': false}));
         }
       },
     );
 
-    test('GPT-5.6 tools no longer force none; sampling follows spec', () async {
+    test('GPT-5.6 Chat tools force none in the provider format', () async {
+      const tools = [
+        {
+          'type': 'function',
+          'function': {
+            'name': 'lookup',
+            'description': 'Look something up',
+            'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+          },
+        },
+      ];
       final body = await _captureChatBody(
         modelId: 'openai/gpt-5.6-sol',
         thinkingBudget: 128000,
@@ -260,16 +239,16 @@ void main() {
         providerId: 'OpenRouter',
       );
 
-      expect(body['reasoning_effort'], 'max');
-      expect(body.containsKey('temperature'), isFalse);
-      expect(body.containsKey('top_p'), isFalse);
-      expect(openRouterBody['reasoning'], {'effort': 'max'});
+      expect(body['reasoning_effort'], 'none');
+      expect(body['temperature'], 0.7);
+      expect(body['top_p'], 0.8);
+      expect(openRouterBody['reasoning'], {'effort': 'none'});
       expect(openRouterBody.containsKey('reasoning_effort'), isFalse);
-      expect(openRouterBody.containsKey('temperature'), isFalse);
-      expect(openRouterBody.containsKey('top_p'), isFalse);
+      expect(openRouterBody['temperature'], 0.7);
+      expect(openRouterBody['top_p'], 0.8);
     });
 
-    test('GPT-5.6 auto omits effort and strips sampling', () async {
+    test('GPT-5.6 auto effort omits incompatible sampling params', () async {
       final body = await _captureChatBody(
         modelId: 'openai/gpt-5.6-terra',
         thinkingBudget: -1,
@@ -282,27 +261,58 @@ void main() {
       expect(body.containsKey('top_p'), isFalse);
     });
 
-    test('nearest-level clamping replaces per-vendor normalization', () async {
+    test('Codex and Pro models clamp off to the lowest legal effort', () async {
+      final codexOff = await _captureChatBody(
+        modelId: 'gpt-5.3-codex',
+        thinkingBudget: 0,
+      );
+      final namespacedCodexOff = await _captureChatBody(
+        modelId: 'openai/gpt-5.2-codex',
+        thinkingBudget: 0,
+      );
+      final proOff = await _captureChatBody(
+        modelId: 'gpt-5.2-pro',
+        thinkingBudget: 0,
+      );
+      final openRouterCodexOff = await _captureChatBody(
+        modelId: 'openai/gpt-5.3-codex',
+        thinkingBudget: 0,
+        providerId: 'OpenRouter',
+      );
+
+      expect(codexOff['reasoning_effort'], 'low');
+      expect(namespacedCodexOff['reasoning_effort'], 'low');
+      expect(proOff['reasoning_effort'], 'medium');
+      expect(openRouterCodexOff['reasoning'], {'effort': 'low'});
+      expect(openRouterCodexOff.containsKey('reasoning_effort'), isFalse);
+      expect(openRouterCodexOff['reasoning'], isNot({'enabled': false}));
+    });
+
+    test('Muse Spark 1.3 sends documented effort including max', () async {
       final body = await _captureChatBody(
         modelId: 'meta/muse-spark-1.3',
         thinkingBudget: 128000,
       );
-      final kimiMedium = await _captureChatBody(
-        modelId: 'kimi-k3',
-        thinkingBudget: 16000,
-      );
-      final deepseekMedium = await _captureChatBody(
-        modelId: 'deepseek-v4-flash',
-        thinkingBudget: 16000,
+      final offBody = await _captureChatBody(
+        modelId: 'muse-spark-1.1',
+        thinkingBudget: 0,
       );
 
       expect(body['reasoning_effort'], 'max');
-      expect(kimiMedium['reasoning_effort'], 'low');
-      expect(deepseekMedium['thinking'], {'type': 'enabled'});
-      expect(deepseekMedium['reasoning_effort'], 'low');
+      expect(offBody['reasoning_effort'], 'low');
     });
 
     test('GPT-6 Astra omits sampling and never sends none', () async {
+      const tools = [
+        {
+          'type': 'function',
+          'function': {
+            'name': 'lookup',
+            'description': 'Look something up',
+            'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+          },
+        },
+      ];
       final offBody = await _captureChatBody(
         modelId: 'gpt-6-astra',
         thinkingBudget: 0,
@@ -413,17 +423,40 @@ void main() {
           'event-stream',
           charset: 'utf-8',
         );
-        final autoBody = await _captureChatBody(
-          modelId: 'grok-4.5',
-          thinkingBudget: -1,
-          useResponseApi: true,
+        request.response.write(
+          'data: ${jsonEncode({'type': 'response.reasoning_text.delta', 'delta': 'reasoning summary'})}\n\n',
         );
+        request.response.write(
+          'data: ${jsonEncode({'type': 'response.output_text.delta', 'delta': 'answer'})}\n\n',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'type': 'response.completed',
+            'response': {
+              'output': const [],
+              'usage': {'input_tokens': 1, 'output_tokens': 2},
+            },
+          })}\n\n',
+        );
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
 
-        expect((offBody['reasoning'] as Map)['effort'], 'low');
-        expect((xhighBody['reasoning'] as Map)['effort'], 'xhigh');
-        expect(autoBody['reasoning'], {'summary': 'auto'});
-        expect((autoBody['reasoning'] as Map).containsKey('effort'), isFalse);
-      },
-    );
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAIConfig(
+          'http://${server.address.address}:${server.port}/v1',
+          useResponseApi: true,
+        ),
+        modelId: 'grok-4.5',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 0,
+      ).toList();
+
+      expect((requestBody['reasoning'] as Map)['effort'], 'low');
+      expect(chunks.joinedReasoning, contains('reasoning summary'));
+      expect(chunks.joinedContent, contains('answer'));
+    });
   });
 }
