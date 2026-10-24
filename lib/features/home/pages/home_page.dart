@@ -1,3 +1,6 @@
+import '../../browser/browser_navigation.dart';
+import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
+import '../../../core/services/chat/chat_service.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
@@ -7,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../main.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
+import '../../../shared/widgets/visible_route_theme.dart';
 import '../../../shared/responsive/breakpoints.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -15,6 +19,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
@@ -31,7 +36,8 @@ import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
-import '../../../desktop/reasoning_budget_popover.dart';
+import '../../../desktop/reasoning_level_popover.dart';
+import '../../../desktop/context_usage_popover.dart';
 import '../../../desktop/tools_popover.dart';
 import '../../../desktop/workspace_dialog.dart';
 import '../../../desktop/skills_popover.dart';
@@ -44,7 +50,7 @@ import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/chat_tools_sheet.dart';
 import '../../chat/utils/ensure_conversation.dart';
 import '../../chat/widgets/context_management_sheet.dart';
-import '../../chat/widgets/reasoning_budget_sheet.dart';
+import '../../chat/widgets/reasoning_level_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
 import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../../chat/widgets/chat_assistant_background.dart';
@@ -714,7 +720,7 @@ class _HomePageState extends State<HomePage>
       InteractiveDrawerController();
   final ValueNotifier<int> _assistantPickerCloseTick = ValueNotifier<int>(0);
   final FocusNode _inputFocus = FocusNode();
-  final TextEditingController _inputController = TextEditingController();
+  final TextEditingController _inputController = MessageEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
   scroll_ctrl.ChatAutoFollowScrollController _scrollController =
       scroll_ctrl.ChatAutoFollowScrollController();
@@ -824,9 +830,9 @@ class _HomePageState extends State<HomePage>
     _incomingShares?.dispose();
     _controller.removeListener(_onControllerChanged);
     _drawerController.removeListener(_onDrawerValueChanged);
+    _controller.dispose();
     _inputFocus.dispose();
     _inputController.dispose();
-    _controller.dispose();
     _scrollController.dispose();
     routeObserver.unsubscribe(this);
     super.dispose();
@@ -958,9 +964,20 @@ class _HomePageState extends State<HomePage>
     _readingIncomingShares = true;
     try {
       await _chatReady;
+      if (!mounted) return;
+      final drafts = context.read<ChatService>().composerDrafts;
       while (mounted && _incomingShareChanged) {
         _incomingShareChanged = false;
-        final shares = await service.pending();
+        final pendingShares = await service.pending();
+        final shares = <IncomingShare>[];
+        for (final share in pendingShares) {
+          if (await drafts?.hasShareReceipt(share.id) == true) {
+            await service.acknowledge([share]);
+            await drafts?.acknowledgeShares([share.id]);
+          } else {
+            shares.add(share);
+          }
+        }
         if (!mounted || shares.isEmpty) continue;
         final hasContent = shares.any(
           (share) => share.text.trim().isNotEmpty || share.files.isNotEmpty,
@@ -975,25 +992,39 @@ class _HomePageState extends State<HomePage>
           if (!mounted) return;
           final ChatInputData input;
           try {
-            input = await service.prepare(shares);
+            input = await service.prepare(
+              shares,
+              uploadDirectory: await drafts?.directoryFor('share-import'),
+            );
           } on ShareImportCancelled {
             await service.acknowledge(shares);
             continue;
           }
           var accepted = false;
+          var completed = false;
           try {
             if (!mounted) return;
             // Check the current draft at delivery time: preparing a large
             // attachment may take long enough for the user to keep typing.
-            accepted = await _controller.acceptIncomingShareDraft(input);
+            accepted = await _controller.acceptIncomingShareDraft(
+              input,
+              shareIds: shares.map((share) => share.id),
+            );
+            completed = true;
           } finally {
-            if (!accepted) await service.discardPrepared(input);
+            // The durable store owns a separate copy; native delivery remains
+            // unacknowledged if persistence failed.
+            if ((completed && drafts != null) ||
+                (drafts == null && !accepted)) {
+              await service.discardPrepared(input);
+            }
           }
         }
         if (shares.any((share) => share.failedFiles > 0)) {
           _showIncomingShareFailure();
         }
         await service.acknowledge(shares);
+        await drafts?.acknowledgeShares(shares.map((share) => share.id));
       }
     } on MissingPluginException {
       // The desktop/test host does not have a mobile incoming-share inbox.
@@ -1042,7 +1073,12 @@ class _HomePageState extends State<HomePage>
   // ============================================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      // Keep action callbacks on the page's live context. Dialogs must not
+      // capture the deferred theme intended only for this page's contents.
+      VisibleRouteTheme(child: _buildPage(context));
+
+  Widget _buildPage(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
@@ -1405,7 +1441,6 @@ class _HomePageState extends State<HomePage>
           ? const ChatAssistantBackground(
               desktop: true,
               includeSurfaceFill: true,
-              applyMaskStrength: false,
               pinnedToBackdrop: true,
             )
           : null,
@@ -1447,7 +1482,9 @@ class _HomePageState extends State<HomePage>
                 child: Builder(
                   builder: (context) {
                     Widget input = _buildChatInputBar(context, isTablet: true);
-                    input = Center(
+                    input = Align(
+                      alignment: Alignment.bottomCenter,
+                      heightFactor: 1,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(
                           maxWidth: ChatLayoutConstants.maxInputWidth,
@@ -1472,7 +1509,6 @@ class _HomePageState extends State<HomePage>
     return const ChatAssistantBackground(
       desktop: true,
       includeSurfaceFill: true,
-      applyMaskStrength: false,
     );
   }
 
@@ -1553,6 +1589,7 @@ class _HomePageState extends State<HomePage>
       showProducedFiles: settings.showProducedFiles,
       showToolResultSummary: settings.showToolResultSummary,
       hideToolResultImages: settings.hideToolResultImages,
+      showBrowserPageCards: settings.showBrowserPageCards,
       collapsedCodeLines: settings.autoCollapseCodeBlock
           ? settings.autoCollapseCodeBlockLines
           : null,
@@ -1683,6 +1720,14 @@ class _HomePageState extends State<HomePage>
             context,
             anchorKey: _inputBarKey,
             assistantId: a.id,
+            supportsModelTools:
+                chatModel.providerKey != null &&
+                chatModel.modelId != null &&
+                _controller.isToolModel(
+                  chatModel.providerKey!,
+                  chatModel.modelId!,
+                ),
+            conversationId: _controller.currentConversation?.id,
           );
         } else {
           _controller.dismissKeyboard();
@@ -1700,38 +1745,10 @@ class _HomePageState extends State<HomePage>
       },
       onOpenSearch: _openSearchSettings,
       onConfigureReasoning: () async {
-        final assistantProvider = context.read<AssistantProvider>();
-        final settingsProvider = context.read<SettingsProvider>();
-        final assistant = assistantProvider.currentAssistant;
-        if (assistant == null) return;
-        if (PlatformUtils.isDesktop) {
-          // Desktop popover keeps the legacy global-settings sync flow.
-          if (assistant.thinkingBudget != null) {
-            settingsProvider.setThinkingBudget(assistant.thinkingBudget);
-          }
-          await _openReasoningSettings();
-          if (!mounted) return;
-          final chosen = settingsProvider.thinkingBudget;
-          await assistantProvider.updateAssistant(
-            assistant.copyWith(thinkingBudget: chosen),
-          );
-          return;
-        }
-        // Mobile: seed the sheet via initialBudget instead of pre-writing
-        // global settings. setThinkingBudget notifies synchronously and would
-        // rebuild the home page (message list, input bar, drawer) on the
-        // first frames of the sheet's entrance animation, dropping frames.
-        int? chosen;
-        await _openReasoningSettings(
-          initialBudget: assistant.thinkingBudget,
-          onChanged: (v) => chosen = v,
-        );
-        if (!mounted) return;
-        if (chosen != null && chosen != assistant.thinkingBudget) {
-          await assistantProvider.updateAssistant(
-            assistant.copyWith(thinkingBudget: chosen),
-          );
-        }
+        await _openReasoningSettings();
+      },
+      onOpenContextUsage: () async {
+        await _openContextUsagePopover();
       },
       onReasoningBudgetChanged: _setComposerReasoningBudget,
       onComposerModelChanged: _setComposerModel,
@@ -1767,6 +1784,11 @@ class _HomePageState extends State<HomePage>
       onPickCamera: _controller.onPickCamera,
       onPickPhotos: _controller.onPickPhotos,
       onUploadFiles: _controller.onPickFiles,
+      onOpenBrowser: () => openBrowserPage(
+        context,
+        conversationId: _controller.currentConversation?.id,
+        assistantId: context.read<AssistantProvider>().currentAssistantId,
+      ),
       onToggleLearningMode: _openInstructionInjectionPopover,
       onOpenWorldBook: _openWorldBookPopover,
       onLongPressLearning: _showLearningPromptSheet,
@@ -2023,20 +2045,29 @@ class _HomePageState extends State<HomePage>
     ValueChanged<int>? onChanged,
   }) async {
     final model = _resolvedChatModel();
+    final providerKey = model.providerKey;
+    final modelId = model.modelId;
+    if (providerKey == null || modelId == null) return;
+    final settings = context.read<SettingsProvider>();
+    final config = settings.getProviderConfig(providerKey);
+    if (!ModelSpecResolver.instance.spec(config, modelId).supportsReasoning) {
+      return;
+    }
+    final assistant = context.read<AssistantProvider>().currentAssistant;
     if (PlatformUtils.isDesktop) {
-      await showDesktopReasoningBudgetPopover(
+      await showDesktopReasoningLevelPopover(
         context,
         anchorKey: _inputBarKey,
-        modelProvider: model.providerKey,
-        modelId: model.modelId,
+        config: config,
+        modelId: modelId,
+        assistant: assistant,
       );
     } else {
-      await showReasoningBudgetSheet(
+      await showReasoningLevelSheet(
         context,
-        modelProvider: model.providerKey,
-        modelId: model.modelId,
-        initialBudget: initialBudget,
-        onChanged: onChanged,
+        config: config,
+        modelId: modelId,
+        assistant: assistant,
       );
     }
   }
@@ -2191,6 +2222,8 @@ class _HomePageState extends State<HomePage>
         return SafeArea(
           top: false,
           child: ContextManagementSheet(
+            conversationId: _controller.currentConversation?.id,
+            draftText: _inputController.text,
             messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {
               await Navigator.of(ctx).maybePop();

@@ -1,0 +1,42 @@
+name: Upstream Compatibility Analyzer
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/upstream-compat-analyze.yml
+      - lib/**
+      - test/**
+      - integration_test/**
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    if: github.event.pull_request.number == 22
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+      - name: Restore dependencies
+        run: flutter pub get
+      - name: Analyze merged source independently of format checks
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/upstream-diagnostics
+          dart analyze --fatal-infos lib test integration_test 2>&1 | tee build/upstream-diagnostics/analyzer.txt
+      - name: Upload analyzer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-v2-analyzer
+          path: build/upstream-diagnostics/
+          if-no-files-found: warn
+          retention-days: 14

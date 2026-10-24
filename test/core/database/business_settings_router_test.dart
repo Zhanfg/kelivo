@@ -52,12 +52,20 @@ void main() {
           BusinessKeyDisposition.localOnly,
         );
         expect(
+          BusinessKeyRegistry.classify('linux_hide_title_bar_v1'),
+          BusinessKeyDisposition.localOnly,
+        );
+        expect(
           BusinessKeyRegistry.classify('pinned_chat_ids'),
           BusinessKeyDisposition.discarded,
         );
         expect(
           BusinessKeyRegistry.classify('plugin_future_key_v1'),
           BusinessKeyDisposition.unknownPreference,
+        );
+        expect(
+          BusinessKeyRegistry.classify('reasoning_choice_by_model_v1'),
+          BusinessKeyDisposition.preference,
         );
       },
     );
@@ -89,7 +97,8 @@ void main() {
           'providers_order_v1': <String>['first', 'orphan'],
           'theme_mode_v1': 'dark',
           'use_dynamic_color_v1': false,
-          'thinking_budget_v1': 4096,
+          'reasoning_choice_by_model_v1':
+              '{"OpenAI::gpt-test":{"level":"high","budgetTokens":32000}}',
           'tts_speech_rate_v1': 0.75,
           'pinned_models_v1': jsonEncode(['first/model-a']),
           'plugin_future_key_v1': <String>['one', 'two'],
@@ -655,7 +664,7 @@ void main() {
           },
         ]),
         'search_services_v1': jsonEncode([
-          {'id': 'search-1', 'type': 'bing_local', 'acceptLanguage': 'en-US'},
+          {'id': 'search-1', 'type': 'bing_local'},
         ]),
         'tts_services_v1': jsonEncode([
           {
@@ -718,6 +727,35 @@ void main() {
       );
     });
 
+    test('preserves optional boolean provider prompt cache key settings', () {
+      for (final fields in <Map<String, Object?>>[
+        {},
+        {'promptCacheKeyEnabled': null},
+        {'promptCacheKeyEnabled': false},
+        {'promptCacheKeyEnabled': true},
+      ]) {
+        final provider = {'id': 'provider-1', ...fields};
+        final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+          'provider_configs_v1': jsonEncode({'provider-1': provider}),
+        });
+        final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+        final providers =
+            jsonDecode(exported['provider_configs_v1']! as String) as Map;
+        expect(providers['provider-1'], provider);
+      }
+    });
+
+    test('rejects a non-string OAuth model cache version', () {
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'provider_configs_v1': jsonEncode({
+            'account': {'oauthModelsClientVersion': 159},
+          }),
+        }),
+        throwsFormatException,
+      );
+    });
+
     test('rejects entity fields that runtime models cannot decode', () {
       final invalidBySourceKey = <String, Object>{
         'assistants_v1': [
@@ -777,6 +815,69 @@ void main() {
             'search_services_v1',
           ),
         ),
+      );
+    });
+
+    test('accepts and preserves DeepSeek search credentials', () {
+      final service = {
+        'id': 'deepseek-1',
+        'type': 'deepseek',
+        'apiKey': 'primary-key',
+        'apiKeys': ['backup-key'],
+      };
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'search_services_v1': jsonEncode([service]),
+      });
+      final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+      expect(jsonDecode(exported['search_services_v1']! as String), [service]);
+
+      for (final invalid in [
+        {'apiKey': 123},
+        {'apiKeys': 'not-a-list'},
+        {
+          'apiKeys': [123],
+        },
+      ]) {
+        expect(
+          () => BusinessSettingsRouter.normalizeAndRoute({
+            'search_services_v1': jsonEncode([
+              {...service, ...invalid},
+            ]),
+          }),
+          throwsA(isA<FormatException>()),
+        );
+      }
+    });
+
+    test('accepts and preserves Kagi search credentials', () {
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'search_services_v1': jsonEncode([
+          {
+            'id': 'kagi-1',
+            'type': 'kagi',
+            'apiKey': 'primary-key',
+            'apiKeys': ['backup-key'],
+          },
+        ]),
+      });
+
+      final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+      expect(jsonDecode(exported['search_services_v1']! as String), [
+        {
+          'id': 'kagi-1',
+          'type': 'kagi',
+          'apiKey': 'primary-key',
+          'apiKeys': ['backup-key'],
+        },
+      ]);
+
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'search_services_v1': jsonEncode([
+            {'id': 'kagi-invalid', 'type': 'kagi', 'apiKey': 123},
+          ]),
+        }),
+        throwsA(isA<FormatException>()),
       );
     });
 

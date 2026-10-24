@@ -115,72 +115,106 @@ class _AsrServicesSectionState extends State<AsrServicesSection> {
     }
   }
 
+  Future<void> _reorderServices(int oldIndex, int newIndex) async {
+    final settings = context.read<SettingsProvider>();
+    final updated = reorderVoiceServiceList(
+      settings.asrServices,
+      oldIndex,
+      newIndex,
+    );
+    if (identical(updated, settings.asrServices)) return;
+    await settings.setAsrServices(updated);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
     final services = settings.asrServices;
 
-    return Padding(
-      padding: EdgeInsets.only(top: widget.desktop ? 28 : 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          VoiceServiceSectionHeader(
-            title: l10n.asrServicesSectionTitle,
-            addTooltip: l10n.asrServicesAddTooltip,
-            onAdd: _addService,
-            desktop: widget.desktop,
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.only(top: widget.desktop ? 28 : 0),
+          sliver: SliverToBoxAdapter(
+            child: VoiceServiceSectionHeader(
+              title: l10n.asrServicesSectionTitle,
+              addTooltip: l10n.asrServicesAddTooltip,
+              onAdd: _addService,
+              desktop: widget.desktop,
+            ),
           ),
-          SizedBox(height: widget.desktop ? 16 : 0),
-          if (services.isEmpty)
-            _EmptyAsrState(desktop: widget.desktop)
-          else if (!widget.desktop)
-            VoiceServiceMobileCard(
-              children: [
-                for (var index = 0; index < services.length; index++) ...[
-                  _AsrServiceCard(
-                    key: ValueKey('asr-service-${services[index].id}'),
-                    service: services[index],
-                    selected:
-                        settings.selectedAsrServiceId == services[index].id,
-                    desktop: false,
+        ),
+        if (widget.desktop)
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+        if (services.isEmpty)
+          SliverToBoxAdapter(child: _EmptyAsrState(desktop: widget.desktop))
+        else if (widget.desktop)
+          SliverReorderableList(
+            itemCount: services.length,
+            onReorderItem: _reorderServices,
+            onReorderStart: (_) => Tooltip.dismissAllToolTips(),
+            proxyDecorator: voiceServiceDragProxy,
+            itemBuilder: (context, index) {
+              final service = services[index];
+              return Padding(
+                key: ValueKey('asr-service-${service.id}'),
+                padding: EdgeInsets.only(
+                  bottom: index == services.length - 1 ? 0 : 12,
+                ),
+                child: ReorderableDragStartListener(
+                  index: index,
+                  child: _AsrServiceCard(
+                    service: service,
+                    selected: settings.selectedAsrServiceId == service.id,
+                    desktop: true,
                     modelManager: _modelManager,
                     onSelect: () =>
-                        settings.setSelectedAsrServiceId(services[index].id),
-                    onEdit: () => _editService(services[index]),
-                    onDelete: () => _deleteService(services[index]),
+                        settings.setSelectedAsrServiceId(service.id),
+                    onEdit: () => _editService(service),
+                    onDelete: () => _deleteService(service),
                   ),
-                  if (index != services.length - 1)
-                    voiceServiceMobileDivider(context),
-                ],
-              ],
-            )
-          else
-            Column(
-              children: [
-                for (var index = 0; index < services.length; index++)
-                  Padding(
-                    key: ValueKey('asr-service-${services[index].id}'),
-                    padding: EdgeInsets.only(
-                      bottom: index == services.length - 1 ? 0 : 12,
+                ),
+              );
+            },
+          )
+        else
+          VoiceServiceCardSliver(
+            sliver: SliverReorderableList(
+              itemCount: services.length,
+              onReorderItem: _reorderServices,
+              onReorderStart: (_) {
+                Tooltip.dismissAllToolTips();
+                Haptics.light();
+              },
+              proxyDecorator: voiceServiceDragProxy,
+              itemBuilder: (context, index) {
+                final service = services[index];
+                return Column(
+                  key: ValueKey('asr-service-${service.id}'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ReorderableDelayedDragStartListener(
+                      index: index,
+                      child: _AsrServiceCard(
+                        service: service,
+                        selected: settings.selectedAsrServiceId == service.id,
+                        desktop: false,
+                        modelManager: _modelManager,
+                        onSelect: () =>
+                            settings.setSelectedAsrServiceId(service.id),
+                        onEdit: () => _editService(service),
+                        onDelete: () => _deleteService(service),
+                      ),
                     ),
-                    child: _AsrServiceCard(
-                      service: services[index],
-                      selected:
-                          settings.selectedAsrServiceId == services[index].id,
-                      desktop: widget.desktop,
-                      modelManager: _modelManager,
-                      onSelect: () =>
-                          settings.setSelectedAsrServiceId(services[index].id),
-                      onEdit: () => _editService(services[index]),
-                      onDelete: () => _deleteService(services[index]),
-                    ),
-                  ),
-              ],
+                    if (index != services.length - 1)
+                      voiceServiceMobileDivider(context),
+                  ],
+                );
+              },
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
@@ -230,7 +264,6 @@ class _EmptyAsrState extends StatelessWidget {
 
 class _AsrServiceCard extends StatefulWidget {
   const _AsrServiceCard({
-    super.key,
     required this.service,
     required this.selected,
     required this.desktop,
@@ -484,6 +517,8 @@ class _ProviderBadge extends StatelessWidget {
 String? _kindBrandAsset(AsrServiceKind kind) {
   final hint = switch (kind) {
     AsrServiceKind.openAiRealtime => 'OpenAI',
+    AsrServiceKind.groq => 'Groq',
+    AsrServiceKind.mistral => 'Mistral',
     AsrServiceKind.dashScope => 'Qwen',
     AsrServiceKind.qwenAudio => 'Qwen',
     AsrServiceKind.volcengine => 'Doubao',
@@ -824,6 +859,28 @@ class _AsrEditorState extends State<_AsrEditor> {
           ),
         );
         return;
+      case AsrServiceKind.groq:
+      case AsrServiceKind.mistral:
+        final initial = widget.initial is AudioTranscriptionAsrOptions
+            ? widget.initial as AudioTranscriptionAsrOptions
+            : null;
+        widget.onSubmit(
+          AudioTranscriptionAsrOptions(
+            id: id,
+            kind: _kind,
+            name: name,
+            apiKey: _apiKeyController.text.trim(),
+            baseUrl: _valueOrDefault(
+              _endpointController.text,
+              _defaultEndpoint(_kind),
+            ),
+            model: _valueOrDefault(_modelController.text, _defaultModel(_kind)),
+            language: language,
+            sampleRate: initial?.sampleRate ?? 16000,
+            segmentDurationSec: initial?.segmentDurationSec ?? 30,
+          ),
+        );
+        return;
       case AsrServiceKind.dashScope:
         final initial = widget.initial is DashScopeAsrOptions
             ? widget.initial as DashScopeAsrOptions
@@ -1120,6 +1177,8 @@ class _AsrEditorState extends State<_AsrEditor> {
                       AsrServiceKind.system,
                       AsrServiceKind.sherpaOnnx,
                       AsrServiceKind.openAiRealtime,
+                      AsrServiceKind.groq,
+                      AsrServiceKind.mistral,
                       AsrServiceKind.dashScope,
                       AsrServiceKind.qwenAudio,
                       AsrServiceKind.volcengine,
@@ -1238,6 +1297,8 @@ class _ProviderChoiceGrid extends StatelessWidget {
           children: [
             for (final kind in const [
               AsrServiceKind.openAiRealtime,
+              AsrServiceKind.groq,
+              AsrServiceKind.mistral,
               AsrServiceKind.dashScope,
               AsrServiceKind.qwenAudio,
               AsrServiceKind.volcengine,
@@ -1988,6 +2049,9 @@ IconData _kindIcon(AsrServiceKind kind) {
       return Lucide.AudioWaveform;
     case AsrServiceKind.mimo:
       return Lucide.Globe;
+    case AsrServiceKind.groq:
+    case AsrServiceKind.mistral:
+      return Lucide.AudioWaveform;
     case AsrServiceKind.step:
       return Lucide.AudioWaveform;
   }
@@ -2029,6 +2093,8 @@ bool _isDefaultServiceName(AsrServiceKind kind, String name) {
       'OpenAI Realtime ASR',
       'OpenAI Realtime',
     }.contains(name),
+    AsrServiceKind.groq => name == 'Groq',
+    AsrServiceKind.mistral => name == 'Mistral',
     AsrServiceKind.dashScope => const {
       'DashScope ASR',
       'DashScope Realtime',
@@ -2075,6 +2141,10 @@ String _kindTitle(AppLocalizations l10n, AsrServiceKind kind) {
       return l10n.asrServicesLocalTitle;
     case AsrServiceKind.openAiRealtime:
       return l10n.asrServicesOpenAiTitle;
+    case AsrServiceKind.groq:
+      return 'Groq';
+    case AsrServiceKind.mistral:
+      return 'Mistral';
     case AsrServiceKind.dashScope:
       return l10n.asrServicesDashScopeTitle;
     case AsrServiceKind.qwenAudio:
@@ -2096,6 +2166,10 @@ String _kindSubtitle(AppLocalizations l10n, AsrServiceKind kind) {
       return l10n.asrServicesLocalSubtitle;
     case AsrServiceKind.openAiRealtime:
       return l10n.asrServicesOpenAiSubtitle;
+    case AsrServiceKind.groq:
+      return l10n.asrServicesGroqSubtitle;
+    case AsrServiceKind.mistral:
+      return l10n.asrServicesMistralSubtitle;
     case AsrServiceKind.dashScope:
       return l10n.asrServicesDashScopeSubtitle;
     case AsrServiceKind.qwenAudio:
@@ -2112,6 +2186,7 @@ String _kindSubtitle(AppLocalizations l10n, AsrServiceKind kind) {
 String _apiKeyOf(AsrServiceOptions? options) {
   return switch (options) {
     OpenAiRealtimeAsrOptions value => value.apiKey,
+    AudioTranscriptionAsrOptions value => value.apiKey,
     DashScopeAsrOptions value => value.apiKey,
     QwenAudioAsrOptions value => value.apiKey,
     VolcengineAsrOptions value => value.apiKey,
@@ -2124,6 +2199,7 @@ String _apiKeyOf(AsrServiceOptions? options) {
 String _endpointOf(AsrServiceOptions? options) {
   return switch (options) {
     OpenAiRealtimeAsrOptions value => value.websocketUrl,
+    AudioTranscriptionAsrOptions value => value.baseUrl,
     DashScopeAsrOptions value => value.websocketUrl,
     QwenAudioAsrOptions value => value.workspaceId,
     VolcengineAsrOptions value => value.websocketUrl,
@@ -2136,6 +2212,7 @@ String _endpointOf(AsrServiceOptions? options) {
 String _modelOf(AsrServiceOptions? options) {
   return switch (options) {
     OpenAiRealtimeAsrOptions value => value.model,
+    AudioTranscriptionAsrOptions value => value.model,
     DashScopeAsrOptions value => value.model,
     QwenAudioAsrOptions value => value.model,
     MimoAsrOptions value => value.model,
@@ -2156,6 +2233,7 @@ String _languageOf(AsrServiceOptions? options) {
     SherpaOnnxAsrOptions value => value.language,
     SystemAsrOptions value => value.localeId,
     OpenAiRealtimeAsrOptions value => value.language,
+    AudioTranscriptionAsrOptions value => value.language,
     DashScopeAsrOptions value => value.language,
     VolcengineAsrOptions value => value.language,
     MimoAsrOptions value => value.language,
@@ -2168,6 +2246,9 @@ String _defaultEndpoint(AsrServiceKind kind) {
   switch (kind) {
     case AsrServiceKind.openAiRealtime:
       return 'wss://api.openai.com/v1/realtime?intent=transcription';
+    case AsrServiceKind.groq:
+    case AsrServiceKind.mistral:
+      return AudioTranscriptionAsrOptions(kind: kind).baseUrl;
     case AsrServiceKind.dashScope:
       return 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime';
     case AsrServiceKind.qwenAudio:
@@ -2188,6 +2269,9 @@ String _defaultModel(AsrServiceKind kind) {
   switch (kind) {
     case AsrServiceKind.openAiRealtime:
       return 'gpt-live-transcribe';
+    case AsrServiceKind.groq:
+    case AsrServiceKind.mistral:
+      return AudioTranscriptionAsrOptions(kind: kind).model;
     case AsrServiceKind.dashScope:
       return 'qwen3-asr-flash-realtime';
     case AsrServiceKind.qwenAudio:

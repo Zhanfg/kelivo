@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:Kelivo/core/services/search/search_service.dart';
+import 'package:Kelivo/core/services/search/web_fetch.dart';
 import 'package:Kelivo/core/services/search/search_service_usage_service.dart';
 import 'package:Kelivo/features/search/pages/search_api_keys_page.dart';
 import 'package:Kelivo/features/search/pages/search_service_editor_page.dart';
@@ -12,6 +13,181 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('adds DeepSeek with a required API key', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+    await tester.dragUntilVisible(
+      find.text('DeepSeek'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('DeepSeek'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    expect(result, isNull);
+    expect(find.byType(SearchServiceEditorPage), findsOneWidget);
+
+    await tester.enterText(_apiKeyField(), 'deepseek-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    expect(result?.service, isA<DeepSeekOptions>());
+    expect((result!.service! as DeepSeekOptions).apiKey, 'deepseek-key');
+  });
+
+  testWidgets('edits DeepSeek and preserves extra API keys', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: DeepSeekOptions(
+        id: 'deepseek',
+        apiKey: 'old-key',
+        extraApiKeys: const ['extra-key'],
+      ),
+      onResult: (value) => result = value,
+    );
+    expect(find.text('old-key'), findsOneWidget);
+    await tester.enterText(_apiKeyField(), 'new-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    final saved = result!.service! as DeepSeekOptions;
+    expect(saved.id, 'deepseek');
+    expect(saved.apiKey, 'new-key');
+    expect(saved.extraApiKeys, ['extra-key']);
+  });
+
+  testWidgets(
+    'fetch test uses the current provider and ignores an obsolete URL',
+    (tester) async {
+      final first = Completer<WebFetchPage>();
+      final second = Completer<WebFetchPage>();
+      final urls = <String>[];
+      await _pumpEditor(
+        tester,
+        initialService: TavilyOptions(id: 'fetch-test', apiKey: 'key'),
+        pageFetcher: (url, options) {
+          expect((options as TavilyOptions).apiKey, 'key');
+          urls.add(url);
+          return urls.length == 1 ? first.future : second.future;
+        },
+        onResult: (_) {},
+      );
+      await tester.dragUntilVisible(
+        find.text('Read page'),
+        find.byType(ListView),
+        const Offset(0, -240),
+      );
+      await tester.tap(find.text('Read page'));
+      await tester.pumpAndSettle();
+      final urlField = find.byKey(const ValueKey('search-service-test-url'));
+      await tester.enterText(urlField, 'https://example.com/old');
+      await tester.pump();
+      await tester.tap(find.byIcon(Lucide.Play));
+      await tester.pump();
+      await tester.enterText(urlField, 'https://example.com/new');
+      await tester.pump();
+      await tester.tap(find.byIcon(Lucide.Play));
+      await tester.pump();
+      second.complete(
+        const WebFetchPage(
+          url: 'https://example.com/new',
+          title: 'New page',
+          content: 'New body',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('New page'), findsOneWidget);
+      expect(find.text('New body'), findsOneWidget);
+      first.complete(
+        const WebFetchPage(
+          url: 'https://example.com/old',
+          title: 'Old page',
+          content: 'Old body',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('New page'), findsOneWidget);
+      expect(find.text('Old page'), findsNothing);
+      expect(urls, ['https://example.com/old', 'https://example.com/new']);
+    },
+  );
+
+  testWidgets('switching to search ignores a pending fetch failure', (
+    tester,
+  ) async {
+    final fetch = Completer<WebFetchPage>();
+    await _pumpEditor(
+      tester,
+      initialService: TavilyOptions(id: 'fetch-mode', apiKey: 'key'),
+      pageFetcher: (_, _) => fetch.future,
+      onResult: (_) {},
+    );
+    await tester.dragUntilVisible(
+      find.text('Read page'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('Read page'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('search-service-test-url')),
+      'https://example.com',
+    );
+    await tester.pump();
+    await tester.tap(find.byIcon(Lucide.Play));
+    await tester.pump();
+    await tester.tap(find.text('Search'));
+    await tester.pumpAndSettle();
+    fetch.completeError(Exception('stale fetch error'));
+    await tester.pumpAndSettle();
+    expect(_testQueryField(), findsOneWidget);
+    expect(find.textContaining('stale fetch error'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('adds Exa MCP without an API key or custom URL', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+    await tester.tap(find.text('Exa MCP'));
+    await tester.pumpAndSettle();
+    expect(find.text('API Key (optional)'), findsOneWidget);
+    expect(find.text(ExaMcpOptions.defaultUrl), findsOneWidget);
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    final saved = result!.service! as ExaMcpOptions;
+    expect(saved.apiKey, isEmpty);
+    expect(saved.resolvedUrl, ExaMcpOptions.defaultUrl);
+  });
+
+  testWidgets('edits Exa MCP endpoint and preserves credentials', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: ExaMcpOptions(
+        id: 'exa-mcp',
+        apiKey: 'key',
+        extraApiKeys: const ['extra'],
+      ),
+      onResult: (value) => result = value,
+    );
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const ValueKey('search-service-field-url')),
+        matching: find.byType(TextFormField),
+      ),
+      ' https://example.com/mcp ',
+    );
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    final saved = result!.service! as ExaMcpOptions;
+    expect(saved.id, 'exa-mcp');
+    expect(saved.apiKey, 'key');
+    expect(saved.extraApiKeys, ['extra']);
+    expect(saved.url, 'https://example.com/mcp');
+  });
+
   testWidgets('does not show the provider description', (tester) async {
     await _pumpEditor(
       tester,
@@ -363,6 +539,32 @@ void main() {
     expect((result!.service! as TavilyOptions).apiKey, 'new-key');
   });
 
+  testWidgets('saves edited Kagi credentials from the full page', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: KagiOptions(
+        id: 'kagi',
+        apiKey: 'old-key',
+        extraApiKeys: const ['backup-key'],
+      ),
+      onResult: (value) => result = value,
+    );
+
+    await tester.enterText(_apiKeyField(), 'new-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.deleted, isFalse);
+    expect(result?.service, isA<KagiOptions>());
+    final saved = result!.service! as KagiOptions;
+    expect(saved.id, 'kagi');
+    expect(saved.apiKey, 'new-key');
+    expect(saved.extraApiKeys, ['backup-key']);
+  });
+
   testWidgets('preserves Firecrawl sources and categories when saving', (
     tester,
   ) async {
@@ -432,6 +634,65 @@ void main() {
     expect(saved.mode, ParallelOptions.defaultMode);
   });
 
+  testWidgets('selects Kimi from the add page and defaults to Pro', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+
+    await tester.dragUntilVisible(
+      find.text('Kimi'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('Kimi'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_apiKeyField(), 'kimi-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<KimiOptions>());
+    final saved = result!.service! as KimiOptions;
+    expect(saved.apiKey, 'kimi-key');
+    expect(saved.mode, 'pro');
+  });
+
+  testWidgets('edits Kimi mode and preserves its extra API keys', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: KimiOptions(
+        id: 'kimi',
+        apiKey: 'kimi-key',
+        extraApiKeys: const ['extra-key'],
+      ),
+      onResult: (value) => result = value,
+    );
+
+    final modeField = find.byKey(const ValueKey('search-service-field-mode'));
+    await tester.dragUntilVisible(
+      modeField,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(modeField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Basic').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    final saved = result!.service! as KimiOptions;
+    expect(saved.id, 'kimi');
+    expect(saved.apiKey, 'kimi-key');
+    expect(saved.mode, 'basic');
+    expect(saved.extraApiKeys, ['extra-key']);
+  });
+
   testWidgets('selects You.com from the add page and saves', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(tester, onResult: (value) => result = value);
@@ -452,6 +713,27 @@ void main() {
     final saved = result!.service! as YouSearchOptions;
     expect(saved.apiKey, 'you-key');
     expect(saved.contentMode, YouSearchOptions.defaultContentMode);
+  });
+
+  testWidgets('selects Kagi from the add page and saves', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+
+    await tester.dragUntilVisible(
+      find.text('Kagi'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('Kagi'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_apiKeyField(), 'kagi-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<KagiOptions>());
+    final saved = result!.service! as KagiOptions;
+    expect(saved.apiKey, 'kagi-key');
   });
 
   testWidgets('selects Brave from the add page and keeps web mode', (
@@ -832,6 +1114,7 @@ Future<void> _pumpEditor(
   bool autoQueryUsage = false,
   SearchServiceUsageFetcher? usageFetcher,
   SearchServiceTestFetcher? searchFetcher,
+  SearchServicePageFetcher? pageFetcher,
   bool settle = true,
 }) async {
   await tester.pumpWidget(
@@ -855,6 +1138,7 @@ Future<void> _pumpEditor(
                           autoQueryUsage: autoQueryUsage,
                           usageFetcher: usageFetcher,
                           searchFetcher: searchFetcher,
+                          pageFetcher: pageFetcher,
                         ),
                       ),
                     );

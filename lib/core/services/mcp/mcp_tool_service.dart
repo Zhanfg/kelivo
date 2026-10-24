@@ -4,9 +4,9 @@ import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../../providers/mcp_provider.dart';
 import '../chat/chat_service.dart';
 import '../../providers/assistant_provider.dart';
-import '../../../utils/app_directories.dart';
 import '../../../utils/mcp_structured_image.dart';
-import '../../../utils/sandbox_path_resolver.dart';
+import '../api/tool_call_cancellation.dart';
+import 'mcp_image_snapshot.dart';
 
 class _McpToolRoute {
   const _McpToolRoute({
@@ -301,6 +301,7 @@ class McpToolService extends ChangeNotifier {
     final buf = StringBuffer();
     final imageUris = <String>[];
     final seen = <String>{};
+    final remoteSnapshots = <String, Future<String?>>{};
     for (final c in res.content) {
       try {
         if (c is mcp.TextContent) {
@@ -321,25 +322,25 @@ class McpToolService extends ChangeNotifier {
         }
         if (c is mcp.ImageContent) {
           final data = (c.data ?? '').toString();
-          final mime = c.mimeType.toString();
           String? uri;
           if (data.isNotEmpty) {
-            final savedPath = await AppDirectories.saveBase64Image(
-              mime,
-              data,
-              prefix: 'mcp_img',
-            );
-            if (savedPath != null) {
-              uri = SandboxPathResolver.canonicalize(savedPath);
-            }
+            uri = await McpImageSnapshot.save(data);
           } else {
             final url = (c.url ?? '').toString();
-            if (url.isNotEmpty) uri = url;
+            uri = await remoteSnapshots.putIfAbsent(
+              url,
+              () => McpImageSnapshot.download(url),
+            );
           }
           if (uri != null && uri.isNotEmpty) {
             if (seen.add(uri)) imageUris.add(uri);
             if (buf.isNotEmpty && !_endsWithLineBreak(buf)) buf.writeln();
             buf.writeln('![](${encodeMarkdownImageDestination(uri)})');
+          } else {
+            _writeEscapedToolText(
+              buf,
+              '(Image omitted: unavailable, invalid, unsupported, or too large.)',
+            );
           }
           continue;
         }
@@ -370,7 +371,9 @@ class McpToolService extends ChangeNotifier {
         if (!s.startsWith('Instance of')) {
           _writeEscapedToolText(buf, s);
         }
-      } catch (_) {}
+      } catch (_) {
+        ToolCallCancellation.current?.throwIfCancelled();
+      }
     }
     return McpToolResult(
       markdown: buf.toString().trim(),

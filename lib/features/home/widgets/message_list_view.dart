@@ -1,3 +1,4 @@
+import '../../browser/models/browser_tool_presentation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -17,6 +18,7 @@ import '../../../core/models/assistant_regex.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/selection_scroll_container.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/timeline_projection.dart';
 import '../../chat/widgets/timeline_visibility.dart';
@@ -157,6 +159,7 @@ class MessageListView extends StatefulWidget {
     this.showProducedFiles = true,
     this.showToolResultSummary = false,
     this.hideToolResultImages = false,
+    this.showBrowserPageCards = true,
     this.collapsedCodeLines,
     this.wrapCodeBlocks = false,
     this.showModelIcon = true,
@@ -274,6 +277,7 @@ class MessageListView extends StatefulWidget {
 
   /// Whether tool-result image thumbnails are hidden under the card.
   final bool hideToolResultImages;
+  final bool showBrowserPageCards;
 
   /// Lines a long code block collapses to, or null when it stays expanded.
   final int? collapsedCodeLines;
@@ -567,6 +571,7 @@ class _MessageListViewState extends State<MessageListView> {
     showToolCards: true,
     showToolResultSummary: false,
     hideToolResultImages: false,
+    showBrowserPageCards: true,
     collapsedCodeLines: null,
     wrapCodeBlocks: false,
     visualRegexSignature: 0,
@@ -938,7 +943,10 @@ class _MessageListViewState extends State<MessageListView> {
       }
       if (!block.isThinking) continue;
       final collapsed = collapseTimelineSteps(
-        block.thinkingSteps,
+        groupBrowserTimelineSteps(
+          block.thinkingSteps,
+          isPendingApproval: isPending,
+        ),
         collapseThinkingSteps: settings.collapseThinkingSteps,
       );
       addVisible(
@@ -977,6 +985,12 @@ class _MessageListViewState extends State<MessageListView> {
           textWidth: textWidth,
           fontScale: fontScale,
         );
+      } else if (step.browserTools != null) {
+        extent +=
+            _estimateCollapsedCard +
+            (settings.showBrowserPageCards
+                ? estimateBrowserGroupBodyHeight(lite: step.browserLite)
+                : 0);
       } else {
         final tool = step.tool!;
         extent += _estimateCollapsedCard;
@@ -1257,6 +1271,7 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.showProducedFiles != widget.showProducedFiles ||
         oldWidget.showToolResultSummary != widget.showToolResultSummary ||
         oldWidget.hideToolResultImages != widget.hideToolResultImages ||
+        oldWidget.showBrowserPageCards != widget.showBrowserPageCards ||
         oldWidget.collapsedCodeLines != widget.collapsedCodeLines ||
         oldWidget.wrapCodeBlocks != widget.wrapCodeBlocks ||
         !identical(oldWidget.assistant, widget.assistant);
@@ -1559,6 +1574,7 @@ class _MessageListViewState extends State<MessageListView> {
         old.completionTokens != current.completionTokens ||
         old.cachedTokens != current.cachedTokens ||
         old.durationMs != current.durationMs ||
+        old.firstTokenMs != current.firstTokenMs ||
         _partsIdentityChanged(old.parts, current.parts);
   }
 
@@ -1699,6 +1715,7 @@ class _MessageListViewState extends State<MessageListView> {
       showToolCards: widget.showToolCards,
       showToolResultSummary: widget.showToolResultSummary,
       hideToolResultImages: widget.hideToolResultImages,
+      showBrowserPageCards: widget.showBrowserPageCards,
       collapsedCodeLines: widget.collapsedCodeLines,
       wrapCodeBlocks: widget.wrapCodeBlocks,
       visualRegexSignature: _visualRegexEstimateSignature(widget.assistant),
@@ -1760,14 +1777,25 @@ class _MessageListViewState extends State<MessageListView> {
               },
             );
 
-            final historyList = NotificationListener<ScrollNotification>(
-              onNotification: _handleScrollNotification,
-              child: list,
-            );
+            final historyList =
+                NotificationListener<SelectionAutoScrollNotification>(
+                  onNotification: (_) {
+                    _handleUserScrollActivity();
+                    return false;
+                  },
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _handleScrollNotification,
+                    child: list,
+                  ),
+                );
 
             final userScrollAwareList = Listener(
               onPointerDown: (event) {
-                if (_isDesktopPlatform) _keyboardFocusNode.requestFocus();
+                // Keep copy shortcuts on a focused text selection when the
+                // second click of a double-click reaches the list.
+                if (_isDesktopPlatform && !_keyboardFocusNode.hasFocus) {
+                  _keyboardFocusNode.requestFocus();
+                }
                 if (event.buttons != 0 &&
                     event.buttons != kSecondaryMouseButton) {
                   _pointerDragInProgress = true;
@@ -2545,6 +2573,7 @@ final class _EstimateSettings {
     required this.showToolCards,
     required this.showToolResultSummary,
     required this.hideToolResultImages,
+    required this.showBrowserPageCards,
     required this.collapsedCodeLines,
     required this.wrapCodeBlocks,
     required this.visualRegexSignature,
@@ -2568,6 +2597,7 @@ final class _EstimateSettings {
 
   /// Whether tool-result image thumbnails are hidden under the card.
   final bool hideToolResultImages;
+  final bool showBrowserPageCards;
 
   /// Lines a long code block collapses to, or null when it stays expanded.
   final int? collapsedCodeLines;
@@ -2593,6 +2623,7 @@ final class _EstimateSettings {
       other.showToolCards == showToolCards &&
       other.showToolResultSummary == showToolResultSummary &&
       other.hideToolResultImages == hideToolResultImages &&
+      other.showBrowserPageCards == showBrowserPageCards &&
       other.collapsedCodeLines == collapsedCodeLines &&
       other.wrapCodeBlocks == wrapCodeBlocks &&
       other.visualRegexSignature == visualRegexSignature &&
@@ -2606,6 +2637,7 @@ final class _EstimateSettings {
     showToolCards,
     showToolResultSummary,
     hideToolResultImages,
+    showBrowserPageCards,
     collapsedCodeLines,
     wrapCodeBlocks,
     visualRegexSignature,

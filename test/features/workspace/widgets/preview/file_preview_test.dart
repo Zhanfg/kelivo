@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:markstream/markstream.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -17,7 +18,7 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +27,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../../support/business_test_harness.dart';
+import '../../../../support/markdown_render_helpers.dart';
 
 const _pngBytes = <int>[
   0x89,
@@ -326,6 +328,88 @@ void main() {
 
     expect(find.byType(MarkdownWithCodeHighlight), findsOneWidget);
   });
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'markdown preview splits long documents through source toggles: desktop=$desktop',
+      (tester) async {
+        tester.view.physicalSize = desktop
+            ? const Size(1400, 900)
+            : const Size(400, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final source = [
+          '# Preview document',
+          for (var i = 0; i < 80; i++)
+            'Section $i: Keep **formatting** and `code` in this paragraph.',
+          [
+            '| Input | Output |',
+            '| --- | --- |',
+            for (var i = 0; i < 40; i++) '| row $i | result $i |',
+          ].join('\n'),
+          'Final paragraph.',
+        ].join('\n\n');
+        final markdown = File(p.join(tempDir.path, 'document.md'))
+          ..writeAsStringSync(source);
+
+        await _openPreview(tester, markdown, kind: FilePreviewKind.markdown);
+        await _loadMarkdownPreview(tester);
+        await tester.pumpAndSettle();
+
+        for (var round = 0; round < 2; round++) {
+          // The full document is parsed to one AST and rendered as bounded
+          // groups, rather than one giant rich-text layout.
+          expect(
+            tester
+                .widgetList<BlockList>(find.byType(BlockList))
+                .first
+                .blocks
+                .length,
+            greaterThan(2),
+          );
+          expect(
+            tester.widget<MarkstreamView>(find.byType(MarkstreamView)).source,
+            source,
+          );
+          // Static previews must retain rows beyond the streaming row limit.
+          final showMore = find.byWidgetPredicate(
+            (widget) =>
+                widget is MarkstreamActionButton &&
+                widget.action.kind == MarkstreamActionKind.showMore,
+          );
+          await tester.ensureVisible(showMore);
+          await tester.tap(showMore);
+          await tester.pumpAndSettle();
+          expect(find.text('row 39', findRichText: true), findsOneWidget);
+          final scroll = tester.state<ScrollableState>(
+            find
+                .ancestor(
+                  of: find.byType(MarkstreamView),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await scroll.position.ensureVisible(
+            markdownParagraph(tester, 'Final paragraph.'),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          if (round == 1) break;
+
+          await tester.tap(find.text('Source'));
+          await tester.pumpAndSettle();
+          expect(find.byType(MarkdownWithCodeHighlight), findsNothing);
+          final sourceText = tester.widget<SelectableText>(
+            find.byKey(CodeFilePreview.codeKey),
+          );
+          expect(sourceText.textSpan!.toPlainText(), source);
+
+          await tester.tap(find.text('Rendered'));
+          await tester.pumpAndSettle();
+        }
+      },
+    );
+  }
 
   testWidgets('large markdown bypasses parsing and uses lazy plain text', (
     tester,
@@ -681,9 +765,7 @@ void main() {
       ),
     );
     await tester.pump();
-    final link = find.text('foo');
-    final richLink = find.textContaining('foo', findRichText: true);
-    await tester.tap(link.evaluate().isNotEmpty ? link : richLink.first);
+    await tester.tapAt(markdownGlyphCenter(tester, 'foo'));
     await _pumpAsyncUi(tester);
     if (find.byType(CodeFilePreview).evaluate().isNotEmpty) {
       await _loadCodePreview(tester);

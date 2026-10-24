@@ -18,6 +18,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.OutputStream
 import java.util.concurrent.Executors
+import java.util.Locale
 
 class MainActivity : FlutterActivity() {
     private val kelivo get() = application as KelivoApplication
@@ -107,6 +108,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
          super.configureFlutterEngine(flutterEngine)
+        kelivo.messageInput.attachActivity(this)
         incomingShareHandler = IncomingShareHandler(this, flutterEngine.dartExecutor.binaryMessenger)
          OAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
          kelivo.backgroundRuntime.attachActivity(this)
@@ -169,6 +171,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        kelivo.messageInput.detachActivity(this)
         deviceLocalToolsHandler?.detachActivity(this)
         kelivo.backgroundRuntime.detachActivity(this)
         OAuthHandler.detachActivity(this)
@@ -228,7 +231,7 @@ class MainActivity : FlutterActivity() {
         }
 
         val args = arguments as? Map<*, *>
-        val rawSourcePath = args?.get("sourcePath")?.toString()?.trim().orEmpty()
+        val rawSourcePath = (args?.get("sourcePath") as? String).orEmpty()
         if (rawSourcePath.isEmpty()) {
             result.error("invalid_args", "Missing sourcePath.", null)
             return
@@ -240,7 +243,7 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        val suggestedFileName = args?.get("fileName")?.toString()?.trim().takeUnless { it.isNullOrEmpty() }
+        val suggestedFileName = (args?.get("fileName") as? String).takeUnless { it.isNullOrEmpty() }
             ?: sourceFile.name
 
         pendingSaveResult = result
@@ -249,14 +252,12 @@ class MainActivity : FlutterActivity() {
         try {
             val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
-                type = "application/zip"
+                type = fileSaveMimeType(suggestedFileName)
                 putExtra(Intent.EXTRA_TITLE, suggestedFileName)
             }
             startActivityForResult(intent, CREATE_DOCUMENT_REQUEST_CODE)
         } catch (e: ActivityNotFoundException) {
-            pendingSaveResult = null
-            pendingSaveSourcePath = null
-            result.error("launch_failed", e.message, null)
+            finishPendingSave(result) { it.error("launch_failed", e.message, null) }
         }
     }
 
@@ -283,9 +284,7 @@ class MainActivity : FlutterActivity() {
             }
             startActivityForResult(intent, CREATE_DOCUMENT_REQUEST_CODE)
         } catch (e: ActivityNotFoundException) {
-            pendingSaveResult = null
-            pendingDirectWrite = false
-            result.error("launch_failed", e.message, null)
+            finishPendingSave(result) { it.error("launch_failed", e.message, null) }
         }
     }
 
@@ -393,13 +392,24 @@ class MainActivity : FlutterActivity() {
         return cleanupError
     }
 
+    // All callers run on the main thread. Clear the matching request before
+    // replying so cancellation, completion and a late worker cannot reply twice.
+    private fun finishPendingSave(
+        expected: MethodChannel.Result?,
+        reply: (MethodChannel.Result) -> Unit,
+    ) {
+        if (expected == null || pendingSaveResult !== expected) return
+        pendingSaveResult = null
+        pendingSaveSourcePath = null
+        pendingDirectWrite = false
+        reply(expected)
+    }
+
     private fun handleSaveDestination(destUri: Uri?) {
         val result = pendingSaveResult ?: return
         if (pendingDirectWrite) {
-            pendingSaveResult = null
-            pendingDirectWrite = false
             if (destUri == null) {
-                result.success(null)
+                finishPendingSave(result) { it.success(null) }
                 return
             }
             try {
@@ -408,7 +418,7 @@ class MainActivity : FlutterActivity() {
                     ?: throw IllegalStateException("Unable to open destination file.")
                 pendingWritableStream = ParcelFileDescriptor.AutoCloseOutputStream(descriptor)
                 writableFileState = WritableFileState.OPEN
-                result.success(true)
+                finishPendingSave(result) { it.success(true) }
             } catch (e: Exception) {
                 try {
                     DocumentsContract.deleteDocument(contentResolver, destUri)
@@ -416,16 +426,14 @@ class MainActivity : FlutterActivity() {
                     // Preserve the error that prevented the destination from opening.
                 }
                 pendingWritableUri = null
-                result.error("open_failed", e.message, null)
+                finishPendingSave(result) { it.error("open_failed", e.message, null) }
             }
             return
         }
         val sourcePath = pendingSaveSourcePath
 
-        if (destUri == null || sourcePath.isNullOrBlank()) {
-            pendingSaveResult = null
-            pendingSaveSourcePath = null
-            result.success(false)
+        if (destUri == null || sourcePath.isNullOrEmpty()) {
+            finishPendingSave(result) { it.success(false) }
             return
         }
 
@@ -438,20 +446,21 @@ class MainActivity : FlutterActivity() {
                 } ?: throw IllegalStateException("Unable to open destination stream.")
 
                 runOnUiThread {
-                    pendingSaveResult = null
-                    pendingSaveSourcePath = null
-                    result.success(true)
+                    finishPendingSave(result) { it.success(true) }
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    pendingSaveResult = null
-                    pendingSaveSourcePath = null
-                    result.error("save_failed", e.message, null)
+                    finishPendingSave(result) { it.error("save_failed", e.message, null) }
                 }
             }
         }.start()
     }
 }
+
+internal fun fileSaveMimeType(fileName: String): String =
+    MimeTypeMap.getSingleton()
+        .getMimeTypeFromExtension(File(fileName).extension.lowercase(Locale.ROOT))
+        ?: "application/octet-stream"
 
 /** Cold launches are read by HomePage; a retained HomePage instead needs an
  * event when Android creates its replacement Activity. Consume the extra so

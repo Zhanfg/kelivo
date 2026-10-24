@@ -1,31 +1,12 @@
 #!/usr/bin/env bash
-# Download Termux PRoot (and its shared-library deps) for Android jniLibs.
-#
-# OpenMinis pinned Termux proot 5.1.107-70. That build has rolled off
-# https://packages.termux.dev/apt/termux-main/pool/main/p/proot/ — the
-# current package is 5.1.107.92, which is dynamically linked against
-# libtalloc and libandroid-shmem.
-#
-# Layout written:
-#   android/app/src/main/jniLibs/<abi>/libproot_exec.so
-#   android/app/src/main/jniLibs/<abi>/libproot_loader.so
-#   android/app/src/main/jniLibs/<abi>/libtalloc.so
-#   android/app/src/main/jniLibs/<abi>/libandroid-shmem.so
-#
+# Restore the pinned Termux PRoot runtime from the checked-in archive.
 # Usage: ./tool/fetch_proot.sh
-
 set -euo pipefail
-
-for need in python3 curl tar; do
-  if ! command -v "$need" >/dev/null 2>&1; then
-    echo "error: required tool missing: $need" >&2
-    exit 1
-  fi
-done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CHECKSUMS_FILE="$SCRIPT_DIR/proot_checksums.txt"
+ARCHIVE="$REPO_ROOT/dependencies/termux/proot-5.1.107.92.tar.xz"
 JNI_LIBS="$REPO_ROOT/android/app/src/main/jniLibs"
 
 TERMUX_POOL="${TERMUX_POOL:-https://packages.termux.dev/apt/termux-main/pool/main}"
@@ -79,98 +60,21 @@ sha256_of() {
   fi
 }
 
-# macOS / BSD `ar` rejects Debian members named `data.tar.xz/` (trailing
-# slash). Parse the SysV archive in Python instead.
-extract_ar() {
-  local deb="$1"
-  local dest="$2"
-  python3 - "$deb" "$dest" <<'PY'
-import sys
-from pathlib import Path
+TMPDIR_FETCH="$(mktemp -d "${TMPDIR:-/tmp}/kelivo-proot.XXXXXX")"
+trap 'rm -rf "$TMPDIR_FETCH"' EXIT
 
-deb = Path(sys.argv[1])
-dest = Path(sys.argv[2])
-dest.mkdir(parents=True, exist_ok=True)
-data = deb.read_bytes()
-if data[:8] != b"!<arch>\n":
-    raise SystemExit(f"not an ar archive: {deb}")
-offset = 8
-while offset + 60 <= len(data):
-    header = data[offset : offset + 60]
-    offset += 60
-    raw_name = header[0:16].decode("ascii", "replace").strip()
-    size = int(header[48:58].decode("ascii").strip())
-    payload = data[offset : offset + size]
-    offset += size + (size % 2)
-    if raw_name.startswith("#1/"):
-        name_len = int(raw_name[3:])
-        raw_name = payload[:name_len].decode("ascii", "replace").rstrip("\x00")
-        payload = payload[name_len:]
-    name = raw_name.rstrip("/").split("/")[-1]
-    if not name:
-        continue
-    (dest / name).write_bytes(payload)
-PY
-}
+echo "Extracting pinned Termux PRoot runtime from $ARCHIVE"
+tar -xJf "$ARCHIVE" -C "$TMPDIR_FETCH"
 
-extract_deb() {
-  local deb="$1"
-  local dest="$2"
-  mkdir -p "$dest"
-  extract_ar "$deb" "$dest"
-  (
-    cd "$dest"
-    local data=""
-    if [[ -f data.tar.xz ]]; then
-      data=data.tar.xz
-    elif [[ -f data.tar.gz ]]; then
-      data=data.tar.gz
-    elif [[ -f data.tar.zst ]]; then
-      if ! command -v zstd >/dev/null 2>&1; then
-        echo "error: $deb contains data.tar.zst but zstd is not installed" >&2
-        exit 1
-      fi
-      zstd -d data.tar.zst -o data.tar
-      data=data.tar
-    elif [[ -f data.tar ]]; then
-      data=data.tar
-    else
-      echo "error: no data.tar* in $deb" >&2
-      ls -la
-      exit 1
-    fi
-    tar xf "$data"
-  )
-}
-
-find_regular_file() {
-  local root="$1"
-  shift
-  local name
-  for name in "$@"; do
-    local found
-    found="$(find "$root" -type f -name "$name" ! -name '*32' | head -n 1 || true)"
-    if [[ -n "$found" ]]; then
-      echo "$found"
-      return 0
-    fi
-  done
-  return 1
-}
-
-copy_elf() {
-  local src="$1"
-  local dest="$2"
-  mkdir -p "$(dirname "$dest")"
-  # Follow a symlink to the real ELF so AGP packages a file, not a link.
-  cp -f "$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$src")" "$dest"
-  chmod 755 "$dest"
-}
-
-verify_checksums() {
-  if [[ ! -f "$CHECKSUMS_FILE" ]]; then
-    echo "error: checksum file missing: $CHECKSUMS_FILE" >&2
-    echo "  Refusing to accept unverified binaries. Commit tool/proot_checksums.txt." >&2
+# Verify every library before replacing any existing local runtime files.
+while read -r hash path; do
+  [[ -z "${hash:-}" || "$hash" == \#* ]] && continue
+  relative_path="${path#android/app/src/main/jniLibs/}"
+  actual="$(sha256_of "$TMPDIR_FETCH/$relative_path")"
+  if [[ "$actual" != "$hash" ]]; then
+    echo "error: checksum mismatch for $path" >&2
+    echo "  expected: $hash" >&2
+    echo "  actual:   $actual" >&2
     exit 1
   fi
   echo "Verifying $CHECKSUMS_FILE"
