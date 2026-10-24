@@ -1,0 +1,162 @@
+name: Reconcile Official Upstream (Guarded)
+
+on:
+  push:
+    branches:
+      - sync/upstream-full-20261024
+    paths:
+      - .github/workflows/reconcile-official-upstream.yml
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/reconcile-official-upstream.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: upstream-reconcile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    if: github.repository == 'Zhanfg/kelivo' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 19)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout isolated integration candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch official upstream without modifying main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add official https://github.com/Chevey339/kelivo.git
+          git fetch --no-tags official master
+          mkdir -p build/upstream-integration
+          TARGET="199647a5d718ed47783dde405007e4c080efdec5"
+          git cat-file -e "$TARGET^{commit}"
+          git merge-base --is-ancestor "$TARGET" official/master
+          printf "Fork candidate: %s\nUpstream target: %s\n" "$(git rev-parse HEAD)" "$TARGET" > build/upstream-integration/baselines.txt
+          git rev-list --left-right --count "HEAD...$TARGET" > build/upstream-integration/ahead-behind.txt
+
+      - name: Reconcile pinned upstream with reviewed conflict policy
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="199647a5d718ed47783dde405007e4c080efdec5"
+          # Squash source so the GitHub App never pushes the upstream's
+          # historic workflow-modifying commits without workflow permission.
+          git merge --squash -s ort -X ours "$TARGET" > build/upstream-integration/merge.log 2>&1 || true
+          git diff --name-only --diff-filter=U > build/upstream-integration/unresolved-paths.txt
+          if [ -s build/upstream-integration/unresolved-paths.txt ]; then
+            echo "Explicitly resolving previously audited publish-workflow and compat-file conflicts:"
+            cat build/upstream-integration/unresolved-paths.txt
+            while IFS= read -r conflict; do
+              case "$conflict" in
+                .github/workflows/build-stable-38.yml|\
+                .github/workflows/build-stable-47.yml|\
+                .github/workflows/build-stable.yml|\
+                .github/workflows/build.yml)
+                  # These legacy release workflows were deliberately removed
+                  # from our fork; never silently re-enable their write privileges.
+                  git rm -f --ignore-unmatch -- "$conflict"
+                  ;;
+                lib/core/utils/openai_model_compat.dart)
+                  # Keep the fork's custom OpenAI/MiMo compatibility shim.
+                  git add -- "$conflict"
+                  ;;
+                *)
+                  echo "UNREVIEWED UPSTREAM CONFLICT: $conflict" >&2
+                  cat build/upstream-integration/merge.log >&2
+                  exit 1
+                  ;;
+              esac
+            done < build/upstream-integration/unresolved-paths.txt
+          fi
+          # Keep the fork's own Actions policy; upstream workflows must be
+          # reviewed separately and are excluded from this code-only snapshot.
+          git restore --source=HEAD --staged --worktree -- .github/workflows
+          if [ -n "$(git diff --cached --name-only -- .github/workflows)" ]; then
+            echo "Upstream workflow changes remained after restore" >&2
+            exit 1
+          fi
+          if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+            echo "Unresolved merge conflicts remain" >&2
+            git diff --name-only --diff-filter=U >&2
+            exit 1
+          fi
+          git diff --cached --name-only > build/upstream-integration/changed-paths.txt
+          # Vendor source and existing iOS kernel patches ship with upstream
+          # whitespace; do not mass-reformat third-party code during merging.
+          # Still enforce whitespace in first-party changed source.
+          git diff --cached --check -- . ':(exclude)dependencies/**' ':(exclude)ios/sandbox/patches/**'
+          test -f lib/features/agent/services/agent_task_runner.dart
+          test -f lib/features/agent/services/agent_runtime_bootstrap.dart
+          test -f lib/core/providers/world_book_provider.dart
+          test -d assets/story_skills
+          grep -q 'storyMode' lib/features/home/widgets/chat_input_section.dart
+          test -d lib/features/chat
+          test -f assets/agent_runtime/kelivo-control.ts
+          git commit -m "chore(upstream): source snapshot from official Kelivo 199647a5 (workflows excluded)"
+          echo "FULL PINNED UPSTREAM MERGE STAGED — tests and review required" > build/upstream-integration/status.txt
+          echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve merged source in quarantined review branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This branch is deliberately NOT main, not release-ready and not
+          # protected by any passing-build claim; analysis runs afterwards.
+          gh auth setup-git
+          git push origin HEAD:refs/heads/sync/upstream-full-candidate-20261024
+
+      - name: Prepare Flutter verification
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+
+      - name: Analyze and test full integrated candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p lib/secrets
+          printf "const String siliconflowFallbackKey = '';\n" > lib/secrets/fallback.dart
+          flutter pub get
+          flutter gen-l10n
+          dart analyze --fatal-infos lib test integration_test
+          flutter test test/features/agent
+          flutter test test/features/story
+          # Four test shards use the repository's established CI test runner.
+          for shard in 0 1 2 3; do
+            SHARD="$shard" SHARD_COUNT=4 bash .github/scripts/run_test_shard.sh
+          done
+
+      - name: Publish only tested candidate to isolated branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git push origin HEAD:refs/heads/sync/upstream-full-20261024
+
+      - name: Publish diagnostic artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kelivo-upstream-merge-diagnostics
+          path: build/upstream-integration/
+          if-no-files-found: warn
+          retention-days: 14
