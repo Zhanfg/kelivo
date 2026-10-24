@@ -8,15 +8,18 @@ class _SandboxRuntime extends WorkspaceRuntime {
   bool get supportsPty => true;
 
   @override
-  Future<RuntimeStatus> status() async => const RuntimeStatus(
-    ready: true,
-    engine: 'fake',
-    sandboxed: true,
-  );
+  Future<RuntimeStatus> status() async {
+    return const RuntimeStatus(
+      ready: true,
+      engine: 'fake',
+      sandboxed: true,
+    );
+  }
 
   @override
-  Stream<CommandEvent> run(CommandRequest request) =>
-      const Stream<CommandEvent>.empty();
+  Stream<CommandEvent> run(CommandRequest request) {
+    return const Stream<CommandEvent>.empty();
+  }
 
   @override
   Future<void> cancel(String runId) async {}
