@@ -891,6 +891,7 @@ class _MessageListViewState extends State<MessageListView> {
     );
     var extent = 0.0;
     var visibleBlockCount = 0;
+    var textBubbleCount = 0;
     void addVisible(double height) {
       if (visibleBlockCount > 0) extent += 8.0;
       extent += height;
@@ -918,6 +919,7 @@ class _MessageListViewState extends State<MessageListView> {
         continue;
       }
       if (block.isText && block.text != null) {
+        textBubbleCount++;
         final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(block.text!));
         final charsPerLine = math.max(1.0, textWidth / charWidth);
         addVisible(
@@ -950,6 +952,11 @@ class _MessageListViewState extends State<MessageListView> {
           fontScale: fontScale,
         ),
       );
+    }
+    // Each additional visible text bubble has 12px vertical padding on both
+    // sides. The base chrome budget already includes the first bubble.
+    if (textBubbleCount > 1) {
+      extent += (textBubbleCount - 1) * 24.0;
     }
     return (extent: extent, fromParts: projected.fromParts);
   }
