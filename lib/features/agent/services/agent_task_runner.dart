@@ -17,6 +17,7 @@ import 'agent_context_materializer.dart';
 import 'agent_model_bridge.dart';
 import 'agent_runtime_bootstrap.dart';
 import 'agent_task_journal.dart';
+import 'agent_resume_safety.dart';
 import 'agent_engine_installer.dart';
 import 'agent_github_cli_installer.dart';
 import 'pi_rpc_session.dart';
@@ -87,10 +88,22 @@ class AgentTaskRunner {
     Map<String, String> secretValues = const <String, String>{};
 
     try {
+      final resume = AgentResumeSafety.inspect(
+        task.phase == AgentTaskPhase.queued
+            ? const <AgentTaskEvent>[]
+            : await journal.read(taskId),
+      );
+      if (resume.action == AgentResumeAction.blocked) {
+        throw StateError(
+          resume.reason ?? 'agent_resume_requires_manual_review',
+        );
+      }
+      final continuing = resume.action == AgentResumeAction.continueSession;
+
       await tasks.setPhase(
         taskId,
-        AgentTaskPhase.preparing,
-        currentStep: 'Preparing task',
+        continuing ? AgentTaskPhase.recovering : AgentTaskPhase.preparing,
+        currentStep: continuing ? 'Restoring saved Agent session' : 'Preparing task',
       );
 
       final runtimeHandle = await runtimeBootstrap.ensureReady(
@@ -103,6 +116,12 @@ class AgentTaskRunner {
       if (workspace == null) throw StateError('agent_workspace_missing');
       final workspaceRoot = await workspaces.hostRootFor(workspace);
       final taskDir = await AppDirectories.agentTaskDir(task.id);
+      if (continuing &&
+          !await AgentResumeSafety.hasPersistedSession(
+            Directory('${taskDir.path}/pi-session'),
+          )) {
+        throw StateError('agent_resume_session_file_missing');
+      }
       final installation = await engineInstaller.ensureInstalled(
         environmentId: task.environmentId,
       );
@@ -143,6 +162,12 @@ class AgentTaskRunner {
       );
       final pinnedModel = task.pinnedModel;
       final permissionMode = agentSettings.permissionMode;
+      // A recovered model must request approval before new mutations, even
+      // when the original task was created in automatic execution mode.
+      final executionPermission = continuing &&
+              permissionMode != AgentPermissionMode.readOnly
+          ? AgentPermissionMode.ask
+          : permissionMode;
       final providerKey =
           pinnedModel?.providerKey ??
           (agentSettings.hasModelOverride
@@ -173,7 +198,7 @@ class AgentTaskRunner {
       );
       final engineConfigFile = await _writeEngineConfig(
         taskDir,
-        permissionMode: permissionMode,
+        permissionMode: executionPermission,
         maxParallelAgents: agentSettings.maxParallelAgents,
         subagentIsolation: agentSettings.subagentIsolation,
         githubEnabled: githubCli != null,
@@ -213,7 +238,8 @@ class AgentTaskRunner {
         cwd: '/workspace',
         sessionDir: '/kelivo-agent-task/pi-session',
         sessionName: task.title.isEmpty ? 'KELIVO Agent' : task.title,
-        approvalMode: _ompApprovalMode(permissionMode),
+        resumeExisting: continuing,
+        approvalMode: _ompApprovalMode(executionPermission),
         appendSystemPrompt: materializedContext.guestPromptFile,
         extraArgs: <String>[
           '--model',
@@ -227,7 +253,7 @@ class AgentTaskRunner {
           'PI_CODING_AGENT_DIR': '/home/kelivo/.pi/agent',
           'PI_TELEMETRY': '0',
           'PI_SKIP_VERSION_CHECK': '1',
-          'KELIVO_AGENT_PERMISSION_MODE': permissionMode.name,
+          'KELIVO_AGENT_PERMISSION_MODE': executionPermission.name,
           'KELIVO_AGENT_BRIDGE_KEY': modelEndpoint.token,
           'OMP_WORKTREE_DIR': '/kelivo-agent-task/worktrees',
           if (githubCli != null)
@@ -236,7 +262,7 @@ class AgentTaskRunner {
         },
       );
       _sessions[taskId] = session;
-      _sessionPermissions[taskId] = permissionMode;
+      _sessionPermissions[taskId] = executionPermission;
       _sessionSecrets[taskId] = executionSecrets;
       final subagentSubscription = await session.setSubagentSubscription(
         level: 'events',
@@ -280,7 +306,24 @@ class AgentTaskRunner {
         AgentTaskPhase.running,
         currentStep: 'Working',
       );
-      final promptResponse = await session.prompt(task.goal);
+      // Flush intent before dispatch. A crash between RPC acceptance and
+      // the next event must never cause a blind replay of the original goal.
+      await journal.append(
+        taskId,
+        AgentTaskEventKind.checkpoint,
+        payload: const <String, dynamic>{
+          'kind': 'prompt_dispatch_started',
+        },
+      );
+      final promptResponse = await session.prompt(
+        continuing
+            ? 'Continue the existing task using the persisted session history. '
+                  'Inspect prior tool results and the current workspace before '
+                  'planning any further actions. Do not re-execute previously '
+                  'completed mutating or external operations. Ask for explicit '
+                  'approval before any new side effects, and report uncertainty.'
+            : task.goal,
+      );
       if (promptResponse['success'] != true) {
         throw StateError('pi_prompt_rejected');
       }
