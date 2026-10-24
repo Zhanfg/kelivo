@@ -87,15 +87,13 @@ jobs:
           fi
 
       - name: Setup Flutter for candidate verification
-        if: steps.cherry.outputs.ported == 'true'
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.44.9'
           channel: stable
           cache: true
 
-      - name: Validate ported source
-        if: steps.cherry.outputs.ported == 'true'
+      - name: Validate candidate source
         shell: bash
         run: |
           set -euo pipefail
