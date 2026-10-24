@@ -85,7 +85,10 @@ jobs:
             exit 1
           fi
           git diff --cached --name-only > build/upstream-integration/changed-paths.txt
-          git diff --cached --check
+          # Vendor source and existing iOS kernel patches ship with upstream
+          # whitespace; do not mass-reformat third-party code during merging.
+          # Still enforce whitespace in first-party changed source.
+          git diff --cached --check -- . ':(exclude)dependencies/**' ':(exclude)ios/sandbox/patches/**'
           test -f lib/features/agent/services/agent_task_runner.dart
           test -f lib/features/agent/services/agent_runtime_bootstrap.dart
           test -d lib/features/story
