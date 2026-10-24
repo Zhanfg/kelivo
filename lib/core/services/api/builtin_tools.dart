@@ -1,7 +1,4 @@
-import '../../models/model_spec.dart';
-import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
-import '../model_spec/model_spec_resolver.dart';
 
 class BuiltInToolsRequestPayload {
   final List<Map<String, dynamic>> tools;
@@ -139,24 +136,40 @@ abstract class BuiltInToolsHelper {
     return host == _dashScopeHost;
   }
 
+  static String _normalizedModelId(String? modelId) {
+    return modelId?.trim().toLowerCase() ?? '';
+  }
+
+  static DateTime? _snapshotDate(String normalizedModelId) {
+    final m = RegExp(r'-(\d{4}-\d{2}-\d{2})$').firstMatch(normalizedModelId);
+    if (m == null) return null;
+    try {
+      return DateTime.parse(m.group(1)!);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool _matchesExactOrSnapshot(
+    String normalizedModelId, {
+    required String alias,
+    String? minSnapshot,
+    List<String> extraExact = const <String>[],
+  }) {
+    if (normalizedModelId == alias) return true;
+    if (extraExact.contains(normalizedModelId)) return true;
+    if (minSnapshot == null || !normalizedModelId.startsWith('$alias-')) {
+      return false;
+    }
+    final date = _snapshotDate(normalizedModelId);
+    if (date == null) return false;
+    return !date.isBefore(DateTime.parse(minSnapshot));
+  }
+
   static int? _readIntish(Object? raw) {
     if (raw is int) return raw;
     if (raw is String) return int.tryParse(raw.trim());
     return null;
-  }
-
-  static bool _isChatModel(ProviderConfig? cfg, String? modelId) {
-    if (cfg == null || (modelId ?? '').trim().isEmpty) return false;
-    return ModelSpecResolver.instance.spec(cfg, modelId!).type ==
-        ModelType.chat;
-  }
-
-  static Set<String> _enabledTools(ProviderConfig cfg, String modelId) {
-    final spec = ModelSpecResolver.instance.spec(cfg, modelId);
-    return {
-      ...BuiltInToolNames.parseAndNormalize(spec.builtInTools),
-      ...BuiltInToolNames.parseFromOverride(cfg.modelOverrides[modelId]),
-    };
   }
 
   static bool isDashScopeProvider(ProviderConfig? cfg) {
@@ -165,18 +178,66 @@ abstract class BuiltInToolsHelper {
     return _isDashScopeHost(host);
   }
 
-  static bool isGrokProvider(ProviderConfig? cfg) {
-    if (cfg == null) return false;
-    if (cfg.oauthProvider == OAuthProvider.grok) return true;
-    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
-    final providerId = cfg.id.toLowerCase();
-    final providerName = cfg.name.toLowerCase();
-    return host.contains('x.ai') ||
-        host.contains('grok') ||
-        providerId.contains('grok') ||
-        providerId.contains('xai') ||
-        providerName.contains('grok') ||
-        providerName.contains('xai');
+  static bool isGrokModel(String? modelId) {
+    return _normalizedModelId(modelId).contains('grok');
+  }
+
+  /// Claude model gating: internal builds always qualify, everything else has
+  /// to be listed explicitly because Anthropic ids carry no version ordering.
+  static bool _isClaudeModelIn(String? modelId, Set<String> supported) {
+    final normalized = _normalizedModelId(modelId);
+    return normalized.contains('mythos') ||
+        normalized.contains('fable') ||
+        supported.contains(normalized);
+  }
+
+  /// Current-generation Claude ids, which support every server tool below.
+  static const _claudeCurrentModels = <String>{
+    'claude-fable-5-1',
+    'claude-fable-5',
+    'claude-opus-5',
+    'claude-opus-4-8',
+    'claude-opus-4-7',
+    'claude-opus-4-6',
+    'claude-sonnet-5',
+    'claude-sonnet-4-6',
+  };
+
+  static bool isClaudeBuiltInSearchSupportedModel(String? modelId) {
+    return _isClaudeModelIn(modelId, const <String>{
+      ..._claudeCurrentModels,
+      'claude-sonnet-4-5-20250929',
+      'claude-sonnet-4-20250514',
+      'claude-3-7-sonnet-20250219',
+      'claude-haiku-4-5-20251001',
+      'claude-3-5-haiku-latest',
+      'claude-opus-4-1-20250805',
+      'claude-opus-4-20250514',
+    });
+  }
+
+  static bool isClaudeDynamicWebSearchSupportedModel(String? modelId) {
+    return _isClaudeModelIn(modelId, _claudeCurrentModels);
+  }
+
+  static bool isClaudeCodeExecutionSupportedModel(String? modelId) {
+    return _isClaudeModelIn(modelId, const <String>{
+      ..._claudeCurrentModels,
+      'claude-opus-4-5-20251101',
+      'claude-sonnet-4-5-20250929',
+      'claude-haiku-4-5-20251001',
+    });
+  }
+
+  static bool isOpenAIResponsesBuiltInSearchSupportedModel(String? modelId) {
+    final m = _normalizedModelId(modelId);
+    return m.startsWith('gpt-4o') ||
+        m.startsWith('gpt-4.1') ||
+        m.startsWith('o4-mini') ||
+        m == 'o3' ||
+        m.startsWith('o3-') ||
+        m.startsWith('gpt-5') ||
+        m.startsWith('gpt-6');
   }
 
   static bool isOpenRouterProvider(ProviderConfig? cfg) {
@@ -184,11 +245,6 @@ abstract class BuiltInToolsHelper {
     final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
     final providerId = cfg.id.toLowerCase();
     return host.contains('openrouter.ai') || providerId.contains('openrouter');
-  }
-
-  static bool isVercelProvider(ProviderConfig? cfg) {
-    return Uri.tryParse(cfg?.baseUrl ?? '')?.host.toLowerCase() ==
-        'ai-gateway.vercel.sh';
   }
 
   static Map<String, dynamic>? _openRouterServerTool(String toolName) {
@@ -222,6 +278,125 @@ abstract class BuiltInToolsHelper {
     final raw = cfg.baseUrl.trim();
     if (raw.isEmpty) return true;
     return (Uri.tryParse(raw)?.host.toLowerCase() ?? '') == 'api.anthropic.com';
+  }
+
+  static bool isDeepSeekResponsesBuiltInSearchSupportedModel(String? modelId) {
+    return RegExp(
+      r'(^|[/_:@])(?:deepseek-v4-|deepseek-flash(?:$|[-.]))',
+      caseSensitive: false,
+    ).hasMatch(_normalizedModelId(modelId));
+  }
+
+  static bool isDashScopeChatBuiltInSearchSupportedModel(String? modelId) {
+    final m = _normalizedModelId(modelId);
+    return _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen-max',
+          minSnapshot: '2024-09-19',
+          extraExact: const <String>['qwen-max-latest'],
+        ) ||
+        _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen3-max',
+          minSnapshot: '2025-09-23',
+          extraExact: const <String>['qwen3-max-preview'],
+        ) ||
+        _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen-plus',
+          minSnapshot: '2025-07-14',
+          extraExact: const <String>['qwen-plus-latest'],
+        ) ||
+        _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen3.5-plus',
+          minSnapshot: '2026-02-15',
+        ) ||
+        _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen-flash',
+          minSnapshot: '2025-07-28',
+        ) ||
+        _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen3.5-flash',
+          minSnapshot: '2026-02-23',
+        ) ||
+        _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen-turbo',
+          minSnapshot: '2025-07-15',
+          extraExact: const <String>['qwen-turbo-latest'],
+        ) ||
+        m == 'qwq-plus' ||
+        _isDashScopeQwen37SearchModel(m) ||
+        _isDashScopeQwen38SearchModel(m);
+  }
+
+  static bool isDashScopeResponsesBuiltInSearchSupportedModel(String? modelId) {
+    final m = _normalizedModelId(modelId);
+    return _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen3.6-plus',
+          minSnapshot: '2026-04-02',
+        ) ||
+        _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen3.6-flash',
+          minSnapshot: '2026-04-16',
+        ) ||
+        _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen3.5-plus',
+          minSnapshot: '2026-02-15',
+        ) ||
+        _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen3.5-flash',
+          minSnapshot: '2026-02-23',
+        ) ||
+        _matchesExactOrSnapshot(
+          m,
+          alias: 'qwen3-max',
+          minSnapshot: '2026-01-23',
+        ) ||
+        _isDashScopeQwen37SearchModel(m) ||
+        _isDashScopeQwen38SearchModel(m);
+  }
+
+  static bool _isDashScopeQwen37SearchModel(String normalizedModelId) {
+    return _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.7-max',
+          minSnapshot: '2026-05-17',
+          extraExact: const <String>['qwen3.7-max-preview'],
+        ) ||
+        _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.7-plus',
+          minSnapshot: '2026-05-26',
+        ) ||
+        _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.7-flash',
+          minSnapshot: '2026-07-15',
+        );
+  }
+
+  static bool _isDashScopeQwen38SearchModel(String normalizedModelId) {
+    return _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.8-max',
+          minSnapshot: '2026-08-02',
+          extraExact: const <String>['qwen3.8-max-preview', 'qwen3.8-max-0902'],
+        ) ||
+        _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.8-flash',
+          minSnapshot: '2026-08-26',
+        ) ||
+        normalizedModelId == 'qwen3.8-2.4t-a95b' ||
+        normalizedModelId == 'qwen3.8-27b';
   }
 
   static bool isArkProvider(ProviderConfig? cfg) {
@@ -280,26 +455,50 @@ abstract class BuiltInToolsHelper {
         providerName.contains('智谱');
   }
 
+  static bool isMimoBuiltInSearchSupportedModel(String? modelId) {
+    final m = _normalizedModelId(modelId);
+    return m.startsWith('mimo-v2') || m.contains('/mimo-v2');
+  }
+
+  static bool isKimiK3Model(String? modelId) {
+    return RegExp(
+      r'(^|[/_:@])kimi-k3(?:$|[-.])',
+      caseSensitive: false,
+    ).hasMatch(_normalizedModelId(modelId));
+  }
+
+  static bool isGlmBuiltInSearchSupportedModel(String? modelId) {
+    final m = _normalizedModelId(modelId);
+    return RegExp(r'(^|[/_:@])glm-').hasMatch(m) || m.startsWith('glm');
+  }
+
+  static bool isDoubaoResponsesBuiltInSearchSupportedModel(String? modelId) {
+    final m = _normalizedModelId(modelId);
+    return m.contains('doubao') ||
+        m.contains('seed-1') ||
+        m.contains('seed-2') ||
+        m.contains('seed-evolving');
+  }
+
   static bool supportsBuiltInSearchForModel({
     required ProviderConfig? cfg,
     required String? modelId,
   }) {
-    if (!_isChatModel(cfg, modelId)) return false;
+    if (cfg == null || (modelId ?? '').trim().isEmpty) return false;
     final kind = ProviderConfig.classify(
-      cfg!.id,
+      cfg.id,
       explicitType: cfg.providerType,
+    );
+    final upstreamModelId = BuiltInToolNames.effectiveModelId(
+      cfg: cfg,
+      modelId: modelId,
     );
     switch (kind) {
       case ProviderKind.google:
         return true;
       case ProviderKind.claude:
-        if (isVercelProvider(cfg)) {
-          return BuiltInToolNames.effectiveModelId(
-            cfg: cfg,
-            modelId: modelId,
-          ).toLowerCase().startsWith('anthropic/');
-        }
-        return true;
+        if (isDeepSeekProvider(cfg)) return true;
+        return isClaudeBuiltInSearchSupportedModel(upstreamModelId);
       case ProviderKind.openai:
         if (isOpenRouterProvider(cfg)) {
           return true;
@@ -338,15 +537,6 @@ abstract class BuiltInToolsHelper {
         if (isZhipuProvider(cfg)) {
           return isGlmBuiltInSearchSupportedModel(upstreamModelId);
         }
-        if (isOpenRouterProvider(cfg)) return true;
-        // Native Grok search is only available as Responses tools.
-        if (isGrokProvider(cfg)) return cfg.useResponseApi == true;
-        if (cfg.useResponseApi == true) return true;
-        if (isDashScopeProvider(cfg)) return true;
-        if (isArkProvider(cfg)) return true;
-        if (isMimoProvider(cfg)) return true;
-        if (isMoonshotProvider(cfg)) return true;
-        if (isZhipuProvider(cfg)) return true;
         return false;
     }
   }
@@ -357,7 +547,7 @@ abstract class BuiltInToolsHelper {
     Iterable<String>? override,
   ) {
     return override == null
-        ? _enabledTools(cfg, modelId)
+        ? BuiltInToolNames.parseFromOverride(cfg.modelOverrides[modelId])
         : BuiltInToolNames.parseAndNormalize(override);
   }
 
@@ -410,6 +600,16 @@ abstract class BuiltInToolsHelper {
       add({'type': 'x_search'});
       return BuiltInToolsRequestPayload(tools: tools);
     }
+
+    final supportsSearch =
+        isOpenAIResponsesBuiltInSearchSupportedModel(upstreamModelId) ||
+        (isDeepSeekProvider(cfg) &&
+            isDeepSeekResponsesBuiltInSearchSupportedModel(upstreamModelId)) ||
+        (isDashScopeProvider(cfg) &&
+            isDashScopeResponsesBuiltInSearchSupportedModel(upstreamModelId)) ||
+        (isArkProvider(cfg) &&
+            isDoubaoResponsesBuiltInSearchSupportedModel(upstreamModelId));
+    if (!supportsSearch) return BuiltInToolsRequestPayload(tools: tools);
     if (isDashScopeProvider(cfg) || isArkProvider(cfg)) {
       add({'type': 'web_search'});
       return BuiltInToolsRequestPayload(tools: tools);
@@ -482,14 +682,16 @@ abstract class BuiltInToolsHelper {
         },
       );
     }
-    if (isMimoProvider(cfg)) {
+    if (isMimoProvider(cfg) &&
+        isMimoBuiltInSearchSupportedModel(upstreamModelId)) {
       return const BuiltInToolsRequestPayload(
         tools: <Map<String, dynamic>>[
           <String, dynamic>{'type': 'web_search'},
         ],
       );
     }
-    if (isZhipuProvider(cfg)) {
+    if (isZhipuProvider(cfg) &&
+        isGlmBuiltInSearchSupportedModel(upstreamModelId)) {
       return const BuiltInToolsRequestPayload(
         tools: <Map<String, dynamic>>[
           <String, dynamic>{
@@ -513,39 +715,11 @@ abstract class BuiltInToolsHelper {
     if (cfg == null || modelId == null || modelId.trim().isEmpty) {
       return false;
     }
-    if (!_enabledTools(cfg, modelId).contains(BuiltInToolNames.search)) {
-      return false;
-    }
+    final rawOv = cfg.modelOverrides[modelId];
+    final builtInSet = BuiltInToolNames.parseFromOverride(rawOv);
+    if (!builtInSet.contains(BuiltInToolNames.search)) return false;
     if (!requireSupport) return true;
     return supportsBuiltInSearchForModel(cfg: cfg, modelId: modelId);
-  }
-
-  /// Whether this model request already carries a provider-native page reader.
-  static bool isBuiltInFetchEnabled({
-    required ProviderConfig? cfg,
-    required String? modelId,
-  }) {
-    if (cfg == null || modelId == null || !_isChatModel(cfg, modelId)) {
-      return false;
-    }
-    final enabled = _enabledTools(cfg, modelId);
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
-    if (kind == ProviderKind.google) {
-      return enabled.contains(BuiltInToolNames.urlContext);
-    }
-    if (kind == ProviderKind.claude) {
-      return claudeServerToolEntries(
-        cfg: cfg,
-        modelId: modelId,
-        enabled: enabled,
-      ).any((tool) => tool['name'] == BuiltInToolNames.webFetch);
-    }
-    return kind == ProviderKind.openai &&
-        isOpenRouterProvider(cfg) &&
-        enabled.contains(BuiltInToolNames.webFetch);
   }
 
   /// Upstream model id when [cfg] talks to the official Claude API, or null
@@ -570,9 +744,9 @@ abstract class BuiltInToolsHelper {
     required ProviderConfig? cfg,
     required String? modelId,
   }) {
-    return _isChatModel(cfg, modelId) &&
-        _claudeUpstreamModelId(cfg: cfg, modelId: modelId) != null &&
-        ModelSpecResolver.instance.spec(cfg!, modelId!).dynamicWebSearch;
+    final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
+    return upstreamModelId != null &&
+        isClaudeDynamicWebSearchSupportedModel(upstreamModelId);
   }
 
   /// Persisted marker for the dynamic-filtering web search opt-in. Kept as a
@@ -647,22 +821,17 @@ abstract class BuiltInToolsHelper {
     required ProviderConfig? cfg,
     required String? modelId,
   }) {
-    // Tool type version differs by Claude generation (2026-03-18 vs 2025-03-05).
     return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId)
         ? claudeSearchToolTypeDynamic
         : claudeSearchToolTypeBasic;
   }
 
-  static String claudeBuiltInFetchToolType({
-    required ProviderConfig? cfg,
-    required String? modelId,
-  }) {
-    // Fetch tool version follows the same generation split as web search.
-    return claudeBuiltInSearchToolType(cfg: cfg, modelId: modelId) ==
-            claudeSearchToolTypeDynamic
-        ? claudeFetchToolTypeDynamic
-        : claudeFetchToolTypeBasic;
-  }
+  /// Anthropic ships web fetch on the same models as built-in search, with one
+  /// documented hole: Opus 5 runs every other server tool but not this one, so
+  /// declaring it there is an error rather than an unused tool.
+  static bool isClaudeWebFetchSupportedModel(String? modelId) =>
+      _normalizedModelId(modelId) != 'claude-opus-5' &&
+      isClaudeBuiltInSearchSupportedModel(modelId);
 
   /// Request entries for the Anthropic-hosted server tools beyond search, whose
   /// entry is shaped by the per-model web search options instead. These run on
@@ -673,18 +842,24 @@ abstract class BuiltInToolsHelper {
     required String? modelId,
     required Set<String> enabled,
   }) {
-    if (_claudeUpstreamModelId(cfg: cfg, modelId: modelId) == null) {
-      return const <Map<String, dynamic>>[];
-    }
-    if (!_isChatModel(cfg, modelId)) return const <Map<String, dynamic>>[];
+    final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
+    if (upstreamModelId == null) return const <Map<String, dynamic>>[];
+    final dynamicFiltering = isClaudeDynamicWebSearchEnabled(
+      cfg: cfg,
+      modelId: modelId,
+    );
     return <Map<String, dynamic>>[
-      if (enabled.contains(BuiltInToolNames.webFetch))
+      if (enabled.contains(BuiltInToolNames.webFetch) &&
+          isClaudeWebFetchSupportedModel(upstreamModelId))
         <String, dynamic>{
-          'type': claudeBuiltInFetchToolType(cfg: cfg, modelId: modelId),
+          'type': dynamicFiltering
+              ? claudeFetchToolTypeDynamic
+              : claudeFetchToolTypeBasic,
           'name': 'web_fetch',
           'max_content_tokens': claudeFetchMaxContentTokens,
         },
-      if (enabled.contains(BuiltInToolNames.codeExecution))
+      if (enabled.contains(BuiltInToolNames.codeExecution) &&
+          isClaudeCodeExecutionSupportedModel(upstreamModelId))
         <String, dynamic>{
           'type': claudeCodeExecutionToolType,
           'name': 'code_execution',
@@ -709,10 +884,9 @@ abstract class BuiltInToolsHelper {
     required String? modelId,
     Iterable<Map<String, dynamic>> clientTools = const [],
   }) {
-    if (_claudeUpstreamModelId(cfg: cfg, modelId: modelId) == null) {
-      return false;
-    }
-    if (!_isChatModel(cfg, modelId)) return false;
+    final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
+    if (upstreamModelId == null) return false;
+    if (!isClaudeCodeExecutionSupportedModel(upstreamModelId)) return false;
     if (clientTools.map(claimedToolName).contains('code_execution')) {
       return false;
     }
@@ -780,15 +954,7 @@ abstract class BuiltInToolsHelper {
 
   /// Tool names edited in a model's built-in tools tab. Search is excluded
   /// because it is controlled from the chat search switch.
-  static Set<String> modelSettingsToolNames(
-    ProviderConfig cfg, {
-    String? modelId,
-  }) {
-    if (modelId != null &&
-        modelId.trim().isNotEmpty &&
-        !_isChatModel(cfg, modelId)) {
-      return const <String>{};
-    }
+  static Set<String> modelSettingsToolNames(ProviderConfig cfg) {
     final kind = ProviderConfig.classify(
       cfg.id,
       explicitType: cfg.providerType,
@@ -826,9 +992,8 @@ abstract class BuiltInToolsHelper {
     required ProviderConfig cfg,
     required Iterable<String> current,
     required Iterable<String> selected,
-    String? modelId,
   }) {
-    final editable = modelSettingsToolNames(cfg, modelId: modelId);
+    final editable = modelSettingsToolNames(cfg);
     final result = BuiltInToolNames.parseAndNormalize(current);
     // Only clear what this API mode can edit, so tools hidden by the current
     // mode (e.g. OpenRouter code_interpreter on Chat Completions) survive a save.
@@ -882,15 +1047,14 @@ abstract class BuiltInToolsHelper {
       return const BuiltInToolsState();
     }
 
-    final builtInSet = _enabledTools(cfg, modelId);
+    final rawOv = cfg.modelOverrides[modelId];
+    final builtInSet = BuiltInToolNames.parseFromOverride(rawOv);
 
     final bool searchActive = isBuiltInSearchEnabled(
       cfg: cfg,
       modelId: modelId,
     );
-    final active = builtInSet.intersection(
-      modelSettingsToolNames(cfg, modelId: modelId),
-    );
+    final active = builtInSet.intersection(modelSettingsToolNames(cfg));
 
     return BuiltInToolsState(
       searchActive: searchActive,
