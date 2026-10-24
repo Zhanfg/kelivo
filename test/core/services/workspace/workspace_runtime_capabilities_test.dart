@@ -9,11 +9,7 @@ class _SandboxRuntime extends WorkspaceRuntime {
 
   @override
   Future<RuntimeStatus> status() async {
-    return const RuntimeStatus(
-      ready: true,
-      engine: 'fake',
-      sandboxed: true,
-    );
+    return const RuntimeStatus(ready: true, engine: 'fake', sandboxed: true);
   }
 
   @override
