@@ -40,6 +40,27 @@ void main() {
     expect(events.last.payload['exitCode'], 0);
   });
 
+  test('rejects traversal and malformed task identifiers', () async {
+    final journal = AgentTaskJournal(rootDirectory: root);
+    for (final invalid in <String>[
+      '../other',
+      '/tmp/escaped',
+      'a/b',
+      r'a\b',
+      '..',
+      '.',
+      '',
+      'x' * 129,
+    ]) {
+      await expectLater(
+        journal.append(invalid, AgentTaskEventKind.note),
+        throwsArgumentError,
+      );
+      await expectLater(journal.read(invalid), throwsArgumentError);
+    }
+    expect(await root.list().toList(), isEmpty);
+  });
+
   test('journal ignores a corrupt trailing record', () async {
     final journal = AgentTaskJournal(rootDirectory: root);
     await journal.append('task-1', AgentTaskEventKind.note);
