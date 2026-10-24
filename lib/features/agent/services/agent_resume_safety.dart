@@ -29,6 +29,14 @@ abstract final class AgentResumeSafety {
         case AgentTaskEventKind.checkpoint:
           if (payload['kind'] == 'prompt_dispatch_started') {
             promptMayHaveRun = true;
+          } else if (payload['kind'] ==
+              'resume_uncertain_operations_acknowledged') {
+            // Only an explicit review may clear uncertainties that predate it.
+            // Any subsequent in-flight tool or approval blocks again.
+            promptMayHaveRun = true;
+            pendingTools.clear();
+            uncorrelatedTool = false;
+            unresolvedApprovals = 0;
           }
           break;
         case AgentTaskEventKind.turnStarted:
