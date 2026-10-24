@@ -1,0 +1,41 @@
+name: Format PR23 Dart Regression
+
+on:
+  push:
+    branches: [sync/upstream-workspace-capabilities-20261024]
+    paths:
+      - .github/workflows/pr23-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  autoformat:
+    if: github.repository == 'Zhanfg/kelivo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sync/upstream-workspace-capabilities-20261024
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+      - name: Apply deterministic dart_style format to PR test
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart format --output=write test/core/services/workspace/workspace_runtime_capabilities_test.dart
+          git diff --check
+          if git diff --quiet -- test/core/services/workspace/workspace_runtime_capabilities_test.dart; then
+            echo "already canonical"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add test/core/services/workspace/workspace_runtime_capabilities_test.dart
+          git commit -m "style(test): apply canonical dart format for workspace regression"
+          git push origin HEAD:refs/heads/sync/upstream-workspace-capabilities-20261024
