@@ -1,4 +1,3 @@
-import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -6,21 +5,15 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-import '../../../../models/model_spec.dart';
 import '../../../../models/token_usage.dart';
 import '../../../../providers/model_provider.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
-import '../../../model_spec/model_spec_resolver.dart';
-import '../../../model_spec/vendor_defaults.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
-import '../../native_input_attachments.dart';
-import '../../tool_result_content.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../kimi_formula_search.dart';
-import '../../reasoning/reasoning_dialects.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
@@ -31,7 +24,6 @@ import 'openai_vendor_compat.dart';
 import 'openai_protocol_compat.dart';
 import 'responses_api.dart';
 import 'responses_decoder.dart';
-import 'responses_history.dart';
 
 Uri _openAICompatibleUrl(ProviderConfig config) {
   final rawBase = config.baseUrl.endsWith('/')
@@ -111,9 +103,8 @@ Stream<StreamChunk> sendOpenAIStream(
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
-  String? conversationId,
   List<String>? userImagePaths,
-  ReasoningRequest reasoning = ReasoningRequest.auto,
+  int? thinkingBudget,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -145,21 +136,47 @@ Stream<StreamChunk> sendOpenAIStream(
         ).where((name) => name == BuiltInToolNames.search)
       : null;
   final url = _openAICompatibleUrl(config);
+  // Claude models served through OpenAI-compatible proxies require signed
+  // thinking blocks; unsigned reasoning echoes are stripped before sending.
+  final isClaudeUpstream = upstreamModelId.toLowerCase().contains('claude');
 
-  final spec = ModelSpecResolver.instance.spec(config, modelId);
-  final wantsImageOutput = spec.output.contains(Modality.image);
-  final bool canImageInput = spec.input.contains(Modality.image);
-  final vendor = VendorDefaults.forProvider(config);
-  final bool allowRemoteImages = canImageInput && spec.remoteImageUrls;
+  final effectiveInfo = effectiveModelInfo(config, modelId);
+  final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
+  final wantsImageOutput = effectiveInfo.output.contains(Modality.image);
+  final bool canImageInput = effectiveInfo.input.contains(Modality.image);
+
+  final effort = openAIEffortForBudget(thinkingBudget, upstreamModelId);
+  final modelMetadata = config.modelOverrides[modelId];
+  final info = OpenAIProviderInfo(
+    host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
+    providerId: config.id.toLowerCase(),
+    upstreamModelId: upstreamModelId,
+    // Kimi Code can advertise opaque IDs such as k3. Its declared protocol and
+    // thinking capability apply even when the ID has no kimi-* prefix.
+    isKimiCodeThinkingModel:
+        config.oauthProvider == OAuthProvider.kimi &&
+        config.useResponseApi != true &&
+        modelMetadata is Map &&
+        modelMetadata['oauthProtocol'] == 'openai' &&
+        (isReasoning || modelMetadata['oauthThinkingRequired'] == true),
+  );
+  final bool allowRemoteImages =
+      canImageInput &&
+      !isKimiK3Model(upstreamModelId) &&
+      !info.isKimiCodeK3Model;
   // OpenRouter documents delta-style `reasoning_details` chunks that must be
   // concatenated in order, so cumulative-snapshot detection is disabled for
   // it; other providers may resend the full array-so-far with each chunk.
   final reasoningDetailsAllowSnapshots =
       !BuiltInToolsHelper.isOpenRouterProvider(config);
   final bool needsReasoningEcho =
-      spec.reasoning.replay != ReasoningReplayPolicy.none;
+      info.isKimiCodeThinkingModel ||
+      (info.needsReasoningEcho &&
+          (isReasoning ||
+              info.isKimiCodingModel ||
+              (info.isDeepSeek && tools?.isNotEmpty == true)));
   void setMaxTokens(Map<String, dynamic> map) {
-    if (maxTokens != null) map[vendor.maxTokensKey] = maxTokens;
+    if (maxTokens != null) map[info.completionTokensKey] = maxTokens;
   }
 
   // Kimi K3 Formula web-search: fetch tool decls, then fiber-execute calls.
@@ -170,20 +187,9 @@ Stream<StreamChunk> sendOpenAIStream(
     config,
     modelId,
   ).contains(BuiltInToolNames.search);
-  if (BuiltInToolsHelper.isVercelProvider(config) &&
-      config.useResponseApi == true &&
-      builtInSearchEnabled &&
-      !BuiltInToolsHelper.supportsBuiltInSearchForModel(
-        cfg: config,
-        modelId: modelId,
-      )) {
-    throw UnsupportedError(
-      'Kelivo supports Vercel Responses native web search with OpenAI models. '
-      'Use Chat Completions for Vercel Gateway search with other models.',
-    );
-  }
   if (config.useResponseApi != true &&
       BuiltInToolsHelper.isMoonshotProvider(config) &&
+      BuiltInToolsHelper.isKimiK3Model(upstreamModelId) &&
       builtInSearchEnabled) {
     try {
       kimiFormulaTools = await KimiFormulaSearch.fetchTools(
@@ -226,11 +232,7 @@ Stream<StreamChunk> sendOpenAIStream(
       const <Map<String, dynamic>>[];
   String responsesInstructions = '';
   List<dynamic>? responsesIncludeParam;
-  final responsesRecorder = ResponsesTurnRecorder(
-    responsesReplayScope(config, modelId),
-  );
   if (config.useResponseApi == true) {
-    messages = filterResponsesReasoningHistory(messages, spec.reasoning.replay);
     final input = <Map<String, dynamic>>[];
     // Extract system messages into `instructions` (Responses API best practice)
     String instructions = '';
@@ -276,12 +278,6 @@ Stream<StreamChunk> sendOpenAIStream(
           : (originalContent ?? '').toString();
       final roleRaw = (m['role'] ?? 'user').toString();
 
-      if (roleRaw == 'assistant' &&
-          m[multimodalInternalResponsesItemKey] is Map) {
-        input.add(responsesInputItem(m));
-        continue;
-      }
-
       // Responses API supports a top-level `instructions` field that has higher priority
       if (roleRaw == 'system') {
         if (raw.isNotEmpty) {
@@ -298,44 +294,13 @@ Stream<StreamChunk> sendOpenAIStream(
           input.add({
             'type': 'function_call_output',
             'call_id': toolCallId,
-            'output': (await ToolResultContent.read(
-              (m['name'] ?? '').toString(),
-              content,
-              metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
-              canImageInput: canImageInput,
-            )).responsesOutput,
+            'output': content,
           });
         }
         continue;
       }
 
-      final nativeParts =
-          await NativeInputAttachments(
-            config: config,
-            spec: spec,
-            protocol: NativeInputProtocol.responses,
-          ).build(
-            m,
-            userPaths: i == lastResponsesUserIndex ? userImagePaths : null,
-          );
-      void addMessage(Map<String, dynamic> message) {
-        if (nativeParts.isNotEmpty) {
-          final content = message['content'];
-          message['content'] = [
-            if (content is List)
-              ...content
-            else if (content is String && content.isNotEmpty)
-              {'type': 'input_text', 'text': content},
-            ...nativeParts,
-          ];
-        }
-        input.add(message);
-      }
-
       final isAssistant = roleRaw == 'assistant';
-      // Reconstructed assistant text precedes its calls. Insert it here so
-      // no message separates a tool-call batch from its matching results.
-      final assistantMessageIndex = input.length;
 
       // Handle assistant messages with tool_calls - convert to function_call format
       if (isAssistant && m['tool_calls'] is List) {
@@ -400,7 +365,7 @@ Stream<StreamChunk> sendOpenAIStream(
         );
         if (!canImageInput) {
           if (isAssistant) {
-            input.insert(assistantMessageIndex, {
+            input.add({
               'type': 'message',
               'role': 'assistant',
               'status': 'completed',
@@ -409,7 +374,7 @@ Stream<StreamChunk> sendOpenAIStream(
               ],
             });
           } else {
-            addMessage({'role': roleRaw, 'content': parsed.text});
+            input.add({'role': roleRaw, 'content': parsed.text});
           }
           continue;
         }
@@ -473,7 +438,6 @@ Stream<StreamChunk> sendOpenAIStream(
           final p = mediaRef.uri;
           final String mime = mimeForInternalMediaRef(mediaRef);
           final bool isAv = isAudioMime(mime) || isVideoMime(mime);
-          if ((isAv || isPdfMime(mime)) && !isAssistant) continue;
           if (isAv) {
             // Responses path has no first-class A/V input parts here; never
             // encode video/audio as input_image. Keep a text reference for both
@@ -531,20 +495,20 @@ Stream<StreamChunk> sendOpenAIStream(
           if (assistantContent.isEmpty) {
             assistantContent.add({'type': 'output_text', 'text': parsed.text});
           }
-          input.insert(assistantMessageIndex, {
+          input.add({
             'type': 'message',
             'role': 'assistant',
             'status': 'completed',
             'content': assistantContent,
           });
         } else {
-          addMessage({'role': roleRaw, 'content': parts});
+          input.add({'role': roleRaw, 'content': parts});
         }
       } else {
         // No images
         if (isAssistant) {
           // Use proper message object format for assistant messages
-          input.insert(assistantMessageIndex, {
+          input.add({
             'type': 'message',
             'role': 'assistant',
             'status': 'completed',
@@ -553,7 +517,7 @@ Stream<StreamChunk> sendOpenAIStream(
             ],
           });
         } else {
-          addMessage({'role': roleRaw, 'content': raw});
+          input.add({'role': roleRaw, 'content': raw});
         }
       }
     }
@@ -567,7 +531,20 @@ Stream<StreamChunk> sendOpenAIStream(
       if (maxTokens != null) 'max_output_tokens': maxTokens,
       if (toolList.isNotEmpty) 'tools': toResponsesToolsFormat(toolList),
       if (toolList.isNotEmpty) 'tool_choice': 'auto',
+      if (isReasoning && effort != 'off')
+        'reasoning': {
+          'summary': 'auto',
+          if (effort != 'auto') 'effort': effort,
+        },
     };
+    applyCompatibleResponsesReasoning(
+      body,
+      config: config,
+      modelId: modelId,
+      upstreamModelId: upstreamModelId,
+      isReasoning: isReasoning,
+      thinkingBudget: thinkingBudget,
+    );
     // OpenAI-compatible native search can optionally expose source details.
     // OpenRouter rejects the `include` parameter, so skip it there.
     if (!BuiltInToolsHelper.isDashScopeProvider(config) &&
@@ -579,12 +556,6 @@ Stream<StreamChunk> sendOpenAIStream(
           body['include'] = ['web_search_call.action.sources'];
         }
       } catch (_) {}
-    }
-    if (Uri.tryParse(config.baseUrl)?.host == 'api.openai.com') {
-      body['include'] = [
-        ...?body['include'] as List?,
-        'reasoning.encrypted_content',
-      ];
     }
     // Save initial Responses context
     try {
@@ -619,15 +590,13 @@ Stream<StreamChunk> sendOpenAIStream(
     final mm = await buildOpenAIChatCompletionMessages(
       messages,
       userMediaPaths: userImagePaths,
-      nativeInputs: NativeInputAttachments(
-        config: config,
-        spec: spec,
-        protocol: NativeInputProtocol.chatCompletions,
-      ),
       canImageInput: canImageInput,
       allowRemoteImages: allowRemoteImages,
-      reasoningReplay: spec.reasoning.replay,
-      replayField: spec.reasoning.replayField,
+      reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
+      supportsGoogleOpenAIThoughtSignatures:
+          info.supportsGoogleOpenAIThoughtSignatures,
+      stripReasoningContent: isClaudeUpstream,
+      normalizeReasoningDetails: isClaudeUpstream,
       skipImageParsing: skipImageParsing,
     );
     body = {
@@ -636,11 +605,32 @@ Stream<StreamChunk> sendOpenAIStream(
       'stream': stream,
       if (temperature != null) 'temperature': temperature,
       if (topP != null) 'top_p': topP,
+      if (isReasoning && effort != 'off' && effort != 'auto')
+        'reasoning_effort': effort,
       if (tools != null && tools.isNotEmpty)
-        'tools': copyChatCompletionTools(tools),
+        'tools': cleanToolsForCompatibility(tools),
       if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
     };
     setMaxTokens(body);
+  }
+
+  // Vendor-specific reasoning knobs for chat-completions compatible hosts
+  if (config.useResponseApi != true) {
+    applyVendorReasoningKnobs(
+      body,
+      info: info,
+      isReasoning: isReasoning,
+      thinkingBudget: thinkingBudget,
+    );
+    if (info.isKimiThinkingModel) {
+      normalizeMoonshotKimiChatBody(
+        body,
+        info: info,
+        upstreamModelId: upstreamModelId,
+        isReasoning: isReasoning,
+        thinkingBudget: thinkingBudget,
+      );
+    }
   }
 
   final request = http.Request('POST', url);
@@ -655,33 +645,38 @@ Stream<StreamChunk> sendOpenAIStream(
     assistantHeaders: extraHeaders,
   );
   request.headers.addAll(headers);
-  maybeAddStreamingUsageOptions(body, stream: stream, config: config);
+  maybeAddStreamingUsageOptions(
+    body,
+    stream: stream,
+    config: config,
+    host: info.host,
+  );
   if (config.useResponseApi != true) {
     formulaToolNames.addAll(
       KimiFormulaSearch.mergeTools(body, kimiFormulaTools),
     );
   }
-  applyOpenRouterClaudePromptCaching(body, config: config, spec: spec);
-
-  applyOpenAIResolvedRequest(
+  applyOpenRouterClaudePromptCaching(
     body,
-    spec: spec,
-    reasoning: reasoning,
-    transport: config.useResponseApi == true
-        ? ReasoningTransport.responses
-        : ReasoningTransport.chatCompletions,
+    config: config,
+    upstreamModelId: upstreamModelId,
   );
-  // Custom body keys go last so they win over the reasoning dialect.
+
+  // Merge custom body keys (override takes precedence)
   final extraBodyCfg = customBody(config, modelId, assistantBody: extraBody);
-  CustomRequestMerger.applyBody(body, extraBodyCfg);
-  if (promptCacheKey != null) {
-    body.putIfAbsent('prompt_cache_key', () => promptCacheKey);
+  if (extraBodyCfg.isNotEmpty) {
+    body.addAll(extraBodyCfg);
   }
+  applyPoolsideThinkingIfNeeded(
+    body,
+    info: info,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
   // Built-in tools run after the custom body and merge by type so custom
   // function tools and provider server tools coexist.
-  Object? builtInSearchQuery;
   if (config.useResponseApi != true) {
-    builtInSearchQuery = applyChatCompletionsBuiltInTools(
+    applyChatCompletionsBuiltInTools(
       body,
       config: config,
       modelId: modelId,
@@ -689,6 +684,26 @@ Stream<StreamChunk> sendOpenAIStream(
       configuredTools: configuredBuiltInTools,
     );
   }
+  sanitizeOpenAIGpt5SamplingParams(
+    body,
+    upstreamModelId,
+    fallbackEffort: effort,
+    isOpenRouter: info.isOpenRouter,
+  );
+  normalizeMoonshotKimiChatBody(
+    body,
+    info: info,
+    upstreamModelId: upstreamModelId,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
+  applyKimiCodeChatThinking(
+    body,
+    config: config,
+    modelId: modelId,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
   request.body = jsonEncode(body);
 
   final response = await client.send(request);
@@ -704,12 +719,6 @@ Stream<StreamChunk> sendOpenAIStream(
       final obj = jsonDecode(txt);
       // Responses API non-stream
       if (config.useResponseApi == true) {
-        for (final chunk
-            in ResponsesStreamDecoder(sourceId: 'finish').decodeSearchResults(
-              obj['response'] is Map ? obj['response'] as Map : obj as Map,
-            )) {
-          yield chunk;
-        }
         String outText = '';
         final rawOutput = obj['output'] ?? obj['response']?['output'];
         final reasoningText = responsesReasoningText(rawOutput);
@@ -778,51 +787,6 @@ Stream<StreamChunk> sendOpenAIStream(
         );
         final ids = StreamChunkIds('finish');
         yield* emitImages(images, ids: ids);
-        final outputItems = <Map<String, dynamic>>[
-          if (rawOutput is List)
-            for (final item in rawOutput.whereType<Map>())
-              item.cast<String, dynamic>(),
-        ];
-        final calls = responsesCallsFromOutput(outputItems);
-        yield responsesRecorder.record(outputItems, calls);
-        if (calls.isNotEmpty && effectiveOnToolCall != null) {
-          yield* emitDelta(
-            ids: ids,
-            content: outText,
-            reasoning: reasoningText,
-            usage: usage,
-          );
-          yield* runOpenAIResponsesToolFollowUps(
-            recorder: responsesRecorder,
-            client: client,
-            config: config,
-            modelId: modelId,
-            upstreamModelId: upstreamModelId,
-            url: url,
-            spec: spec,
-            initialInput: responsesInitialInput,
-            firstOutputItems: outputItems,
-            initialCalls: calls,
-            responsesToolsSpec: responsesToolsSpec,
-            responsesInstructions: responsesInstructions,
-            responsesIncludeParam: responsesIncludeParam,
-            onToolCall: effectiveOnToolCall,
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-            promptCacheKey: promptCacheKey,
-            temperature: temperature,
-            topP: topP,
-            maxTokens: maxTokens,
-            reasoning: reasoning,
-            initialUsage: usage,
-            streamRound: 1,
-            approxPromptTokens: (jsonEncode(messages).length / 4).round(),
-            approxCompletionChars: outText.length,
-            stream: false,
-            retryRound: retryRound,
-          );
-          return;
-        }
         yield* emitDone(
           ids: ids,
           content: outText,
@@ -861,7 +825,7 @@ Stream<StreamChunk> sendOpenAIStream(
           modelId: modelId,
           upstreamModelId: upstreamModelId,
           url: url,
-          spec: spec,
+          info: info,
           messages: messages,
           requestBody: body,
           firstObj: lastObj,
@@ -871,6 +835,7 @@ Stream<StreamChunk> sendOpenAIStream(
           canImageInput: canImageInput,
           allowRemoteImages: allowRemoteImages,
           skipImageParsing: skipImageParsing,
+          isClaudeUpstream: isClaudeUpstream,
           needsReasoningEcho: needsReasoningEcho,
           extraHeaders: extraHeaders,
           initialUsage: firstUsage,
@@ -883,11 +848,6 @@ Stream<StreamChunk> sendOpenAIStream(
       );
       final firstMessage = openaiFirstChoiceMessage(lastObj);
       final ids = StreamChunkIds('finish');
-      for (final chunk in ChatCompletionsStreamDecoder(
-        sourceId: 'finish',
-      ).decodeCitations(lastObj)) {
-        yield chunk;
-      }
       yield* emitImages(visible.images, ids: ids);
       yield* emitDone(
         ids: ids,
@@ -935,6 +895,7 @@ Stream<StreamChunk> sendOpenAIStream(
       <int, Map<String, String>>{}; // index -> {call_id,name,args,series_id}
   List<Map<String, dynamic>> lastResponseOutputItems =
       const <Map<String, dynamic>>[];
+  String? finishReason;
   var streamRound = 0;
   final responsesDecoder = config.useResponseApi == true
       ? ResponsesStreamDecoder(
@@ -982,14 +943,6 @@ Stream<StreamChunk> sendOpenAIStream(
             for (final call in decoder.takeFunctionCalls())
               call.index: call.toIndexFields(),
           });
-        final recordedCalls = responsesCallsFromIndexMap(respToolCallsByIndex);
-        yield responsesRecorder.record(
-          withResponsesFunctionCallItems(
-            lastResponseOutputItems,
-            recordedCalls,
-          ),
-          recordedCalls,
-        );
         if (!decoder.emittedImageEvents) {
           var fallbackCount = 0;
           for (final image in decoder.takeImages()) {
@@ -1050,13 +1003,12 @@ Stream<StreamChunk> sendOpenAIStream(
                     ),
                 ];
           yield* runOpenAIResponsesToolFollowUps(
-            recorder: responsesRecorder,
             client: client,
             config: config,
             modelId: modelId,
             upstreamModelId: upstreamModelId,
             url: url,
-            spec: spec,
+            info: info,
             initialInput: responsesInitialInput,
             firstOutputItems: lastResponseOutputItems,
             initialCalls: callInfos,
@@ -1066,11 +1018,12 @@ Stream<StreamChunk> sendOpenAIStream(
             onToolCall: effectiveOnToolCall,
             extraHeaders: extraHeaders,
             extraBody: extraBody,
-            promptCacheKey: promptCacheKey,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
-            reasoning: reasoning,
+            isReasoning: isReasoning,
+            effort: effort,
+            thinkingBudget: thinkingBudget,
             initialUsage: usage,
             streamRound: streamRound,
             approxPromptTokens: approxPromptTokens,
@@ -1097,14 +1050,179 @@ Stream<StreamChunk> sendOpenAIStream(
         toolAcc
           ..clear()
           ..addAll(decoder.toolCalls);
+        finishReason = decoder.finishReason;
         usage = decoder.usage ?? usage;
         if (usage != null) totalTokens = usage.totalTokens;
         approxCompletionChars = decoder.approxCompletionChars;
         reasoningBuffer = decoder.reasoningEcho;
         assistantContentBuffer = decoder.assistantContent;
-        // Usage can arrive after finish_reason, including tool_calls. Drain
-        // through [DONE] or EOF before starting the next API request.
-        if (data == '[DONE]') break;
+        if (data == '[DONE]') {
+          for (final chunk in decoder.onClosed()) {
+            yield chunk;
+          }
+          if (effectiveOnToolCall != null && toolAcc.isNotEmpty) {
+            yield* runOpenAIChatCompletionsToolFollowUps(
+              client: client,
+              config: config,
+              modelId: modelId,
+              upstreamModelId: upstreamModelId,
+              url: url,
+              info: info,
+              messages: messages,
+              firstToolAcc: toolAcc,
+              firstAssistantContent: assistantContentBuffer,
+              firstReasoning: reasoningBuffer,
+              firstReasoningDetails:
+                  decoder.reasoningDetails ??
+                  reasoningDetailsBuffer.detailsOrNull,
+              onToolCall: effectiveOnToolCall,
+              userImagePaths: userImagePaths,
+              canImageInput: canImageInput,
+              allowRemoteImages: allowRemoteImages,
+              skipImageParsing: skipImageParsing,
+              isClaudeUpstream: isClaudeUpstream,
+              isReasoning: isReasoning,
+              effort: effort,
+              thinkingBudget: thinkingBudget,
+              temperature: temperature,
+              topP: topP,
+              tools: tools,
+              extraBodyCfg: extraBodyCfg,
+              extraHeaders: extraHeaders,
+              wantsImageOutput: wantsImageOutput,
+              needsReasoningEcho: needsReasoningEcho,
+              reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
+              applyMaxTokens: setMaxTokens,
+              initialUsage: usage,
+              streamRound: streamRound,
+              approxPromptTokens: approxPromptTokens,
+              approxCompletionChars: approxCompletionChars,
+              includeReasoningDetailsOnDone: true,
+              retryRound: retryRound,
+            );
+            return;
+          }
+          final approxTotal =
+              approxPromptTokens + approxTokensFromChars(approxCompletionChars);
+          yield* emitDone(
+            ids: StreamChunkIds('finish'),
+            reasoningDetails:
+                decoder.reasoningDetails ??
+                reasoningDetailsBuffer.detailsOrNull,
+            usage: usage,
+            totalTokens: usage?.totalTokens ?? approxTotal,
+          );
+          return;
+        }
+      }
+
+      // Some providers (e.g., OpenRouter) may omit the [DONE] sentinel
+      // and only send finish_reason on the last delta. If we see a
+      // definitive finish that's not tool_calls, end the stream now so
+      // the UI can persist the message.
+      // XinLiu compatibility: Execute tools immediately if we have finish_reason='tool_calls' and accumulated calls
+      if (config.useResponseApi != true &&
+          finishReason == 'tool_calls' &&
+          toolAcc.isNotEmpty &&
+          effectiveOnToolCall != null) {
+        for (final chunk in chatDecoder.onClosed()) {
+          yield chunk;
+        }
+        yield* runOpenAIChatCompletionsToolFollowUps(
+          client: client,
+          config: config,
+          modelId: modelId,
+          upstreamModelId: upstreamModelId,
+          url: url,
+          info: info,
+          messages: messages,
+          firstToolAcc: toolAcc,
+          firstAssistantContent: assistantContentBuffer,
+          firstReasoning: reasoningBuffer,
+          firstReasoningDetails:
+              chatDecoder.reasoningDetails ??
+              reasoningDetailsBuffer.detailsOrNull,
+          onToolCall: effectiveOnToolCall,
+          userImagePaths: userImagePaths,
+          canImageInput: canImageInput,
+          allowRemoteImages: allowRemoteImages,
+          skipImageParsing: skipImageParsing,
+          isClaudeUpstream: isClaudeUpstream,
+          isReasoning: isReasoning,
+          effort: effort,
+          thinkingBudget: thinkingBudget,
+          temperature: temperature,
+          topP: topP,
+          tools: tools,
+          extraBodyCfg: extraBodyCfg,
+          extraHeaders: extraHeaders,
+          wantsImageOutput: wantsImageOutput,
+          needsReasoningEcho: needsReasoningEcho,
+          reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
+          applyMaxTokens: setMaxTokens,
+          initialUsage: usage,
+          streamRound: streamRound,
+          approxPromptTokens: approxPromptTokens,
+          approxCompletionChars: approxCompletionChars,
+          includeReasoningDetailsOnDone: true,
+          retryRound: retryRound,
+        );
+        return;
+      }
+      // XinLiu compatibility: Don't end early if we have accumulated tool calls
+      if (config.useResponseApi != true &&
+          finishReason != null &&
+          finishReason != 'tool_calls') {
+        final bool hasPendingToolCalls =
+            toolAcc.isNotEmpty || toolAccResp.isNotEmpty;
+        final pendingHandler = effectiveOnToolCall;
+        if (hasPendingToolCalls && pendingHandler != null) {
+          // Some providers (like XinLiu/iflow.cn) may return tool_calls with finish_reason='stop'
+          // and may not send a [DONE] marker. Execute tools immediately in this case.
+          for (final chunk in chatDecoder.onClosed()) {
+            yield chunk;
+          }
+          yield* runOpenAIChatCompletionsToolFollowUps(
+            client: client,
+            config: config,
+            modelId: modelId,
+            upstreamModelId: upstreamModelId,
+            url: url,
+            info: info,
+            messages: messages,
+            firstToolAcc: toolAcc,
+            firstAssistantContent: assistantContentBuffer,
+            firstReasoning: reasoningBuffer,
+            firstReasoningDetails:
+                chatDecoder.reasoningDetails ??
+                reasoningDetailsBuffer.detailsOrNull,
+            onToolCall: pendingHandler,
+            userImagePaths: userImagePaths,
+            canImageInput: canImageInput,
+            allowRemoteImages: allowRemoteImages,
+            skipImageParsing: skipImageParsing,
+            isClaudeUpstream: isClaudeUpstream,
+            isReasoning: isReasoning,
+            effort: effort,
+            thinkingBudget: thinkingBudget,
+            temperature: temperature,
+            topP: topP,
+            tools: tools,
+            extraBodyCfg: extraBodyCfg,
+            extraHeaders: extraHeaders,
+            wantsImageOutput: wantsImageOutput,
+            needsReasoningEcho: needsReasoningEcho,
+            reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
+            applyMaxTokens: setMaxTokens,
+            initialUsage: usage,
+            streamRound: streamRound,
+            approxPromptTokens: approxPromptTokens,
+            approxCompletionChars: approxCompletionChars,
+            includeReasoningDetailsOnDone: false,
+            retryRound: retryRound,
+          );
+          return;
+        }
       }
     } on ProviderOAuthException {
       rethrow;
@@ -1120,71 +1238,12 @@ Stream<StreamChunk> sendOpenAIStream(
     }
   }
 
-  // Close the first request after [DONE] or EOF, then continue client tools.
+  // Fallback: provider closed SSE without sending [DONE]
   for (final chunk in chatDecoder?.onClosed() ?? const <StreamChunk>[]) {
     yield chunk;
   }
   for (final chunk in responsesDecoder?.onClosed() ?? const <StreamChunk>[]) {
     yield chunk;
-  }
-  if (responsesDecoder != null) {
-    usage = responsesDecoder.usage ?? usage;
-    approxCompletionChars = responsesDecoder.approxCompletionChars;
-    final output = responsesDecoder.outputItems;
-    if (output.isNotEmpty) {
-      // EOF can follow complete output_item.done events without a terminal
-      // response event. Retain those native items, but do not synthesize or
-      // execute function calls whose response never completed.
-      yield responsesRecorder.record(
-        output,
-        responsesCallsFromIndexMap({
-          for (final call in responsesDecoder.takeFunctionCalls())
-            call.index: call.toIndexFields(),
-        }),
-      );
-    }
-  }
-  if (chatDecoder != null &&
-      effectiveOnToolCall != null &&
-      toolAcc.isNotEmpty) {
-    yield* runOpenAIChatCompletionsToolFollowUps(
-      client: client,
-      config: config,
-      modelId: modelId,
-      upstreamModelId: upstreamModelId,
-      url: url,
-      spec: spec,
-      messages: messages,
-      firstToolAcc: toolAcc,
-      firstAssistantContent: assistantContentBuffer,
-      firstReasoning: reasoningBuffer,
-      firstReasoningDetails:
-          chatDecoder.reasoningDetails ?? reasoningDetailsBuffer.detailsOrNull,
-      onToolCall: effectiveOnToolCall,
-      userImagePaths: userImagePaths,
-      canImageInput: canImageInput,
-      allowRemoteImages: allowRemoteImages,
-      skipImageParsing: skipImageParsing,
-      reasoning: reasoning,
-      temperature: temperature,
-      topP: topP,
-      tools: tools,
-      builtInSearchQuery: builtInSearchQuery,
-      extraBodyCfg: extraBodyCfg,
-      promptCacheKey: promptCacheKey,
-      extraHeaders: extraHeaders,
-      wantsImageOutput: wantsImageOutput,
-      needsReasoningEcho: needsReasoningEcho,
-      reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
-      applyMaxTokens: setMaxTokens,
-      initialUsage: usage,
-      streamRound: streamRound,
-      approxPromptTokens: approxPromptTokens,
-      approxCompletionChars: approxCompletionChars,
-      includeReasoningDetailsOnDone: true,
-      retryRound: retryRound,
-    );
-    return;
   }
   final approxTotal =
       usage?.totalTokens ??
