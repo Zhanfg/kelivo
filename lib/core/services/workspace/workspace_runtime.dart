@@ -134,6 +134,9 @@ abstract class WorkspaceRuntime {
   bool get supportsPty => false;
   bool get supportsSystemTerminal => false;
 
+  /// True only when this runtime can reveal a HOST path in a real file manager.
+  bool get supportsFileManager => false;
+
   Future<PtySession> openPty({
     required List<Mount> mounts,
     required String cwd,

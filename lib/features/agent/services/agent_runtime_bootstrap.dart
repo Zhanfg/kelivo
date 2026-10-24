@@ -241,6 +241,9 @@ class AgentAndroidRuntime implements WorkspaceStdioRuntime {
   bool get supportsSystemTerminal => false;
 
   @override
+  bool get supportsFileManager => false;
+
+  @override
   Future<RuntimeStatus> status() async {
     if (!await rootfsDir.exists() ||
         !await File(p.join(rootfsDir.path, 'bin', 'sh')).exists()) {
