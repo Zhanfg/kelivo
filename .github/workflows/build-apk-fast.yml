@@ -23,6 +23,19 @@ on:
       - pubspec.yaml
       - dependencies/**
 
+  pull_request:
+    branches:
+      - main
+    paths:
+      - lib/**
+      - test/**
+      - integration_test/**
+      - android/**
+      - assets/**
+      - tool/**
+      - pubspec.yaml
+      - dependencies/**
+
 concurrency:
   group: fast-test-apk-${{ github.ref }}
   cancel-in-progress: true
