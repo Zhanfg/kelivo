@@ -100,6 +100,17 @@ jobs:
           echo "FULL PINNED UPSTREAM MERGE STAGED — tests and review required" > build/upstream-integration/status.txt
           echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      - name: Preserve merged source in quarantined review branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This branch is deliberately NOT main, not release-ready and not
+          # protected by any passing-build claim; analysis runs afterwards.
+          gh auth setup-git
+          git push origin HEAD:refs/heads/sync/upstream-full-candidate-20261024
+
       - name: Prepare Flutter verification
         uses: subosito/flutter-action@v2
         with:
