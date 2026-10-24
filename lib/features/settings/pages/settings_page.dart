@@ -195,9 +195,7 @@ class SettingsPage extends StatelessWidget {
                     : 'Chat',
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ChatSettingsPage(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const ChatSettingsPage()),
                   );
                 },
               ),
@@ -417,19 +415,6 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Wrench,
-                label: l10n.toolSchemaSettingsPageTitle,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ToolSchemaSettingsPage(),
-                    ),
-                  );
-                },
-              ),
             ],
           ),
 
@@ -549,6 +534,19 @@ class SettingsPage extends StatelessWidget {
                 ),
               ],
 
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Wrench,
+                label: l10n.toolSchemaSettingsPageTitle,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ToolSchemaSettingsPage(),
+                    ),
+                  );
+                },
+              ),
               _iosDivider(context),
               _iosNavRow(
                 context,
