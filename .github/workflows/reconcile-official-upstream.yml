@@ -59,6 +59,8 @@ jobs:
             git commit -m "merge(upstream): reconcile official Kelivo through 2026-10-24"
           else
             printf '%s\n' "full merge has unresolved conflicts; attempt isolated patches only" > build/upstream-integration/status.txt
+            echo "Full merge diagnostics:"
+            cat build/upstream-integration/merge.log
             git diff --name-only --diff-filter=U > build/upstream-integration/unresolved-paths.txt || true
             git merge --abort 2>/dev/null || true
             ported=0
@@ -78,6 +80,7 @@ jobs:
             done
             if [ "$ported" -eq 0 ]; then
               echo "No upstream commit integrated safely; branch remains unchanged" >&2
+              cat build/upstream-integration/cherry-errors.txt 2>/dev/null || true
               exit 1
             fi
           fi
