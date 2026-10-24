@@ -136,6 +136,21 @@ class AgentTaskJournal extends ChangeNotifier {
   }
 
   Future<File> _journalFile(String taskId, {bool create = true}) async {
+    // Task IDs become directory names. Never allow a malformed or imported
+    // task to escape the private journal root through path traversal.
+    if (taskId.length > 128 ||
+        !RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*
+        _injectedRootDirectory ?? await AppDirectories.getAgentTasksDirectory();
+    final dir = Directory('${root.path}/$taskId');
+    if (create && !await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return File('${dir.path}/journal.ndjson');
+  }
+}
+).hasMatch(taskId)) {
+      throw ArgumentError.value(taskId, 'taskId', 'Invalid agent task ID');
+    }
     final root =
         _injectedRootDirectory ?? await AppDirectories.getAgentTasksDirectory();
     final dir = Directory('${root.path}/$taskId');
