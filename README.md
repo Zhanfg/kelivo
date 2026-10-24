@@ -29,6 +29,9 @@ Use every major model in one app, give it a workspace to get real work done, and
 
 </div>
 
+> **Zhanfg fork — Android ARM64 Preview 2 (2026-10-24).** [Download the tested APK](https://github.com/Zhanfg/kelivo/releases/download/kelivo-preview-20261024-d27fdc0c/Kelivo_1.3.0_preview_20261024_d27fdc0c_arm64_debug.apk) · [Release notes, signature & SHA-256](https://github.com/Zhanfg/kelivo/releases/tag/kelivo-preview-20261024-d27fdc0c) · [Upstream sync ledger](docs/kelivo-upstream-sync-ledger-20261024.md). This is an ARM64 **debug-signed prerelease**, not a production-stable or fully synchronized upstream build. Back up before installing; a different signing certificate can prevent in-place updates.
+
+
 ## 💡 Overview
 
 Kelivo is a cross-platform LLM client built with Flutter for Android, iOS, macOS, Windows and Linux. Connect your own API keys or sign in with a supported subscription, and switch between OpenAI, Gemini, Claude, DeepSeek, OpenRouter and any OpenAI-compatible service without switching apps.
