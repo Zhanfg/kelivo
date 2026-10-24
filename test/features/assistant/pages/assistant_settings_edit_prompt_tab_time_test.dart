@@ -454,7 +454,10 @@ void main() {
             (w) =>
                 w is IosIconButton && w.semanticLabel == 'Appended time format',
           );
-          await tester.ensureVisible(info);
+          // ensureVisible can align the icon underneath the persistent header.
+          // Center the actual scrollable target before hit-testing its button.
+          await Scrollable.ensureVisible(tester.element(info), alignment: 0.5);
+          await tester.pumpAndSettle();
           await tester.tap(info);
           await tester.pumpAndSettle();
           expect(
