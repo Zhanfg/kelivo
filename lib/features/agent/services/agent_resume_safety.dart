@@ -100,10 +100,11 @@ abstract final class AgentResumeSafety {
         if (await entity.length() == 0) continue;
         // OMP may materialize a title slot and a session header before any
         // user turn. A header-only file cannot recover the interrupted prompt.
-        await for (final line in entity
-            .openRead()
-            .transform(utf8.decoder)
-            .transform(const LineSplitter())) {
+        await for (final line
+            in entity
+                .openRead()
+                .transform(utf8.decoder)
+                .transform(const LineSplitter())) {
           try {
             final data = jsonDecode(line);
             if (data is Map &&
