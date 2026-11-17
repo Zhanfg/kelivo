@@ -13,7 +13,7 @@ enum RootfsArchiveFormat {
     for (final item in values) {
       if (item.wireValue == value) return item;
     }
-    throw FormatException('Unsupported rootfs archive format: ' + value);
+    throw FormatException('Unsupported rootfs archive format: $value');
   }
 }
 
@@ -41,7 +41,7 @@ final class RootfsArchiveDescriptor {
     if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(sha256)) {
       throw ArgumentError.value(sha256, 'sha256', 'Expected lowercase SHA-256');
     }
-    if (!parsed.path.endsWith('.' + format.wireValue)) {
+    if (!parsed.path.endsWith('.${format.wireValue}')) {
       throw ArgumentError('Archive format does not match URL extension');
     }
   }
@@ -68,7 +68,7 @@ final class RootfsArchiveDescriptor {
         format: RootfsArchiveFormat.fromWire(_string(value, 'format')),
       );
     } on ArgumentError catch (e) {
-      throw FormatException('Invalid rootfs archive: ' + e.toString());
+      throw FormatException('Invalid rootfs archive: $e');
     }
   }
 }
@@ -86,7 +86,7 @@ final class RootfsRegistryRelease {
     if (!RegExp(r'^[a-z][a-z0-9-]{1,30}$').hasMatch(distro) ||
         !RegExp(r'^[a-z][a-z0-9-]{0,31}$').hasMatch(codename) ||
         !RegExp(r'^[0-9]+(?:\.[0-9]+){0,3}$').hasMatch(version) ||
-        id != distro + '-' + version ||
+        id != '$distro-$version' ||
         archives.isEmpty ||
         archives.map((a) => a.arch).toSet().length != archives.length) {
       throw ArgumentError('Invalid rootfs release identity or archives');
@@ -130,7 +130,7 @@ final class RootfsRegistryRelease {
         }).toList(),
       );
     } on ArgumentError catch (e) {
-      throw FormatException('Invalid release: ' + e.toString());
+      throw FormatException('Invalid release: $e');
     }
   }
 }
@@ -194,14 +194,14 @@ final class RootfsRegistryManifest {
         }).toList(),
       );
     } on ArgumentError catch (e) {
-      throw FormatException('Invalid rootfs registry: ' + e.toString());
+      throw FormatException('Invalid rootfs registry: $e');
     }
   }
 }
 
 String _string(Map<String, Object?> obj, String key) {
   final value = obj[key];
-  if (value is! String) throw FormatException(key + ' must be string');
+  if (value is! String) throw FormatException('$key must be string');
   return value;
 }
 
