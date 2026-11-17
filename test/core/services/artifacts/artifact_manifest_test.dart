@@ -368,7 +368,7 @@ void main() {
         'report|1.md',
         'what?.md',
         'a<b>c',
-        '${'n' * 256}',
+        'n' * 256,
       ]) {
         expect(
           () => buildManifest(displayName: displayName),
