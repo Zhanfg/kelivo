@@ -5,7 +5,7 @@ env:
 
 on:
   pull_request:
-    branches: [master]
+    branches: [master, dev/upstream-first-20261117]
 
 jobs:
   checks:
