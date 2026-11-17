@@ -109,10 +109,7 @@ void main() {
         () => ArtifactManifest.idFromUri('artifact://Art-1'),
         throwsFormatException,
       );
-      expect(
-        () => ArtifactManifest.uriFor('a/b'),
-        throwsArgumentError,
-      );
+      expect(() => ArtifactManifest.uriFor('a/b'), throwsArgumentError);
     });
   });
 
@@ -261,8 +258,10 @@ void main() {
   group('byteLength validation', () {
     test('accepts zero and rejects negatives', () {
       expect(buildManifest(byteLength: 0).byteLength, 0);
-      expect(buildManifest(byteLength: 1099511627776).byteLength,
-          1099511627776);
+      expect(
+        buildManifest(byteLength: 1099511627776).byteLength,
+        1099511627776,
+      );
       expect(() => buildManifest(byteLength: -1), throwsArgumentError);
       expect(() => buildManifest(byteLength: -1024), throwsArgumentError);
     });
@@ -327,7 +326,10 @@ void main() {
 
       final garbageJson = buildJson();
       garbageJson['createdAt'] = 'yesterday';
-      expect(() => ArtifactManifest.fromJson(garbageJson), throwsFormatException);
+      expect(
+        () => ArtifactManifest.fromJson(garbageJson),
+        throwsFormatException,
+      );
     });
   });
 
@@ -467,7 +469,10 @@ void main() {
       }
 
       final fractional = buildJson()..['byteLength'] = 42.5;
-      expect(() => ArtifactManifest.fromJson(fractional), throwsFormatException);
+      expect(
+        () => ArtifactManifest.fromJson(fractional),
+        throwsFormatException,
+      );
     });
 
     test('rejects semantic violations carried in json', () {
@@ -497,10 +502,7 @@ void main() {
       expect(() => ArtifactManifest.fromJson(withQuery), throwsFormatException);
 
       final localFile = buildJson()..['uri'] = 'file:///tmp/art-0001';
-      expect(
-        () => ArtifactManifest.fromJson(localFile),
-        throwsFormatException,
-      );
+      expect(() => ArtifactManifest.fromJson(localFile), throwsFormatException);
     });
   });
 
@@ -536,7 +538,10 @@ void main() {
         );
       }
 
-      expect(manifest.toJson().keys.toSet(), kRequiredJsonKeys.toSet()..add('displayName'));
+      expect(
+        manifest.toJson().keys.toSet(),
+        kRequiredJsonKeys.toSet()..add('displayName'),
+      );
       expect(manifest.uri, 'artifact://art-0001');
       expect(Uri.parse(manifest.uri).hasQuery, isFalse);
       expect(Uri.parse(manifest.uri).userInfo, isEmpty);

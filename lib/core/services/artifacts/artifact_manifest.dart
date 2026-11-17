@@ -342,9 +342,7 @@ const int _maxDisplayNameLength = 255;
 String _readString(Map<String, dynamic> json, String key) {
   final value = json[key];
   if (value is! String) {
-    throw FormatException(
-      'artifact manifest $key must be a string: $value',
-    );
+    throw FormatException('artifact manifest $key must be a string: $value');
   }
   return value;
 }
