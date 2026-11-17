@@ -34,7 +34,7 @@ final class ScientificOperationSpec {
     this.status = ScientificOperationStatus.planned,
   }) {
     if (!RegExp(r'^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$').hasMatch(id) ||
-        !id.startsWith(domain + '.') ||
+        !id.startsWith('$domain.') ||
         id.length > 90) {
       throw ArgumentError.value(id, 'id', 'Invalid scientific operation ID');
     }
@@ -119,7 +119,7 @@ final class ScientificRequest {
         arguments: Map<String, Object?>.from(arguments),
       );
     } on ArgumentError catch (e) {
-      throw FormatException('Invalid scientific request: ' + e.toString());
+      throw FormatException('Invalid scientific request: $e');
     }
   }
 }
@@ -187,7 +187,7 @@ abstract final class ScientificOperationRegistry {
       for (final name in _namesByDomain[domain]!.split(' ')) {
         if (name.isEmpty) continue;
         result.add(
-          ScientificOperationSpec(id: domain + '.' + name, domain: domain),
+          ScientificOperationSpec(id: '$domain.$name', domain: domain),
         );
       }
     }
