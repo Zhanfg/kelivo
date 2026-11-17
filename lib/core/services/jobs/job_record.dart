@@ -20,7 +20,7 @@ enum JobState {
     for (final state in values) {
       if (state.wireName == value) return state;
     }
-    throw FormatException('Unknown job state: ' + value);
+    throw FormatException('Unknown job state: $value');
   }
 
   bool get isTerminal =>
@@ -204,7 +204,7 @@ class JobRecord {
         artifactIds: ids.cast<String>(),
       );
     } on ArgumentError catch (error) {
-      throw FormatException('Invalid job record: ' + error.toString());
+      throw FormatException('Invalid job record: $error');
     } on TypeError catch (_) {
       throw const FormatException('Invalid job record field type');
     }
@@ -212,7 +212,7 @@ class JobRecord {
 
   static String _requiredString(Map<String, Object?> json, String key) {
     final value = json[key];
-    if (value is! String) throw FormatException(key + ' must be a string');
+    if (value is! String) throw FormatException('$key must be a string');
     return value;
   }
 
@@ -223,18 +223,18 @@ class JobRecord {
 
   static int _requiredInt(Map<String, Object?> json, String key) {
     final value = json[key];
-    if (value is! int) throw FormatException(key + ' must be an integer');
+    if (value is! int) throw FormatException('$key must be an integer');
     return value;
   }
 
   static DateTime _timestamp(Map<String, Object?> json, String key) {
     final text = _requiredString(json, key);
     if (!text.endsWith('Z')) {
-      throw FormatException(key + ' must be UTC ISO-8601');
+      throw FormatException('$key must be UTC ISO-8601');
     }
     final result = DateTime.tryParse(text);
     if (result == null || !result.isUtc) {
-      throw FormatException(key + ' must be UTC ISO-8601');
+      throw FormatException('$key must be UTC ISO-8601');
     }
     return result;
   }
