@@ -84,7 +84,10 @@ void main() {
         {...data, 'schema_version': 2},
         {...data, 'state': 'unknown'},
         {...data, 'created_at': '2026-11-17T12:00:00+08:00'},
-        {...data, 'artifact_ids': ['good', 42]},
+        {
+          ...data,
+          'artifact_ids': ['good', 42],
+        },
         {...data, 'attempt': '1'},
       ]) {
         expect(() => JobRecord.fromJson(mutation), throwsFormatException);
@@ -150,8 +153,10 @@ void main() {
       expect(completed.state, JobState.completed);
       expect(completed.isTerminal, isTrue);
       expect(completed.resultRef, 'result:abc');
-      expect(() => completed.transition(JobState.queued, at: second),
-          throwsStateError);
+      expect(
+        () => completed.transition(JobState.queued, at: second),
+        throwsStateError,
+      );
     });
 
     test('paused and interrupted may be requeued explicitly', () {
@@ -161,10 +166,12 @@ void main() {
         at: second.add(const Duration(seconds: 1)),
       );
       expect(
-        paused.transition(
-          JobState.queued,
-          at: second.add(const Duration(seconds: 2)),
-        ).state,
+        paused
+            .transition(
+              JobState.queued,
+              at: second.add(const Duration(seconds: 2)),
+            )
+            .state,
         JobState.queued,
       );
       final interrupted = running.transition(
@@ -172,10 +179,12 @@ void main() {
         at: second.add(const Duration(seconds: 1)),
       );
       expect(
-        interrupted.transition(
-          JobState.queued,
-          at: second.add(const Duration(seconds: 2)),
-        ).state,
+        interrupted
+            .transition(
+              JobState.queued,
+              at: second.add(const Duration(seconds: 2)),
+            )
+            .state,
         JobState.queued,
       );
     });

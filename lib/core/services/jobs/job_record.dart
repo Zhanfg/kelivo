@@ -105,16 +105,24 @@ class JobRecord {
   static const Map<JobState, Set<JobState>> allowedTransitions = {
     JobState.queued: {JobState.running, JobState.cancelled},
     JobState.running: {
-      JobState.paused, JobState.completed, JobState.failed,
-      JobState.cancelled, JobState.interrupted, JobState.outcomeUnknown,
+      JobState.paused,
+      JobState.completed,
+      JobState.failed,
+      JobState.cancelled,
+      JobState.interrupted,
+      JobState.outcomeUnknown,
     },
     JobState.paused: {JobState.queued, JobState.cancelled},
     JobState.interrupted: {
-      JobState.queued, JobState.outcomeUnknown, JobState.failed,
+      JobState.queued,
+      JobState.outcomeUnknown,
+      JobState.failed,
       JobState.cancelled,
     },
     JobState.outcomeUnknown: {
-      JobState.completed, JobState.failed, JobState.cancelled,
+      JobState.completed,
+      JobState.failed,
+      JobState.cancelled,
     },
     JobState.completed: {},
     JobState.failed: {},
