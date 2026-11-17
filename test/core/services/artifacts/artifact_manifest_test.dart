@@ -308,7 +308,7 @@ void main() {
       final local = DateTime(2026, 5, 4, 12, 34, 56);
       final manifest = buildManifest(createdAt: local.toUtc());
       expect(manifest.createdAt.isUtc, isTrue);
-      expect(manifest.createdAt, local);
+      expect(manifest.createdAt, local.toUtc());
       expect(manifest.toJson()['createdAt'], endsWith('Z'));
     });
 
