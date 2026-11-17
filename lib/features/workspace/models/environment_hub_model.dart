@@ -92,7 +92,7 @@ final class EnvironmentPortSnapshot {
         loopbackOnly: local,
       );
     } on ArgumentError catch (e) {
-      throw FormatException('Invalid port: ' + e.toString());
+      throw FormatException('Invalid port: $e');
     }
   }
 }
@@ -131,10 +131,7 @@ final class EnvironmentInstanceSnapshot {
             usedBytes! > capacityBytes!) {
       throw ArgumentError('Invalid capacity information');
     }
-    if (ports
-            .map((p) => p.protocol.wireName + ':' + p.port.toString())
-            .toSet()
-            .length !=
+    if (ports.map((p) => '${p.protocol.wireName}:${p.port}').toSet().length !=
         ports.length) {
       throw ArgumentError('Duplicate observed ports');
     }
@@ -205,7 +202,7 @@ final class EnvironmentInstanceSnapshot {
         }).toList(),
       );
     } on ArgumentError catch (e) {
-      throw FormatException('Invalid environment instance: ' + e.toString());
+      throw FormatException('Invalid environment instance: $e');
     }
   }
 }
@@ -268,7 +265,7 @@ final class EnvironmentHubSnapshot {
         }).toList(),
       );
     } on ArgumentError catch (e) {
-      throw FormatException('Invalid hub snapshot: ' + e.toString());
+      throw FormatException('Invalid hub snapshot: $e');
     }
   }
 }
@@ -277,7 +274,7 @@ bool _controls(String input) => input.runes.any((r) => r < 32 || r == 127);
 
 String _str(Map<String, Object?> json, String key) {
   final raw = json[key];
-  if (raw is! String) throw FormatException(key + ' must be string');
+  if (raw is! String) throw FormatException('$key must be string');
   return raw;
 }
 
