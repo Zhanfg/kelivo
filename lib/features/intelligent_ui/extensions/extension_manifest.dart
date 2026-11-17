@@ -92,7 +92,7 @@ final class UiExtensionComponent {
         requiredProperties: required.cast<String>().toSet(),
       );
     } on ArgumentError catch (error) {
-      throw FormatException('Invalid UI component: ' + error.toString());
+      throw FormatException('Invalid UI component: $error');
     }
   }
 }
@@ -142,13 +142,13 @@ final class UiExtensionManifest {
   final List<UiExtensionComponent> components;
   final Set<String> requestedCapabilities;
 
-  String get packageVersion => packageId + '@' + version;
+  String get packageVersion => '$packageId@$version';
 
   String componentReference(String component) {
     if (!components.any((item) => item.name == component)) {
       throw ArgumentError('Component not declared by package');
     }
-    return packageVersion + '/' + component;
+    return '$packageVersion/$component';
   }
 
   Map<String, Object?> toJson() => {
@@ -196,14 +196,14 @@ final class UiExtensionManifest {
         requestedCapabilities: permissions.cast<String>().toSet(),
       );
     } on ArgumentError catch (error) {
-      throw FormatException('Invalid extension manifest: ' + error.toString());
+      throw FormatException('Invalid extension manifest: $error');
     }
   }
 }
 
 String _string(Map<String, Object?> json, String key) {
   final value = json[key];
-  if (value is! String) throw FormatException(key + ' must be a string');
+  if (value is! String) throw FormatException('$key must be a string');
   return value;
 }
 
