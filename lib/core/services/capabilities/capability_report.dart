@@ -216,8 +216,7 @@ class CapabilityDescriptor {
       Object.hash(id, availability, reason, _metadataEquality.hash(metadata));
 
   @override
-  String toString() =>
-      'CapabilityDescriptor($id, ${availability.wireName})';
+  String toString() => 'CapabilityDescriptor($id, ${availability.wireName})';
 }
 
 /// A full capability snapshot for one device at one instant.
@@ -297,9 +296,7 @@ class CapabilityReport {
     }
     final observedAt = json['observedAt'];
     if (observedAt is! String) {
-      throw const FormatException(
-        'observedAt must be an ISO-8601 UTC string',
-      );
+      throw const FormatException('observedAt must be an ISO-8601 UTC string');
     }
     final rawDescriptors = json['descriptors'];
     if (rawDescriptors is! List) {
@@ -374,7 +371,9 @@ String? _validateReason(String? reason) {
     );
   }
   if (_hasControlCharacter(reason)) {
-    throw const FormatException('capability reason contains control characters');
+    throw const FormatException(
+      'capability reason contains control characters',
+    );
   }
   return reason;
 }
@@ -448,7 +447,9 @@ String _validatePlatformToken(String field, String value, int maxLength) {
     throw FormatException('$field must not be empty');
   }
   if (value.length > maxLength) {
-    throw FormatException('$field longer than $maxLength chars: ${value.length}');
+    throw FormatException(
+      '$field longer than $maxLength chars: ${value.length}',
+    );
   }
   if (!_platformTokenPattern.hasMatch(value)) {
     throw FormatException('invalid $field token: $value');
@@ -508,5 +509,4 @@ bool _hasControlCharacter(String text) {
   return false;
 }
 
-List<String> _sortedKeys(Map<String, String> map) =>
-    map.keys.toList()..sort();
+List<String> _sortedKeys(Map<String, String> map) => map.keys.toList()..sort();

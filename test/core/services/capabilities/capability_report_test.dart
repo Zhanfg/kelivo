@@ -4,26 +4,26 @@ import 'package:Kelivo/core/services/capabilities/capability_report.dart';
 void main() {
   final observed = DateTime.utc(2026, 11, 17, 14, 0);
 
-  CapabilityReport sample({
-    List<CapabilityDescriptor>? descriptors,
-  }) => CapabilityReport(
-    platform: 'android',
-    architecture: 'arm64',
-    observedAt: observed,
-    descriptors: descriptors ??
-        [
-          CapabilityDescriptor(
-            id: 'device.camera',
-            availability: CapabilityAvailability.permissionRequired,
-            reason: 'User approval required',
-            metadata: {'backend': 'camera2'},
-          ),
-          CapabilityDescriptor(
-            id: 'workspace.shell',
-            availability: CapabilityAvailability.available,
-          ),
-        ],
-  );
+  CapabilityReport sample({List<CapabilityDescriptor>? descriptors}) =>
+      CapabilityReport(
+        platform: 'android',
+        architecture: 'arm64',
+        observedAt: observed,
+        descriptors:
+            descriptors ??
+            [
+              CapabilityDescriptor(
+                id: 'device.camera',
+                availability: CapabilityAvailability.permissionRequired,
+                reason: 'User approval required',
+                metadata: {'backend': 'camera2'},
+              ),
+              CapabilityDescriptor(
+                id: 'workspace.shell',
+                availability: CapabilityAvailability.available,
+              ),
+            ],
+      );
 
   group('CapabilityReport contract', () {
     test('roundtrip preserves statuses and timestamp', () {
@@ -33,10 +33,14 @@ void main() {
       expect(payload['observedAt'], endsWith('Z'));
       final restored = CapabilityReport.fromJson(payload);
       expect(restored, report);
-      expect(restored['device.camera']?.availability,
-          CapabilityAvailability.permissionRequired);
-      expect(restored['workspace.shell']?.availability,
-          CapabilityAvailability.available);
+      expect(
+        restored['device.camera']?.availability,
+        CapabilityAvailability.permissionRequired,
+      );
+      expect(
+        restored['workspace.shell']?.availability,
+        CapabilityAvailability.available,
+      );
       expect(restored['missing'], isNull);
     });
 
@@ -111,10 +115,7 @@ void main() {
       final report = sample(descriptors: descriptors);
       descriptors.clear();
       expect(report.descriptors, hasLength(1));
-      expect(
-        () => report.descriptors.clear(),
-        throwsUnsupportedError,
-      );
+      expect(() => report.descriptors.clear(), throwsUnsupportedError);
     });
 
     test('invalid JSON schema and field types are rejected', () {
