@@ -83,7 +83,7 @@ void main() {
       'use example.model3d@1.2.3 as model\nnode unsafe',
       'import model.Viewer as X()',
       'import model.Viewer as ../outside',
-      'use example.model3d@1.2.3 as $root',
+      r'use example.model3d@1.2.3 as $root',
     ]) {
       expect(() => parser.parse(source), throwsFormatException);
     }
