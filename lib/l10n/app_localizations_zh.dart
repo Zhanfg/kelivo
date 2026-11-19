@@ -4326,6 +4326,54 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 小时';
 
   @override
+  String get providerBalanceAutoRefresh => '余额自动刷新';
+
+  @override
+  String get providerBalanceScopeProvider => '此供应商';
+
+  @override
+  String get providerBalanceScopeGlobal => '全局默认';
+
+  @override
+  String get providerBalanceInterval => '定时刷新';
+
+  @override
+  String get providerBalanceRefreshOnReply => '回复后刷新';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return '默认 · $value';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => '关闭';
+
+  @override
+  String get providerBalanceRefreshOn => '开启';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 小时';
+
+  @override
+  String get providerBalanceCustomInterval => '自定义间隔…';
+
+  @override
+  String get providerBalanceIntervalMinutes => '间隔分钟数';
+
+  @override
+  String get providerBalanceRefreshNow => '立即刷新余额';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return '最后更新于 $date $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => '账户余额';
 
   @override
@@ -4359,10 +4407,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => '查询中...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => '重置';
+  String get providerDetailPageBalanceResetDefaultsButton => '恢复默认余额设置';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip => '重置余额设置';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      '这会覆盖当前供应商自定义的余额查询配置，将余额查询开关恢复为默认状态，并让自动刷新跟随全局设置。';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => '恢复默认';
 
   @override
   String providerDetailPageBalanceResult(String value) {
@@ -4712,6 +4764,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageModelsTitle => '模型';
 
   @override
+  String get providerDetailPageReorderModels => '模型排序';
+
+  @override
   String get providerModelsGetButton => '获取';
 
   @override
@@ -4841,6 +4896,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => '滚动到底部';
 
   @override
+  String get miniMapSearchHint => '在小地图中搜索';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    return '$count 处';
+  }
+
+  @override
+  String get miniMapSearchNoResults => '没有匹配的消息';
+
+  @override
+  String get miniMapSearchFailed => '搜索消息失败';
+
+  @override
   String get conversationFindHint => '查找';
 
   @override
@@ -4968,6 +5037,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchServicesEditDialogRegionOptional => '地区（可选，默认 us-en）';
+
+  @override
+  String get searchServicesFourGetUrlInvalid => '请输入 HTTP 或 HTTPS 实例地址。';
+
+  @override
+  String get searchServicesFourGetScraperOptional => '上游搜索引擎（可选）';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'pass Cookie（可选）';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      '如果实例要求验证码，请完成验证并粘贴 pass Cookie 的值。';
 
   @override
   String get searchServiceEditorProviderTypeTitle => '搜索提供商';
@@ -6285,6 +6367,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchProviderSearXNGDescription => '注重隐私的元搜索引擎。需自建实例，无跟踪。';
 
   @override
+  String get searchProviderFourGetDescription =>
+      '通过已启用 API 的公开或自建 4get 实例搜索网页。';
+
+  @override
   String get searchProviderTavilyDescription =>
       '为大型语言模型（LLMs）优化的 AI 搜索 API，提供高质量、相关的搜索结果。';
 
@@ -6323,6 +6409,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';
@@ -20827,6 +20916,54 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 小时';
 
   @override
+  String get providerBalanceAutoRefresh => '余额自动刷新';
+
+  @override
+  String get providerBalanceScopeProvider => '此供应商';
+
+  @override
+  String get providerBalanceScopeGlobal => '全局默认';
+
+  @override
+  String get providerBalanceInterval => '定时刷新';
+
+  @override
+  String get providerBalanceRefreshOnReply => '回复后刷新';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return '默认 · $value';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => '关闭';
+
+  @override
+  String get providerBalanceRefreshOn => '开启';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 小时';
+
+  @override
+  String get providerBalanceCustomInterval => '自定义间隔…';
+
+  @override
+  String get providerBalanceIntervalMinutes => '间隔分钟数';
+
+  @override
+  String get providerBalanceRefreshNow => '立即刷新余额';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return '最后更新于 $date $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => '账户余额';
 
   @override
@@ -20860,10 +20997,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageBalanceQuerying => '查询中...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => '重置';
+  String get providerDetailPageBalanceResetDefaultsButton => '恢复默认余额设置';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip => '重置余额设置';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      '这会覆盖当前供应商自定义的余额查询配置，将余额查询开关恢复为默认状态，并让自动刷新跟随全局设置。';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => '恢复默认';
 
   @override
   String providerDetailPageBalanceResult(String value) {
@@ -21213,6 +21354,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageModelsTitle => '模型';
 
   @override
+  String get providerDetailPageReorderModels => '模型排序';
+
+  @override
   String get providerModelsGetButton => '获取';
 
   @override
@@ -21342,6 +21486,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get miniMapScrollToBottomTooltip => '滚动到底部';
 
   @override
+  String get miniMapSearchHint => '在小地图中搜索';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    return '$count 处';
+  }
+
+  @override
+  String get miniMapSearchNoResults => '没有匹配的消息';
+
+  @override
+  String get miniMapSearchFailed => '搜索消息失败';
+
+  @override
   String get conversationFindHint => '查找';
 
   @override
@@ -21469,6 +21627,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServicesEditDialogRegionOptional => '地区（可选，默认 us-en）';
+
+  @override
+  String get searchServicesFourGetUrlInvalid => '请输入 HTTP 或 HTTPS 实例地址。';
+
+  @override
+  String get searchServicesFourGetScraperOptional => '上游搜索引擎（可选）';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'pass Cookie（可选）';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      '如果实例要求验证码，请完成验证并粘贴 pass Cookie 的值。';
 
   @override
   String get searchServiceEditorProviderTypeTitle => '搜索提供商';
@@ -22786,6 +22957,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchProviderSearXNGDescription => '注重隐私的元搜索引擎。需自建实例，无跟踪。';
 
   @override
+  String get searchProviderFourGetDescription =>
+      '通过已启用 API 的公开或自建 4get 实例搜索网页。';
+
+  @override
   String get searchProviderTavilyDescription =>
       '为大型语言模型（LLMs）优化的 AI 搜索 API，提供高质量、相关的搜索结果。';
 
@@ -22824,6 +22999,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';
@@ -37333,6 +37511,54 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 小時';
 
   @override
+  String get providerBalanceAutoRefresh => '餘額自動重新整理';
+
+  @override
+  String get providerBalanceScopeProvider => '此供應商';
+
+  @override
+  String get providerBalanceScopeGlobal => '全域預設';
+
+  @override
+  String get providerBalanceInterval => '定時重新整理';
+
+  @override
+  String get providerBalanceRefreshOnReply => '回覆後重新整理';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return '預設 · $value';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => '關閉';
+
+  @override
+  String get providerBalanceRefreshOn => '開啟';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    return '$count 分鐘';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 小時';
+
+  @override
+  String get providerBalanceCustomInterval => '自訂間隔…';
+
+  @override
+  String get providerBalanceIntervalMinutes => '間隔分鐘數';
+
+  @override
+  String get providerBalanceRefreshNow => '立即重新整理餘額';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return '最後更新於 $date $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => '帳戶餘額';
 
   @override
@@ -37366,10 +37592,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerDetailPageBalanceQuerying => '查詢中...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => '重設';
+  String get providerDetailPageBalanceResetDefaultsButton => '恢復預設餘額設定';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip => '重設餘額設定';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      '這會覆寫此供應商自訂的餘額查詢設定，將餘額查詢開關恢復為預設狀態，並讓自動重新整理跟隨全域設定。';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => '恢復預設';
 
   @override
   String providerDetailPageBalanceResult(String value) {
@@ -37718,6 +37948,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerDetailPageModelsTitle => '模型';
 
   @override
+  String get providerDetailPageReorderModels => '重新排序模型';
+
+  @override
   String get providerModelsGetButton => '取得';
 
   @override
@@ -37847,6 +38080,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get miniMapScrollToBottomTooltip => '捲動到底部';
 
   @override
+  String get miniMapSearchHint => '搜尋小地圖';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 處',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get miniMapSearchNoResults => '沒有符合的訊息';
+
+  @override
+  String get miniMapSearchFailed => '無法搜尋訊息';
+
+  @override
   String get conversationFindHint => '查找';
 
   @override
@@ -37974,6 +38226,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServicesEditDialogRegionOptional => '地區（可選，預設 us-en）';
+
+  @override
+  String get searchServicesFourGetUrlInvalid => '請輸入 HTTP 或 HTTPS 執行個體位址。';
+
+  @override
+  String get searchServicesFourGetScraperOptional => '上游搜尋引擎（選填）';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'pass Cookie（選填）';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      '如果執行個體要求驗證碼，請完成驗證並貼上 pass Cookie 的值。';
 
   @override
   String get searchServiceEditorProviderTypeTitle => '搜尋提供商';
@@ -39291,6 +39556,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchProviderSearXNGDescription => '重視隱私的元搜尋引擎。需自建實例，無追蹤。';
 
   @override
+  String get searchProviderFourGetDescription =>
+      '透過已啟用 API 的公開或自架 4get 執行個體搜尋網頁。';
+
+  @override
   String get searchProviderTavilyDescription =>
       '為大型語言模型（LLM）優化的 AI 搜尋 API，提供高品質、相關的搜尋結果。';
 
@@ -39330,6 +39599,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';

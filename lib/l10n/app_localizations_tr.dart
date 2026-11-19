@@ -4530,6 +4530,60 @@ class AppLocalizationsTr extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 saat';
 
   @override
+  String get providerBalanceAutoRefresh => 'Otomatik bakiye yenileme';
+
+  @override
+  String get providerBalanceScopeProvider => 'Bu sağlayıcı';
+
+  @override
+  String get providerBalanceScopeGlobal => 'Genel varsayılanlar';
+
+  @override
+  String get providerBalanceInterval => 'Zamanlı yenileme';
+
+  @override
+  String get providerBalanceRefreshOnReply => 'Yanıtlardan sonra yenile';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return 'Varsayılan · $value';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => 'Kapalı';
+
+  @override
+  String get providerBalanceRefreshOn => 'Açık';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count dakika',
+      one: '1 dakika',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 saat';
+
+  @override
+  String get providerBalanceCustomInterval => 'Özel aralık…';
+
+  @override
+  String get providerBalanceIntervalMinutes => 'Dakika cinsinden aralık';
+
+  @override
+  String get providerBalanceRefreshNow => 'Bakiyeyi şimdi yenile';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return 'Son güncelleme: $date $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => 'Hesap Bakiyesi';
 
   @override
@@ -4565,11 +4619,16 @@ class AppLocalizationsTr extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => 'Kontrol ediliyor...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => 'Sıfırla';
+  String get providerDetailPageBalanceResetDefaultsButton =>
+      'Varsayılan bakiye ayarlarını geri yükle';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip =>
-      'Bakiye ayarlarını sıfırla';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      'Bu işlem, bu sağlayıcının özel bakiye isteği ayarlarını değiştirecek, bakiye anahtarını varsayılan durumuna döndürecek ve otomatik yenilemenin genel ayarları izlemesini sağlayacaktır.';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton =>
+      'Varsayılanları geri yükle';
 
   @override
   String providerDetailPageBalanceResult(String value) {
@@ -4925,6 +4984,9 @@ class AppLocalizationsTr extends AppLocalizations {
   String get providerDetailPageModelsTitle => 'Modeller';
 
   @override
+  String get providerDetailPageReorderModels => 'Modelleri yeniden sırala';
+
+  @override
   String get providerModelsGetButton => 'Getir';
 
   @override
@@ -5057,6 +5119,26 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get miniMapScrollToBottomTooltip => 'En alta kaydır';
+
+  @override
+  String get miniMapSearchHint => 'Mini haritada ara';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count eşleşme',
+      one: '1 eşleşme',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get miniMapSearchNoResults => 'Eşleşen mesaj yok';
+
+  @override
+  String get miniMapSearchFailed => 'Mesajlar aranamadı';
 
   @override
   String get conversationFindHint => 'Bul';
@@ -5195,6 +5277,21 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get searchServicesEditDialogRegionOptional =>
       'Bölge (isteğe bağlı, varsayılan: us-en)';
+
+  @override
+  String get searchServicesFourGetUrlInvalid =>
+      'Bir HTTP veya HTTPS temel URL\'si girin.';
+
+  @override
+  String get searchServicesFourGetScraperOptional =>
+      'Üst kaynak motoru (isteğe bağlı)';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'pass çerezi (isteğe bağlı)';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      'Örnek bir CAPTCHA gerektiriyorsa, CAPTCHA\'yı tamamlayın ve pass çerezinin değerini yapıştırın.';
 
   @override
   String get searchServiceEditorProviderTypeTitle => 'Arama sağlayıcısı';
@@ -6618,6 +6715,10 @@ class AppLocalizationsTr extends AppLocalizations {
       'Gizliliğe saygılı meta arama motoru. Kendi barındırdığınız bir örnek gerekir; izleme yok.';
 
   @override
+  String get searchProviderFourGetDescription =>
+      'API\'si etkinleştirilmiş genel veya kendi barındırdığınız bir 4get örneği üzerinden web araması yapın.';
+
+  @override
   String get searchProviderTavilyDescription =>
       'LLM\'ler için optimize edilmiş AI arama API\'si. Yüksek kaliteli, ilgili sonuçlar sağlar.';
 
@@ -6657,6 +6758,9 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';
