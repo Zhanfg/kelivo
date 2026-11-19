@@ -1,5 +1,5 @@
 import "dart:io";
-import '../../../../lib/core/services/skills/skills_discovery.dart';
+import 'package:Kelivo/core/services/skills/skills_discovery.dart';
 
 Future<void> main() async {
   final now = DateTime.utc(2026, 11, 18);
@@ -65,5 +65,5 @@ Future<void> main() async {
   } on SkillDiscoveryException catch (e) {
     assert(e.code == 'network_error');
   }
-  print('skills_discovery self-test: PASS');
+  // Reaching this point with assertions enabled is the success condition.
 }
