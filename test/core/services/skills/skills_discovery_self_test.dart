@@ -14,10 +14,18 @@ Future<void> main() async {
       assert(uri.queryParameters['owner'] == 'vercel-labs');
       return <String, Object?>{
         'skills': [
-          {'id': 'vercel-labs/skills/find-skills', 'name': 'find-skills',
-           'source': 'vercel-labs/skills', 'installs': 42},
-          {'id': 'vercel-labs/skills/find-skills', 'name': 'duplicate',
-           'source': 'vercel-labs/skills', 'installs': 1},
+          {
+            'id': 'vercel-labs/skills/find-skills',
+            'name': 'find-skills',
+            'source': 'vercel-labs/skills',
+            'installs': 42,
+          },
+          {
+            'id': 'vercel-labs/skills/find-skills',
+            'name': 'duplicate',
+            'source': 'vercel-labs/skills',
+            'installs': 1,
+          },
           {'id': '../unsafe', 'name': 'unsafe', 'source': 'x', 'installs': 99},
         ],
       };
@@ -58,9 +66,11 @@ Future<void> main() async {
     assert(e.code == 'invalid_response');
   }
   try {
-    await SkillsDiscovery(fetch: (_) async {
-      throw const SocketException('offline');
-    }).search('test');
+    await SkillsDiscovery(
+      fetch: (_) async {
+        throw const SocketException('offline');
+      },
+    ).search('test');
     throw StateError('expected network error');
   } on SkillDiscoveryException catch (e) {
     assert(e.code == 'network_error');
