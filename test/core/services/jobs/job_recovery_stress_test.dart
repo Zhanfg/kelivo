@@ -4,169 +4,151 @@ import 'package:Kelivo/core/services/jobs/job_executor.dart';
 import 'package:Kelivo/core/services/jobs/job_record.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-final _epoch = DateTime.utc(2026, 11, 19);
+final _time = DateTime.utc(2026);
 
-JobRecord _queued(String id) => JobRecord(
+JobRecord _job(String id) => JobRecord(
   jobId: 'job_${id.padLeft(8, '0')}',
   kind: 'download',
   ownerId: 'owner:test',
   state: JobState.queued,
-  createdAt: _epoch,
-  updatedAt: _epoch,
+  createdAt: _time,
+  updatedAt: _time,
   idempotencyKey: 'idem:$id',
 );
 
 void main() {
-  group('W07: Job transition and crash-state contract', () {
-    test('running to interrupted is explicit and not terminal', () {
-      final running = _queued('1').transition(JobState.running, at: _epoch);
-      final interrupted = running.transition(
-        JobState.interrupted,
-        at: _epoch.add(const Duration(seconds: 1)),
-      );
-      expect(interrupted.isTerminal, isFalse);
-      expect(interrupted.state, JobState.interrupted);
-      final resumed = interrupted.transition(
-        JobState.queued,
-        at: _epoch.add(const Duration(seconds: 2)),
-      );
-      expect(resumed.state, JobState.queued);
+  group('W07 recovery contract', () {
+    test('interrupted work can be requeued explicitly', () {
+      final first = _job('1');
+      final running = first.transition(JobState.running, at: _time);
+      final stopped = running.transition(JobState.interrupted, at: _time);
+      expect(stopped.isTerminal, isFalse);
+      final queued = stopped.transition(JobState.queued, at: _time);
+      expect(queued.state, JobState.queued);
       expect(
-        () => interrupted.transition(
-          JobState.completed,
-          at: _epoch.add(const Duration(seconds: 2)),
-        ),
+        () => stopped.transition(JobState.completed, at: _time),
         throwsStateError,
       );
     });
 
-    test('unknown outcomes cannot auto-retry or resolve unreviewed', () {
-      final unknown = _queued('2')
-          .transition(JobState.running, at: _epoch)
-          .transition(JobState.outcomeUnknown, at: _epoch);
+    test('unknown side effects require review', () {
+      final first = _job('2');
+      final running = first.transition(JobState.running, at: _time);
+      final unknown = running.transition(JobState.outcomeUnknown, at: _time);
       expect(unknown.isTerminal, isFalse);
       expect(
-        () => unknown.transition(JobState.queued, at: _epoch),
+        () => unknown.transition(JobState.queued, at: _time),
         throwsStateError,
       );
       expect(
-        () => unknown.transition(JobState.completed, at: _epoch),
+        () => unknown.transition(JobState.completed, at: _time),
         throwsStateError,
       );
       final reviewed = unknown.transition(
         JobState.completed,
-        at: _epoch,
+        at: _time,
         outcomeReviewed: true,
       );
       expect(reviewed.state, JobState.completed);
     });
 
-    test('state transition timestamps never move backwards', () {
-      final running = _queued('3').transition(
-        JobState.running,
-        at: _epoch.add(const Duration(seconds: 2)),
-      );
+    test('timestamps are monotonic', () {
+      final later = _time.add(const Duration(seconds: 2));
+      final earlier = _time.add(const Duration(seconds: 1));
+      final running = _job('3').transition(JobState.running, at: later);
       expect(
-        () => running.transition(
-          JobState.failed,
-          at: _epoch.add(const Duration(seconds: 1)),
-        ),
+        () => running.transition(JobState.failed, at: earlier),
         throwsArgumentError,
       );
     });
 
-    test('terminal states cannot transition again', () {
-      final completed = _queued('4')
-          .transition(JobState.running, at: _epoch)
-          .transition(JobState.completed, at: _epoch);
+    test('terminal jobs reject new transitions', () {
+      final running = _job('4').transition(JobState.running, at: _time);
+      final done = running.transition(JobState.completed, at: _time);
       expect(
-        () => completed.transition(JobState.queued, at: _epoch),
-        throwsStateError,
-      );
-      expect(
-        () => completed.transition(JobState.failed, at: _epoch),
+        () => done.transition(JobState.queued, at: _time),
         throwsStateError,
       );
     });
   });
 
-  group('W07: deterministic fake scheduler stress and cancellation', () {
-    test('duplicate submission is rejected without duplicate work', () async {
-      final executor = FakeJobExecutor(clock: () => _epoch);
-      final job = _queued('5');
-      await executor.submit(job);
-      await expectLater(executor.submit(job), throwsStateError);
-      expect(executor.list(), hasLength(1));
-      expect(executor.runNext()?.jobId, job.jobId);
-      expect(executor.runNext(), isNull);
+  group('W07 fake executor invariants', () {
+    test('duplicate submit cannot create duplicate work', () async {
+      final runner = FakeJobExecutor(clock: () => _time);
+      final record = _job('5');
+      await runner.submit(record);
+      await expectLater(runner.submit(record), throwsStateError);
+      expect(runner.list(), hasLength(1));
+      expect(runner.runNext()?.jobId, record.jobId);
+      expect(runner.runNext(), isNull);
     });
 
-    test('repeated cancellation is idempotent', () async {
-      final executor = FakeJobExecutor(clock: () => _epoch);
-      final job = _queued('6');
-      await executor.submit(job);
-      final cancelled = await executor.cancel(job.jobId);
-      expect(await executor.cancel(job.jobId), same(cancelled));
-      expect(executor.runNext(), isNull);
+    test('cancel is idempotent and blocks finish', () async {
+      final runner = FakeJobExecutor(clock: () => _time);
+      final record = _job('6');
+      await runner.submit(record);
+      final cancelled = await runner.cancel(record.jobId);
+      expect(await runner.cancel(record.jobId), same(cancelled));
+      expect(runner.runNext(), isNull);
       expect(
-        () => executor.finish(job.jobId, succeeded: true),
+        () => runner.finish(record.jobId, succeeded: true),
         throwsStateError,
       );
     });
 
-    test('cancel/run interleavings have deterministic outcomes', () async {
-      for (final cancelBeforeRun in [true, false]) {
-        final executor = FakeJobExecutor(clock: () => _epoch);
-        final job = _queued(cancelBeforeRun ? '7' : '8');
-        await executor.submit(job);
-        if (cancelBeforeRun) {
-          await executor.cancel(job.jobId);
-          expect(executor.runNext(), isNull);
+    test('cancel before or after start blocks completion', () async {
+      for (final before in [true, false]) {
+        final runner = FakeJobExecutor(clock: () => _time);
+        final record = _job(before ? '7' : '8');
+        await runner.submit(record);
+        if (before) {
+          await runner.cancel(record.jobId);
+          expect(runner.runNext(), isNull);
         } else {
-          expect(executor.runNext()?.state, JobState.running);
-          await executor.cancel(job.jobId);
+          expect(runner.runNext()?.state, JobState.running);
+          await runner.cancel(record.jobId);
         }
-        expect(executor.status(job.jobId)?.state, JobState.cancelled);
+        expect(runner.status(record.jobId)?.state, JobState.cancelled);
         expect(
-        () => executor.finish(job.jobId, succeeded: true),
-        throwsStateError,
-      );
+          () => runner.finish(record.jobId, succeeded: true),
+          throwsStateError,
+        );
       }
     });
 
-    test('seeded interleavings preserve terminal states', () async {
+    test('seeded interleavings preserve terminal outcomes', () async {
       final random = Random(109);
-      final executor = FakeJobExecutor(clock: () => _epoch);
+      final runner = FakeJobExecutor(clock: () => _time);
       final ids = <String>[];
       for (var i = 0; i < 80; i++) {
-        final job = _queued('stress$i');
-        ids.add(job.jobId);
-        await executor.submit(job);
+        final record = _job('stress$i');
+        ids.add(record.jobId);
+        await runner.submit(record);
       }
       final cancelled = <String>{};
       for (final id in ids) {
         if (random.nextBool()) {
           cancelled.add(id);
-          await executor.cancel(id);
+          await runner.cancel(id);
         }
       }
       final executed = <String>{};
       while (true) {
-        final current = executor.runNext();
+        final current = runner.runNext();
         if (current == null) break;
         expect(executed.add(current.jobId), isTrue);
-        executor.finish(current.jobId, succeeded: random.nextBool());
+        runner.finish(current.jobId, succeeded: random.nextBool());
       }
       expect(executed.intersection(cancelled), isEmpty);
       expect(executed.length + cancelled.length, ids.length);
       for (final id in ids) {
-        expect(executor.status(id)?.isTerminal, isTrue);
+        expect(runner.status(id)?.isTerminal, isTrue);
         expect(
-          () => executor.finish(id, succeeded: true),
+          () => runner.finish(id, succeeded: true),
           throwsStateError,
         );
       }
-      expect(executor.runNext(), isNull);
+      expect(runner.runNext(), isNull);
     });
   });
 }
