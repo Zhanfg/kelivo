@@ -28,8 +28,9 @@ void main() {
   });
 
   test('running state is interrupted on restart, never auto-run', () {
-    final running = _session('restart')
-        .transition(SubagentSessionState.running, at: _time);
+    final running = _session(
+      'restart',
+    ).transition(SubagentSessionState.running, at: _time);
     final interrupted = running.interruptedAfterRestart(_time);
     expect(interrupted.state, SubagentSessionState.interrupted);
     expect(interrupted.interruptedAfterRestart(_time), same(interrupted));
@@ -40,8 +41,9 @@ void main() {
   });
 
   test('unknown side effects require explicit review', () {
-    final running = _session('unknown')
-        .transition(SubagentSessionState.running, at: _time);
+    final running = _session(
+      'unknown',
+    ).transition(SubagentSessionState.running, at: _time);
     final unknown = running.transition(
       SubagentSessionState.outcomeUnknown,
       at: _time,
@@ -75,8 +77,9 @@ void main() {
 
   test('state time never moves backwards', () {
     final later = _time.add(const Duration(seconds: 2));
-    final running = _session('time')
-        .transition(SubagentSessionState.running, at: later);
+    final running = _session(
+      'time',
+    ).transition(SubagentSessionState.running, at: later);
     expect(
       () => running.transition(SubagentSessionState.failed, at: _time),
       throwsArgumentError,
