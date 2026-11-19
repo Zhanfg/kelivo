@@ -31,10 +31,12 @@ void main() {
 
   test('invalid owner fails closed before calling network', () async {
     var called = false;
-    final client = SkillsDiscovery(fetch: (_) async {
-      called = true;
-      return <String, Object?>{'skills': []};
-    });
+    final client = SkillsDiscovery(
+      fetch: (_) async {
+        called = true;
+        return <String, Object?>{'skills': []};
+      },
+    );
     await expectLater(
       client.search('x', owner: '../../unsafe'),
       throwsA(isA<SkillDiscoveryException>()),
