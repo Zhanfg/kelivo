@@ -26,14 +26,18 @@ void main() {
       );
       expect(interrupted.isTerminal, isFalse);
       expect(interrupted.state, JobState.interrupted);
-      expect(interrupted.transition(
+      final resumed = interrupted.transition(
         JobState.queued,
         at: _epoch.add(const Duration(seconds: 2)),
-      ).state, JobState.queued);
-      expect(() => interrupted.transition(
-        JobState.completed,
-        at: _epoch.add(const Duration(seconds: 2)),
-      ), throwsStateError);
+      );
+      expect(resumed.state, JobState.queued);
+      expect(
+        () => interrupted.transition(
+          JobState.completed,
+          at: _epoch.add(const Duration(seconds: 2)),
+        ),
+        throwsStateError,
+      );
     });
 
     test('unknown outcomes cannot auto-retry or resolve unreviewed', () {
@@ -41,13 +45,20 @@ void main() {
           .transition(JobState.running, at: _epoch)
           .transition(JobState.outcomeUnknown, at: _epoch);
       expect(unknown.isTerminal, isFalse);
-      expect(() => unknown.transition(JobState.queued, at: _epoch), throwsStateError);
-      expect(() => unknown.transition(JobState.completed, at: _epoch), throwsStateError);
-      expect(unknown.transition(
+      expect(
+        () => unknown.transition(JobState.queued, at: _epoch),
+        throwsStateError,
+      );
+      expect(
+        () => unknown.transition(JobState.completed, at: _epoch),
+        throwsStateError,
+      );
+      final reviewed = unknown.transition(
         JobState.completed,
         at: _epoch,
         outcomeReviewed: true,
-      ).state, JobState.completed);
+      );
+      expect(reviewed.state, JobState.completed);
     });
 
     test('state transition timestamps never move backwards', () {
@@ -55,18 +66,27 @@ void main() {
         JobState.running,
         at: _epoch.add(const Duration(seconds: 2)),
       );
-      expect(() => running.transition(
-        JobState.failed,
-        at: _epoch.add(const Duration(seconds: 1)),
-      ), throwsArgumentError);
+      expect(
+        () => running.transition(
+          JobState.failed,
+          at: _epoch.add(const Duration(seconds: 1)),
+        ),
+        throwsArgumentError,
+      );
     });
 
     test('terminal states cannot transition again', () {
       final completed = _queued('4')
           .transition(JobState.running, at: _epoch)
           .transition(JobState.completed, at: _epoch);
-      expect(() => completed.transition(JobState.queued, at: _epoch), throwsStateError);
-      expect(() => completed.transition(JobState.failed, at: _epoch), throwsStateError);
+      expect(
+        () => completed.transition(JobState.queued, at: _epoch),
+        throwsStateError,
+      );
+      expect(
+        () => completed.transition(JobState.failed, at: _epoch),
+        throwsStateError,
+      );
     });
   });
 
@@ -81,17 +101,20 @@ void main() {
       expect(executor.runNext(), isNull);
     });
 
-    test('repeated cancellation is idempotent, completion stays blocked', () async {
+    test('repeated cancellation is idempotent', () async {
       final executor = FakeJobExecutor(clock: () => _epoch);
       final job = _queued('6');
       await executor.submit(job);
       final cancelled = await executor.cancel(job.jobId);
       expect(await executor.cancel(job.jobId), same(cancelled));
       expect(executor.runNext(), isNull);
-      expect(() => executor.finish(job.jobId, succeeded: true), throwsStateError);
+      expect(
+        () => executor.finish(job.jobId, succeeded: true),
+        throwsStateError,
+      );
     });
 
-    test('cancel then run and run then cancel have deterministic outcomes', () async {
+    test('cancel/run interleavings have deterministic outcomes', () async {
       for (final cancelBeforeRun in [true, false]) {
         final executor = FakeJobExecutor(clock: () => _epoch);
         final job = _queued(cancelBeforeRun ? '7' : '8');
@@ -104,11 +127,14 @@ void main() {
           await executor.cancel(job.jobId);
         }
         expect(executor.status(job.jobId)?.state, JobState.cancelled);
-        expect(() => executor.finish(job.jobId, succeeded: true), throwsStateError);
+        expect(
+        () => executor.finish(job.jobId, succeeded: true),
+        throwsStateError,
+      );
       }
     });
 
-    test('bounded seeded interleavings preserve each job terminal state', () async {
+    test('seeded interleavings preserve terminal states', () async {
       final random = Random(109);
       final executor = FakeJobExecutor(clock: () => _epoch);
       final ids = <String>[];
@@ -135,7 +161,10 @@ void main() {
       expect(executed.length + cancelled.length, ids.length);
       for (final id in ids) {
         expect(executor.status(id)?.isTerminal, isTrue);
-        expect(() => executor.finish(id, succeeded: true), throwsStateError);
+        expect(
+          () => executor.finish(id, succeeded: true),
+          throwsStateError,
+        );
       }
       expect(executor.runNext(), isNull);
     });
