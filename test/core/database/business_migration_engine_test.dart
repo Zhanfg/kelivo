@@ -271,9 +271,43 @@ void main() {
     },
   );
 
+  test('rejects invalid balance refresh preference types without routing', () {
+    for (final invalid in <Object>['30', -1, 3.5]) {
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          BusinessKeyRegistry.balanceRefreshIntervalKey: invalid,
+        }),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'preference',
+            BusinessKeyRegistry.balanceRefreshIntervalKey,
+          ),
+        ),
+      );
+    }
+    expect(
+      () => BusinessSettingsRouter.normalizeAndRoute({
+        BusinessKeyRegistry.balanceRefreshOnReplyKey: 'true',
+      }),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'preference',
+          BusinessKeyRegistry.balanceRefreshOnReplyKey,
+        ),
+      ),
+    );
+  });
+
   test('routes a complete registered business snapshot without loss', () async {
     final source = <String, Object?>{
-      for (final key in BusinessKeyRegistry.preferenceKeys) key: 'value:$key',
+      for (final key in BusinessKeyRegistry.preferenceKeys)
+        key: switch (key) {
+          BusinessKeyRegistry.balanceRefreshIntervalKey => 30,
+          BusinessKeyRegistry.balanceRefreshOnReplyKey => true,
+          _ => 'value:$key',
+        },
       for (final kind in BusinessEntityKind.values)
         kind.sourceKey: kind == BusinessEntityKind.provider
             ? jsonEncode({
