@@ -143,10 +143,7 @@ void main() {
       expect(executed.length + cancelled.length, ids.length);
       for (final id in ids) {
         expect(runner.status(id)?.isTerminal, isTrue);
-        expect(
-          () => runner.finish(id, succeeded: true),
-          throwsStateError,
-        );
+        expect(() => runner.finish(id, succeeded: true), throwsStateError);
       }
       expect(runner.runNext(), isNull);
     });
