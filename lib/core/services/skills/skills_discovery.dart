@@ -36,8 +36,8 @@ class SkillCandidate {
 /// Read-only discovery. Search results are untrusted and never installed.
 class SkillsDiscovery {
   SkillsDiscovery({DiscoveryFetch? fetch, DateTime Function()? clock})
-      : _fetch = fetch ?? _fetchJson,
-        _clock = clock ?? DateTime.now;
+    : _fetch = fetch ?? _fetchJson,
+      _clock = clock ?? DateTime.now;
 
   static final Uri _endpoint = Uri.https('skills.sh', '/api/search');
   final DiscoveryFetch _fetch;
@@ -49,7 +49,8 @@ class SkillsDiscovery {
     int limit = 20,
   }) async {
     final term = query.trim();
-    if (term.isEmpty || term.length > 160 ||
+    if (term.isEmpty ||
+        term.length > 160 ||
         term.contains(RegExp(r'[\x00-\x1f]'))) {
       throw const SkillDiscoveryException('invalid_query');
     }
@@ -60,10 +61,9 @@ class SkillsDiscovery {
     if (limit < 1 || limit > 100) {
       throw const SkillDiscoveryException('invalid_limit');
     }
-    final uri = _endpoint.replace(queryParameters: {
-      'q': term,
-      if (owner != null) 'owner': owner,
-    });
+    final uri = _endpoint.replace(
+      queryParameters: {'q': term, if (owner != null) 'owner': owner},
+    );
     final Map<String, Object?> document;
     try {
       document = await _fetch(uri).timeout(const Duration(seconds: 12));
@@ -86,31 +86,38 @@ class SkillsDiscovery {
       final name = row['name'];
       final source = row['source'];
       final installs = row['installs'];
-      if (id is! String || name is! String || source is! String ||
-          id.length > 200 || name.length > 200 ||
-          !RegExp(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')
-              .hasMatch(id)) {
+      if (id is! String ||
+          name is! String ||
+          source is! String ||
+          id.length > 200 ||
+          name.length > 200 ||
+          !RegExp(
+            r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$',
+          ).hasMatch(id)) {
         continue;
       }
       final parts = id.split('/');
       final landing = Uri.https('skills.sh', '/${parts.join('/')}');
       if (!seen.add(id)) continue;
-      output.add(SkillCandidate(
-        name: name,
-        slug: parts.last,
-        source: source,
-        installs: installs is int && installs >= 0 ? installs : 0,
-        landingUrl: landing,
-        foundAt: _clock().toUtc(),
-        warning: 'Unverified third-party skill; review before importing.',
-      ));
+      output.add(
+        SkillCandidate(
+          name: name,
+          slug: parts.last,
+          source: source,
+          installs: installs is int && installs >= 0 ? installs : 0,
+          landingUrl: landing,
+          foundAt: _clock().toUtc(),
+          warning: 'Unverified third-party skill; review before importing.',
+        ),
+      );
       if (output.length >= limit) break;
     }
     return List<SkillCandidate>.unmodifiable(output);
   }
 
   static Future<Map<String, Object?>> _fetchJson(Uri uri) async {
-    if (uri.scheme != 'https' || uri.host != 'skills.sh' ||
+    if (uri.scheme != 'https' ||
+        uri.host != 'skills.sh' ||
         uri.path != '/api/search') {
       throw const SkillDiscoveryException('invalid_endpoint');
     }
