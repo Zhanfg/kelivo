@@ -8,7 +8,7 @@ class SkillDiscoveryException implements Exception {
   const SkillDiscoveryException(this.code);
   final String code;
   @override
-  String toString() => 'SkillDiscoveryException(' + code + ')';
+  String toString() => 'SkillDiscoveryException($code)';
 }
 
 class SkillCandidate {
@@ -93,7 +93,7 @@ class SkillsDiscovery {
         continue;
       }
       final parts = id.split('/');
-      final landing = Uri.https('skills.sh', '/' + parts.join('/'));
+      final landing = Uri.https('skills.sh', '/${parts.join('/')}');
       if (!seen.add(id)) continue;
       output.add(SkillCandidate(
         name: name,
