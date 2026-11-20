@@ -4561,6 +4561,62 @@ class AppLocalizationsRu extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 час';
 
   @override
+  String get providerBalanceAutoRefresh => 'Автоматическое обновление баланса';
+
+  @override
+  String get providerBalanceScopeProvider => 'Этот провайдер';
+
+  @override
+  String get providerBalanceScopeGlobal => 'Глобальные настройки по умолчанию';
+
+  @override
+  String get providerBalanceInterval => 'Обновление по таймеру';
+
+  @override
+  String get providerBalanceRefreshOnReply => 'Обновлять после ответов';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return 'По умолчанию · $value';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => 'Выкл.';
+
+  @override
+  String get providerBalanceRefreshOn => 'Вкл.';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count минуты',
+      many: '$count минут',
+      few: '$count минуты',
+      one: '$count минута',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 час';
+
+  @override
+  String get providerBalanceCustomInterval => 'Свой интервал…';
+
+  @override
+  String get providerBalanceIntervalMinutes => 'Интервал в минутах';
+
+  @override
+  String get providerBalanceRefreshNow => 'Обновить баланс сейчас';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return 'Последнее обновление: $date в $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => 'Баланс аккаунта';
 
   @override
@@ -4597,11 +4653,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => 'Проверка...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => 'Сбросить';
+  String get providerDetailPageBalanceResetDefaultsButton =>
+      'Восстановить настройки баланса по умолчанию';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip =>
-      'Сбросить настройки баланса';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      'Это заменит пользовательские настройки запроса баланса этого провайдера, восстановит состояние его переключателя баланса по умолчанию и настроит автоматическое обновление в соответствии с глобальными настройками.';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton =>
+      'Восстановить по умолчанию';
 
   @override
   String providerDetailPageBalanceResult(String value) {
@@ -4961,6 +5022,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get providerDetailPageModelsTitle => 'Модели';
 
   @override
+  String get providerDetailPageReorderModels => 'Изменить порядок моделей';
+
+  @override
   String get providerModelsGetButton => 'Получить';
 
   @override
@@ -5092,6 +5156,28 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get miniMapScrollToBottomTooltip => 'Прокрутить вниз';
+
+  @override
+  String get miniMapSearchHint => 'Поиск по миникарте';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count совпадения',
+      many: '$count совпадений',
+      few: '$count совпадения',
+      one: '$count совпадение',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get miniMapSearchNoResults => 'Нет подходящих сообщений';
+
+  @override
+  String get miniMapSearchFailed => 'Не удалось выполнить поиск сообщений';
 
   @override
   String get conversationFindHint => 'Найти';
@@ -5230,6 +5316,21 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get searchServicesEditDialogRegionOptional =>
       'Регион (необязательно, по умолчанию: us-en)';
+
+  @override
+  String get searchServicesFourGetUrlInvalid =>
+      'Введите базовый URL HTTP или HTTPS.';
+
+  @override
+  String get searchServicesFourGetScraperOptional =>
+      'Вышестоящий движок (необязательно)';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'Cookie pass (необязательно)';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      'Если экземпляр требует CAPTCHA, пройдите её и вставьте значение cookie pass.';
 
   @override
   String get searchServiceEditorProviderTypeTitle => 'Поисковый провайдер';
@@ -6662,6 +6763,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Метапоисковик, уважающий приватность. Требуется собственный экземпляр; без отслеживания.';
 
   @override
+  String get searchProviderFourGetDescription =>
+      'Веб-поиск через публичный или самостоятельно размещённый экземпляр 4get с включённым API.';
+
+  @override
   String get searchProviderTavilyDescription =>
       'Поисковый API на базе ИИ, оптимизированный для LLM. Предоставляет качественные релевантные результаты.';
 
@@ -6701,6 +6806,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';

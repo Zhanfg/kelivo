@@ -4504,6 +4504,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 hour';
 
   @override
+  String get providerBalanceAutoRefresh => 'Automatic balance refresh';
+
+  @override
+  String get providerBalanceScopeProvider => 'This provider';
+
+  @override
+  String get providerBalanceScopeGlobal => 'Global defaults';
+
+  @override
+  String get providerBalanceInterval => 'Timed refresh';
+
+  @override
+  String get providerBalanceRefreshOnReply => 'Refresh after replies';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return 'Default · $value';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => 'Off';
+
+  @override
+  String get providerBalanceRefreshOn => 'On';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count minutes',
+      one: '1 minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 hour';
+
+  @override
+  String get providerBalanceCustomInterval => 'Custom interval…';
+
+  @override
+  String get providerBalanceIntervalMinutes => 'Interval in minutes';
+
+  @override
+  String get providerBalanceRefreshNow => 'Refresh balance now';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return 'Last updated $date at $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => 'Account Balance';
 
   @override
@@ -4537,11 +4591,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => 'Checking...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => 'Reset';
+  String get providerDetailPageBalanceResetDefaultsButton =>
+      'Restore default balance settings';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip =>
-      'Reset balance settings';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      'This will replace this provider’s custom balance request settings, restore the default state of its balance switch, and make automatic refresh follow the global settings.';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => 'Restore defaults';
 
   @override
   String providerDetailPageBalanceResult(String value) {
@@ -4897,6 +4955,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageModelsTitle => 'Models';
 
   @override
+  String get providerDetailPageReorderModels => 'Reorder models';
+
+  @override
   String get providerModelsGetButton => 'Get';
 
   @override
@@ -5030,6 +5091,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => 'Scroll to bottom';
 
   @override
+  String get miniMapSearchHint => 'Search minimap';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count matches',
+      one: '1 match',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get miniMapSearchNoResults => 'No matching messages';
+
+  @override
+  String get miniMapSearchFailed => 'Couldn’t search messages';
+
+  @override
   String get conversationFindHint => 'Find';
 
   @override
@@ -5160,6 +5241,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get searchServicesEditDialogRegionOptional =>
       'Region (optional, default: us-en)';
+
+  @override
+  String get searchServicesFourGetUrlInvalid =>
+      'Enter an HTTP or HTTPS base URL.';
+
+  @override
+  String get searchServicesFourGetScraperOptional =>
+      'Upstream engine (optional)';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'Pass cookie (optional)';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      'If the instance requires a CAPTCHA, complete it and paste the value of the pass cookie.';
 
   @override
   String get searchServiceEditorProviderTypeTitle => 'Search provider';
@@ -6563,6 +6659,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Privacy-respecting metasearch engine. Self-hosted instance required; no tracking.';
 
   @override
+  String get searchProviderFourGetDescription =>
+      'Web search through a public or self-hosted 4get instance with the API enabled.';
+
+  @override
   String get searchProviderTavilyDescription =>
       'AI search API optimized for LLMs. Provides high-quality, relevant results.';
 
@@ -6602,6 +6702,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';

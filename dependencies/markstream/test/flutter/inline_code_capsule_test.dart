@@ -98,49 +98,71 @@ Offset point(RenderParagraph p, int offset, {bool end = false}) {
   );
 }
 
-void main() {
-  testWidgets(
-    'desktop drag crosses code and math atoms in both directions',
-    (tester) async {
-      final listener = SelectionListenerNotifier();
-      addTearDown(listener.dispose);
-      String? selected;
-      await tester.pumpWidget(
-        harness(
-          code: 'run(中😀)',
-          platform: defaultTargetPlatform,
-          listener: listener,
-          onSelection: (value) => selected = value?.plainText,
-        ),
-      );
-      await tester.pumpAndSettle();
-      final p = paragraph();
-      for (final reverse in [false, true]) {
-        tester
-            .state<SelectableRegionState>(find.byType(SelectableRegion))
-            .clearSelection();
-        await tester.pump(const Duration(milliseconds: 600));
-        final a = point(p, 0), b = point(p, 22, end: true);
-        final gesture = await tester.startGesture(
-          reverse ? b : a,
-          kind: ui.PointerDeviceKind.mouse,
-        );
-        await gesture.moveTo(reverse ? a : b);
-        await tester.pump();
-        await gesture.up();
-        await gesture.removePointer();
-        await tester.pumpAndSettle();
-        expect(selected, r'Before run(中😀) middle $x+y$ After');
-        final range = listener.selection.range!;
-        expect((
-          range.startOffset,
-          range.endOffset,
-        ), reverse ? (34, 0) : (0, 34));
-      }
-      expect(tester.takeException(), isNull);
-    },
-    variant: TargetPlatformVariant.desktop(),
+Future<void> _dragEndHandleTo(
+  WidgetTester tester,
+  RenderParagraph paragraph,
+  int character,
+) async {
+  final overlay = tester
+      .state<SelectableRegionState>(find.byType(SelectableRegion))
+      .selectionOverlay;
+  final controls = overlay!.selectionControls!;
+  final size = controls.getHandleSize(overlay.lineHeightAtEnd);
+  final center =
+      Offset(size.width / 2, size.height / 2) -
+      controls.getHandleAnchor(overlay.endHandleType, overlay.lineHeightAtEnd);
+  final handle = overlay.endHandleLayerLink.leader!.offset;
+  final gesture = await tester.startGesture(handle + center);
+  final target = box(paragraph, character);
+  final leading = (overlay.lineHeightAtEnd - (target.bottom - target.top)) / 2;
+  await gesture.moveTo(
+    paragraph.localToGlobal(Offset(target.right, target.bottom + leading)) +
+        center,
   );
+  await tester.pump();
+  await gesture.up();
+  await gesture.removePointer();
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('desktop drag crosses code and math atoms in both directions', (
+    tester,
+  ) async {
+    final listener = SelectionListenerNotifier();
+    addTearDown(listener.dispose);
+    String? selected;
+    await tester.pumpWidget(
+      harness(
+        code: 'run(中😀)',
+        platform: defaultTargetPlatform,
+        listener: listener,
+        onSelection: (value) => selected = value?.plainText,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final p = paragraph();
+    for (final reverse in [false, true]) {
+      tester
+          .state<SelectableRegionState>(find.byType(SelectableRegion))
+          .clearSelection();
+      await tester.pump(const Duration(milliseconds: 600));
+      final a = point(p, 0), b = point(p, 22, end: true);
+      final gesture = await tester.startGesture(
+        reverse ? b : a,
+        kind: ui.PointerDeviceKind.mouse,
+      );
+      await gesture.moveTo(reverse ? a : b);
+      await tester.pump();
+      await gesture.up();
+      await gesture.removePointer();
+      await tester.pumpAndSettle();
+      expect(selected, r'Before run(中😀) middle $x+y$ After');
+      final range = listener.selection.range!;
+      expect((range.startOffset, range.endOffset), reverse ? (34, 0) : (0, 34));
+    }
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.desktop());
 
   testWidgets(
     'mobile long press and end handle extend across an inline capsule',
@@ -161,31 +183,47 @@ void main() {
       await tester.longPressAt(point(p, 2));
       await tester.pumpAndSettle();
       expect(selected, 'Before');
-      final overlay = tester
-          .state<SelectableRegionState>(find.byType(SelectableRegion))
-          .selectionOverlay;
-      final controls = overlay!.selectionControls!;
-      final size = controls.getHandleSize(overlay.lineHeightAtEnd);
-      final center =
-          Offset(size.width / 2, size.height / 2) -
-          controls.getHandleAnchor(
-            overlay.endHandleType,
-            overlay.lineHeightAtEnd,
-          );
-      final handle = overlay.endHandleLayerLink.leader!.offset;
-      final gesture = await tester.startGesture(handle + center);
-      final target = box(p, 22);
-      final leading =
-          (overlay.lineHeightAtEnd - (target.bottom - target.top)) / 2;
-      await gesture.moveTo(
-        p.localToGlobal(Offset(target.right, target.bottom + leading)) + center,
-      );
-      await tester.pump();
-      await gesture.up();
-      await gesture.removePointer();
-      await tester.pumpAndSettle();
+      await _dragEndHandleTo(tester, p, 22);
       expect(selected, r'Before code middle $x+y$ After');
       expect(listener.selection.range!.endOffset, 30);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets(
+    'Android long press and handle drag select part of an inline capsule',
+    (tester) async {
+      final listener = SelectionListenerNotifier();
+      addTearDown(listener.dispose);
+      String? selected;
+      await tester.pumpWidget(
+        harness(
+          code: 'archived: true',
+          listener: listener,
+          platform: TargetPlatform.android,
+          onSelection: (value) => selected = value?.plainText,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final code = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: find.byType(InlineCodeCapsule),
+          matching: find.byType(RichText),
+        ),
+      );
+
+      final capsuleRect = tester.getRect(find.byType(InlineCodeCapsule));
+      await tester.longPressAt(
+        Offset(capsuleRect.left + 1, capsuleRect.center.dy),
+      );
+      await tester.pumpAndSettle();
+      expect(selected, 'archived');
+
+      await _dragEndHandleTo(tester, code, 2);
+      expect(selected, 'arc');
+      final range = listener.selection.range!;
+      expect((range.startOffset, range.endOffset), (7, 10));
       expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.android),
@@ -222,56 +260,51 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   });
-  testWidgets(
-    'platform copy shortcut includes both inline atoms',
-    (tester) async {
-      String? clipboard;
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+  testWidgets('platform copy shortcut includes both inline atoms', (
+    tester,
+  ) async {
+    String? clipboard;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboard = (call.arguments as Map)['text'] as String;
+        }
+        if (call.method == 'Clipboard.hasStrings')
+          return {'value': clipboard != null};
+        if (call.method == 'Clipboard.getData') return {'text': clipboard};
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
-        (call) async {
-          if (call.method == 'Clipboard.setData') {
-            clipboard = (call.arguments as Map)['text'] as String;
-          }
-          if (call.method == 'Clipboard.hasStrings')
-            return {'value': clipboard != null};
-          if (call.method == 'Clipboard.getData') return {'text': clipboard};
-          return null;
-        },
-      );
-      addTearDown(
-        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          SystemChannels.platform,
-          null,
-        ),
-      );
-      final listener = SelectionListenerNotifier();
-      addTearDown(listener.dispose);
-      await tester.pumpWidget(
-        harness(
-          code: 'code',
-          listener: listener,
-          platform: defaultTargetPlatform,
-          onSelection: (_) {},
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tapAt(
-        point(paragraph(), 0),
-        kind: ui.PointerDeviceKind.mouse,
-      );
-      tester
-          .state<SelectableRegionState>(find.byType(SelectableRegion))
-          .selectAll(SelectionChangedCause.keyboard);
-      await tester.pumpAndSettle();
-      final modifier = defaultTargetPlatform == TargetPlatform.macOS
-          ? LogicalKeyboardKey.metaLeft
-          : LogicalKeyboardKey.controlLeft;
-      await tester.sendKeyDownEvent(modifier);
-      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
-      await tester.sendKeyUpEvent(modifier);
-      await tester.pumpAndSettle();
-      expect(clipboard, r'Before code middle $x+y$ After');
-    },
-    variant: TargetPlatformVariant.desktop(),
-  );
+        null,
+      ),
+    );
+    final listener = SelectionListenerNotifier();
+    addTearDown(listener.dispose);
+    await tester.pumpWidget(
+      harness(
+        code: 'code',
+        listener: listener,
+        platform: defaultTargetPlatform,
+        onSelection: (_) {},
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tapAt(point(paragraph(), 0), kind: ui.PointerDeviceKind.mouse);
+    tester
+        .state<SelectableRegionState>(find.byType(SelectableRegion))
+        .selectAll(SelectionChangedCause.keyboard);
+    await tester.pumpAndSettle();
+    final modifier = defaultTargetPlatform == TargetPlatform.macOS
+        ? LogicalKeyboardKey.metaLeft
+        : LogicalKeyboardKey.controlLeft;
+    await tester.sendKeyDownEvent(modifier);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(modifier);
+    await tester.pumpAndSettle();
+    expect(clipboard, r'Before code middle $x+y$ After');
+  }, variant: TargetPlatformVariant.desktop());
 }

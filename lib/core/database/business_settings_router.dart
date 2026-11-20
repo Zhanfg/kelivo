@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import '../models/assistant.dart';
+import '../models/provider_balance_refresh_interval.dart';
 import 'business_data.dart';
 
 enum BusinessKeyDisposition {
@@ -16,6 +17,10 @@ enum BusinessKeyDisposition {
 
 final class BusinessKeyRegistry {
   BusinessKeyRegistry._();
+
+  static const balanceRefreshIntervalKey = 'balance_refresh_interval_v1';
+  static const balanceRefreshOnReplyKey = 'balance_refresh_on_reply_v1';
+  static const modelListMetadataCacheKey = 'model_list_metadata_v1';
 
   static const localOnlyKeys = <String>{
     'window_width_v1',
@@ -34,6 +39,7 @@ final class BusinessKeyRegistry {
     'flutter_log_enabled_v1',
     'model_catalog_auto_update_v1',
     'ollama_model_metadata_v1',
+    modelListMetadataCacheKey,
   };
 
   static const discardedKeys = <String>{
@@ -57,6 +63,8 @@ final class BusinessKeyRegistry {
     'provider_group_map_v1',
     'provider_group_collapsed_v1',
     'provider_ungrouped_position_v1',
+    balanceRefreshIntervalKey,
+    balanceRefreshOnReplyKey,
     'assistant_tag_map_v1',
     'assistant_tag_collapsed_v1',
     'instruction_injections_active_ids_by_assistant_v1',
@@ -625,6 +633,7 @@ final class BusinessSettingsRouter {
             'multiKeyEnabled',
             'aihubmixAppCodeEnabled',
             'balanceEnabled',
+            'balanceRefreshOnReply',
             'claudePromptCachingEnabled',
           },
           lists: const {'models', 'apiKeys', 'customHeaders', 'customBody'},
@@ -636,6 +645,10 @@ final class BusinessSettingsRouter {
             'requestBudget',
           },
         );
+        final interval = payload['balanceRefreshInterval'];
+        if (interval != null && !isBalanceRefreshInterval(interval)) {
+          throw FormatException(kind.sourceKey);
+        }
         _validateProviderChildren(kind, payload);
         return;
       case BusinessEntityKind.providerGroup:
@@ -1107,6 +1120,13 @@ final class BusinessSettingsRouter {
           requiredStrings: const {'url'},
           strings: const {'engines', 'language', 'username', 'password'},
         );
+      case '4get':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'url'},
+          strings: const {'scraper', 'passToken'},
+        );
       case 'duckduckgo':
         _validateKnownFields(kind, payload, strings: const {'region'});
       case 'perplexity':
@@ -1272,6 +1292,11 @@ final class BusinessSettingsRouter {
   }
 
   static Object _validatePreferenceValue(String key, Object value) {
+    if (key == BusinessKeyRegistry.balanceRefreshIntervalKey &&
+            !isBalanceRefreshInterval(value) ||
+        key == BusinessKeyRegistry.balanceRefreshOnReplyKey && value is! bool) {
+      throw FormatException(key);
+    }
     if (value is bool || value is int || value is double || value is String) {
       return value;
     }

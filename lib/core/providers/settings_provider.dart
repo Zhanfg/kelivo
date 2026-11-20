@@ -34,6 +34,7 @@ import '../models/backup.dart';
 import '../models/compress_context_options.dart';
 import '../models/auto_retry_options.dart';
 import '../models/provider_group.dart';
+import '../models/provider_balance_refresh_interval.dart';
 import '../services/haptics.dart';
 import '../services/api/retry_policy.dart';
 import '../services/screen_wakelock.dart';
@@ -43,12 +44,14 @@ import '../../utils/avatar_cache.dart';
 import '../models/assistant.dart';
 import '../models/model_spec.dart';
 import '../models/reasoning_request.dart';
+import '../services/model_spec/model_list_metadata_cache.dart';
 import '../services/model_spec/model_spec_resolver.dart';
 import '../services/model_spec/ollama_model_service.dart';
 import '../../utils/provider_grouping_logic.dart';
 import '../../utils/brand_assets.dart';
 import '../../utils/image_compressor.dart';
 import '../database/business_preferences.dart';
+import '../database/business_settings_router.dart';
 import '../services/backup/backup_secure_password_store.dart';
 import '../services/backup/backup_encryption.dart';
 import '../services/backup/backup_cancel_token.dart';
@@ -60,6 +63,7 @@ import '../../theme/chat_bubble_style.dart';
 import '../models/tool_schema_override.dart';
 import '../services/app_exit_flush.dart';
 import '../services/linux_window_service.dart';
+import '../services/provider_balance_refresh.dart';
 import '../../desktop/desktop_startup_service.dart';
 
 // Desktop: topic list position
@@ -596,6 +600,30 @@ class SettingsProvider extends ChangeNotifier {
   Map<String, ProviderConfig> _providerConfigs = {};
   Map<String, ProviderConfig> get providerConfigs =>
       Map.unmodifiable(_providerConfigs);
+  static const _defaultBalanceRefreshOnReply = true;
+  int _balanceRefreshInterval = 0;
+  bool _balanceRefreshOnReply = _defaultBalanceRefreshOnReply;
+  int get balanceRefreshInterval => _balanceRefreshInterval;
+  bool get balanceRefreshOnReply => _balanceRefreshOnReply;
+  ProviderBalanceRefresh? _balanceRefresh;
+  ProviderBalanceRefresh get balanceRefresh =>
+      _balanceRefresh ??= ProviderBalanceRefresh(this);
+
+  int balanceRefreshIntervalFor(ProviderConfig config) =>
+      config.balanceRefreshInterval ?? _balanceRefreshInterval;
+
+  bool balanceRefreshOnReplyFor(ProviderConfig config) =>
+      config.balanceRefreshOnReply ?? _balanceRefreshOnReply;
+
+  void refreshBalanceAfterReply(String providerKey) {
+    final config = getProviderConfig(providerKey);
+    if (config.enabled &&
+        config.balanceEnabled == true &&
+        balanceRefreshOnReplyFor(config)) {
+      balanceRefresh.replyFinished(providerKey);
+    }
+  }
+
   bool get hasAnyActiveModel => _providerConfigs.values.any(
     (c) => c.enabled && c.enabledModels.isNotEmpty,
   );
@@ -706,6 +734,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.load();
     final localPreferences = await SharedPreferences.getInstance();
     await OllamaModelService.instance.ensureLoaded();
+    await ModelListMetadataCache.instance.ensureLoaded();
     _providersOrder = prefs.getStringList(_providersOrderKey) ?? [];
     final m = prefs.getString(_themeModeKey);
     switch (m) {
@@ -722,6 +751,11 @@ class SettingsProvider extends ChangeNotifier {
     _useDynamicColor = prefs.getBool(_useDynamicColorKey) ?? true;
     _loadCustomThemes(prefs);
     final cfgStr = prefs.getString(_providerConfigsKey);
+    _balanceRefreshInterval =
+        prefs.getInt(BusinessKeyRegistry.balanceRefreshIntervalKey) ?? 0;
+    _balanceRefreshOnReply =
+        prefs.getBool(BusinessKeyRegistry.balanceRefreshOnReplyKey) ??
+        _defaultBalanceRefreshOnReply;
     if (cfgStr != null && cfgStr.isNotEmpty) {
       try {
         final raw = jsonDecode(cfgStr) as Map<String, dynamic>;
@@ -2449,20 +2483,41 @@ class SettingsProvider extends ChangeNotifier {
 
   int _webDavWrites = 0;
   int _s3Writes = 0;
+  final _reportedInvalidBackupFields = <String>{};
   bool get savingWebDavConfig => _webDavWrites > 0;
   bool get savingS3Config => _s3Writes > 0;
 
   // BusinessStartupGate loads these preferences before the first frame.
-  WebDavConfig get webDavConfig {
-    final value = _preferences.get(_webDavConfigKey);
-    return value is String
-        ? WebDavConfig.fromJsonString(value)
-        : const WebDavConfig();
+  ({WebDavConfig webDav, S3Config s3}) get backupConfigs {
+    final webDav = WebDavConfig.fromPreference(
+      _preferences.get(_webDavConfigKey),
+      onInvalidField: (field) =>
+          _reportInvalidBackupField(_webDavConfigKey, field),
+    );
+    final s3 = S3Config.fromPreference(
+      _preferences.get(_s3ConfigKey),
+      onInvalidField: (field) => _reportInvalidBackupField(_s3ConfigKey, field),
+    );
+    if (setEquals(webDav.scope.excluded, s3.scope.excluded)) {
+      return (webDav: webDav, s3: s3);
+    }
+    // Both destinations store the shared selection. An explicit exclusion in
+    // either copy still applies if the other copy is missing or damaged.
+    final scope = webDav.scope.intersect(s3.scope);
+    return (
+      webDav: webDav.copyWith(scope: scope),
+      s3: s3.copyWith(scope: scope),
+    );
   }
 
-  S3Config get s3Config {
-    final value = _preferences.get(_s3ConfigKey);
-    return value is String ? S3Config.fromJsonString(value) : const S3Config();
+  WebDavConfig get webDavConfig => backupConfigs.webDav;
+  S3Config get s3Config => backupConfigs.s3;
+
+  void _reportInvalidBackupField(String key, String? field) {
+    final name = field == null ? key : '$key.$field';
+    if (_reportedInvalidBackupFields.add(name)) {
+      debugPrint('[BackupSettings] Ignoring invalid $name.');
+    }
   }
 
   Future<void> updateWebDavConfig(WebDavConfig Function(WebDavConfig) edit) =>
@@ -2484,10 +2539,11 @@ class SettingsProvider extends ChangeNotifier {
     if (s3 != null) _s3Writes++;
     final write = _preferences.runExclusiveMutation(() async {
       await _preferences.load();
+      final current = backupConfigs;
       await _preferences.setMany({
         if (webDav != null)
-          _webDavConfigKey: webDav(webDavConfig).toJsonString(),
-        if (s3 != null) _s3ConfigKey: s3(s3Config).toJsonString(),
+          _webDavConfigKey: webDav(current.webDav).toJsonString(),
+        if (s3 != null) _s3ConfigKey: s3(current.s3).toJsonString(),
       });
     });
     notifyListeners();
@@ -3289,6 +3345,7 @@ class SettingsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _balanceRefresh?.dispose();
     _backupEncryptionPassword = null;
     ProviderOAuthService.instance.unbind(this);
     _toolSchemaOverridePersistTimer?.cancel();
@@ -3393,6 +3450,29 @@ class SettingsProvider extends ChangeNotifier {
     final prefs = _preferences;
     final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
+  }
+
+  Future<void> setBalanceRefreshInterval(int minutes) async {
+    if (!isBalanceRefreshInterval(minutes)) {
+      throw ArgumentError.value(minutes, 'minutes');
+    }
+    if (_balanceRefreshInterval == minutes) return;
+    _balanceRefreshInterval = minutes;
+    notifyListeners();
+    await _preferences.setInt(
+      BusinessKeyRegistry.balanceRefreshIntervalKey,
+      minutes,
+    );
+  }
+
+  Future<void> setBalanceRefreshOnReply(bool enabled) async {
+    if (_balanceRefreshOnReply == enabled) return;
+    _balanceRefreshOnReply = enabled;
+    notifyListeners();
+    await _preferences.setBool(
+      BusinessKeyRegistry.balanceRefreshOnReplyKey,
+      enabled,
+    );
   }
 
   Future<void> setModelEnabled(
@@ -3733,8 +3813,11 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> removeProviderConfig(String key) async {
-    if (!_providerConfigs.containsKey(key)) return;
-    _providerConfigs.remove(key);
+    final removed = _providerConfigs.remove(key);
+    if (removed == null) return;
+    final clearMetadata = ModelListMetadataCache.instance.clearProvider(
+      removed.id,
+    );
     // Remove from order
     _providersOrder = List<String>.from(_providersOrder.where((k) => k != key));
     // Also remove from grouping map
@@ -3809,6 +3892,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
     await prefs.setStringList(_providersOrderKey, _providersOrder);
     await prefs.setString(_providerGroupMapKey, jsonEncode(_providerGroupMap));
+    await clearMetadata;
     notifyListeners();
   }
 
@@ -6209,6 +6293,8 @@ Requirements:
     copy._customThemes = _customThemes;
     copy._selectedCustomThemeId = _selectedCustomThemeId;
     copy._providerConfigs = _providerConfigs;
+    copy._balanceRefreshInterval = _balanceRefreshInterval;
+    copy._balanceRefreshOnReply = _balanceRefreshOnReply;
     copy._pinnedModels.addAll(_pinnedModels);
     copy._currentModelProvider = _currentModelProvider;
     copy._currentModelId = _currentModelId;
@@ -6686,6 +6772,8 @@ class ProviderConfig {
   final String balanceMethod;
   final List<Map<String, String>> balanceHeaders;
   final String balanceBody;
+  final int? balanceRefreshInterval;
+  final bool? balanceRefreshOnReply;
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
   final String? claudePromptCachingTtl;
@@ -6775,6 +6863,8 @@ class ProviderConfig {
     this.balanceMethod = 'GET',
     this.balanceHeaders = const [],
     this.balanceBody = '',
+    this.balanceRefreshInterval,
+    this.balanceRefreshOnReply,
     this.claudePromptCachingEnabled = false,
     this.claudePromptCachingTtl = claudePromptCachingTtl5m,
   });
@@ -6836,6 +6926,8 @@ class ProviderConfig {
     String? balanceMethod,
     List<Map<String, String>>? balanceHeaders,
     String? balanceBody,
+    Object? balanceRefreshInterval = _sentinel,
+    Object? balanceRefreshOnReply = _sentinel,
     bool? claudePromptCachingEnabled,
     String? claudePromptCachingTtl,
   }) => ProviderConfig(
@@ -6891,6 +6983,12 @@ class ProviderConfig {
     balanceMethod: balanceMethod ?? this.balanceMethod,
     balanceHeaders: balanceHeaders ?? this.balanceHeaders,
     balanceBody: balanceBody ?? this.balanceBody,
+    balanceRefreshInterval: identical(balanceRefreshInterval, _sentinel)
+        ? this.balanceRefreshInterval
+        : balanceRefreshInterval as int?,
+    balanceRefreshOnReply: identical(balanceRefreshOnReply, _sentinel)
+        ? this.balanceRefreshOnReply
+        : balanceRefreshOnReply as bool?,
     claudePromptCachingEnabled:
         claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
     claudePromptCachingTtl:
@@ -6944,6 +7042,10 @@ class ProviderConfig {
     'balanceMethod': balanceMethod,
     'balanceHeaders': balanceHeaders,
     'balanceBody': balanceBody,
+    if (balanceRefreshInterval != null)
+      'balanceRefreshInterval': balanceRefreshInterval,
+    if (balanceRefreshOnReply != null)
+      'balanceRefreshOnReply': balanceRefreshOnReply,
     'claudePromptCachingEnabled': claudePromptCachingEnabled,
     'claudePromptCachingTtl': resolveClaudePromptCachingTtl(
       claudePromptCachingTtl,
@@ -7031,6 +7133,11 @@ class ProviderConfig {
             .toList() ??
         const [],
     balanceBody: json['balanceBody'] as String? ?? '',
+    balanceRefreshInterval:
+        isBalanceRefreshInterval(json['balanceRefreshInterval'])
+        ? json['balanceRefreshInterval'] as int
+        : null,
+    balanceRefreshOnReply: json['balanceRefreshOnReply'] as bool?,
     claudePromptCachingEnabled:
         json['claudePromptCachingEnabled'] as bool? ?? false,
     claudePromptCachingTtl: resolveClaudePromptCachingTtl(
