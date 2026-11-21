@@ -1,8 +1,6 @@
 import '../../../core/models/native_compaction.dart';
 import '../../../core/models/provider_oauth.dart';
 import '../../../core/models/carried_original.dart';
-import '../../../core/services/api/providers/openai/responses_request.dart';
-import '../../../core/services/api/request_history_context.dart';
 import '../../../core/services/api/native_compaction_context.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import '../../../core/models/message_part.dart';
@@ -328,6 +326,7 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Called when streaming finishes (UI may show notification).
   void Function(String conversationId)? onStreamFinished;
+  VoidCallback? onConversationIdle;
 
   /// Completes once downstream work has taken over background execution.
   FutureOr<void> Function(ChatMessage message)? onAssistantMessageFinished;
@@ -403,6 +402,7 @@ class HomeViewModel extends ChangeNotifier {
   void _onLoadingChanged(String conversationId, bool loading) {
     notifyListeners();
     if (!loading) {
+      onConversationIdle?.call();
       _chatService.contextCompression.resumeIfReady(conversationId);
       unawaited(_drainQueuedInputIfReady(conversationId));
     }
@@ -1472,17 +1472,13 @@ class HomeViewModel extends ChangeNotifier {
         carryBudgetTokens: carryBudgetTokens,
         prepareNative: (selection) async {
           final prepared = await prepare(selection);
-          final body = await buildOpenAIResponsesBody(
-            nativeResponsesConfig(config),
-            model,
-            RequestHistoryContext.identify(prepared.apiMessages),
+          return ChatApiService.prepareNativeCompactionBody(
+            config: config,
+            modelId: model,
+            messages: prepared.apiMessages,
             tools: [...prepared.tools, ...prepared.mcpTools],
+            imageContext: prepared.imageContext,
           );
-          return await prepared.imageContext?.project(
-                body,
-                preserveSources: true,
-              ) ??
-              body;
         },
         automatic: automatic,
         ownsContinuation: ownsContinuation,
@@ -1626,18 +1622,12 @@ class HomeViewModel extends ChangeNotifier {
       }
       final user = snapshot.messages.where(isCompressionUserMessage).lastOrNull;
       if (user == null) throw StateError('no_messages');
-      final settings = _contextProvider.read<SettingsProvider>();
-      final config = await _chatService.compressionConfig(
-        id,
-        settings.compressionDefaults,
-      );
       final request = await buildCompressionRequest(
         id,
-        options: CompressContextOptions(
+        options: const CompressContextOptions(
           mode: CompressContextLimitMode.keepRecent,
-          keepUserMessages: config.keepRecentUserTurns < 1
-              ? 1
-              : config.keepRecentUserTurns,
+          keepUserMessages: 1,
+          regenerateExisting: true,
         ),
         beforeMessageId: user.id,
         ownsContinuation: true,
@@ -1699,7 +1689,6 @@ class HomeViewModel extends ChangeNotifier {
     final planner = CompressionPlanner(
       request: request,
       materials: [],
-      previousSummary: '',
       background: background,
     );
     return _previewCompressionMaterials(
@@ -2215,15 +2204,7 @@ Future<CompressionRequestPreview> _previewCompressionMaterials(
   String Function(int) quoteMarker,
 ) => Isolate.run(() {
   planner.materials.addAll(
-    buildCompressRequestContents(
-      messages.where((m) => !ContextOperation.isSummary(m)).toList(),
-      options,
-      quoteMarker: quoteMarker,
-    ),
+    buildCompressRequestContents(messages, options, quoteMarker: quoteMarker),
   );
-  planner.previousSummary = messages
-      .where(ContextOperation.isSummary)
-      .map((m) => m.content)
-      .join('\n\n');
   return planner.preview();
 });

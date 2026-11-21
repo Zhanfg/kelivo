@@ -28,7 +28,7 @@ import 'package:flutter/foundation.dart'
     show kIsWeb, mapEquals, ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
-    show MissingPluginException, Clipboard, ClipboardData, LogicalKeyboardKey;
+    show MissingPluginException, Clipboard, ClipboardData;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -41,8 +41,8 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../core/providers/settings_provider.dart';
-import '../../../core/providers/hotkey_provider.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../core/services/api/response_speed.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
@@ -398,26 +398,9 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  Widget _findKeyBinding(Widget child) {
-    final apple = PlatformUtils.isMacOS || PlatformUtils.isIOS;
-    final shortcut = SingleActivator(
-      LogicalKeyboardKey.keyF,
-      meta: apple,
-      control: !apple,
-    );
-    final claimed =
-        PlatformUtils.isDesktop &&
-        context.select<HotkeyProvider?, bool>(
-          (provider) => provider?.handlesShortcut(shortcut) ?? false,
-        );
-    return CallbackShortcuts(
-      bindings: {if (!claimed) shortcut: _openConversationFind},
-      child: child,
-    );
-  }
-
-  Widget _chatFindShortcuts(Widget body) => _findKeyBinding(
-    Focus(
+  Widget _chatFindShortcuts(Widget body) => ConversationFindShortcut(
+    onOpen: _openConversationFind,
+    child: Focus(
       focusNode: _chatFocus,
       autofocus: true,
       skipTraversal: true,
@@ -427,8 +410,9 @@ class _HomePageState extends State<HomePage>
 
   PreferredSizeWidget _mobileFindHeader() => PreferredSize(
     preferredSize: const Size.fromHeight(kToolbarHeight),
-    child: _findKeyBinding(
-      SafeArea(
+    child: ConversationFindShortcut(
+      onOpen: _openConversationFind,
+      child: SafeArea(
         bottom: false,
         child: SizedBox(
           height: kToolbarHeight,
@@ -1324,6 +1308,13 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildTabletBody(BuildContext context, ColorScheme cs) {
+    final fullWidth =
+        !kIsWeb &&
+        _controller.isDesktopPlatform &&
+        context.watch<SettingsProvider>().desktopFullWidthChat;
+    final maxContentWidth = fullWidth
+        ? double.infinity
+        : ChatLayoutConstants.maxContentWidth;
     final bottomContentPadding = _controller.inputBarHeight + 16;
     final topContentPadding = _chatTopOverlayInset(context) + 8;
     final backgroundImageActive = _assistantBackgroundActive(context);
@@ -1347,6 +1338,7 @@ class _HomePageState extends State<HomePage>
             ),
             child: _buildMessageListView(
               context,
+              fullWidth: fullWidth,
               topContentPadding: topContentPadding,
               bottomContentPadding: bottomContentPadding,
               dividerPadding: const EdgeInsets.symmetric(
@@ -1360,7 +1352,7 @@ class _HomePageState extends State<HomePage>
       bottomOverlay: _controller.selecting
           ? ConstrainedBox(
               constraints: const BoxConstraints(
-                maxWidth: ChatLayoutConstants.maxInputWidth,
+                maxWidth: ChatLayoutConstants.maxContentWidth,
               ),
               child: _buildSelectionActionBar(context),
             )
@@ -1379,9 +1371,7 @@ class _HomePageState extends State<HomePage>
                       alignment: Alignment.bottomCenter,
                       heightFactor: 1,
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: ChatLayoutConstants.maxInputWidth,
-                        ),
+                        constraints: BoxConstraints(maxWidth: maxContentWidth),
                         child: input,
                       ),
                     );
@@ -1415,6 +1405,7 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMessageListView(
     BuildContext context, {
+    bool fullWidth = false,
     required double topContentPadding,
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
@@ -1529,6 +1520,13 @@ class _HomePageState extends State<HomePage>
       selecting: _controller.selecting,
       selectedItems: _controller.selectedItems,
       suggestions: suggestions,
+      fullWidth: fullWidth,
+      rightOverlayWidth:
+          fullWidth &&
+              settings.desktopMessageNavButtonsMode !=
+                  DesktopMessageNavButtonsMode.never
+          ? ScrollNavButtonsPanel.defaultOverlayWidth
+          : 0,
       topContentPadding: topContentPadding,
       bottomContentPadding: bottomContentPadding,
       dividerPadding: dividerPadding,
@@ -2094,7 +2092,8 @@ class _HomePageState extends State<HomePage>
     if (providerKey == null || modelId == null) return;
     final settings = context.read<SettingsProvider>();
     final config = settings.getProviderConfig(providerKey);
-    if (!ModelSpecResolver.instance.spec(config, modelId).supportsReasoning) {
+    if (!ModelSpecResolver.instance.spec(config, modelId).supportsReasoning &&
+        ResponseSpeedCapabilities.resolve(config, modelId).tiers.isEmpty) {
       return;
     }
     final assistant = context.read<AssistantProvider>().currentAssistant;

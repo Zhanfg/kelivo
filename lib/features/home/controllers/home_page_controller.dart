@@ -210,6 +210,7 @@ class HomePageController extends ChangeNotifier {
   static const int startupWarmupConversationCount = 4;
   int _warmupSerial = 0;
   bool _startupWarmupScheduled = false;
+  bool _startupWarmupDeferred = false;
 
   @visibleForTesting
   int get debugWarmupSerial => _warmupSerial;
@@ -257,7 +258,12 @@ class HomePageController extends ChangeNotifier {
   // would add value or merely duplicate content already on screen.
   bool _homeRouteVisible = true;
   bool _homePresentationVisible = true;
-  bool _homeAppVisible = true;
+  bool _homeAppVisible = _isAppVisible(WidgetsBinding.instance.lifecycleState);
+
+  static bool _isAppVisible(AppLifecycleState? state) =>
+      state != AppLifecycleState.hidden &&
+      state != AppLifecycleState.paused &&
+      state != AppLifecycleState.detached;
   bool _chatInitialized = false;
   bool _openingNotificationConversation = false;
   String? _pendingNotificationConversationId;
@@ -1016,7 +1022,10 @@ class HomePageController extends ChangeNotifier {
       // Committing the new window already invalidated its predecessor's read.
       _resetMessageJump();
       _restoreMessageUiState();
-      _scrollCtrl.positionAtBottomOnNextLayout();
+      _scrollCtrl.positionAtBottomOnOpen();
+    };
+    _viewModel.onConversationIdle = () {
+      if (!_homeAppVisible) _releaseInactiveMessageCaches();
     };
     _viewModel.onStreamFinished = (conversationId) {
       onFindGenerationFinished?.call(conversationId);
@@ -1061,7 +1070,7 @@ class HomePageController extends ChangeNotifier {
     _scrollCtrl.dispose();
     _scrollController = controller;
     _initializeScrollController();
-    _scrollCtrl.positionAtBottomOnNextLayout();
+    _scrollCtrl.positionAtBottomOnOpen();
   }
 
   void _initializeProviders() {
@@ -1401,7 +1410,7 @@ class HomePageController extends ChangeNotifier {
           notifyListeners();
           await Future.wait([restoreAssistant, loadWindow]);
           _restoreMessageUiState();
-          _scrollCtrl.positionAtBottomOnNextLayout();
+          _scrollCtrl.positionAtBottomOnOpen();
           notifyListeners();
           _scheduleStartupWarmup();
         } else {
@@ -1447,6 +1456,8 @@ class HomePageController extends ChangeNotifier {
   /// initial restore (cache plan measure 14). Runs once per launch.
   void _scheduleStartupWarmup() {
     if (_startupWarmupScheduled) return;
+    _startupWarmupDeferred = !_homeAppVisible;
+    if (_startupWarmupDeferred) return;
     _startupWarmupScheduled = true;
     final serial = _warmupSerial;
     final currentId = _chatService.currentConversationId;
@@ -1481,7 +1492,9 @@ class HomePageController extends ChangeNotifier {
     int serial,
   ) async {
     for (final id in conversationIds) {
-      if (serial != _warmupSerial || !_context.mounted) return;
+      if (serial != _warmupSerial || !_context.mounted || !_homeAppVisible) {
+        return;
+      }
       // A streaming conversation owns the single connection queue.
       if (_chatController.loadingConversationIds.contains(id)) continue;
       try {
@@ -1489,6 +1502,9 @@ class HomePageController extends ChangeNotifier {
           id,
           limit: ChatService.defaultTimelineInitialSlots,
         );
+        if (!_homeAppVisible && _context.mounted) {
+          _releaseInactiveMessageCaches();
+        }
       } catch (_) {
         // Warm-up failures lose nothing user-visible.
       }
@@ -4165,10 +4181,12 @@ class HomePageController extends ChangeNotifier {
         }),
       );
     }
-    _homeAppVisible =
-        state != AppLifecycleState.paused &&
-        state != AppLifecycleState.hidden &&
-        state != AppLifecycleState.detached;
+    final wasVisible = _homeAppVisible;
+    _homeAppVisible = _isAppVisible(state);
+    if (wasVisible && !_homeAppVisible) {
+      _warmupSerial++;
+      _releaseInactiveMessageCaches();
+    }
     _streamController.setPresentationEnabled(
       _homePresentationVisible && _homeAppVisible,
     );
@@ -4181,6 +4199,7 @@ class HomePageController extends ChangeNotifier {
       );
     }
     if (state == AppLifecycleState.resumed) {
+      if (_startupWarmupDeferred) _scheduleStartupWarmup();
       ScreenWakelock.reassert();
     }
   }
@@ -4195,6 +4214,13 @@ class HomePageController extends ChangeNotifier {
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) => dismissKeyboard());
     }
+  }
+
+  void _releaseInactiveMessageCaches() {
+    _chatService.releaseInactiveMessageCaches({
+      ?currentConversation?.id,
+      ...loadingConversationIds,
+    });
   }
 
   void onDidPushNext() {

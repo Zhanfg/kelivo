@@ -1641,6 +1641,15 @@ class AppLocalizationsTr extends AppLocalizations {
   String get hotkeysResetAll => 'Tümünü varsayılana sıfırla';
 
   @override
+  String hotkeysShortcutInUse(String action) {
+    return 'Bu kısayol zaten “$action” eylemine atanmış.';
+  }
+
+  @override
+  String get hotkeysTextEditing =>
+      'Metin düzenleme ve odaklar arasında gezinme';
+
+  @override
   String get assistantEditTemperatureTitle => 'Sıcaklık';
 
   @override
@@ -1726,6 +1735,20 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get backupPageChooseExternalFolder =>
       'iCloud Drive\'ı veya \"iPhone\'um > Kelivo\" dışında bir klasör seçin. Kelivo klasöründeki dosyalar uygulamayla birlikte silinir. Yedek kaydedilmedi.';
+
+  @override
+  String get backupPageChooseNewFile =>
+      'Yedeğinizi kaydetmek için yeni bir dosya adı veya başka bir klasör seçin.';
+
+  @override
+  String backupArchiveFileSizeLimit(String name, String limit) {
+    return '“$name” yedek dosyası, dosya başına $limit sınırını aşıyor.';
+  }
+
+  @override
+  String backupArchiveTotalSizeLimit(String limit) {
+    return 'Sıkıştırılmamış yedek, $limit sınırını aşıyor.';
+  }
 
   @override
   String get backupPageFilesLabel => 'Dosyalar ve Görseller';
@@ -1858,7 +1881,8 @@ class AppLocalizationsTr extends AppLocalizations {
   String get restoreProgressStageInstallingBackup => 'Yedek yükleniyor';
 
   @override
-  String get restoreProgressStageVerifying => 'Doğrulanıyor';
+  String get restoreProgressStageVerifying =>
+      'Geri yüklenen veriler kontrol ediliyor';
 
   @override
   String get restoreProgressStageRollingBack =>
@@ -2173,6 +2197,35 @@ class AppLocalizationsTr extends AppLocalizations {
   String get backupProgressPreparing => 'Hazırlanıyor';
 
   @override
+  String get backupProgressScanning => 'Yedek dosyaları taranıyor';
+
+  @override
+  String backupProgressDiscoveredFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count dosya bulundu',
+      one: '$count dosya bulundu',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupProgressCheckingDatabase => 'Veritabanı kontrol ediliyor';
+
+  @override
+  String get backupProgressChoosingDestination =>
+      'Kaydedilecek konum seçiliyor';
+
+  @override
+  String get backupProgressSavingFile => 'Yedek dosyası kaydediliyor';
+
+  @override
+  String backupProgressElapsed(String time) {
+    return 'Geçen süre $time';
+  }
+
+  @override
   String get backupProgressSnapshotting =>
       'Veritabanı anlık görüntüsü oluşturuluyor';
 
@@ -2180,7 +2233,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get backupProgressPacking => 'Paketleniyor';
 
   @override
-  String get backupProgressVerifying => 'Doğrulanıyor';
+  String get backupProgressVerifying => 'Yedek arşivi kontrol ediliyor';
 
   @override
   String get backupProgressUploading => 'Yükleniyor';
@@ -2192,13 +2245,14 @@ class AppLocalizationsTr extends AppLocalizations {
   String get backupProgressExtracting => 'Çıkarılıyor';
 
   @override
-  String get backupProgressValidating => 'Geçerliliği kontrol ediliyor';
+  String get backupProgressValidating =>
+      'Geri yükleme dosyaları kontrol ediliyor';
 
   @override
   String get backupProgressReadingSettings => 'Ayarlar okunuyor';
 
   @override
-  String get backupProgressStaging => 'Hazırlanıyor';
+  String get backupProgressStaging => 'Geri yükleme dosyaları hazırlanıyor';
 
   @override
   String get backupProgressCommitting => 'Kaydediliyor';
@@ -4315,6 +4369,13 @@ class AppLocalizationsTr extends AppLocalizations {
       'http(s) görsel bağlantılarını olduğu gibi gönder; kapalıyken uzak bağlantılar atlanır ve yalnızca yerel görseller gönderilir';
 
   @override
+  String get modelSpecFormResponseSpeedTiers => 'Yanıt hızı kademeleri';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      'Bu modelin sohbetlerde sunduğu hızlandırma kademelerini özelleştirin. Yalnızca Standart sunmak için ikisini de temizleyin.';
+
+  @override
   String get modelSpecFormPromptCacheControl => 'İstem önbellek işaretçisi';
 
   @override
@@ -5300,6 +5361,13 @@ class AppLocalizationsTr extends AppLocalizations {
   String get searchServiceEditorConfigurationTitle => 'Yapılandırma';
 
   @override
+  String get searchServiceEditorChangeIcon => 'Simgeyi değiştir';
+
+  @override
+  String get searchServiceEditorIconFailed =>
+      'Bu simge kullanılamadı. Başka bir görsel veya simge seçin.';
+
+  @override
   String get searchServiceEditorNoConfiguration =>
       'Bu sağlayıcı ek yapılandırma gerektirmez.';
 
@@ -5867,6 +5935,14 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get displaySettingsPageAutoSwitchTopicsTitle =>
       'Otomatik olarak Konulara geç';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatTitle =>
+      'Tam genişlikte sohbet';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      'Mesajları ve giriş kutusunu sohbet alanını dolduracak şekilde genişlet.';
 
   @override
   String get desktopDisplaySettingsTopicPositionTitle => 'Konu konumu';
@@ -9743,6 +9819,14 @@ class AppLocalizationsTr extends AppLocalizations {
       'Asistan yanıtındaki boş satırlar her paragrafı ayrı bir balona böler';
 
   @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCards =>
+      'Düşünme ve araç kartlarını özelleştir';
+
+  @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle =>
+      'Düşünme ve araç çağrılarına kendi görünümlerini ver';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle =>
       'Yarı saydam buzlu cam';
 
@@ -9795,8 +9879,11 @@ class AppLocalizationsTr extends AppLocalizations {
   String get messageStyleSettingsPageRoleAssistant => 'Asistan';
 
   @override
+  String get messageStyleSettingsPageRoleThinkingTool => 'Kartlar';
+
+  @override
   String get messageStyleSettingsPageRoleAssistantHint =>
-      'Asistan ayarları ayrıca düşünme, araç çağırma ve çeviri kartlarına da uygulanır.';
+      'Çeviri kartları asistan stilini izler. Düşünme ve araç kartları varsayılan olarak onu izler.';
 
   @override
   String get localSnapshotSectionTitle => 'Yerel Kopyalar';
@@ -11840,7 +11927,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get workspaceToolHelpViewImage =>
-      'Modelin çalışma alanındaki bir görseli incelemesine izin verin.';
+      'Modelin çalışma alanındaki görselleri veya genel URL\'lerdeki görselleri incelemesine izin verin.';
 
   @override
   String get workspaceToolHelpWrite =>
@@ -15179,7 +15266,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get compressOverSnack =>
-      'Özet hâlâ çok uzun ve sınırı aşacak, bu nedenle kullanılmadı. Tekrar sıkıştırın veya daha büyük bağlamı olan bir modele geçin.';
+      'Sonuç sohbet modelinin penceresini aşabilir. Özeti inceleyip uygulayabilirsiniz.';
 
   @override
   String get contextSummaryHint =>
@@ -16264,6 +16351,19 @@ class AppLocalizationsTr extends AppLocalizations {
   String get imageContextOmitted => 'Dahil edilmedi';
 
   @override
+  String get imageContextExclude => 'Bağlamdan hariç tut';
+
+  @override
+  String get imageContextRestore => 'Dışlamayı kaldır';
+
+  @override
+  String get imageContextExcluded => 'Tarafınızdan hariç tutuldu';
+
+  @override
+  String get imageContextExcludedWithOriginal =>
+      'Orijinal görsel hariç tutuldu';
+
+  @override
   String get imageContextPin => 'Görseli sabitle';
 
   @override
@@ -16289,7 +16389,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get imageContextActionsHint =>
-      'Bir görseli önceliklendirmek için sabitleyin veya yazma alanına yeniden ekleyin.';
+      'Görselleri tek tek hariç tutabilir, öncelik için sabitleyebilir veya giriş alanına yeniden ekleyebilirsiniz.';
 
   @override
   String get imageContextEmptyDescription =>
@@ -16503,13 +16603,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get compressionTrigger => 'Başlangıç';
 
   @override
-  String get compressionTarget => 'Sıkıştır';
+  String get compressionTarget => 'Hedef';
 
   @override
-  String get compressionWindow => 'Özet modeli kapasitesi';
-
-  @override
-  String get compressionRequests => 'Maksimum istek';
+  String get compressionWindow => 'Otomatik sıkıştırma planlama penceresi';
 
   @override
   String get compressionReference => 'Arka plan referanslarını kullan';
@@ -16582,16 +16679,12 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get compressionBudgetError =>
-      'Bu işlem, mevcut sınırın izin verdiğinden daha fazla model isteği gerektirir, bu nedenle bağlam değişmedi. Maksimum istek sayısını artırın veya daha büyük bağlamı olan bir modele geçin.';
-
-  @override
   String get compressionIncomplete =>
       'Özet kesildi veya reddedildi ve bağlam değişmedi. Çıktı sınırını artırın veya farklı bir model deneyin.';
 
   @override
-  String get compressionReferenceTooLarge =>
-      'Referans materyali bu modelin kapasitesini zaten dolduruyor ve özet için yer kalmıyor. Daha az referans kullanın veya daha büyük bağlamı olan bir modele geçin.';
+  String get compressionProviderContextRejected =>
+      'Sağlayıcı isteğin çok büyük olduğunu bildirdi. Daha büyük bağlam penceresine sahip bir model deneyin.';
 
   @override
   String get compressionReferenceChanged =>
@@ -16599,7 +16692,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get compressionTargetNotReached =>
-      'Sıkıştırmadan sonra bile kullanım otomatik başlangıç noktasının üzerinde kalacaktı, bu nedenle orijinal bağlam korundu. Özeti kısaltın veya Başlangıç değerini artırın.';
+      'Sonucun en az orijinal kadar bağlam kullandığı tahmin ediliyor. Özeti inceleyip kısaltabilirsiniz.';
 
   @override
   String get compressionTemplateMissing =>
@@ -16686,8 +16779,14 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bir kez sıkıştır, sonra başarısız olan yanıtı yeniden dene';
 
   @override
-  String compressionPlannedCalls(int count, int limit) {
-    return 'Tahmini $count istek · sınır $limit, yeniden denemeler dahil';
+  String compressionPlannedCalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Yaklaşık $count istek',
+      one: 'Yaklaşık 1 istek',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -16781,9 +16880,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get compressionTurnUnit => 'tur';
 
   @override
-  String get compressionCallUnit => 'çağrı';
-
-  @override
   String get compressionRequestTimeout => 'Sıkıştırma isteği zaman aşımı';
 
   @override
@@ -16806,10 +16902,15 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get compressionAdvancedHint =>
-      'Referanslar, orijinallere geri bakılıp bakılmayacağı ve istek sınırı';
+      'Arka plan referansları, orijinal geçmiş ve pencere tahminleri';
 
   @override
   String get compressionAutomaticWindow => 'Otomatik';
+
+  @override
+  String compressionSummaryWindowEstimate(String tokens, String source) {
+    return 'Özet modeli penceresi · $tokens token · $source';
+  }
 
   @override
   String get compressionAutoOffHint =>
@@ -16854,7 +16955,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get compressionAutoKeepHint =>
-      'Otomatik sıkıştırma, manuel çalıştırma için seçtiğiniz aralıktan bağımsız olarak her zaman son orijinalleri tutar. Tur sayısı manuel sıkıştırmayla paylaşılır.';
+      'Otomatik sıkıştırma, yer olduğunda son turları korur. Gerektiğinde daha eski turları da özetleyebilir ve geçerli isteği her zaman korur.';
 
   @override
   String get requestBudgetTitle => 'Görsel ve istek bütçeleri';

@@ -120,6 +120,8 @@ class MessageListView extends StatefulWidget {
     required this.selecting,
     required this.selectedItems,
     required this.dividerPadding,
+    this.fullWidth = false,
+    this.rightOverlayWidth = 0,
     this.topContentPadding = 8,
     this.bottomContentPadding = 16,
     this.footer,
@@ -207,6 +209,8 @@ class MessageListView extends StatefulWidget {
   final bool selecting;
   final Set<String> selectedItems;
   final EdgeInsetsGeometry dividerPadding;
+  final bool fullWidth;
+  final double rightOverlayWidth;
   final double topContentPadding;
   final double bottomContentPadding;
   final String? pinnedStreamingMessageId;
@@ -743,7 +747,17 @@ class _MessageListViewState extends State<MessageListView> {
       reasoningSegments,
       isStreaming: message.isStreaming,
     );
-    final toolSignature = _toolEstimateSignature(toolParts);
+    final toolImageAspects =
+        _timelineStorage[message.id]?.readState(
+              context,
+              identifier: timelineToolImageAspectsStorageId,
+            )
+            as Map<String, double>?;
+    final toolSignature = Object.hash(
+      _toolEstimateSignature(toolParts),
+      toolImageAspects?.length,
+      widget.selecting,
+    );
     final partsSignature = _partsEstimateSignature(estimateParts);
     final streamingSignature = Object.hash(
       snapshot?.timelineStructureSignature ?? 0,
@@ -813,6 +827,13 @@ class _MessageListViewState extends State<MessageListView> {
     // User bubbles are inset and never span the full width.
     final bubbleWidth = crossAxisExtent * (message.role == 'user' ? 0.85 : 1.0);
     final textWidth = math.max(80.0, bubbleWidth - 28);
+    final toolImageMaxWidth =
+        crossAxisExtent -
+        2 *
+            (assistantMessageHorizontalPadding +
+                timelineCardHorizontalPadding) -
+        timelineStepContentInset -
+        (widget.selecting ? 44 : 0); // Checkbox hit target and its padding.
     // Wide (CJK) glyphs are about twice as wide as Latin ones, so the mix
     // decides how many characters fit on a line.
     final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(body));
@@ -846,6 +867,8 @@ class _MessageListViewState extends State<MessageListView> {
           snapshot?.toolCountAtSplit ??
           widget.contentSplits[message.id]?.toolCounts,
       textWidth: textWidth,
+      toolImageMaxWidth: toolImageMaxWidth,
+      toolImageAspects: toolImageAspects,
       fontScale: fontScale,
     );
     final bodyForLines = message.role == 'assistant'
@@ -906,6 +929,8 @@ class _MessageListViewState extends State<MessageListView> {
     required List<int>? reasoningCountAtSplit,
     required List<int>? toolCountAtSplit,
     required double textWidth,
+    required double toolImageMaxWidth,
+    required Map<String, double>? toolImageAspects,
     required double fontScale,
   }) {
     if (message.role != 'assistant') {
@@ -1038,6 +1063,8 @@ class _MessageListViewState extends State<MessageListView> {
           ),
           conversationId: message.conversationId,
           textWidth: textWidth,
+          toolImageMaxWidth: toolImageMaxWidth,
+          toolImageAspects: toolImageAspects,
           fontScale: fontScale,
         ),
       );
@@ -1049,6 +1076,8 @@ class _MessageListViewState extends State<MessageListView> {
     VisibleTimelineBlock visible, {
     required String conversationId,
     required double textWidth,
+    required double toolImageMaxWidth,
+    required Map<String, double>? toolImageAspects,
     required double fontScale,
   }) {
     final settings = _estimateSettings;
@@ -1082,6 +1111,8 @@ class _MessageListViewState extends State<MessageListView> {
             toolCallId: tool.providerId,
           ),
           textWidth: textWidth,
+          imageMaxWidth: toolImageMaxWidth,
+          imageAspects: toolImageAspects,
           fontScale: fontScale,
           wrappedLineCount: _wrappedLineCount,
         );
@@ -1811,9 +1842,17 @@ class _MessageListViewState extends State<MessageListView> {
       conversationId: widget.messages.firstOrNull?.conversationId,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final horizontalPad =
+          final centeredPadding =
               ((constraints.maxWidth - ChatLayoutConstants.maxContentWidth) / 2)
                   .clamp(0.0, double.infinity);
+          // Reuse the existing gutter for the overlay in full-width mode so
+          // narrow panes never give up any extra space.
+          final horizontalPadding = EdgeInsets.only(
+            left: widget.fullWidth ? 0 : centeredPadding,
+            right: widget.fullWidth
+                ? math.min(centeredPadding, widget.rightOverlayWidth)
+                : centeredPadding,
+          );
 
           return Builder(
             builder: (context) {
@@ -1825,11 +1864,10 @@ class _MessageListViewState extends State<MessageListView> {
                 addRepaintBoundaries: false,
                 findChildIndexCallback: _findMessageIndexByKey,
                 extentEstimation: _estimateItemExtent,
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPad,
-                  widget.topContentPadding,
-                  horizontalPad,
-                  widget.bottomContentPadding +
+                padding: horizontalPadding.copyWith(
+                  top: widget.topContentPadding,
+                  bottom:
+                      widget.bottomContentPadding +
                       (widget.isPinnedIndicatorActive ? 12 : 0),
                 ),
                 itemCount: _effectiveRenderModels.isEmpty && _hasFooter
@@ -1903,7 +1941,7 @@ class _MessageListViewState extends State<MessageListView> {
                       child: IgnorePointer(
                         child: _WindowLoadingSkeleton(
                           key: MessageListView.windowSkeletonKey,
-                          horizontalPadding: horizontalPad,
+                          horizontalPadding: horizontalPadding,
                           topPadding: widget.topContentPadding,
                         ),
                       ),
@@ -3084,7 +3122,7 @@ class _WindowLoadingSkeleton extends StatefulWidget {
     required this.topPadding,
   });
 
-  final double horizontalPadding;
+  final EdgeInsets horizontalPadding;
   final double topPadding;
 
   @override
@@ -3126,11 +3164,8 @@ class _WindowLoadingSkeletonState extends State<_WindowLoadingSkeleton>
     }
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        widget.horizontalPadding + 12,
-        widget.topPadding + 24,
-        widget.horizontalPadding + 12,
-        0,
+      padding: widget.horizontalPadding.add(
+        EdgeInsets.fromLTRB(12, widget.topPadding + 24, 12, 0),
       ),
       child: FadeTransition(
         opacity: _pulse.drive(Tween<double>(begin: 0.45, end: 1.0)),

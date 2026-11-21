@@ -1663,6 +1663,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get hotkeysResetAll => 'Сбросить все по умолчанию';
 
   @override
+  String hotkeysShortcutInUse(String action) {
+    return 'Это сочетание клавиш уже назначено действию «$action».';
+  }
+
+  @override
+  String get hotkeysTextEditing => 'Редактирование текста и перемещение фокуса';
+
+  @override
   String get assistantEditTemperatureTitle => 'Температура';
 
   @override
@@ -1749,6 +1757,20 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get backupPageChooseExternalFolder =>
       'Выберите iCloud Drive или папку вне «На моём iPhone > Kelivo». Файлы в папке Kelivo удаляются вместе с приложением. Резервная копия не сохранена.';
+
+  @override
+  String get backupPageChooseNewFile =>
+      'Выберите новое имя файла или другую папку для сохранения резервной копии.';
+
+  @override
+  String backupArchiveFileSizeLimit(String name, String limit) {
+    return 'Файл резервной копии «$name» превышает предельный размер одного файла $limit.';
+  }
+
+  @override
+  String backupArchiveTotalSizeLimit(String limit) {
+    return 'Размер резервной копии в распакованном виде превышает предел $limit.';
+  }
 
   @override
   String get backupPageFilesLabel => 'Файлы и изображения';
@@ -1881,7 +1903,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Установка резервной копии';
 
   @override
-  String get restoreProgressStageVerifying => 'Проверка';
+  String get restoreProgressStageVerifying => 'Проверка восстановленных данных';
 
   @override
   String get restoreProgressStageRollingBack =>
@@ -2198,13 +2220,43 @@ class AppLocalizationsRu extends AppLocalizations {
   String get backupProgressPreparing => 'Подготовка';
 
   @override
+  String get backupProgressScanning => 'Сканирование файлов резервной копии';
+
+  @override
+  String backupProgressDiscoveredFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Найдено $count файла',
+      many: 'Найдено $count файлов',
+      few: 'Найдено $count файла',
+      one: 'Найден $count файл',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupProgressCheckingDatabase => 'Проверка базы данных';
+
+  @override
+  String get backupProgressChoosingDestination => 'Выбор места сохранения';
+
+  @override
+  String get backupProgressSavingFile => 'Сохранение файла резервной копии';
+
+  @override
+  String backupProgressElapsed(String time) {
+    return 'Прошло $time';
+  }
+
+  @override
   String get backupProgressSnapshotting => 'Создание снимка базы данных';
 
   @override
   String get backupProgressPacking => 'Упаковка';
 
   @override
-  String get backupProgressVerifying => 'Проверка';
+  String get backupProgressVerifying => 'Проверка архива резервной копии';
 
   @override
   String get backupProgressUploading => 'Загрузка';
@@ -2216,13 +2268,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get backupProgressExtracting => 'Распаковка';
 
   @override
-  String get backupProgressValidating => 'Валидация';
+  String get backupProgressValidating => 'Проверка файлов восстановления';
 
   @override
   String get backupProgressReadingSettings => 'Чтение настроек';
 
   @override
-  String get backupProgressStaging => 'Подготовка данных';
+  String get backupProgressStaging => 'Подготовка файлов восстановления';
 
   @override
   String get backupProgressCommitting => 'Фиксация';
@@ -4346,6 +4398,13 @@ class AppLocalizationsRu extends AppLocalizations {
       'Отправлять ссылки на изображения http(s) как есть; при выключении удалённые ссылки отбрасываются и отправляются только локальные изображения';
 
   @override
+  String get modelSpecFormResponseSpeedTiers => 'Уровни скорости ответа';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      'Настройте, какие уровни ускорения доступны для этой модели в чатах. Снимите оба флажка, чтобы оставить только «Стандартный».';
+
+  @override
   String get modelSpecFormPromptCacheControl => 'Маркер кэша промпта';
 
   @override
@@ -5339,6 +5398,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get searchServiceEditorConfigurationTitle => 'Конфигурация';
 
   @override
+  String get searchServiceEditorChangeIcon => 'Сменить значок';
+
+  @override
+  String get searchServiceEditorIconFailed =>
+      'Не удалось использовать этот значок. Выберите другое изображение или значок.';
+
+  @override
   String get searchServiceEditorNoConfiguration =>
       'Этому провайдеру не требуется дополнительная настройка.';
 
@@ -5908,6 +5974,13 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get displaySettingsPageAutoSwitchTopicsTitle => 'Автопереход к темам';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatTitle => 'Чат на всю ширину';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      'Растянуть сообщения и поле ввода на всю доступную ширину области чата.';
 
   @override
   String get desktopDisplaySettingsTopicPositionTitle => 'Положение тем';
@@ -9817,6 +9890,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Пустые строки разбивают ответ ассистента на отдельные пузыри для каждого абзаца';
 
   @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCards =>
+      'Настроить карточки рассуждений и инструментов';
+
+  @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle =>
+      'Задайте отдельный вид для рассуждений и вызовов инструментов';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle =>
       'Полупрозрачное матовое стекло';
 
@@ -9870,8 +9951,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get messageStyleSettingsPageRoleAssistant => 'Ассистент';
 
   @override
+  String get messageStyleSettingsPageRoleThinkingTool => 'Карточки';
+
+  @override
   String get messageStyleSettingsPageRoleAssistantHint =>
-      'Настройки ассистента также применяются к карточкам рассуждения, вызова инструментов и перевода.';
+      'Карточки перевода используют стиль ассистента. Карточки рассуждений и инструментов по умолчанию также используют его.';
 
   @override
   String get localSnapshotSectionTitle => 'Локальные копии';
@@ -11940,7 +12024,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get workspaceToolHelpViewImage =>
-      'Позволить модели просмотреть изображение из рабочей области.';
+      'Позволяет модели просматривать изображения в рабочей области или изображения по публичным URL.';
 
   @override
   String get workspaceToolHelpWrite =>
@@ -15339,7 +15423,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressOverSnack =>
-      'Сводка всё ещё слишком длинная и превысит лимит, поэтому она не была использована. Сожмите ещё раз или переключитесь на модель с большим контекстом.';
+      'Результат может превысить контекстное окно модели чата. Вы можете просмотреть и применить сводку.';
 
   @override
   String get contextSummaryHint =>
@@ -16450,6 +16534,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get imageContextOmitted => 'Не включено';
 
   @override
+  String get imageContextExclude => 'Исключить из контекста';
+
+  @override
+  String get imageContextRestore => 'Отменить исключение';
+
+  @override
+  String get imageContextExcluded => 'Исключено вами';
+
+  @override
+  String get imageContextExcludedWithOriginal =>
+      'Исходное изображение исключено';
+
+  @override
   String get imageContextPin => 'Закрепить изображение';
 
   @override
@@ -16475,7 +16572,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get imageContextActionsHint =>
-      'Закрепите, чтобы отдать приоритет изображению, или снова добавьте его в поле ввода.';
+      'Исключайте отдельные изображения, закрепляйте их для приоритетного сохранения или снова добавляйте в поле ввода.';
 
   @override
   String get imageContextEmptyDescription =>
@@ -16693,13 +16790,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressionTrigger => 'Начинать при';
 
   @override
-  String get compressionTarget => 'Сжимать до';
+  String get compressionTarget => 'Целевой расход';
 
   @override
-  String get compressionWindow => 'Ёмкость модели сводки';
-
-  @override
-  String get compressionRequests => 'Максимум запросов';
+  String get compressionWindow => 'Окно планирования автосжатия';
 
   @override
   String get compressionReference => 'Использовать справочные материалы';
@@ -16773,16 +16867,12 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get compressionBudgetError =>
-      'Для этого потребуется больше запросов к модели, чем позволяет текущий лимит, поэтому контекст не изменён. Увеличьте «Максимум запросов» или переключитесь на модель с большим контекстом.';
-
-  @override
   String get compressionIncomplete =>
       'Сводка была обрезана или отклонена, контекст не изменён. Увеличьте лимит вывода или попробуйте другую модель.';
 
   @override
-  String get compressionReferenceTooLarge =>
-      'Справочные материалы уже занимают всю ёмкость этой модели, и для сводки не остаётся места. Используйте меньше справочных материалов или переключитесь на модель с большим контекстом.';
+  String get compressionProviderContextRejected =>
+      'Провайдер сообщил, что запрос слишком большой. Попробуйте модель с большим контекстом.';
 
   @override
   String get compressionReferenceChanged =>
@@ -16790,7 +16880,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionTargetNotReached =>
-      'Даже после сжатия использование всё ещё будет выше порога автоматического запуска, поэтому исходный контекст сохранён. Сократите сводку или увеличьте «Запускать при».';
+      'По оценке, результат займёт не меньше контекста, чем исходный. Вы можете просмотреть и сократить сводку.';
 
   @override
   String get compressionTemplateMissing =>
@@ -16879,8 +16969,16 @@ class AppLocalizationsRu extends AppLocalizations {
       'Сжать один раз, затем повторить неудачный ответ';
 
   @override
-  String compressionPlannedCalls(int count, int limit) {
-    return 'Ожидается запросов: $count · лимит $limit, включая повторы';
+  String compressionPlannedCalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Около $count запроса',
+      many: 'Около $count запросов',
+      few: 'Около $count запросов',
+      one: 'Около $count запроса',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -16974,9 +17072,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressionTurnUnit => 'ходов';
 
   @override
-  String get compressionCallUnit => 'вызовов';
-
-  @override
   String get compressionRequestTimeout => 'Тайм-аут запроса сжатия';
 
   @override
@@ -16999,10 +17094,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionAdvancedHint =>
-      'Справочные материалы, повторное обращение к оригиналам и лимит запросов';
+      'Фоновые ссылки, исходная история и оценки окна';
 
   @override
   String get compressionAutomaticWindow => 'Авто';
+
+  @override
+  String compressionSummaryWindowEstimate(String tokens, String source) {
+    return 'Окно модели сводки · $tokens токенов · $source';
+  }
 
   @override
   String get compressionAutoOffHint => 'Сжимайте вручную, когда потребуется.';
@@ -17046,7 +17146,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionAutoKeepHint =>
-      'Автоматическое сжатие всегда сохраняет недавние оригиналы независимо от диапазона, выбранного для ручного запуска. Число ходов общее с ручным сжатием.';
+      'Автоматическое сжатие сохраняет последние ходы, пока есть место. При необходимости оно может суммировать дополнительные старые ходы и всегда защищает текущий запрос.';
 
   @override
   String get requestBudgetTitle => 'Лимиты изображений и запросов';

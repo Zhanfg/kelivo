@@ -57,13 +57,7 @@ class ToolHandlerService {
     try {
       final chat = contextProvider.read<ChatService>();
       final workspaces = contextProvider.read<WorkspaceProvider>();
-      Future<void> Function(String skillId)? onSkillRead;
-      Future<void> Function()? onShellCompleted;
-      try {
-        final skills = contextProvider.read<SkillsService>();
-        onSkillRead = skills.incrementUseCount;
-        onShellCompleted = skills.rescan;
-      } catch (_) {}
+      final skills = contextProvider.read<SkillsService?>();
       return WorkspaceToolsService(
         registry: contextProvider.read<ToolRunRegistry>(),
         runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),
@@ -71,8 +65,9 @@ class ToolHandlerService {
         readPermissionState: ConversationToolPermissions.forChat(chat).read,
         permissionChanges: chat,
         touchLastUsed: workspaces.touchLastUsed,
-        onSkillRead: onSkillRead,
-        onShellCompleted: onShellCompleted,
+        onSkillRead: skills?.incrementUseCount,
+        refreshSkills: skills?.rescan,
+        isLinkedSkillEntrypoint: skills?.isLinkedEntrypointTarget,
         loadEnvironment: contextProvider
             .read<EnvironmentProvider?>()
             ?.loadExecutionConfig,
@@ -625,9 +620,10 @@ class ToolHandlerService {
                 'Image is unavailable in the current conversation context.',
               );
             }
-            if (!(await chat.imageContextSettings(
+            final imageSettings = await chat.imageContextSettings(
               conversationId,
-            )).allowRecall) {
+            );
+            if (!imageSettings.allowRecall) {
               return const ClientToolResult(
                 'Image recall is disabled for this conversation. Ask the user to attach the image again if needed.',
               );
@@ -639,6 +635,7 @@ class ToolHandlerService {
             return imageContext.readImage(
               (args['image_id'] ?? '').toString(),
               allowedMessages: allowed.map((m) => m.id).toSet(),
+              excluded: imageSettings.excluded,
               offset: args['offset'] is int ? args['offset'] as int : 0,
             );
           }

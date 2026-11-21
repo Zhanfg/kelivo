@@ -1599,6 +1599,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get hotkeysResetAll => '모든 단축키를 기본값으로 재설정';
 
   @override
+  String hotkeysShortcutInUse(String action) {
+    return '이 단축키는 이미 $action에 할당되어 있습니다.';
+  }
+
+  @override
+  String get hotkeysTextEditing => '텍스트 편집 및 포커스 탐색';
+
+  @override
   String get assistantEditTemperatureTitle => '온도';
 
   @override
@@ -1683,6 +1691,19 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get backupPageChooseExternalFolder =>
       'iCloud Drive 또는 \'내 iPhone > Kelivo\' 외부의 폴더를 선택하세요. Kelivo 폴더의 파일은 앱과 함께 삭제됩니다. 백업이 저장되지 않았습니다.';
+
+  @override
+  String get backupPageChooseNewFile => '백업을 저장할 새 파일 이름이나 다른 폴더를 선택하세요.';
+
+  @override
+  String backupArchiveFileSizeLimit(String name, String limit) {
+    return '백업 파일 “$name”이(가) 파일당 최대 크기 $limit을(를) 초과했습니다.';
+  }
+
+  @override
+  String backupArchiveTotalSizeLimit(String limit) {
+    return '압축 해제된 백업이 최대 크기 $limit을(를) 초과했습니다.';
+  }
 
   @override
   String get backupPageFilesLabel => '파일 및 이미지';
@@ -1811,7 +1832,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get restoreProgressStageInstallingBackup => '백업 설치 중';
 
   @override
-  String get restoreProgressStageVerifying => '확인 중';
+  String get restoreProgressStageVerifying => '복원된 데이터 확인 중';
 
   @override
   String get restoreProgressStageRollingBack => '이전 데이터 복원 중';
@@ -2116,13 +2137,40 @@ class AppLocalizationsKo extends AppLocalizations {
   String get backupProgressPreparing => '준비 중';
 
   @override
+  String get backupProgressScanning => '백업 파일 스캔 중';
+
+  @override
+  String backupProgressDiscoveredFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 파일 발견됨',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupProgressCheckingDatabase => '데이터베이스 확인 중';
+
+  @override
+  String get backupProgressChoosingDestination => '저장 위치 선택 중';
+
+  @override
+  String get backupProgressSavingFile => '백업 파일 저장 중';
+
+  @override
+  String backupProgressElapsed(String time) {
+    return '경과 시간 $time';
+  }
+
+  @override
   String get backupProgressSnapshotting => '데이터베이스 스냅샷 생성 중';
 
   @override
   String get backupProgressPacking => '패키징 중';
 
   @override
-  String get backupProgressVerifying => '검증 중';
+  String get backupProgressVerifying => '백업 아카이브 확인 중';
 
   @override
   String get backupProgressUploading => '업로드 중';
@@ -2134,13 +2182,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get backupProgressExtracting => '압축 해제 중';
 
   @override
-  String get backupProgressValidating => '확인 중';
+  String get backupProgressValidating => '복원 파일 확인 중';
 
   @override
   String get backupProgressReadingSettings => '설정 읽는 중';
 
   @override
-  String get backupProgressStaging => '준비 중';
+  String get backupProgressStaging => '복원 파일 준비 중';
 
   @override
   String get backupProgressCommitting => '커밋 중';
@@ -4190,6 +4238,13 @@ class AppLocalizationsKo extends AppLocalizations {
       'http(s) 이미지 링크를 그대로 전송합니다. 끄면 원격 링크는 제외되고 로컬 이미지만 전송됩니다';
 
   @override
+  String get modelSpecFormResponseSpeedTiers => '응답 속도 등급';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      '채팅에서 이 모델이 제공할 가속 등급을 사용자 지정합니다. 둘 다 선택하지 않으면 표준만 제공됩니다.';
+
+  @override
   String get modelSpecFormPromptCacheControl => '프롬프트 캐시 마커';
 
   @override
@@ -5145,6 +5200,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get searchServiceEditorConfigurationTitle => '구성';
 
   @override
+  String get searchServiceEditorChangeIcon => '아이콘 변경';
+
+  @override
+  String get searchServiceEditorIconFailed =>
+      '이 아이콘을 사용할 수 없습니다. 다른 이미지나 아이콘을 선택하세요.';
+
+  @override
   String get searchServiceEditorNoConfiguration => '이 공급자는 추가 구성이 필요하지 않습니다.';
 
   @override
@@ -5665,6 +5727,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get displaySettingsPageAutoSwitchTopicsTitle => '주제로 자동 전환';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatTitle => '전체 너비 채팅';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      '메시지와 입력 상자를 채팅 영역에 맞게 확장합니다.';
 
   @override
   String get desktopDisplaySettingsTopicPositionTitle => '주제 위치';
@@ -9413,6 +9482,14 @@ class AppLocalizationsKo extends AppLocalizations {
       '어시스턴트 답변의 빈 줄마다 문단별로 하나의 말풍선으로 나눕니다';
 
   @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCards =>
+      '사고 및 도구 카드 사용자 지정';
+
+  @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle =>
+      '사고 및 도구 호출에 별도의 모양 적용';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '반투명 프로스트 유리';
 
   @override
@@ -9462,8 +9539,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get messageStyleSettingsPageRoleAssistant => '어시스턴트';
 
   @override
+  String get messageStyleSettingsPageRoleThinkingTool => '카드';
+
+  @override
   String get messageStyleSettingsPageRoleAssistantHint =>
-      '어시스턴트 설정은 생각, 도구 호출, 번역 카드에도 적용됩니다.';
+      '번역 카드는 어시스턴트 스타일을 따르며, 사고 및 도구 카드도 기본적으로 이를 따릅니다.';
 
   @override
   String get localSnapshotSectionTitle => '로컬 사본';
@@ -11427,7 +11507,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get workspaceToolHelpRead => '줄 번호와 페이지 넘김으로 파일을 읽습니다.';
 
   @override
-  String get workspaceToolHelpViewImage => '모델이 작업 공간의 이미지를 확인할 수 있게 합니다.';
+  String get workspaceToolHelpViewImage =>
+      '모델이 작업 공간 이미지나 공개 URL의 이미지를 확인할 수 있도록 합니다.';
 
   @override
   String get workspaceToolHelpWrite => '파일을 생성하거나 내용을 덮어씁니다.';
@@ -14624,7 +14705,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressOverSnack =>
-      '요약이 여전히 너무 길어 한도를 초과하므로 사용되지 않았습니다. 다시 압축하거나 컨텍스트가 더 큰 모델로 전환하세요.';
+      '결과가 채팅 모델의 윈도우를 초과할 수 있습니다. 요약을 검토하고 적용할 수 있습니다.';
 
   @override
   String get contextSummaryHint =>
@@ -15676,6 +15757,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get imageContextOmitted => '포함되지 않음';
 
   @override
+  String get imageContextExclude => '컨텍스트에서 제외';
+
+  @override
+  String get imageContextRestore => '제외 해제';
+
+  @override
+  String get imageContextExcluded => '사용자가 제외함';
+
+  @override
+  String get imageContextExcludedWithOriginal => '원본 이미지 제외됨';
+
+  @override
   String get imageContextPin => '이미지 고정';
 
   @override
@@ -15698,7 +15791,8 @@ class AppLocalizationsKo extends AppLocalizations {
       '업로드한 첨부 파일을 더 오래 유지하고 오래된 도구 이미지는 따로 보관합니다.';
 
   @override
-  String get imageContextActionsHint => '고정하여 우선 유지하거나 입력창에 다시 추가하세요.';
+  String get imageContextActionsHint =>
+      '개별 이미지를 제외하거나, 우선 유지를 위해 고정하거나, 입력창에 다시 추가할 수 있습니다.';
 
   @override
   String get imageContextEmptyDescription => '보내거나 도구가 읽은 이미지가 여기에 표시됩니다.';
@@ -15903,13 +15997,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionTrigger => '사용량 도달 시';
 
   @override
-  String get compressionTarget => '압축 목표';
+  String get compressionTarget => '목표 사용량';
 
   @override
-  String get compressionWindow => '요약 모델 용량';
-
-  @override
-  String get compressionRequests => '최대 요청 수';
+  String get compressionWindow => '자동 압축 추정 윈도우';
 
   @override
   String get compressionReference => '배경 참조 사용';
@@ -15978,16 +16069,12 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get compressionBudgetError =>
-      '현재 한도보다 더 많은 모델 요청이 필요하므로 컨텍스트가 변경되지 않았습니다. 최대 요청 수를 높이거나 컨텍스트가 더 큰 모델로 전환하세요.';
-
-  @override
   String get compressionIncomplete =>
       '요약이 중단되었거나 거부되어 컨텍스트가 변경되지 않았습니다. 출력 한도를 높이거나 다른 모델을 사용해 보세요.';
 
   @override
-  String get compressionReferenceTooLarge =>
-      '참고 자료가 이미 이 모델의 용량을 채워 요약할 공간이 없습니다. 참고 자료를 줄이거나 컨텍스트가 더 큰 모델로 전환하세요.';
+  String get compressionProviderContextRejected =>
+      '공급자가 요청이 너무 크다고 보고했습니다. 컨텍스트가 더 큰 모델을 사용해 보세요.';
 
   @override
   String get compressionReferenceChanged =>
@@ -15995,7 +16082,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressionTargetNotReached =>
-      '압축 후에도 사용량이 자동 시작 지점보다 높아 원래 컨텍스트가 유지되었습니다. 요약을 더 줄이거나 시작 지점을 높이세요.';
+      '결과가 원본만큼 많은 컨텍스트를 사용할 것으로 추정됩니다. 요약을 검토하고 줄일 수 있습니다.';
 
   @override
   String get compressionTemplateMissing =>
@@ -16081,8 +16168,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionOverflowAction => '한 번 압축한 후 실패한 응답 다시 시도';
 
   @override
-  String compressionPlannedCalls(int count, int limit) {
-    return '예상 $count회 요청 · 이번 한도 $limit회(재시도 포함)';
+  String compressionPlannedCalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '약 $count회 요청',
+      one: '약 1회 요청',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -16170,9 +16263,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionTurnUnit => '턴';
 
   @override
-  String get compressionCallUnit => '회';
-
-  @override
   String get compressionRequestTimeout => '압축 요청 시간 초과';
 
   @override
@@ -16194,10 +16284,15 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionAdvancedOptions => '압축 세부 정보';
 
   @override
-  String get compressionAdvancedHint => '참고 자료, 원문 다시 보기 여부, 요청 한도';
+  String get compressionAdvancedHint => '배경 참조, 원본 기록 및 윈도우 추정';
 
   @override
   String get compressionAutomaticWindow => '자동';
+
+  @override
+  String compressionSummaryWindowEstimate(String tokens, String source) {
+    return '요약 모델 윈도우 · $tokens 토큰 · $source';
+  }
 
   @override
   String get compressionAutoOffHint => '필요할 때 압축 페이지에서 수동으로 시작할 수 있습니다.';
@@ -16240,7 +16335,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressionAutoKeepHint =>
-      '자동 압축은 수동 실행에서 선택한 범위와 관계없이 항상 최근 원문을 유지합니다. 턴 수는 수동 압축과 공유됩니다.';
+      '자동 압축은 공간이 있을 때 최근 턴을 유지합니다. 공간이 부족하면 더 오래된 턴을 추가로 요약하며, 현재 요청은 항상 보호됩니다.';
 
   @override
   String get requestBudgetTitle => '이미지 및 요청 예산';
