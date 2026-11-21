@@ -197,51 +197,53 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
 
-  testWidgets('an empty open category picks up new temporary attachments', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(400, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
-    addTearDown(fixture.dispose);
-    final chat = ChatService(
-      existingRepository: ChatDatabaseRepository(fixture.database),
-    );
-    await tester.runAsync(() async {
-      await chat.init();
-      await chat.runAssetReferenceMaintenance();
-      await chat.runAssetMaintenance();
-    });
-    addTearDown(chat.close);
-    await tester.pumpWidget(_storagePage(fixture, chat: chat));
-    await _until(tester, () => find.text('文件').evaluate().isNotEmpty);
-    await tester.tap(find.text('文件').last);
-    await _until(tester, () => find.text('暂无内容').evaluate().isNotEmpty);
+  testWidgets(
+    'an empty open category picks up new temporary attachments',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
+      addTearDown(fixture.dispose);
+      final chat = ChatService(
+        existingRepository: ChatDatabaseRepository(fixture.database),
+      );
+      await tester.runAsync(() async {
+        await chat.init();
+        await chat.runAssetReferenceMaintenance();
+        await chat.runAssetMaintenance();
+      });
+      addTearDown(chat.close);
+      await tester.pumpWidget(_storagePage(fixture, chat: chat));
+      await _until(tester, () => find.text('文件').evaluate().isNotEmpty);
+      await tester.tap(find.text('文件').last);
+      await _until(tester, () => find.text('暂无内容').evaluate().isNotEmpty);
 
-    await tester.runAsync(() async {
-      final business = BusinessRepository(fixture.database);
-      final before = await business.readStorageChangeVersion();
-      final conversation = await chat.createDraftConversation(
-        temporary: true,
-        title: 'Temporary',
+      await tester.runAsync(() async {
+        final business = BusinessRepository(fixture.database);
+        final before = await business.readStorageChangeVersion();
+        final conversation = await chat.createDraftConversation(
+          temporary: true,
+          title: 'Temporary',
+        );
+        final file = await fixture.file('upload/new.txt');
+        await chat.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          parts: [FilePart(uri: file.path, name: 'new.txt')],
+        );
+        expect(await business.readStorageChangeVersion(), before);
+      });
+      await _until(
+        tester,
+        () => find.textContaining('Temporary').evaluate().isNotEmpty,
       );
-      final file = await fixture.file('upload/new.txt');
-      await chat.addMessage(
-        conversationId: conversation.id,
-        role: 'user',
-        parts: [FilePart(uri: file.path, name: 'new.txt')],
-      );
-      expect(await business.readStorageChangeVersion(), before);
-    });
-    await _until(
-      tester,
-      () => find.textContaining('Temporary').evaluate().isNotEmpty,
-    );
-    expect(find.text('new.txt'), findsOneWidget);
-    expect(find.byType(IosCheckbox), findsNothing);
-    await tester.pumpWidget(const SizedBox.shrink());
-  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+      expect(find.text('new.txt'), findsOneWidget);
+      expect(find.byType(IosCheckbox), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
 
   testWidgets(
     'storage details can copy a load failure and recover on refresh',
@@ -314,56 +316,58 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
 
-  testWidgets('active MCP icons are visibly protected in the file list', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(400, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
-    addTearDown(fixture.dispose);
-    await tester.runAsync(() async {
-      final source = await fixture.file(
-        'incoming',
-        img.encodePng(img.Image(width: 2, height: 2)),
-      );
-      final name = await IconCache.importFile(source.path);
-      await fixture.preferences.setString(
-        'mcp_presentation_v1',
-        jsonEncode({
-          'servers': {
-            'server': {
-              'icon': {'type': 'file', 'value': name},
+  testWidgets(
+    'active MCP icons are visibly protected in the file list',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
+      addTearDown(fixture.dispose);
+      await tester.runAsync(() async {
+        final source = await fixture.file(
+          'incoming',
+          img.encodePng(img.Image(width: 2, height: 2)),
+        );
+        final name = await IconCache.importFile(source.path);
+        await fixture.preferences.setString(
+          'mcp_presentation_v1',
+          jsonEncode({
+            'servers': {
+              'server': {
+                'icon': {'type': 'file', 'value': name},
+              },
             },
-          },
-        }),
-      );
-    });
-    await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => SettingsProvider(fixture.preferences),
-        child: MaterialApp(
-          locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const StorageSpacePage(),
+          }),
+        );
+      });
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(fixture.preferences),
+          child: MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const StorageSpacePage(),
+          ),
         ),
-      ),
-    );
-    await _until(tester, () => find.text('文件').evaluate().isNotEmpty);
-    await tester.tap(find.text('文件').last);
-    await _until(tester, () => find.text('使用中').evaluate().isNotEmpty);
-    expect(find.byType(IosCheckbox), findsNothing);
-    expect(
-      tester
-          .widget<IosTileButton>(find.widgetWithText(IosTileButton, '全选'))
-          .enabled,
-      isFalse,
-    );
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
-  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+      );
+      await _until(tester, () => find.text('文件').evaluate().isNotEmpty);
+      await tester.tap(find.text('文件').last);
+      await _until(tester, () => find.text('使用中').evaluate().isNotEmpty);
+      expect(find.byType(IosCheckbox), findsNothing);
+      expect(
+        tester
+            .widget<IosTileButton>(find.widgetWithText(IosTileButton, '全选'))
+            .enabled,
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
 
   for (final desktop in [false, true]) {
     final platform = TargetPlatformVariant.only(

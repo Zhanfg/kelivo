@@ -254,28 +254,32 @@ void main() {
     skip: Platform.isWindows,
   );
 
-  test('network preflight rejects a target replaced during approval', () async {
-    final link = Link(p.join(workspace.path, 'network.txt'))
-      ..createSync('/net/kelivo-permission-test-not-a-real-host/file');
-    final approvals = ToolApprovalService();
-    addTearDown(approvals.dispose);
-    final future = WorkspaceToolsService().handle(
-      ctx(),
-      'read_file',
-      {'path': link.path},
-      toolCallId: 'network',
-      approvalService: approvals,
-    );
-    while (!approvals.hasPending) {
-      await Future<void>.delayed(Duration.zero);
-    }
-    link.deleteSync();
-    link.createSync(p.join(outside.path, 'note.txt'));
-    approvals.approve('network', conversationId: 'chat');
-    final result = ClientToolResult.fromHandler(await future);
-    expect(jsonDecode(result.content)['error'], 'path_changed');
-    expect(result.content, isNot(contains(marker)));
-  }, skip: Platform.isWindows);
+  test(
+    'network preflight rejects a target replaced during approval',
+    () async {
+      final link = Link(p.join(workspace.path, 'network.txt'))
+        ..createSync('/net/kelivo-permission-test-not-a-real-host/file');
+      final approvals = ToolApprovalService();
+      addTearDown(approvals.dispose);
+      final future = WorkspaceToolsService().handle(
+        ctx(),
+        'read_file',
+        {'path': link.path},
+        toolCallId: 'network',
+        approvalService: approvals,
+      );
+      while (!approvals.hasPending) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      link.deleteSync();
+      link.createSync(p.join(outside.path, 'note.txt'));
+      approvals.approve('network', conversationId: 'chat');
+      final result = ClientToolResult.fromHandler(await future);
+      expect(jsonDecode(result.content)['error'], 'path_changed');
+      expect(result.content, isNot(contains(marker)));
+    },
+    skip: Platform.isWindows,
+  );
 
   for (final full in [false, true]) {
     for (final sandboxed in [false, true]) {

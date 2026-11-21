@@ -97,117 +97,125 @@ void main() {
     });
   }
 
-  testWidgets('returning from settings plays with accessible navigation', (
-    tester,
-  ) async {
-    final navigator = GlobalKey<NavigatorState>();
-    final dispatcher = tester.platformDispatcher;
-    dispatcher.accessibilityFeaturesTestValue =
-        const FakeAccessibilityFeatures();
-    addTearDown(dispatcher.clearAccessibilityFeaturesTestValue);
-    late ValueListenable<double> progress;
-    await tester.pumpWidget(
-      MaterialApp(
-        navigatorKey: navigator,
-        home: StatusAnimation(
-          duration: const Duration(seconds: 2),
-          builder: (_, value) {
-            progress = value;
-            return const SizedBox();
-          },
+  testWidgets(
+    'returning from settings plays with accessible navigation',
+    (tester) async {
+      final navigator = GlobalKey<NavigatorState>();
+      final dispatcher = tester.platformDispatcher;
+      dispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures();
+      addTearDown(dispatcher.clearAccessibilityFeaturesTestValue);
+      late ValueListenable<double> progress;
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          home: StatusAnimation(
+            duration: const Duration(seconds: 2),
+            builder: (_, value) {
+              progress = value;
+              return const SizedBox();
+            },
+          ),
         ),
-      ),
-    );
-    await tester.pump(const Duration(milliseconds: 40));
-    expect(progress.value, greaterThan(0));
+      );
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(progress.value, greaterThan(0));
 
-    unawaited(
-      navigator.currentState!.push<void>(
-        MaterialPageRoute(
-          builder: (_) => const Scaffold(body: Text('Settings')),
+      unawaited(
+        navigator.currentState!.push<void>(
+          MaterialPageRoute(
+            builder: (_) => const Scaffold(body: Text('Settings')),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final covered = progress.value;
-    await tester.pump(const Duration(seconds: 1));
-    expect(progress.value, covered);
-    expect(tester.binding.hasScheduledFrame, isFalse);
-
-    dispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(
-      accessibleNavigation: true,
-    );
-    navigator.currentState!.pop();
-    await tester.pumpAndSettle();
-    final returned = progress.value;
-    await tester.pump(const Duration(milliseconds: 40));
-    expect(progress.value, greaterThan(returned));
-    await tester.pumpWidget(const SizedBox());
-  }, variant: const TargetPlatformVariant({TargetPlatform.android}));
-
-  testWidgets('Android clock advances when inactive and pauses when hidden', (
-    tester,
-  ) async {
-    late ValueListenable<double> progress;
-    await tester.pumpWidget(
-      _host(
-        StatusAnimation(
-          duration: const Duration(seconds: 2),
-          builder: (_, value) {
-            progress = value;
-            return const SizedBox();
-          },
-        ),
-      ),
-    );
-    await tester.pump(const Duration(milliseconds: 40));
-    final beforeInactive = progress.value;
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    await tester.pump(const Duration(milliseconds: 40));
-    final beforeHidden = progress.value;
-    expect(beforeHidden, greaterThan(beforeInactive));
-
-    for (final state in [AppLifecycleState.hidden, AppLifecycleState.paused]) {
-      tester.binding.handleAppLifecycleStateChanged(state);
-      await tester.pump(const Duration(milliseconds: 750));
-      expect(progress.value, beforeHidden);
-      expect(tester.binding.transientCallbackCount, 0);
+      );
+      await tester.pumpAndSettle();
+      final covered = progress.value;
+      await tester.pump(const Duration(seconds: 1));
+      expect(progress.value, covered);
       expect(tester.binding.hasScheduledFrame, isFalse);
-    }
 
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    await tester.pump(const Duration(milliseconds: 40));
-    expect(progress.value, greaterThan(beforeHidden));
-    expect(progress.value - beforeHidden, lessThan(0.03));
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpWidget(const SizedBox());
-  }, variant: const TargetPlatformVariant({TargetPlatform.android}));
+      dispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(accessibleNavigation: true);
+      navigator.currentState!.pop();
+      await tester.pumpAndSettle();
+      final returned = progress.value;
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(progress.value, greaterThan(returned));
+      await tester.pumpWidget(const SizedBox());
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.android}),
+  );
 
-  testWidgets('the status clock pauses when the Windows window loses focus', (
-    tester,
-  ) async {
-    late ValueListenable<double> progress;
-    await tester.pumpWidget(
-      _host(
-        StatusAnimation(
-          duration: const Duration(seconds: 2),
-          builder: (_, value) {
-            progress = value;
-            return const SizedBox();
-          },
+  testWidgets(
+    'Android clock advances when inactive and pauses when hidden',
+    (tester) async {
+      late ValueListenable<double> progress;
+      await tester.pumpWidget(
+        _host(
+          StatusAnimation(
+            duration: const Duration(seconds: 2),
+            builder: (_, value) {
+              progress = value;
+              return const SizedBox();
+            },
+          ),
         ),
-      ),
-    );
-    await tester.pump(const Duration(milliseconds: 40));
-    final before = progress.value;
-    expect(before, greaterThan(0));
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    await tester.pump(const Duration(seconds: 1));
-    expect(progress.value, before);
-    expect(tester.binding.hasScheduledFrame, isFalse);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpWidget(const SizedBox());
-  }, variant: const TargetPlatformVariant({TargetPlatform.windows}));
+      );
+      await tester.pump(const Duration(milliseconds: 40));
+      final beforeInactive = progress.value;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump(const Duration(milliseconds: 40));
+      final beforeHidden = progress.value;
+      expect(beforeHidden, greaterThan(beforeInactive));
+
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+        await tester.pump(const Duration(milliseconds: 750));
+        expect(progress.value, beforeHidden);
+        expect(tester.binding.transientCallbackCount, 0);
+        expect(tester.binding.hasScheduledFrame, isFalse);
+      }
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(progress.value, greaterThan(beforeHidden));
+      expect(progress.value - beforeHidden, lessThan(0.03));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpWidget(const SizedBox());
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.android}),
+  );
+
+  testWidgets(
+    'the status clock pauses when the Windows window loses focus',
+    (tester) async {
+      late ValueListenable<double> progress;
+      await tester.pumpWidget(
+        _host(
+          StatusAnimation(
+            duration: const Duration(seconds: 2),
+            builder: (_, value) {
+              progress = value;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 40));
+      final before = progress.value;
+      expect(before, greaterThan(0));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump(const Duration(seconds: 1));
+      expect(progress.value, before);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpWidget(const SizedBox());
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.windows}),
+  );
 
   testWidgets('removing one consumer keeps others running, then stops fully', (
     tester,
