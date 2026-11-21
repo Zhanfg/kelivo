@@ -5,8 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// Host authentication integration is not installed in this package.
 bool isLoopbackBind(InternetAddress address) {
   if (address.type != InternetAddressType.IPv4 &&
-      address.type != InternetAddressType.IPv6)
+      address.type != InternetAddressType.IPv6) {
     return false;
+  }
   return address.isLoopback;
 }
 
