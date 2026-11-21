@@ -57,8 +57,6 @@ void main() {
       final candidates = await discovery.search('unsafe');
       expect(candidates, isEmpty);
     },
-    skip:
-        'NOT TESTED: existing SkillsDiscovery accepts dot-segment IDs; owner fix required',
   );
 
   test('invalid input fails before any network request', () async {

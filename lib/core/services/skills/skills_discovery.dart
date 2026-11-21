@@ -97,6 +97,7 @@ class SkillsDiscovery {
         continue;
       }
       final parts = id.split('/');
+      if (parts.any((part) => part == '.' || part == '..')) continue;
       final landing = Uri.https('skills.sh', '/${parts.join('/')}');
       if (!seen.add(id)) continue;
       output.add(
