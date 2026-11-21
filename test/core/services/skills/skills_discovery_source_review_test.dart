@@ -42,22 +42,19 @@ void main() {
     },
   );
 
-  test(
-    'unsafe dot-segment IDs remain a blocked acceptance gap',
-    () async {
-      // Existing SkillsDiscovery currently accepts evil/../outside because its
-      // ID regex allows dot-only segments. Owner-file changes were not approved.
-      final discovery = SkillsDiscovery(
-        fetch: (_) async => {
-          'skills': [
-            {'id': 'evil/../outside', 'name': 'Unsafe', 'source': 'evil'},
-          ],
-        },
-      );
-      final candidates = await discovery.search('unsafe');
-      expect(candidates, isEmpty);
-    },
-  );
+  test('dot-segment IDs are rejected', () async {
+    // Dot-only path segments ('.' / '..') in a skill ID must be rejected
+    // before any Uri is built, so 'evil/../outside' can never escape.
+    final discovery = SkillsDiscovery(
+      fetch: (_) async => {
+        'skills': [
+          {'id': 'evil/../outside', 'name': 'Unsafe', 'source': 'evil'},
+        ],
+      },
+    );
+    final candidates = await discovery.search('unsafe');
+    expect(candidates, isEmpty);
+  });
 
   test('invalid input fails before any network request', () async {
     var called = false;
