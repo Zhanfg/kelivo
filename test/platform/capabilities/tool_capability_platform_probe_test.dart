@@ -91,8 +91,9 @@ void main() {
       throw StateError('Missing or oversized host probe evidence');
     }
     final data = jsonDecode(await file.readAsString());
-    if (data is! Map<String, dynamic>)
+    if (data is! Map<String, dynamic>) {
       throw const FormatException('Invalid report');
+    }
     final report = CapabilityReport.fromJson(data);
     expect(report.platform, expected);
     expect(report.descriptors, isNotEmpty);
