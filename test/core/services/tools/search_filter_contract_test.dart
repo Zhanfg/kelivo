@@ -45,10 +45,14 @@ void main() {
     final stale = result(timestamp: begin.subtract(const Duration(seconds: 1)));
     final future = result(timestamp: end.add(const Duration(seconds: 1)));
     expect(
-      policy.merge([
-        [stale, future],
-        [atStart, atEnd],
-      ], from: begin, through: end),
+      policy.merge(
+        [
+          [stale, future],
+          [atStart, atEnd],
+        ],
+        from: begin,
+        through: end,
+      ),
       [atStart, atEnd],
     );
     expect(
@@ -167,7 +171,10 @@ void main() {
     );
     final overLimit = policy.validateFetch(
       source,
-      previousUrls: [...history, source.replace(path: '/last')],
+      previousUrls: [
+        ...history,
+        source.replace(path: '/last'),
+      ],
       resolvedAddresses: [publicAddress],
     );
     expect(overLimit.reasons, contains('redirect limit exceeded'));
