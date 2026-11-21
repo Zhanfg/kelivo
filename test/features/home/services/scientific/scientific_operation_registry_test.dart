@@ -2,14 +2,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/features/home/services/scientific/scientific_operation_registry.dart';
 
 void main() {
-  test('catalog includes 120+ unique planned operations', () {
+  test('catalog has at least 120 unique operations beyond expressions', () {
     final operations = ScientificOperationRegistry.operations;
-    expect(operations.length, greaterThanOrEqualTo(120));
-    expect(operations.map((e) => e.id).toSet().length, operations.length);
+    final ids = operations.map((op) => op.id).toSet();
+    expect(ids.length, operations.length);
     expect(
-      operations.every((op) => op.status == ScientificOperationStatus.planned),
-      isTrue,
+      operations.where((op) => op.expression == null).length,
+      greaterThanOrEqualTo(120),
     );
+    expect(operations.where((op) => op.expression != null).length, 23);
+    expect(
+      operations
+          .where((op) => op.status == ScientificOperationStatus.implemented)
+          .length,
+      10,
+    );
+    expect(ids, isNot(contains('statistics.percentile')));
+    expect(ids, isNot(contains('random.random_normal')));
+    expect(ids, isNot(contains('trigonometry.arcsin')));
     for (final id in [
       'basic.add',
       'trigonometry.sin',
@@ -31,22 +41,52 @@ void main() {
     );
   });
 
-  test('catalog is metadata, not an executable scientific function', () {
-    final info = ScientificOperationRegistry.lookup('basic.add')!;
-    expect(info.toJson(), {
-      'id': 'basic.add',
-      'domain': 'basic',
-      'status': 'planned',
-    });
+  test('each catalog entry publishes an argument schema, domain and route', () {
+    for (final operation in ScientificOperationRegistry.operations) {
+      final metadata = operation.toJson();
+      final arguments = metadata['arguments'] as Map<String, Object?>;
+      final properties = arguments['properties'] as Map<String, Object?>;
+      expect(metadata['id'], startsWith('${metadata['domain']}.'));
+      expect(metadata['domainRules'], isNotEmpty, reason: operation.id);
+      expect(metadata['route'], isIn(['exact', 'approximate', 'mixed']));
+      expect(metadata['status'], isIn(['planned', 'implemented']));
+      expect(properties, isNotEmpty, reason: operation.id);
+      expect(arguments['required'], unorderedEquals(properties.keys));
+      expect(arguments['additionalProperties'], isFalse);
+      expect(ScientificOperationRegistry.lookup(operation.id), same(operation));
+    }
+    final add = ScientificOperationRegistry.lookup('basic.add')!;
+    expect(add.expression, 'a + b');
+    expect(add.status, ScientificOperationStatus.planned);
+    expect(add.route, ScientificNumericRoute.exact);
+  });
+
+  test('array, matrix and complex shapes publish their nested types', () {
+    final scalar = ScientificArgumentShape.real.toJsonSchema();
+    final array = ScientificArgumentShape.array.toJsonSchema();
+    final matrix = ScientificArgumentShape.matrix.toJsonSchema();
+    final complex = ScientificArgumentShape.complex.toJsonSchema();
+    expect(array['type'], 'array');
+    expect(array['items'], scalar);
+    expect(matrix['type'], 'array');
+    expect(matrix['items'], array);
+    expect(complex['type'], 'object');
+    expect(complex['properties'], {'real': scalar, 'imaginary': scalar});
+    expect(complex['required'], unorderedEquals(['real', 'imaginary']));
+    expect(complex['additionalProperties'], isFalse);
   });
 
   test('scientific request supports structured data roundtrip', () {
     final request = ScientificRequest(
       operationId: 'linear_algebra.matrix_multiply',
       arguments: {
-        'matrix': [
+        'a': [
           [1.0, 2.0],
           [3.0, 4.0],
+        ],
+        'b': [
+          [1],
+          [2],
         ],
       },
       precision: ScientificPrecision.float64,
@@ -81,7 +121,23 @@ void main() {
     );
   });
 
-  test('rejects malformed schema, precision and unsupported operation', () {
+  test(
+    'requires operation and arguments and defaults the remaining fields',
+    () {
+      final request = ScientificRequest.fromJson({
+        'operationId': 'basic.add',
+        'arguments': {'a': 1, 'b': 2},
+      });
+      expect(request.precision, ScientificPrecision.float64);
+      expect(request.maxOperations, 100000);
+      expect(ScientificRequest.jsonSchema['required'], [
+        'operationId',
+        'arguments',
+      ]);
+    },
+  );
+
+  test('rejects malformed schema, precision and operation ID', () {
     final good = ScientificRequest(
       operationId: 'basic.add',
       arguments: {'a': 1, 'b': 2},
@@ -95,12 +151,15 @@ void main() {
       throwsFormatException,
     );
     expect(
-      () => ScientificRequest.fromJson({...good, 'operationId': 'shell.exec'}),
+      () => ScientificRequest.fromJson({...good, 'operationId': 'invalid id'}),
       throwsFormatException,
     );
     expect(
-      () => ScientificRequest(operationId: 'unknown', arguments: {}),
-      throwsArgumentError,
+      () => ScientificRequest.fromJson({
+        ...good,
+        'arguments': {1: 'wrong key'},
+      }),
+      throwsFormatException,
     );
   });
 
@@ -109,6 +168,13 @@ void main() {
       () => ScientificRequest(
         operationId: 'basic.add',
         arguments: {'a': double.nan},
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => ScientificRequest(
+        operationId: 'basic.add',
+        arguments: {'vector': List.filled(100, '0' * 4096)},
       ),
       throwsArgumentError,
     );
