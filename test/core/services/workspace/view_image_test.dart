@@ -392,19 +392,15 @@ void main() {
     await disconnected.future.timeout(const Duration(seconds: 2));
   });
 
-  test(
-    'keeps scheme-like relative filenames as local paths',
-    () async {
-      const name = 'https:thumbnail.png';
-      await File(
-        p.join(workspace.path, name),
-      ).writeAsBytes(img.encodePng(img.Image(width: 2, height: 3)));
-      final result = await view(name, ctx: context(sandboxed: true));
-      expect(result.metadata!['workspace']['status'], 'ok');
-      expect(result.metadata!['workspace']['path'], '/workspace/$name');
-    },
-    skip: Platform.isWindows,
-  );
+  test('keeps scheme-like relative filenames as local paths', () async {
+    const name = 'https:thumbnail.png';
+    await File(
+      p.join(workspace.path, name),
+    ).writeAsBytes(img.encodePng(img.Image(width: 2, height: 3)));
+    final result = await view(name, ctx: context(sandboxed: true));
+    expect(result.metadata!['workspace']['status'], 'ok');
+    expect(result.metadata!['workspace']['path'], '/workspace/$name');
+  }, skip: Platform.isWindows);
 
   test(
     'rejects invalid arguments, missing/corrupt files and directories',
@@ -427,36 +423,32 @@ void main() {
     },
   );
 
-  test(
-    'rejects disabled tools and paths escaping sandbox zones',
-    () async {
+  test('rejects disabled tools and paths escaping sandbox zones', () async {
+    expect(
+      jsonDecode(
+        (await view('x.png', ctx: context(disabled: true))).content,
+      )['error'],
+      'tool_disabled',
+    );
+    final ctx = context(sandboxed: true);
+    for (final path in [
+      '/workspace/../outside.png',
+      '/etc/passwd',
+      '/workspace/a\u0000.png',
+    ]) {
       expect(
-        jsonDecode(
-          (await view('x.png', ctx: context(disabled: true))).content,
-        )['error'],
-        'tool_disabled',
+        jsonDecode((await view(path, ctx: ctx)).content)['error'],
+        'path_error',
       );
-      final ctx = context(sandboxed: true);
-      for (final path in [
-        '/workspace/../outside.png',
-        '/etc/passwd',
-        '/workspace/a\u0000.png',
-      ]) {
-        expect(
-          jsonDecode((await view(path, ctx: ctx)).content)['error'],
-          'path_error',
-        );
-      }
-      await Link(p.join(workspace.path, 'link.png')).create('/etc/hosts');
-      expect(
-        jsonDecode(
-          (await view('/workspace/link.png', ctx: ctx)).content,
-        )['error'],
-        'path_outside',
-      );
-    },
-    skip: Platform.isWindows,
-  );
+    }
+    await Link(p.join(workspace.path, 'link.png')).create('/etc/hosts');
+    expect(
+      jsonDecode(
+        (await view('/workspace/link.png', ctx: ctx)).content,
+      )['error'],
+      'path_outside',
+    );
+  }, skip: Platform.isWindows);
 
   test('rejects oversized input before decoding', () async {
     final file = File(p.join(workspace.path, 'huge.png'));

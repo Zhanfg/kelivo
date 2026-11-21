@@ -93,179 +93,171 @@ void main() {
     TargetPlatform.iOS,
     TargetPlatform.macOS,
   ]) {
-    testWidgets(
-      'agent changes refresh visible skill lists on $platform',
-      (tester) async {
-        tester.view.physicalSize = const Size(600, 1000);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final settings = SettingsProvider(createBusinessTestPreferences());
-        final assistants = AssistantProvider(
-          preferences: createBusinessTestPreferences(),
-        );
-        final mcp = McpProvider(preferences: createBusinessTestPreferences());
-        final toolService = McpToolService();
-        final chat = FakeChatService();
-        final runtime = _InstallingRuntime();
-        final runtimes = WorkspaceRuntimeProvider()..register(runtime);
-        final registry = ToolRunRegistry();
-        addTearDown(settings.dispose);
-        addTearDown(assistants.dispose);
-        addTearDown(mcp.dispose);
-        addTearDown(toolService.dispose);
-        addTearDown(chat.dispose);
-        addTearDown(runtimes.dispose);
-        addTearDown(registry.dispose);
-        await tester.runAsync(
-          () => Future.wait([settings.loaded, assistants.loaded]),
-        );
-        late BuildContext context;
-        await tester.pumpWidget(
-          MultiProvider(
-            providers: [
-              ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-              ChangeNotifierProvider<AssistantProvider>.value(
-                value: assistants,
-              ),
-              ChangeNotifierProvider<McpProvider>.value(value: mcp),
-              ChangeNotifierProvider<McpToolService>.value(value: toolService),
-              ChangeNotifierProvider<ChatService>.value(value: chat),
-              ChangeNotifierProvider<WorkspaceProvider>.value(
-                value: workspaces,
-              ),
-              ChangeNotifierProvider<WorkspaceRuntimeProvider>.value(
-                value: runtimes,
-              ),
-              ChangeNotifierProvider<ToolRunRegistry>.value(value: registry),
-              ChangeNotifierProvider<SkillsService>.value(value: skills),
-            ],
-            child: MaterialApp(
-              locale: const Locale('en'),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: Scaffold(
-                body: Builder(
-                  builder: (ctx) {
-                    context = ctx;
-                    return const Column(
-                      children: [
-                        Expanded(child: SkillsPane()),
-                        ConversationSkillsPanel(
-                          conversationId: 'chat',
-                          assistant: null,
-                        ),
-                      ],
-                    );
-                  },
-                ),
+    testWidgets('agent changes refresh visible skill lists on $platform', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(600, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final mcp = McpProvider(preferences: createBusinessTestPreferences());
+      final toolService = McpToolService();
+      final chat = FakeChatService();
+      final runtime = _InstallingRuntime();
+      final runtimes = WorkspaceRuntimeProvider()..register(runtime);
+      final registry = ToolRunRegistry();
+      addTearDown(settings.dispose);
+      addTearDown(assistants.dispose);
+      addTearDown(mcp.dispose);
+      addTearDown(toolService.dispose);
+      addTearDown(chat.dispose);
+      addTearDown(runtimes.dispose);
+      addTearDown(registry.dispose);
+      await tester.runAsync(
+        () => Future.wait([settings.loaded, assistants.loaded]),
+      );
+      late BuildContext context;
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+            ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
+            ChangeNotifierProvider<McpProvider>.value(value: mcp),
+            ChangeNotifierProvider<McpToolService>.value(value: toolService),
+            ChangeNotifierProvider<ChatService>.value(value: chat),
+            ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
+            ChangeNotifierProvider<WorkspaceRuntimeProvider>.value(
+              value: runtimes,
+            ),
+            ChangeNotifierProvider<ToolRunRegistry>.value(value: registry),
+            ChangeNotifierProvider<SkillsService>.value(value: skills),
+          ],
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Builder(
+                builder: (ctx) {
+                  context = ctx;
+                  return const Column(
+                    children: [
+                      Expanded(child: SkillsPane()),
+                      ConversationSkillsPanel(
+                        conversationId: 'chat',
+                        assistant: null,
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
-        );
-        await tester.pumpAndSettle();
-        final sandboxed = platform != TargetPlatform.macOS;
-        final handler = ToolHandlerService(contextProvider: context)
-            .buildToolCallHandler(
-              settings,
-              null,
-              workspaceContext: WorkspaceToolContext(
-                permissionMode: ToolPermissionMode.fullAccess,
-                workspace: workspace,
-                binding: WorkspaceBinding(workspaceId: workspace.id),
-                paths: sandboxed
-                    ? WorkspacePaths.sandboxed(
-                        workspaceHostRoot: workspaceDir.path,
-                        sessionHostDir: sessionDir.path,
-                        skillsHostDir: skills.skillsDirectory.path,
-                      )
-                    : WorkspacePaths.native(
-                        workspaceHostRoot: workspaceDir.path,
-                        sessionHostDir: sessionDir.path,
-                        skillsHostDir: skills.skillsDirectory.path,
-                      ),
-                sessionDir: sessionDir,
-                outputsDir: Directory(p.join(sessionDir.path, 'outputs')),
-                runtimeStatus: RuntimeStatus(
-                  ready: true,
-                  engine: 'test',
-                  sandboxed: sandboxed,
-                ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final sandboxed = platform != TargetPlatform.macOS;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            settings,
+            null,
+            workspaceContext: WorkspaceToolContext(
+              permissionMode: ToolPermissionMode.fullAccess,
+              workspace: workspace,
+              binding: WorkspaceBinding(workspaceId: workspace.id),
+              paths: sandboxed
+                  ? WorkspacePaths.sandboxed(
+                      workspaceHostRoot: workspaceDir.path,
+                      sessionHostDir: sessionDir.path,
+                      skillsHostDir: skills.skillsDirectory.path,
+                    )
+                  : WorkspacePaths.native(
+                      workspaceHostRoot: workspaceDir.path,
+                      sessionHostDir: sessionDir.path,
+                      skillsHostDir: skills.skillsDirectory.path,
+                    ),
+              sessionDir: sessionDir,
+              outputsDir: Directory(p.join(sessionDir.path, 'outputs')),
+              runtimeStatus: RuntimeStatus(
+                ready: true,
+                engine: 'test',
+                sandboxed: sandboxed,
               ),
-            )!;
-        const skillId = 'agent-installed';
-        final installed = Directory(
-          p.join(skills.skillsDirectory.path, skillId),
-        );
-        final skillPath = sandboxed
-            ? '/skills/$skillId/SKILL.md'
-            : p.join(installed.path, 'SKILL.md');
-        Future<void> run(String name, Map<String, dynamic> arguments) async {
-          await tester.runAsync(() async {
-            final result = await handler(name, arguments, toolCallId: name);
-            expect(
-              WorkspaceToolMetadata.fromJson(
-                ClientToolResult.fromHandler(result).metadata!,
-              ).status,
-              'ok',
-            );
-          });
-          await tester.pumpAndSettle();
-          expect(tester.takeException(), isNull);
-        }
-
-        expect(find.text('Agent skill'), findsNothing);
-        await run('write_file', {
-          'path': skillPath,
-          'content':
-              '---\nname: Agent skill\ndescription: Installed by the agent\n---\n',
+            ),
+          )!;
+      const skillId = 'agent-installed';
+      final installed = Directory(p.join(skills.skillsDirectory.path, skillId));
+      final skillPath = sandboxed
+          ? '/skills/$skillId/SKILL.md'
+          : p.join(installed.path, 'SKILL.md');
+      Future<void> run(String name, Map<String, dynamic> arguments) async {
+        await tester.runAsync(() async {
+          final result = await handler(name, arguments, toolCallId: name);
+          expect(
+            WorkspaceToolMetadata.fromJson(
+              ClientToolResult.fromHandler(result).metadata!,
+            ).status,
+            'ok',
+          );
         });
-        expect(find.text('Agent skill'), findsNWidgets(2));
-        expect(skills.resolveForAssistant(null).single.record.id, skillId);
-        expect(
-          skills.skills
-              .firstWhere((s) => s.record.id == 'existing')
-              .record
-              .enabled,
-          isFalse,
-        );
-        expect(
-          skills.skills
-              .firstWhere((s) => s.record.id == 'existing')
-              .record
-              .useCount,
-          1,
-        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      }
 
-        await run('edit_file', {
-          'path': skillPath,
-          'old_string': 'name: Agent skill',
-          'new_string': 'name: Renamed skill',
-        });
-        expect(find.text('Agent skill'), findsNothing);
-        expect(find.text('Renamed skill'), findsNWidgets(2));
+      expect(find.text('Agent skill'), findsNothing);
+      await run('write_file', {
+        'path': skillPath,
+        'content':
+            '---\nname: Agent skill\ndescription: Installed by the agent\n---\n',
+      });
+      expect(find.text('Agent skill'), findsNWidgets(2));
+      expect(skills.resolveForAssistant(null).single.record.id, skillId);
+      expect(
+        skills.skills
+            .firstWhere((s) => s.record.id == 'existing')
+            .record
+            .enabled,
+        isFalse,
+      );
+      expect(
+        skills.skills
+            .firstWhere((s) => s.record.id == 'existing')
+            .record
+            .useCount,
+        1,
+      );
 
-        final entrypoint = p.join(installed.path, 'SKILL.md');
-        final bodyFile = p.join(installed.path, 'body.md');
-        runtime.action = () async {
-          await File(entrypoint).rename(bodyFile);
-          await Link(entrypoint).create(bodyFile);
-        };
-        await run('shell', {'command': 'link the test skill entrypoint'});
-        await run('edit_file', {
-          'path': sandboxed ? '/skills/$skillId/body.md' : bodyFile,
-          'old_string': 'name: Renamed skill',
-          'new_string': 'name: Linked skill',
-        });
-        expect(find.text('Renamed skill'), findsNothing);
-        expect(find.text('Linked skill'), findsNWidgets(2));
+      await run('edit_file', {
+        'path': skillPath,
+        'old_string': 'name: Agent skill',
+        'new_string': 'name: Renamed skill',
+      });
+      expect(find.text('Agent skill'), findsNothing);
+      expect(find.text('Renamed skill'), findsNWidgets(2));
 
-        runtime.action = () => installed.delete(recursive: true);
-        await run('shell', {'command': 'remove the installed test skill'});
-        expect(find.text('Linked skill'), findsNothing);
-        expect(skills.resolveForAssistant(null), isEmpty);
-      },
-      variant: TargetPlatformVariant.only(platform),
-    );
+      final entrypoint = p.join(installed.path, 'SKILL.md');
+      final bodyFile = p.join(installed.path, 'body.md');
+      runtime.action = () async {
+        await File(entrypoint).rename(bodyFile);
+        await Link(entrypoint).create(bodyFile);
+      };
+      await run('shell', {'command': 'link the test skill entrypoint'});
+      await run('edit_file', {
+        'path': sandboxed ? '/skills/$skillId/body.md' : bodyFile,
+        'old_string': 'name: Renamed skill',
+        'new_string': 'name: Linked skill',
+      });
+      expect(find.text('Renamed skill'), findsNothing);
+      expect(find.text('Linked skill'), findsNWidgets(2));
+
+      runtime.action = () => installed.delete(recursive: true);
+      await run('shell', {'command': 'remove the installed test skill'});
+      expect(find.text('Linked skill'), findsNothing);
+      expect(skills.resolveForAssistant(null), isEmpty);
+    }, variant: TargetPlatformVariant.only(platform));
   }
 }
