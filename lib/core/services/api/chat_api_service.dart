@@ -3,7 +3,8 @@ import 'providers/openai/responses_request.dart';
 import '../../models/native_compaction.dart';
 import 'native_compaction_context.dart';
 import 'generation/model_request_attempts.dart';
-import '../../models/compress_context_options.dart' show isContextLengthError;
+import '../../models/compress_context_options.dart'
+    show isCompressionCapacityError;
 import 'request_history_context.dart';
 import 'request_image_context.dart';
 import 'request_timeout.dart';
@@ -52,6 +53,28 @@ export 'stream/stream_chunk_emit.dart';
 enum BuiltInToolMode { configured, searchOnly, none }
 
 class ChatApiService {
+  static Future<Map<String, dynamic>> prepareNativeCompactionBody({
+    required ProviderConfig config,
+    required String modelId,
+    required List<Map<String, dynamic>> messages,
+    List<Map<String, dynamic>>? tools,
+    RequestImageContext? imageContext,
+    bool stream = false,
+  }) {
+    Future<Map<String, dynamic>> build() async {
+      final body = await buildOpenAIResponsesBody(
+        nativeResponsesConfig(config),
+        modelId,
+        RequestHistoryContext.identify(messages),
+        tools: tools,
+        stream: stream,
+      );
+      return await imageContext?.project(body, preserveSources: true) ?? body;
+    }
+
+    return imageContext?.runFuture(build) ?? build();
+  }
+
   static Future<NativeCompactionResult> compactHistory({
     required ProviderConfig config,
     required String modelId,
@@ -89,16 +112,14 @@ class ChatApiService {
       check();
       validateNativeCompactionScope(messages, config);
       config = nativeResponsesConfig(config);
-      final body = await buildOpenAIResponsesBody(
-        config,
-        modelId,
-        RequestHistoryContext.identify(messages),
+      final projected = await prepareNativeCompactionBody(
+        config: config,
+        modelId: modelId,
+        messages: messages,
         tools: tools,
+        imageContext: imageContext,
         stream: config.oauthProvider == OAuthProvider.chatgpt,
       );
-      check();
-      final projected =
-          await imageContext?.project(body, preserveSources: true) ?? body;
       check();
       client = ProviderOAuthService.instance.authenticatedClient(
         providerHttpClient(config, cancelToken: token, logRequests: false),
@@ -119,9 +140,8 @@ class ChatApiService {
         ),
         conversationId: conversationId,
       );
-      final result = await (imageContext == null
-          ? sendCompact()
-          : imageContext.run(() => Stream.fromFuture(sendCompact())).first);
+      final result =
+          await (imageContext?.runFuture(sendCompact) ?? sendCompact());
       check();
       return result;
     } catch (_) {
@@ -476,7 +496,7 @@ class ChatApiService {
           isCancelled: () => sessionToken.isCancelled,
           cancelled: _whenCancelled(sessionToken),
           shouldRetry: (error) =>
-              !isContextLengthError(error) &&
+              !isCompressionCapacityError(error) &&
               shouldRetryError(
                 error,
                 options,

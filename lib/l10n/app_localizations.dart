@@ -3088,6 +3088,18 @@ abstract class AppLocalizations {
   /// **'Reset all to defaults'**
   String get hotkeysResetAll;
 
+  /// Conflict message in desktop shortcut settings when a keyboard combination is shared by two actions that can be active at the same time. The action placeholder is the localized name shown for the other action in those settings.
+  ///
+  /// In en, this message translates to:
+  /// **'This shortcut is already assigned to {action}.'**
+  String hotkeysShortcutInUse(String action);
+
+  /// Action name substituted into the desktop shortcut conflict message for built-in keyboard behavior that types, edits text, or moves focus in a conversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Text editing and focus navigation'**
+  String get hotkeysTextEditing;
+
   /// Label for the temperature sampling parameter control in assistant edit settings.
   ///
   /// In en, this message translates to:
@@ -3249,6 +3261,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose iCloud Drive or a folder outside On My iPhone > Kelivo. Files in the Kelivo folder are deleted with the app. The backup was not saved.'**
   String get backupPageChooseExternalFolder;
+
+  /// Error during a local backup export when the selected Android document already contains data or the file provider cannot confirm it is empty. Ask the user to select a fresh destination.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a new filename or another folder to save your backup.'**
+  String get backupPageChooseNewFile;
+
+  /// Backup export or restore error. {name} is a file path inside the ZIP and {limit} is the formatted maximum supported uncompressed size of one file.
+  ///
+  /// In en, this message translates to:
+  /// **'The backup file “{name}” exceeds the per-file limit of {limit}.'**
+  String backupArchiveFileSizeLimit(String name, String limit);
+
+  /// Error when the combined file sizes in a backup ZIP exceed the supported uncompressed total. {limit} is the formatted maximum size.
+  ///
+  /// In en, this message translates to:
+  /// **'The uncompressed backup exceeds the {limit} limit.'**
+  String backupArchiveTotalSizeLimit(String limit);
 
   /// Category label in the backup and import content selector. Includes attachments, avatars, background images, custom fonts and session files.
   ///
@@ -3478,10 +3508,10 @@ abstract class AppLocalizations {
   /// **'Installing the backup'**
   String get restoreProgressStageInstallingBackup;
 
-  /// Restore progress stage label shown while the restored data is being verified.
+  /// Startup restore progress label while verifying that the installed data is intact before completing the restore.
   ///
   /// In en, this message translates to:
-  /// **'Verifying'**
+  /// **'Checking restored data'**
   String get restoreProgressStageVerifying;
 
   /// Restore progress stage label shown when a failed restore is reverting to the user's previous data.
@@ -4006,6 +4036,42 @@ abstract class AppLocalizations {
   /// **'Preparing'**
   String get backupProgressPreparing;
 
+  /// Phase in the backup and restore progress dialog while scanning the files to pack or validate.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning backup files'**
+  String get backupProgressScanning;
+
+  /// Subtitle during an export or restore file scan. {count} is the number of files discovered so far, not a final total.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 file found} other{{count} files found}}'**
+  String backupProgressDiscoveredFiles(int count);
+
+  /// Restore dialog phase while SQLite prepares or checks a database snapshot. The duration is unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the database'**
+  String get backupProgressCheckingDatabase;
+
+  /// Local backup export phase while the system save dialog waits for the user to choose a destination.
+  ///
+  /// In en, this message translates to:
+  /// **'Choosing where to save'**
+  String get backupProgressChoosingDestination;
+
+  /// Local backup export phase while writing the finished archive to the user-selected destination.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving backup file'**
+  String get backupProgressSavingFile;
+
+  /// Subtitle for a backup or restore phase without a measurable total. {time} is the elapsed time in minutes and seconds, for example 2:35.
+  ///
+  /// In en, this message translates to:
+  /// **'Elapsed {time}'**
+  String backupProgressElapsed(String time);
+
   /// Progress phase label for creating a database snapshot during backup.
   ///
   /// In en, this message translates to:
@@ -4018,10 +4084,10 @@ abstract class AppLocalizations {
   /// **'Packing'**
   String get backupProgressPacking;
 
-  /// Progress phase label for verifying the backup archive.
+  /// Phase in the export progress dialog while checking the archive index and manifest, or reading back an internal recovery snapshot.
   ///
   /// In en, this message translates to:
-  /// **'Verifying'**
+  /// **'Checking backup archive'**
   String get backupProgressVerifying;
 
   /// Progress phase label for uploading a backup to remote storage.
@@ -4042,10 +4108,10 @@ abstract class AppLocalizations {
   /// **'Extracting'**
   String get backupProgressExtracting;
 
-  /// Progress phase label for validating the backup contents.
+  /// Phase in the backup import dialog while checking the contents of files prepared for restoration.
   ///
   /// In en, this message translates to:
-  /// **'Validating'**
+  /// **'Checking restore files'**
   String get backupProgressValidating;
 
   /// Progress phase label for reading settings from the backup.
@@ -4054,10 +4120,10 @@ abstract class AppLocalizations {
   /// **'Reading settings'**
   String get backupProgressReadingSettings;
 
-  /// Progress phase label for staging candidate data before committing an import.
+  /// Phase in the backup import dialog while moving or copying selected files into a private folder before replacing current data.
   ///
   /// In en, this message translates to:
-  /// **'Staging'**
+  /// **'Preparing restore files'**
   String get backupProgressStaging;
 
   /// Progress phase label for committing imported data to the database.
@@ -7813,6 +7879,18 @@ abstract class AppLocalizations {
   /// **'Send http(s) image links as-is; when off, remote links are dropped and only local images are sent'**
   String get modelSpecFormRemoteImageUrlsSubtitle;
 
+  /// Label for a switch in the model editor's request compatibility section that overrides the model's default list of available response speed tiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Response speed tiers'**
+  String get modelSpecFormResponseSpeedTiers;
+
+  /// Help under the model editor's response speed tier switch. Fast and UltraFast can be enabled independently, and neither checked leaves Standard as the only available chat option. Users select the actual speed in each chat.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize which acceleration tiers this model offers in chats. Clear both to offer only Standard.'**
+  String get modelSpecFormResponseSpeedTiersSubtitle;
+
   /// Toggle label in request quirks controlling whether a cache_control marker is added to OpenRouter requests.
   ///
   /// In en, this message translates to:
@@ -9355,7 +9433,7 @@ abstract class AppLocalizations {
   /// **'Include thinking'**
   String get conversationFindIncludeThinking;
 
-  /// Tooltip for the message map button that opens the find bar in the current conversation.
+  /// Tooltip for the message map button and label in desktop shortcut settings for opening the find bar in the current conversation.
   ///
   /// In en, this message translates to:
   /// **'Find in conversation'**
@@ -9588,6 +9666,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Configuration'**
   String get searchServiceEditorConfigurationTitle;
+
+  /// Tooltip and accessibility label for the button inside the search service editor that opens the icon source menu for this configured service.
+  ///
+  /// In en, this message translates to:
+  /// **'Change icon'**
+  String get searchServiceEditorChangeIcon;
+
+  /// Error shown in the search service editor when selecting or importing a custom service icon fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not use this icon. Choose another image or icon.'**
+  String get searchServiceEditorIconFailed;
 
   /// Placeholder text shown when the selected provider requires no extra configuration fields.
   ///
@@ -10512,6 +10602,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto switch to Topics'**
   String get displaySettingsPageAutoSwitchTopicsTitle;
+
+  /// Label for the switch in desktop Display settings that removes the fixed maximum width for the message list and input box.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-width chat'**
+  String get desktopDisplaySettingsFullWidthChatTitle;
+
+  /// Tooltip beside the full-width chat switch in desktop Display settings. The chat area is the space available between the sidebars.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand messages and the input box to fill the chat area.'**
+  String get desktopDisplaySettingsFullWidthChatSubtitle;
 
   /// Label for choosing whether the topic list sits on the left or right.
   ///
@@ -17359,6 +17461,18 @@ abstract class AppLocalizations {
   /// **'Blank lines break an assistant reply into one bubble per paragraph'**
   String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle;
 
+  /// Switch label in Message Style settings for the Frosted Glass and Solid styles. Enables a single independent visual style shared by thinking and tool-call cards.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize thinking and tool cards'**
+  String get messageStyleSettingsPageCustomizeThinkingToolCards;
+
+  /// Subtitle below the Message Style switch for editing thinking and tool-call cards independently of the assistant reply bubbles. Both card types share the same appearance settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Give thinking and tool calls their own appearance'**
+  String get messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle;
+
   /// Subtitle for the Frosted background style option, describing a translucent frosted-glass look.
   ///
   /// In en, this message translates to:
@@ -17449,16 +17563,22 @@ abstract class AppLocalizations {
   /// **'User'**
   String get messageStyleSettingsPageRoleUser;
 
-  /// Right segment label selecting the Assistant role when editing message style.
+  /// Segment label for editing the visual style of assistant replies in Message Style settings.
   ///
   /// In en, this message translates to:
   /// **'Assistant'**
   String get messageStyleSettingsPageRoleAssistant;
 
-  /// Hint noting assistant style settings also apply to thinking, tool-call, and translation cards.
+  /// Compact segment label for editing the shared style of thinking and tool-call cards in Message Style settings. The switch above already names thinking and tools, so use a short noun equivalent to Cards if the full label would be long.
   ///
   /// In en, this message translates to:
-  /// **'Assistant settings also apply to thinking, tool-call, and translation cards.'**
+  /// **'Cards'**
+  String get messageStyleSettingsPageRoleThinkingTool;
+
+  /// Hint below the Message Style target selector. Translation cards always use the assistant style, and thinking and tool-call cards use it when their own customization is off.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation cards follow the assistant style. Thinking and tool cards follow it by default.'**
   String get messageStyleSettingsPageRoleAssistantHint;
 
   /// Section header for local database snapshot/copy settings on the backup page and desktop backup pane.
@@ -20961,10 +21081,10 @@ abstract class AppLocalizations {
   /// **'Read files with line numbers and paging.'**
   String get workspaceToolHelpRead;
 
-  /// Description for the 'view_image' tool: lets the model inspect an image stored in the workspace.
+  /// Text in the workspace Tools pane explaining that the view_image tool lets the model inspect workspace images and download images from public HTTP or HTTPS URLs.
   ///
   /// In en, this message translates to:
-  /// **'Let the model inspect an image from the workspace.'**
+  /// **'Let the model inspect workspace images or images at public URLs.'**
   String get workspaceToolHelpViewImage;
 
   /// Description for the 'write_file' tool: creates files or overwrites their contents.
@@ -26628,10 +26748,10 @@ abstract class AppLocalizations {
   /// **'{count} characters'**
   String contextEditCharacters(int count);
 
-  /// Error message when a summary would exceed the context limit and was therefore not applied.
+  /// Advisory notice in manual compression review when the locally estimated context after applying the summary exceeds the chat model window. The user can still choose to apply the summary.
   ///
   /// In en, this message translates to:
-  /// **'The summary is still too long and would exceed the limit, so it wasn’t used. Compress again, or switch to a model with a larger context.'**
+  /// **'The result may exceed the chat model’s window. You can review and apply the summary.'**
   String get compressOverSnack;
 
   /// Hint on the summary editor explaining the summary is used in later requests, saving doesn't rewrite replies, and attachments use only existing text.
@@ -28434,6 +28554,30 @@ abstract class AppLocalizations {
   /// **'Not included'**
   String get imageContextOmitted;
 
+  /// Tooltip on an image row action in the Image context panel. Exclude that image from subsequent model requests and conversation image recall, retaining the original image in chat.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclude from context'**
+  String get imageContextExclude;
+
+  /// Tooltip on the image row action in the Image context panel that removes a manual exclusion. The current conversation and automatic selection rules determine when an eligible image is sent or recalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove exclusion'**
+  String get imageContextRestore;
+
+  /// Status shown beside an image in the Image context panel when the user has explicitly excluded that image from requests and conversation recall.
+  ///
+  /// In en, this message translates to:
+  /// **'Excluded by you'**
+  String get imageContextExcluded;
+
+  /// Status and disabled action tooltip in the Image context panel for a tool-recalled copy that inherits an exclusion from the original image.
+  ///
+  /// In en, this message translates to:
+  /// **'Original image excluded'**
+  String get imageContextExcludedWithOriginal;
+
   /// Tooltip on the pin button for an image; pins it to prioritize retention.
   ///
   /// In en, this message translates to:
@@ -28476,10 +28620,10 @@ abstract class AppLocalizations {
   /// **'Keep your attachments longer and set aside older tool images.'**
   String get imageContextAutomaticDescription;
 
-  /// Hint text in the image context panel explaining pinning prioritizes retention and re-adding sends to composer.
+  /// Hint above the image rows in the Image context panel summarizing the row actions: exclude an image from model requests, pin it to prioritize retention, or add it to the composer again.
   ///
   /// In en, this message translates to:
-  /// **'Pin to prioritize an image, or add it to the composer again.'**
+  /// **'Exclude individual images, pin them for priority, or add them to the composer again.'**
   String get imageContextActionsHint;
 
   /// Empty-state hint in the image context panel telling users that sent images or tool-read images will be listed here.
@@ -28842,23 +28986,17 @@ abstract class AppLocalizations {
   /// **'Start at'**
   String get compressionTrigger;
 
-  /// Percentage field in automatic compression settings: desired input usage after compression.
+  /// Percentage field in automatic compression settings giving a preferred input usage after compression. This percentage guides planning.
   ///
   /// In en, this message translates to:
-  /// **'Compress to'**
+  /// **'Aim for'**
   String get compressionTarget;
 
-  /// Optional input-capacity override for the summary model in compression details, measured in tokens.
+  /// Optional window override in compression details for estimating the current chat model's input capacity when planning automatic compression, measured in tokens. The summary model has its own window.
   ///
   /// In en, this message translates to:
-  /// **'Summary model capacity'**
+  /// **'Auto compression planning window'**
   String get compressionWindow;
-
-  /// Maximum number of model requests allowed for one compression task, including retries. Also labels the recovery action that opens this field.
-  ///
-  /// In en, this message translates to:
-  /// **'Maximum requests'**
-  String get compressionRequests;
 
   /// Main switch in the text compression details for including background information in the summary request. It also controls the availability of the instruction injection option. No placeholders.
   ///
@@ -28968,23 +29106,17 @@ abstract class AppLocalizations {
   /// **'{count} request(s) didn’t return usage data. That doesn’t mean they were free.'**
   String compressionUsageUnknown(int count);
 
-  /// Compression failure when the estimated or actual request count exceeds the configured maximum. Refers to the setting named compressionRequests and confirms no result was applied.
-  ///
-  /// In en, this message translates to:
-  /// **'This would take more model requests than the current limit allows, so the context is unchanged. Raise Maximum requests, or switch to a model with a larger context.'**
-  String get compressionBudgetError;
-
   /// Error message when the summary was truncated or refused and not applied, advising adjusting output limit or model.
   ///
   /// In en, this message translates to:
   /// **'The summary was cut off or refused, and the context is unchanged. Raise the output limit, or try a different model.'**
   String get compressionIncomplete;
 
-  /// Error message when template, reference, or working summary fills the model budget, advising fewer references or a larger model.
+  /// Compression error shown when the model provider actually rejected the final attempted input with a context length or payload size error. Original provider details are shown separately.
   ///
   /// In en, this message translates to:
-  /// **'Reference material already fills this model’s capacity, leaving no room for the summary. Use fewer references, or switch to a model with a larger context.'**
-  String get compressionReferenceTooLarge;
+  /// **'The provider reported that the request was too large. Try a model with a larger context.'**
+  String get compressionProviderContextRejected;
 
   /// Error message when referenced background changed, advising reviewing the candidate or regenerating.
   ///
@@ -28992,10 +29124,10 @@ abstract class AppLocalizations {
   /// **'The referenced background has changed. Review this summary, or generate a new one.'**
   String get compressionReferenceChanged;
 
-  /// Review notice when automatic compression did not reduce the full request below its trigger ratio. The original context remains active; suggests shortening the summary or adjusting compressionTrigger.
+  /// Review notice when automatic compression estimates that the projected chat request with the generated summary and retained messages does not reduce input usage.
   ///
   /// In en, this message translates to:
-  /// **'Even after compression, usage would still be above the automatic starting point, so the original context was kept. Shorten the summary, or raise Start at.'**
+  /// **'The result is estimated to use at least as much context as the original. You can review and shorten the summary.'**
   String get compressionTargetNotReached;
 
   /// Error message when the selected template is unavailable, advising choosing another.
@@ -29148,11 +29280,11 @@ abstract class AppLocalizations {
   /// **'Compress once, then retry the reply that failed'**
   String get compressionOverflowAction;
 
-  /// Status line in the compression options dialog showing estimated request count and the per-run limit, including retries.
+  /// Status line in the compression options dialog with the estimated number of summary model requests. The count can change as the server replies.
   ///
   /// In en, this message translates to:
-  /// **'Estimated {count} request(s) · limit {limit}, including retries'**
-  String compressionPlannedCalls(int count, int limit);
+  /// **'{count, plural, =1{About 1 request} other{About {count} requests}}'**
+  String compressionPlannedCalls(int count);
 
   /// Note in the template library indicating a template is also used as the global default.
   ///
@@ -29310,12 +29442,6 @@ abstract class AppLocalizations {
   /// **'turns'**
   String get compressionTurnUnit;
 
-  /// Unit suffix ('calls') appended to the numeric request-attempts field in compression options.
-  ///
-  /// In en, this message translates to:
-  /// **'calls'**
-  String get compressionCallUnit;
-
   /// Timeout field for each compression request, in minutes. Also labels the recovery action that opens this field.
   ///
   /// In en, this message translates to:
@@ -29352,10 +29478,10 @@ abstract class AppLocalizations {
   /// **'Compression details'**
   String get compressionAdvancedOptions;
 
-  /// Subtitle under the advanced options disclosure describing references, original-history rereading and request limits.
+  /// Subtitle under the advanced options disclosure describing references, original history, and window planning estimates.
   ///
   /// In en, this message translates to:
-  /// **'References, whether to look back at originals, and the request limit'**
+  /// **'Background references, original history, and planning estimates'**
   String get compressionAdvancedHint;
 
   /// Hint for the window field indicating automatic sizing.
@@ -29363,6 +29489,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto'**
   String get compressionAutomaticWindow;
+
+  /// Read-only line in compression details showing the estimated capacity of the model used for summaries. The tokens placeholder is a compact count like 128K, and source is a localized model metadata source such as Catalog or Custom.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary model window · {tokens} tokens · {source}'**
+  String compressionSummaryWindowEstimate(String tokens, String source);
 
   /// Hint in compression options when auto-compression is off, noting manual compression is available.
   ///
@@ -29430,10 +29562,10 @@ abstract class AppLocalizations {
   /// **'Within the character limit, compress more recent complete messages. Messages not selected stay as original text.'**
   String get compressionScopeRecentHint;
 
-  /// Hint in the compression options dialog explaining that automatic compression always keeps recent turns regardless of the manual scope, and that this turn count is shared with manual compression.
+  /// Hint beneath the numeric field for recent turns in automatic text compression. The app may summarize additional old turns when needed. The current request is protected. This is plain text with no placeholders.
   ///
   /// In en, this message translates to:
-  /// **'Automatic compression always keeps recent originals, regardless of the range you pick for a manual run. The turn count is shared with manual compression.'**
+  /// **'Automatic compression keeps recent turns when there is room. It can summarize additional older turns and always protects the current request.'**
   String get compressionAutoKeepHint;
 
   /// Title of the image and request budget settings row and desktop dialog header in provider settings.

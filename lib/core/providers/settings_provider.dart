@@ -299,6 +299,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayLongPasteAsFileThresholdKey =
       'display_long_paste_as_file_threshold_v1';
   static const String _desktopSendShortcutKey = 'desktop_send_shortcut_v1';
+  static const String _displayDesktopFullWidthChatKey =
+      'display_desktop_full_width_chat_v1';
   static const String _displayChatFontScaleKey = 'display_chat_font_scale_v1';
   static const String _displayAutoScrollEnabledKey =
       'display_auto_scroll_enabled_v1';
@@ -368,6 +370,8 @@ class SettingsProvider extends ChangeNotifier {
       'chat_bubble_style_overrides_v1';
   static const String _userChatBubbleStyleOverridesKey =
       'chat_bubble_style_overrides_user_v1';
+  static const String _thinkingToolCardStyleKey =
+      'chat_bubble_style_thinking_tool_card_v1';
   static const String _toolSchemaOverridesKey = 'tool_schema_overrides_v1';
   static const String _mobileAssistantEditTabOrderKey =
       'mobile_assistant_edit_tab_order_v1';
@@ -670,6 +674,9 @@ class SettingsProvider extends ChangeNotifier {
   ];
   List<SearchServiceOptions> get searchServices =>
       List.unmodifiable(_searchServices);
+  final _searchServiceAvatars = <String, AvatarConfig>{};
+  AvatarConfig? searchServiceAvatar(String serviceId) =>
+      _searchServiceAvatars[serviceId];
   SearchCommonOptions _searchCommonOptions = const SearchCommonOptions();
   SearchCommonOptions get searchCommonOptions => _searchCommonOptions;
   int _searchServiceSelected = 0;
@@ -1071,6 +1078,8 @@ class SettingsProvider extends ChangeNotifier {
             .clamp(minMemoryInjectionMaxItems, maxMemoryInjectionMaxItems);
 
     // display settings
+    _desktopFullWidthChat =
+        prefs.getBool(_displayDesktopFullWidthChatKey) ?? false;
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
     _showModelIcon = prefs.getBool(_displayShowModelIconKey) ?? true;
     _showModelNameTimestamp =
@@ -1375,6 +1384,23 @@ class SettingsProvider extends ChangeNotifier {
         // Keep null so a corrupt user key still follows assistant.
       }
     }
+    final thinkingToolCardStyleRaw = prefs.getString(_thinkingToolCardStyleKey);
+    _thinkingToolCardStyle = null;
+    if (thinkingToolCardStyleRaw != null) {
+      try {
+        if (jsonDecode(thinkingToolCardStyleRaw) case {
+          'enabled': final bool enabled,
+          'overrides': final Map<String, dynamic> overrides,
+        }) {
+          _thinkingToolCardStyle = (
+            enabled: enabled,
+            overrides: ChatBubbleStyleOverrides.fromJson(overrides),
+          );
+        }
+      } on FormatException {
+        // Malformed data follows the assistant style.
+      }
+    }
     _toolSchemaOverrides = _decodeToolSchemaOverrides(
       prefs.getString(_toolSchemaOverridesKey),
     );
@@ -1411,13 +1437,19 @@ class SettingsProvider extends ChangeNotifier {
     final searchServicesStr = prefs.getString(_searchServicesKey);
     if (searchServicesStr != null && searchServicesStr.isNotEmpty) {
       try {
-        final list = jsonDecode(searchServicesStr) as List;
-        final decoded = list
-            .map(
-              (e) => SearchServiceOptions.fromJson(e as Map<String, dynamic>),
-            )
-            .toList();
-        if (decoded.isNotEmpty) _searchServices = decoded;
+        final services = <SearchServiceOptions>[];
+        final avatars = <String, AvatarConfig>{};
+        for (final entry in jsonDecode(searchServicesStr) as List) {
+          final json = entry as Map<String, dynamic>;
+          final service = SearchServiceOptions.fromJson(json);
+          services.add(service);
+          final avatar = AvatarConfig.fromJson(json['avatar']);
+          if (avatar != null) avatars[service.id] = avatar;
+        }
+        if (services.isNotEmpty) {
+          _searchServices = services;
+          _searchServiceAvatars.addAll(avatars);
+        }
       } catch (_) {}
     }
     final searchCommonStr = prefs.getString(_searchCommonKey);
@@ -1666,6 +1698,17 @@ class SettingsProvider extends ChangeNotifier {
 
   // Apply global proxy to Dart IO layer; provider-level proxies take precedence at call sites.
   String _lastProxySignature = '';
+
+  /// Whether the current app proxy routes requests to this destination.
+  static bool routesThroughGlobalProxy(Uri uri) {
+    final bypass = switch (HttpOverrides.current) {
+      _ProxyHttpOverrides(:final bypassRules) ||
+      _SocksProxyHttpOverrides(:final bypassRules) => bypassRules,
+      _ => null,
+    };
+    return bypass != null && !_shouldBypassProxy(uri.host, bypass);
+  }
+
   void applyGlobalProxyOverridesIfNeeded() {
     try {
       final enabled = _globalProxyEnabled;
@@ -3165,16 +3208,58 @@ class SettingsProvider extends ChangeNotifier {
   ChatBubbleStyleOverrides _chatBubbleStyleOverrides =
       const ChatBubbleStyleOverrides();
   ChatBubbleStyleOverrides? _userChatBubbleStyleOverrides;
+  ({bool enabled, ChatBubbleStyleOverrides overrides})? _thinkingToolCardStyle;
+
+  bool get canCustomizeThinkingToolCards =>
+      _chatMessageBackgroundStyle != ChatMessageBackgroundStyle.defaultStyle;
+  bool get customizeThinkingToolCards =>
+      _thinkingToolCardStyle?.enabled ?? false;
+
+  Future<void> setCustomizeThinkingToolCards(bool enabled) async {
+    if (enabled == customizeThinkingToolCards) return;
+    await _setThinkingToolCardStyle((
+      enabled: enabled,
+      overrides: _thinkingToolCardStyle?.overrides ?? _chatBubbleStyleOverrides,
+    ));
+  }
+
+  Future<void> resetThinkingToolCardStyle() => _setThinkingToolCardStyle(null);
+
+  Future<void> _setThinkingToolCardStyle(
+    ({bool enabled, ChatBubbleStyleOverrides overrides})? value,
+  ) async {
+    if (_thinkingToolCardStyle == value) return;
+    _thinkingToolCardStyle = value;
+    final write = value == null
+        ? _preferences.remove(_thinkingToolCardStyleKey)
+        : _preferences.setString(
+            _thinkingToolCardStyleKey,
+            jsonEncode({
+              'enabled': value.enabled,
+              'overrides': value.overrides.toJson(),
+            }),
+          );
+    notifyListeners();
+    await write;
+  }
+
   ChatBubbleStyleOverrides get chatBubbleStyleOverrides =>
       _chatBubbleStyleOverrides;
   ChatBubbleStyleOverrides get assistantChatBubbleStyleOverrides =>
       _chatBubbleStyleOverrides;
   ChatBubbleStyleOverrides get userChatBubbleStyleOverrides =>
       _userChatBubbleStyleOverrides ?? _chatBubbleStyleOverrides;
-  ChatBubbleStyleOverrides chatBubbleStyleOverridesFor({
-    required bool isUser,
-  }) =>
-      isUser ? userChatBubbleStyleOverrides : assistantChatBubbleStyleOverrides;
+  ChatBubbleStyleOverrides chatBubbleStyleOverridesFor(
+    ChatBubbleStyleTarget target,
+  ) => switch (target) {
+    ChatBubbleStyleTarget.user => userChatBubbleStyleOverrides,
+    ChatBubbleStyleTarget.assistant => assistantChatBubbleStyleOverrides,
+    ChatBubbleStyleTarget.thinkingToolCard => switch (_thinkingToolCardStyle) {
+      (enabled: true, :final overrides) when canCustomizeThinkingToolCards =>
+        overrides,
+      _ => assistantChatBubbleStyleOverrides,
+    },
+  };
   Future<void> setChatBubbleStyleOverrides(ChatBubbleStyleOverrides v) async {
     final assistantChanged = _chatBubbleStyleOverrides != v;
     final hadUserSplit = _userChatBubbleStyleOverrides != null;
@@ -3193,11 +3278,16 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> setChatBubbleStyleOverridesForRole({
-    required bool isUser,
-    required ChatBubbleStyleOverrides value,
-  }) async {
-    if (isUser) {
+  Future<void> setChatBubbleStyleOverridesFor(
+    ChatBubbleStyleTarget target,
+    ChatBubbleStyleOverrides value,
+  ) async {
+    if (target == ChatBubbleStyleTarget.thinkingToolCard) {
+      if (!customizeThinkingToolCards) return;
+      await _setThinkingToolCardStyle((enabled: true, overrides: value));
+      return;
+    }
+    if (target == ChatBubbleStyleTarget.user) {
       if (_userChatBubbleStyleOverrides == value) return;
       _userChatBubbleStyleOverrides = value;
       notifyListeners();
@@ -4986,6 +5076,15 @@ Requirements:
     return assistant?.reasoning ?? ReasoningRequest.auto;
   }
 
+  bool _desktopFullWidthChat = false;
+  bool get desktopFullWidthChat => _desktopFullWidthChat;
+  Future<void> setDesktopFullWidthChat(bool value) async {
+    if (_desktopFullWidthChat == value) return;
+    _desktopFullWidthChat = value;
+    notifyListeners();
+    await _preferences.setBool(_displayDesktopFullWidthChatKey, value);
+  }
+
   // Display settings: user avatar and model icon visibility
   bool _showUserAvatar = true;
   bool get showUserAvatar => _showUserAvatar;
@@ -6177,8 +6276,26 @@ Requirements:
     return true;
   }
 
+  Future<void> updateSearchService(
+    SearchServiceOptions service, {
+    required AvatarConfig? avatar,
+  }) async {
+    final index = _searchServices.indexWhere((item) => item.id == service.id);
+    if (index < 0) return;
+    if (avatar == null) {
+      _searchServiceAvatars.remove(service.id);
+    } else {
+      _searchServiceAvatars[service.id] = avatar;
+    }
+    final services = List<SearchServiceOptions>.of(_searchServices);
+    services[index] = service;
+    await setSearchServices(services);
+  }
+
   Future<void> setSearchServices(List<SearchServiceOptions> services) async {
     _searchServices = List.from(services);
+    final serviceIds = _searchServices.map((service) => service.id).toSet();
+    _searchServiceAvatars.removeWhere((id, _) => !serviceIds.contains(id));
     final nextFetchMode = WebFetchService.effectiveMode(
       _webFetchMode,
       _searchServices,
@@ -6194,7 +6311,14 @@ Requirements:
     final prefs = _preferences;
     await prefs.setString(
       _searchServicesKey,
-      jsonEncode(_searchServices.map((e) => e.toJson()).toList()),
+      jsonEncode([
+        for (final service in _searchServices)
+          {
+            ...service.toJson(),
+            if (_searchServiceAvatars[service.id] case final avatar?)
+              'avatar': avatar.toJson(),
+          },
+      ]),
     );
     await prefs.setInt(_searchSelectedKey, _searchServiceSelected);
     if (resetFetchMode) await prefs.setString(_webFetchModeKey, _webFetchMode);
@@ -6364,6 +6488,7 @@ Requirements:
     copy._memoryMigratePromptEn = _memoryMigratePromptEn;
     copy._memoryMigrationBatchSize = _memoryMigrationBatchSize;
     copy._memoryInjectionMaxItems = _memoryInjectionMaxItems;
+    copy._desktopFullWidthChat = _desktopFullWidthChat;
     copy._showUserAvatar = _showUserAvatar;
     copy._showModelIcon = _showModelIcon;
     copy._showModelNameTimestamp = _showModelNameTimestamp;
@@ -6456,6 +6581,7 @@ Requirements:
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
     copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;
+    copy._thinkingToolCardStyle = _thinkingToolCardStyle;
     copy._toolSchemaOverrides = Map<String, ToolSchemaOverride>.from(
       _toolSchemaOverrides,
     );

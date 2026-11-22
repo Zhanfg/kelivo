@@ -764,7 +764,9 @@ class ChatDatabaseRepository {
     final database = sqlite.sqlite3.open(snapshotFile.absolute.path);
     late final ChatDatabaseSnapshotInfo initialInfo;
     try {
-      initialInfo = _validateRawSnapshot(database);
+      // This is a disposable copy. Check its shape and counts before editing;
+      // inspectPreparedSnapshot fully checks the reopened result before use.
+      initialInfo = _readSnapshotInfo(database);
       // Now a post-condition: the migration above guarantees it.
       if (initialInfo.schemaVersion != AppDatabase.currentSchemaVersion) {
         throw StateError('database_schema_version');
@@ -893,6 +895,10 @@ class ChatDatabaseRepository {
       throw StateError('foreign_key_check');
     }
 
+    return _readSnapshotInfo(database);
+  }
+
+  static ChatDatabaseSnapshotInfo _readSnapshotInfo(sqlite.Database database) {
     _validateRawStructure(database);
 
     return (
@@ -4051,6 +4057,8 @@ ORDER BY m.message_order DESC LIMIT 20
 
     final modelRows = await _db.customSelect('''
       SELECT m.model_id AS id, NULLIF(TRIM(m.provider_id), '') AS provider_id,
+        CASE WHEN MIN(m.provider_id) = MAX(m.provider_id)
+          THEN MIN(m.provider_id) END AS original_provider_id,
         COUNT(*) AS item_count,
         COALESCE(SUM(m.prompt_tokens), 0) AS input_tokens,
         COALESCE(SUM(m.completion_tokens), 0) AS output_tokens,
@@ -4115,6 +4123,9 @@ ORDER BY m.message_order DESC LIMIT 20
             label: row.read<String>('id'),
             count: row.read<int>('item_count'),
             providerId: row.readNullable<String>('provider_id'),
+            originalProviderId: row.readNullable<String>(
+              'original_provider_id',
+            ),
             inputTokens: row.read<int>('input_tokens'),
             outputTokens: row.read<int>('output_tokens'),
             cachedTokens: row.read<int>('cached_tokens'),
@@ -4506,6 +4517,12 @@ ORDER BY m.message_order DESC LIMIT 20
     });
   }
 
+  // Start with revisions awaiting asset indexing. An ordinary JOIN can scan
+  // every message part per candidate even when the dirty table is empty.
+  static const _dirtyAssetPartsJoin =
+      'FROM asset_reference_dirty_rows d '
+      'CROSS JOIN message_part_rows p ON p.revision_id = d.revision_id';
+
   /// Set-based dirty-part protection for a candidate page.
   ///
   /// A never-registered malformed attachment whose raw payload no longer
@@ -4541,8 +4558,7 @@ ORDER BY m.message_order DESC LIMIT 20
           FROM candidates c
           WHERE EXISTS (
             SELECT 1
-            FROM asset_reference_dirty_rows d
-            JOIN message_part_rows p ON p.revision_id = d.revision_id
+            $_dirtyAssetPartsJoin
             WHERE p.kind IN ('text', 'image', 'file', 'tool_call')
               AND (
                 instr(p.payload, c.path_form) > 0
@@ -4588,8 +4604,7 @@ ORDER BY m.message_order DESC LIMIT 20
               WHERE r.asset_id = g.asset_id
             )
             AND NOT EXISTS (
-              SELECT 1 FROM asset_reference_dirty_rows d
-              JOIN message_part_rows p ON p.revision_id = d.revision_id
+              SELECT 1 $_dirtyAssetPartsJoin
               WHERE p.kind IN ('text', 'image', 'file', 'tool_call')
                 AND (
                   instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
@@ -4644,8 +4659,7 @@ ORDER BY m.message_order DESC LIMIT 20
                 WHERE r.asset_id = g.asset_id
               )
               AND NOT EXISTS (
-                SELECT 1 FROM asset_reference_dirty_rows d
-                JOIN message_part_rows p ON p.revision_id = d.revision_id
+                SELECT 1 $_dirtyAssetPartsJoin
                 WHERE p.kind IN ('text', 'image', 'file', 'tool_call')
                   AND (
                     instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
@@ -6665,6 +6679,11 @@ ORDER BY m.message_order DESC LIMIT 20
         )
         .get();
     final partPayloads = <String, Map<String, List<String>>>{};
+    final messageOrdinals = {
+      for (final (index, row) in messageRows.indexed)
+        row.read<String>('id'): '$index',
+    };
+    final retainedImageOrigins = <String>{};
     // Image/file identity payloads in ordinal order (unavailable stripped).
     final attachmentPayloads = <String, List<String>>{};
     for (final part in partRows) {
@@ -6680,7 +6699,15 @@ ORDER BY m.message_order DESC LIMIT 20
       partPayloads
           .putIfAbsent(revisionId, () => {})
           .putIfAbsent(kind, () => [])
-          .add(payload);
+          .add(
+            kind == 'tool_call'
+                ? remapChatImagePayload(
+                    payload,
+                    messageOrdinals,
+                    retainedImageOrigins,
+                  )
+                : payload,
+          );
     }
     final signatureRows = await _db
         .customSelect(
@@ -6754,10 +6781,12 @@ ORDER BY m.message_order DESC LIMIT 20
               mcpRows.map((row) => row.data).toList(),
               messages,
               await _compressionFingerprint(schema, id),
-              await _imageContextFingerprint(schema, id, {
-                for (var i = 0; i < messageRows.length; i++)
-                  messageRows[i].read<String>('id'): '$i',
-              }),
+              await _imageContextFingerprint(
+                schema,
+                id,
+                messageOrdinals,
+                retainedImageOrigins,
+              ),
               await _contextFingerprintData(
                 schema,
                 id,
@@ -7035,6 +7064,8 @@ ORDER BY m.message_order DESC LIMIT 20
         messageIdMap,
         payload: sourceImages.read<String>('payload'),
       );
+    } else {
+      await _remapChatImageSources(targetId, messageIdMap);
     }
     final sourceContext = await _db
         .customSelect(
@@ -9568,6 +9599,7 @@ final class ChatStatsRank {
     required this.label,
     required this.count,
     this.providerId,
+    this.originalProviderId,
     this.inputTokens = 0,
     this.outputTokens = 0,
     this.cachedTokens = 0,
@@ -9577,6 +9609,8 @@ final class ChatStatsRank {
   final String label;
   final int count;
   final String? providerId;
+  // The original key is known only if the model group has one provider ID.
+  final String? originalProviderId;
   final int inputTokens;
   final int outputTokens;
   final int cachedTokens;

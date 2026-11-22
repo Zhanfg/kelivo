@@ -701,6 +701,19 @@
   "hotkeysResetDefault": "Reset to default",
   "hotkeysClearShortcut": "Clear shortcut",
   "hotkeysResetAll": "Reset all to defaults",
+  "hotkeysShortcutInUse": "This shortcut is already assigned to {action}.",
+  "@hotkeysShortcutInUse": {
+    "description": "Conflict message in desktop shortcut settings when a keyboard combination is shared by two actions that can be active at the same time. The action placeholder is the localized name shown for the other action in those settings.",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "hotkeysTextEditing": "Text editing and focus navigation",
+  "@hotkeysTextEditing": {
+    "description": "Action name substituted into the desktop shortcut conflict message for built-in keyboard behavior that types, edits text, or moves focus in a conversation."
+  },
   "assistantEditTemperatureTitle": "Temperature",
   "assistantEditTopPTitle": "Top-p",
   "assistantSettingsDeleteDialogTitle": "Delete Assistant",
@@ -736,6 +749,20 @@
   "backupPageChooseExternalFolder": "Choose iCloud Drive or a folder outside On My iPhone > Kelivo. Files in the Kelivo folder are deleted with the app. The backup was not saved.",
   "@backupPageChooseExternalFolder": {
     "description": "Error shown when an iOS local backup destination is inside the app container. No file is copied and the backup is not counted as successful. Ask the user to choose a folder that survives deleting Kelivo."
+  },
+  "backupPageChooseNewFile": "Choose a new filename or another folder to save your backup.",
+  "@backupPageChooseNewFile": {
+    "description": "Error during a local backup export when the selected Android document already contains data or the file provider cannot confirm it is empty. Ask the user to select a fresh destination."
+  },
+  "backupArchiveFileSizeLimit": "The backup file “{name}” exceeds the per-file limit of {limit}.",
+  "@backupArchiveFileSizeLimit": {
+    "description": "Backup export or restore error. {name} is a file path inside the ZIP and {limit} is the formatted maximum supported uncompressed size of one file.",
+    "placeholders": {"name": {"type": "String"}, "limit": {"type": "String"}}
+  },
+  "backupArchiveTotalSizeLimit": "The uncompressed backup exceeds the {limit} limit.",
+  "@backupArchiveTotalSizeLimit": {
+    "description": "Error when the combined file sizes in a backup ZIP exceed the supported uncompressed total. {limit} is the formatted maximum size.",
+    "placeholders": {"limit": {"type": "String"}}
   },
   "backupPageFilesLabel": "Files and Images",
   "backupPageSettingsSaveFailed": "Could not save the backup settings. Please try again.",
@@ -797,7 +824,7 @@
   "restoreProgressStageCheckingBackup": "Checking the backup",
   "restoreProgressStagePreservingCurrentData": "Preserving your current data",
   "restoreProgressStageInstallingBackup": "Installing the backup",
-  "restoreProgressStageVerifying": "Verifying",
+  "restoreProgressStageVerifying": "Checking restored data",
   "restoreProgressStageRollingBack": "Restoring your previous data",
   "restoreProgressStageFinishing": "Finishing up",
   "backupRestoreFailureRestartButton": "Restart Kelivo",
@@ -990,15 +1017,49 @@
     }
   },
   "backupProgressPreparing": "Preparing",
+  "backupProgressScanning": "Scanning backup files",
+  "@backupProgressScanning": {
+    "description": "Phase in the backup and restore progress dialog while scanning the files to pack or validate."
+  },
+  "backupProgressDiscoveredFiles": "{count, plural, one{1 file found} other{{count} files found}}",
+  "@backupProgressDiscoveredFiles": {
+    "description": "Subtitle during an export or restore file scan. {count} is the number of files discovered so far, not a final total.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "backupProgressCheckingDatabase": "Checking the database",
+  "@backupProgressCheckingDatabase": {
+    "description": "Restore dialog phase while SQLite prepares or checks a database snapshot. The duration is unknown."
+  },
+  "backupProgressChoosingDestination": "Choosing where to save",
+  "@backupProgressChoosingDestination": {
+    "description": "Local backup export phase while the system save dialog waits for the user to choose a destination."
+  },
+  "backupProgressSavingFile": "Saving backup file",
+  "@backupProgressSavingFile": {
+    "description": "Local backup export phase while writing the finished archive to the user-selected destination."
+  },
+  "backupProgressElapsed": "Elapsed {time}",
+  "@backupProgressElapsed": {
+    "description": "Subtitle for a backup or restore phase without a measurable total. {time} is the elapsed time in minutes and seconds, for example 2:35.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "backupProgressSnapshotting": "Creating database snapshot",
   "backupProgressPacking": "Packing",
-  "backupProgressVerifying": "Verifying",
+  "backupProgressVerifying": "Checking backup archive",
   "backupProgressUploading": "Uploading",
   "backupProgressDownloading": "Downloading",
   "backupProgressExtracting": "Extracting",
-  "backupProgressValidating": "Validating",
+  "backupProgressValidating": "Checking restore files",
   "backupProgressReadingSettings": "Reading settings",
-  "backupProgressStaging": "Staging",
+  "backupProgressStaging": "Preparing restore files",
   "backupProgressCommitting": "Committing",
   "backupProgressImportingSessions": "Importing sessions",
   "backupProgressImportingMessages": "Importing messages",
@@ -2065,6 +2126,8 @@
   "modelSpecFormDynamicWebSearchSubtitle": "When dynamic filtering is on, send the 2026-03-18 web search and fetch tools",
   "modelSpecFormRemoteImageUrls": "Remote image links",
   "modelSpecFormRemoteImageUrlsSubtitle": "Send http(s) image links as-is; when off, remote links are dropped and only local images are sent",
+  "modelSpecFormResponseSpeedTiers": "Response speed tiers",
+  "modelSpecFormResponseSpeedTiersSubtitle": "Customize which acceleration tiers this model offers in chats. Clear both to offer only Standard.",
   "modelSpecFormPromptCacheControl": "Prompt cache marker",
   "modelSpecFormPromptCacheControlSubtitle": "When prompt caching is on, add cache_control to OpenRouter requests",
   "modelSpecFormSamplingAlways": "Always",
@@ -2534,7 +2597,7 @@
   },
   "conversationFindOpenTooltip": "Find in conversation",
   "@conversationFindOpenTooltip": {
-    "description": "Tooltip for the message map button that opens the find bar in the current conversation."
+    "description": "Tooltip for the message map button and label in desktop shortcut settings for opening the find bar in the current conversation."
   },
   "searchServicesPageApiKeyRequiredStatus": "API Key Required",
   "searchServicesPageUrlRequiredStatus": "URL Required",
@@ -2574,6 +2637,8 @@
   "searchServicesFourGetPassHelp": "If the instance requires a CAPTCHA, complete it and paste the value of the pass cookie.",
   "searchServiceEditorProviderTypeTitle": "Search provider",
   "searchServiceEditorConfigurationTitle": "Configuration",
+  "searchServiceEditorChangeIcon": "Change icon",
+  "searchServiceEditorIconFailed": "Could not use this icon. Choose another image or icon.",
   "searchServiceEditorNoConfiguration": "This provider does not require additional configuration.",
   "searchServiceEditorMultiKeyTitle": "Multi-key rotation",
   "searchServiceEditorMultiKeyNone": "Not configured",
@@ -2848,6 +2913,8 @@
   "displaySettingsPageSendShortcutEnter": "Enter",
   "displaySettingsPageSendShortcutCtrlEnter": "Ctrl/Cmd + Enter",
   "displaySettingsPageAutoSwitchTopicsTitle": "Auto switch to Topics",
+  "desktopDisplaySettingsFullWidthChatTitle": "Full-width chat",
+  "desktopDisplaySettingsFullWidthChatSubtitle": "Expand messages and the input box to fill the chat area.",
   "desktopDisplaySettingsTopicPositionTitle": "Topic position",
   "desktopDisplaySettingsTopicPositionLeft": "Left",
   "desktopDisplaySettingsTopicPositionRight": "Right",
@@ -4658,6 +4725,8 @@
   "messageStyleSettingsPageAssistantFitContentSubtitle": "Assistant bubbles hug their text instead of filling the row",
   "messageStyleSettingsPageAssistantSplitParagraphs": "Split paragraphs into bubbles",
   "messageStyleSettingsPageAssistantSplitParagraphsSubtitle": "Blank lines break an assistant reply into one bubble per paragraph",
+  "messageStyleSettingsPageCustomizeThinkingToolCards": "Customize thinking and tool cards",
+  "messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle": "Give thinking and tool calls their own appearance",
   "messageStyleSettingsPageStyleFrostedSubtitle": "Translucent frosted glass",
   "messageStyleSettingsPageStyleSolidSubtitle": "Opaque solid fill",
   "messageStyleSettingsPageBlur": "Blur",
@@ -4674,7 +4743,8 @@
   "messageStyleSettingsPagePreviewThinking": "Thinking",
   "messageStyleSettingsPageRoleUser": "User",
   "messageStyleSettingsPageRoleAssistant": "Assistant",
-  "messageStyleSettingsPageRoleAssistantHint": "Assistant settings also apply to thinking, tool-call, and translation cards.",
+  "messageStyleSettingsPageRoleThinkingTool": "Cards",
+  "messageStyleSettingsPageRoleAssistantHint": "Translation cards follow the assistant style. Thinking and tool cards follow it by default.",
   "localSnapshotSectionTitle": "Local Copies",
   "localSnapshotEnabledTitle": "Keep local copies",
   "localSnapshotEnabledSubtitle": "Kelivo periodically saves a copy of its database on this device, so it is never the only one.",
@@ -5829,7 +5899,7 @@
   "workspaceToolsDescription": "Choose which tools conversations can use in this workspace. Changes are saved automatically.",
   "workspaceToolHelpShell": "Run commands in the workspace environment.",
   "workspaceToolHelpRead": "Read files with line numbers and paging.",
-  "workspaceToolHelpViewImage": "Let the model inspect an image from the workspace.",
+  "workspaceToolHelpViewImage": "Let the model inspect workspace images or images at public URLs.",
   "workspaceToolHelpWrite": "Create files or overwrite their contents.",
   "workspaceToolHelpEdit": "Replace specific text in an existing file.",
   "workspaceToolHelpList": "Browse directories and their entries.",
@@ -7433,7 +7503,7 @@
   "contextOperationSuperseded": "Replaced by a later summary",
   "compressIncludeAttachments": "Attachment text & tool results",
   "contextEditCharacters": "{count} characters",
-  "compressOverSnack": "The summary is still too long and would exceed the limit, so it wasn’t used. Compress again, or switch to a model with a larger context.",
+  "compressOverSnack": "The result may exceed the chat model’s window. You can review and apply the summary.",
   "contextSummaryHint": "This is the summary the model will see next. Saving changes only the summary, not existing replies. Attachments contribute only text already extracted; images are not re-read.",
   "compressAdvanced": "Advanced",
   "compressTaskWaiting": "Waiting for the current reply",
@@ -8144,6 +8214,10 @@
   "imageContextDescription": "Manage the images included in this turn. Originals stay in your chat.",
   "imageContextIncluded": "Included",
   "imageContextOmitted": "Not included",
+  "imageContextExclude": "Exclude from context",
+  "imageContextRestore": "Remove exclusion",
+  "imageContextExcluded": "Excluded by you",
+  "imageContextExcludedWithOriginal": "Original image excluded",
   "imageContextPin": "Pin image",
   "imageContextUnpin": "Unpin image",
   "imageContextAttachAgain": "Add to composer again",
@@ -8151,7 +8225,7 @@
   "imageContextUnavailable": "This image is unavailable in the current context.",
   "imageContextEntryDescription": "Review and manage images for this turn",
   "imageContextAutomaticDescription": "Keep your attachments longer and set aside older tool images.",
-  "imageContextActionsHint": "Pin to prioritize an image, or add it to the composer again.",
+  "imageContextActionsHint": "Exclude individual images, pin them for priority, or add them to the composer again.",
   "imageContextEmptyDescription": "Images you send or tools read will appear here.",
   "imageContextUserImages": "Your images",
   "imageContextToolImages": "Tool images",
@@ -8269,9 +8343,8 @@
   "compressionKeepHint": "A turn is one user message plus the replies and tool activity that follow it.",
   "compressionLength": "Summary length (tokens)",
   "compressionTrigger": "Start at",
-  "compressionTarget": "Compress to",
-  "compressionWindow": "Summary model capacity",
-  "compressionRequests": "Maximum requests",
+  "compressionTarget": "Aim for",
+  "compressionWindow": "Auto compression planning window",
   "compressionReference": "Use background references",
   "compressionReferenceHint": "The summary can draw on the assistant’s system prompt, world book entries matched to this part of the chat, and memories saved at the time. The chat history establishes what happened and what each character knows.",
   "compressionInstructionInjections": "Use instruction injections as references",
@@ -8290,11 +8363,10 @@
   "compressionActualUsage": "Summary model usage",
   "compressionUsageValues": "Input {input} · output {output} tokens",
   "compressionUsageUnknown": "{count} request(s) didn’t return usage data. That doesn’t mean they were free.",
-  "compressionBudgetError": "This would take more model requests than the current limit allows, so the context is unchanged. Raise Maximum requests, or switch to a model with a larger context.",
   "compressionIncomplete": "The summary was cut off or refused, and the context is unchanged. Raise the output limit, or try a different model.",
-  "compressionReferenceTooLarge": "Reference material already fills this model’s capacity, leaving no room for the summary. Use fewer references, or switch to a model with a larger context.",
+  "compressionProviderContextRejected": "The provider reported that the request was too large. Try a model with a larger context.",
   "compressionReferenceChanged": "The referenced background has changed. Review this summary, or generate a new one.",
-  "compressionTargetNotReached": "Even after compression, usage would still be above the automatic starting point, so the original context was kept. Shorten the summary, or raise Start at.",
+  "compressionTargetNotReached": "The result is estimated to use at least as much context as the original. You can review and shorten the summary.",
   "compressionTemplateMissing": "The selected template isn’t available. Please choose another.",
   "compressionTemplates": "Templates",
   "compressionRecipes": "Recipes",
@@ -8366,17 +8438,14 @@
     },
     "description": "Text showing how many conversation overrides reference this template; {count} is an integer."
   },
-  "compressionPlannedCalls": "Estimated {count} request(s) · limit {limit}, including retries",
+  "compressionPlannedCalls": "{count, plural, =1{About 1 request} other{About {count} requests}}",
   "@compressionPlannedCalls": {
     "placeholders": {
       "count": {
         "type": "int"
-      },
-      "limit": {
-        "type": "int"
       }
     },
-    "description": "Status line in the compression options dialog showing estimated request count and the per-run limit, including retries."
+    "description": "Status line in the compression options dialog with the estimated number of summary model requests. The count can change as the server replies."
   },
   "compressionGlobalTemplateReference": "Also used as the global default.",
   "compressionRecipeReferences": "{count} recipe(s) keep their own copy of the template from that time.",
@@ -8420,7 +8489,6 @@
   "compressionSearchRecipes": "Search recipes",
   "compressionRecipeCreateHint": "Save a recipe from More settings to reuse a configuration.",
   "compressionTurnUnit": "turns",
-  "compressionCallUnit": "calls",
   "compressionRequestTimeout": "Compression request timeout",
   "@compressionRequestTimeout": {
     "description": "Timeout field for each compression request, in minutes. Also labels the recovery action that opens this field."
@@ -8447,8 +8515,20 @@
     }
   },
   "compressionAdvancedOptions": "Compression details",
-  "compressionAdvancedHint": "References, whether to look back at originals, and the request limit",
+  "compressionAdvancedHint": "Background references, original history, and planning estimates",
   "compressionAutomaticWindow": "Auto",
+  "compressionSummaryWindowEstimate": "Summary model window · {tokens} tokens · {source}",
+  "@compressionSummaryWindowEstimate": {
+    "description": "Read-only line in compression details showing the estimated capacity of the model used for summaries. The tokens placeholder is a compact count like 128K, and source is a localized model metadata source such as Catalog or Custom.",
+    "placeholders": {
+      "tokens": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
   "compressionAutoOffHint": "Compress manually whenever you need.",
   "compressionAutoNotifyHint": "You’ll be notified when usage is close to the limit, and you decide when to compress.",
   "compressionAutoOnHint": "When usage reaches the set percentage, earlier history is summarized automatically. This uses additional model tokens.",
@@ -8460,7 +8540,7 @@
   "compressionScopeAllHint": "Summarize all history currently in context, without keeping a separate recent original. The original messages can still be viewed.",
   "compressionScopeStartHint": "Within the character limit, compress earlier complete messages. Messages not selected stay as original text.",
   "compressionScopeRecentHint": "Within the character limit, compress more recent complete messages. Messages not selected stay as original text.",
-  "compressionAutoKeepHint": "Automatic compression always keeps recent originals, regardless of the range you pick for a manual run. The turn count is shared with manual compression.",
+  "compressionAutoKeepHint": "Automatic compression keeps recent turns when there is room. It can summarize additional older turns and always protects the current request.",
   "requestBudgetTitle": "Image & request budgets",
   "requestBudgetInherited": "Inherited",
   "requestBudgetCustom": "Custom",
@@ -10217,7 +10297,7 @@
     "description": "Restore progress stage label shown while the selected backup is being written into place."
   },
   "@restoreProgressStageVerifying": {
-    "description": "Restore progress stage label shown while the restored data is being verified."
+    "description": "Startup restore progress label while verifying that the installed data is intact before completing the restore."
   },
   "@restoreProgressStageRollingBack": {
     "description": "Restore progress stage label shown when a failed restore is reverting to the user's previous data."
@@ -10448,7 +10528,7 @@
     "description": "Progress phase label for packing backup contents into an archive."
   },
   "@backupProgressVerifying": {
-    "description": "Progress phase label for verifying the backup archive."
+    "description": "Phase in the export progress dialog while checking the archive index and manifest, or reading back an internal recovery snapshot."
   },
   "@backupProgressUploading": {
     "description": "Progress phase label for uploading a backup to remote storage."
@@ -10460,13 +10540,13 @@
     "description": "Progress phase label for extracting the backup archive."
   },
   "@backupProgressValidating": {
-    "description": "Progress phase label for validating the backup contents."
+    "description": "Phase in the backup import dialog while checking the contents of files prepared for restoration."
   },
   "@backupProgressReadingSettings": {
     "description": "Progress phase label for reading settings from the backup."
   },
   "@backupProgressStaging": {
-    "description": "Progress phase label for staging candidate data before committing an import."
+    "description": "Phase in the backup import dialog while moving or copying selected files into a private folder before replacing current data."
   },
   "@backupProgressCommitting": {
     "description": "Progress phase label for committing imported data to the database."
@@ -12184,6 +12264,12 @@
   "@modelSpecFormRemoteImageUrlsSubtitle": {
     "description": "Subtitle explaining that remote image links are dropped when off, sending only local images."
   },
+  "@modelSpecFormResponseSpeedTiers": {
+    "description": "Label for a switch in the model editor's request compatibility section that overrides the model's default list of available response speed tiers."
+  },
+  "@modelSpecFormResponseSpeedTiersSubtitle": {
+    "description": "Help under the model editor's response speed tier switch. Fast and UltraFast can be enabled independently, and neither checked leaves Standard as the only available chat option. Users select the actual speed in each chat."
+  },
   "@modelSpecFormPromptCacheControl": {
     "description": "Toggle label in request quirks controlling whether a cache_control marker is added to OpenRouter requests."
   },
@@ -12949,6 +13035,12 @@
   "@searchServiceEditorProviderTypeTitle": {
     "description": "Section header for choosing the search provider type in the service editor."
   },
+  "@searchServiceEditorChangeIcon": {
+    "description": "Tooltip and accessibility label for the button inside the search service editor that opens the icon source menu for this configured service."
+  },
+  "@searchServiceEditorIconFailed": {
+    "description": "Error shown in the search service editor when selecting or importing a custom service icon fails."
+  },
   "@searchServiceEditorConfigurationTitle": {
     "description": "Section header for the provider-specific configuration fields in the service editor."
   },
@@ -13368,6 +13460,12 @@
   },
   "@displaySettingsPageAutoSwitchTopicsTitle": {
     "description": "Desktop toggle label to automatically switch to the Topics view."
+  },
+  "@desktopDisplaySettingsFullWidthChatTitle": {
+    "description": "Label for the switch in desktop Display settings that removes the fixed maximum width for the message list and input box."
+  },
+  "@desktopDisplaySettingsFullWidthChatSubtitle": {
+    "description": "Tooltip beside the full-width chat switch in desktop Display settings. The chat area is the space available between the sidebars."
   },
   "@desktopDisplaySettingsTopicPositionTitle": {
     "description": "Label for choosing whether the topic list sits on the left or right."
@@ -16563,6 +16661,12 @@
   "@messageStyleSettingsPageAssistantSplitParagraphsSubtitle": {
     "description": "Subtitle explaining that blank lines in an assistant reply create one bubble per paragraph."
   },
+  "@messageStyleSettingsPageCustomizeThinkingToolCards": {
+    "description": "Switch label in Message Style settings for the Frosted Glass and Solid styles. Enables a single independent visual style shared by thinking and tool-call cards."
+  },
+  "@messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle": {
+    "description": "Subtitle below the Message Style switch for editing thinking and tool-call cards independently of the assistant reply bubbles. Both card types share the same appearance settings."
+  },
   "@messageStyleSettingsPageStyleFrostedSubtitle": {
     "description": "Subtitle for the Frosted background style option, describing a translucent frosted-glass look."
   },
@@ -16609,10 +16713,13 @@
     "description": "Left segment label selecting the User role when editing message style."
   },
   "@messageStyleSettingsPageRoleAssistant": {
-    "description": "Right segment label selecting the Assistant role when editing message style."
+    "description": "Segment label for editing the visual style of assistant replies in Message Style settings."
+  },
+  "@messageStyleSettingsPageRoleThinkingTool": {
+    "description": "Compact segment label for editing the shared style of thinking and tool-call cards in Message Style settings. The switch above already names thinking and tools, so use a short noun equivalent to Cards if the full label would be long."
   },
   "@messageStyleSettingsPageRoleAssistantHint": {
-    "description": "Hint noting assistant style settings also apply to thinking, tool-call, and translation cards."
+    "description": "Hint below the Message Style target selector. Translation cards always use the assistant style, and thinking and tool-call cards use it when their own customization is off."
   },
   "@localSnapshotSectionTitle": {
     "description": "Section header for local database snapshot/copy settings on the backup page and desktop backup pane."
@@ -18160,7 +18267,7 @@
     "description": "Description for the 'read_file' tool: reads file contents by line with paging support."
   },
   "@workspaceToolHelpViewImage": {
-    "description": "Description for the 'view_image' tool: lets the model inspect an image stored in the workspace."
+    "description": "Text in the workspace Tools pane explaining that the view_image tool lets the model inspect workspace images and download images from public HTTP or HTTPS URLs."
   },
   "@workspaceToolHelpWrite": {
     "description": "Description for the 'write_file' tool: creates files or overwrites their contents."
@@ -20752,7 +20859,7 @@
     "description": "Toggle label and detail text for including attachment text and tool results when compressing context."
   },
   "@compressOverSnack": {
-    "description": "Error message when a summary would exceed the context limit and was therefore not applied."
+    "description": "Advisory notice in manual compression review when the locally estimated context after applying the summary exceeds the chat model window. The user can still choose to apply the summary."
   },
   "@contextSummaryHint": {
     "description": "Hint on the summary editor explaining the summary is used in later requests, saving doesn't rewrite replies, and attachments use only existing text."
@@ -21516,6 +21623,18 @@
   "@imageContextIncluded": {
     "description": "Per-image status label in the image context panel meaning the image is sent this turn."
   },
+  "@imageContextExclude": {
+    "description": "Tooltip on an image row action in the Image context panel. Exclude that image from subsequent model requests and conversation image recall, retaining the original image in chat."
+  },
+  "@imageContextRestore": {
+    "description": "Tooltip on the image row action in the Image context panel that removes a manual exclusion. The current conversation and automatic selection rules determine when an eligible image is sent or recalled."
+  },
+  "@imageContextExcluded": {
+    "description": "Status shown beside an image in the Image context panel when the user has explicitly excluded that image from requests and conversation recall."
+  },
+  "@imageContextExcludedWithOriginal": {
+    "description": "Status and disabled action tooltip in the Image context panel for a tool-recalled copy that inherits an exclusion from the original image."
+  },
   "@imageContextOmitted": {
     "description": "Per-image status label in the image context panel meaning the image is not sent this turn."
   },
@@ -21541,7 +21660,7 @@
     "description": "Description under the automatic management setting; explains keeping user attachments longer and setting aside older tool images."
   },
   "@imageContextActionsHint": {
-    "description": "Hint text in the image context panel explaining pinning prioritizes retention and re-adding sends to composer."
+    "description": "Hint above the image rows in the Image context panel summarizing the row actions: exclude an image from model requests, pin it to prioritize retention, or add it to the composer again."
   },
   "@imageContextEmptyDescription": {
     "description": "Empty-state hint in the image context panel telling users that sent images or tool-read images will be listed here."
@@ -21703,13 +21822,10 @@
     "description": "Percentage field in automatic compression settings: input usage at which compression starts."
   },
   "@compressionTarget": {
-    "description": "Percentage field in automatic compression settings: desired input usage after compression."
+    "description": "Percentage field in automatic compression settings giving a preferred input usage after compression. This percentage guides planning."
   },
   "@compressionWindow": {
-    "description": "Optional input-capacity override for the summary model in compression details, measured in tokens."
-  },
-  "@compressionRequests": {
-    "description": "Maximum number of model requests allowed for one compression task, including retries. Also labels the recovery action that opens this field."
+    "description": "Optional window override in compression details for estimating the current chat model's input capacity when planning automatic compression, measured in tokens. The summary model has its own window."
   },
   "@compressionReference": {
     "description": "Main switch in the text compression details for including background information in the summary request. It also controls the availability of the instruction injection option. No placeholders."
@@ -21753,20 +21869,17 @@
   "@compressionActualUsage": {
     "description": "Detail-row label for the summary model's actual token usage."
   },
-  "@compressionBudgetError": {
-    "description": "Compression failure when the estimated or actual request count exceeds the configured maximum. Refers to the setting named compressionRequests and confirms no result was applied."
-  },
   "@compressionIncomplete": {
     "description": "Error message when the summary was truncated or refused and not applied, advising adjusting output limit or model."
   },
-  "@compressionReferenceTooLarge": {
-    "description": "Error message when template, reference, or working summary fills the model budget, advising fewer references or a larger model."
+  "@compressionProviderContextRejected": {
+    "description": "Compression error shown when the model provider actually rejected the final attempted input with a context length or payload size error. Original provider details are shown separately."
   },
   "@compressionReferenceChanged": {
     "description": "Error message when referenced background changed, advising reviewing the candidate or regenerating."
   },
   "@compressionTargetNotReached": {
-    "description": "Review notice when automatic compression did not reduce the full request below its trigger ratio. The original context remains active; suggests shortening the summary or adjusting compressionTrigger."
+    "description": "Review notice when automatic compression estimates that the projected chat request with the generated summary and retained messages does not reduce input usage."
   },
   "@compressionTemplateMissing": {
     "description": "Error message when the selected template is unavailable, advising choosing another."
@@ -21912,14 +22025,11 @@
   "@compressionTurnUnit": {
     "description": "Unit suffix ('turns') appended to a numeric field for kept recent turns in compression options."
   },
-  "@compressionCallUnit": {
-    "description": "Unit suffix ('calls') appended to the numeric request-attempts field in compression options."
-  },
   "@compressionAdvancedOptions": {
     "description": "Disclosure title in compression options and context operation widgets for advanced compression details."
   },
   "@compressionAdvancedHint": {
-    "description": "Subtitle under the advanced options disclosure describing references, original-history rereading and request limits."
+    "description": "Subtitle under the advanced options disclosure describing references, original history, and window planning estimates."
   },
   "@compressionAutomaticWindow": {
     "description": "Hint for the window field indicating automatic sizing."
@@ -21958,7 +22068,7 @@
     "description": "Hint describing the recent scope: recent whole messages selected within a character budget, others kept as original."
   },
   "@compressionAutoKeepHint": {
-    "description": "Hint in the compression options dialog explaining that automatic compression always keeps recent turns regardless of the manual scope, and that this turn count is shared with manual compression."
+    "description": "Hint beneath the numeric field for recent turns in automatic text compression. The app may summarize additional old turns when needed. The current request is protected. This is plain text with no placeholders."
   },
   "@requestBudgetTitle": {
     "description": "Title of the image and request budget settings row and desktop dialog header in provider settings."

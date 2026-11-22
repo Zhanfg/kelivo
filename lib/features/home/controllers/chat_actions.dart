@@ -60,7 +60,7 @@ import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'home_view_model.dart';
 import 'latest_wins_checkpoint_writer.dart';
-import '../../../core/models/tool_event_snapshot.dart';
+import 'streaming_tool_events.dart';
 import 'stream_controller.dart' as stream_ctrl;
 
 final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
@@ -430,9 +430,8 @@ class ChatActions {
   }
 
   void _scheduleBackgroundGenerationUpdate(stream_ctrl.StreamingState state) {
-    final tools = streamController.toolParts[state.messageId] ?? const [];
-    final loadingTools = tools.where((tool) => tool.loading);
-    final activeTool = loadingTools.isEmpty ? null : loadingTools.last;
+    if (!_background.supported) return;
+    final activeTool = streamController.lastLoadingTool(state.messageId);
     _background.update(
       _backgroundTaskId(state.ctx),
       phase: state.retryStatus != null
@@ -451,8 +450,7 @@ class ChatActions {
   final Map<String, LatestWinsCheckpointWriter<_StreamingCheckpoint>>
   _checkpointWriters =
       <String, LatestWinsCheckpointWriter<_StreamingCheckpoint>>{};
-  final Map<String, List<Map<String, dynamic>>> _streamingToolEvents =
-      <String, List<Map<String, dynamic>>>{};
+  final _streamingToolEvents = <String, StreamingToolEvents>{};
   final Map<String, _GenerationCheckpointCursor> _generationCheckpointCursors =
       <String, _GenerationCheckpointCursor>{};
   final ActiveStreamingMessageStore _activeAssistantMessages =
@@ -580,25 +578,18 @@ class ChatActions {
     onLoadingChanged?.call(conversationId, loading);
   }
 
-  List<Map<String, dynamic>> _copyToolEvents(String messageId) {
-    return _toolEventSnapshots[messageId] ??= ToolEventSnapshot(
-      _streamingToolEvents[messageId] ?? const <Map<String, dynamic>>[],
-    );
-  }
+  List<Map<String, dynamic>> _copyToolEvents(String messageId) =>
+      _streamingToolEvents[messageId]?.snapshot ?? const [];
 
-  final _toolEventSnapshots = <String, List<Map<String, dynamic>>>{};
+  StreamingToolEvents _eventsFor(String messageId) =>
+      _streamingToolEvents.putIfAbsent(messageId, StreamingToolEvents.new);
 
   ChatMessage _messageWithCurrentReasoning(ChatMessage message) {
     final messageId = message.id;
     final reasoning = streamController.reasoning[messageId];
-    final segments = streamController.reasoningSegments[messageId];
-    final details = streamController.reasoningDetails[messageId];
-    final reasoningSegmentsJson = segments != null || details != null
-        ? streamController.serializeReasoningSegmentsWithSplits(
-            segments ?? const [],
-            reasoningDetails: details,
-          )
-        : message.reasoningSegmentsJson;
+    final reasoningSegmentsJson =
+        streamController.reasoningSegmentsForCheckpoint(messageId) ??
+        message.reasoningSegmentsJson;
     return message.copyWith(
       reasoningText: reasoning?.text,
       reasoningStartAt: reasoning?.startAt,
@@ -727,9 +718,16 @@ class ChatActions {
     _contextReaders.remove(message.id);
     _generationCheckpointCursors.remove(message.id);
     _streamingToolEvents.remove(message.id);
-    _toolEventSnapshots.remove(message.id);
     _streamingStates.remove(message.id);
     _activeAssistantMessages.removeIfMatches(message);
+    if (!_messages.any((item) => item.id == message.id)) {
+      // Switching away keeps a running turn alive. Once its terminal write is
+      // durable, its decoded tool results and reasoning can be restored on demand.
+      streamController.pruneOffWindowState({
+        ...activeStreamingMessageIds,
+        for (final item in _messages) item.id,
+      });
+    }
   }
 
   Future<PrepareErrorAction> _finishPrepareError(
@@ -799,85 +797,6 @@ class ChatActions {
       }
     }
   });
-
-  void _upsertStreamingToolEvent(
-    String messageId, {
-    required String id,
-    required String name,
-    required Map<String, dynamic> arguments,
-    String? content,
-    Map<String, dynamic>? metadata,
-  }) {
-    _toolEventSnapshots.remove(messageId);
-    final events = _streamingToolEvents.putIfAbsent(
-      messageId,
-      () => <Map<String, dynamic>>[],
-    );
-    var index = id.isEmpty
-        ? -1
-        : events.indexWhere((event) => '${event['id'] ?? ''}' == id);
-    if (index < 0) {
-      index = events.indexWhere(
-        (event) =>
-            '${event['name'] ?? ''}' == name &&
-            (event['content'] == null || '${event['content']}'.isEmpty),
-      );
-    }
-    final record = <String, dynamic>{
-      'id': id,
-      'name': name,
-      'arguments': arguments,
-      'content': content,
-      if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
-    };
-    if (index < 0) {
-      events.add(record);
-    } else {
-      events[index] = mergeStreamingToolEventRecord(events[index], record);
-    }
-  }
-
-  @visibleForTesting
-  static Map<String, dynamic> mergeStreamingToolEventRecord(
-    Map<String, dynamic> existing,
-    Map<String, dynamic> incoming,
-  ) {
-    final merged = Map<String, dynamic>.from(existing);
-    for (final entry in incoming.entries) {
-      if (entry.key == 'metadata') continue;
-      if (_isEmptyToolOverlay(entry.value) &&
-          !_isEmptyToolOverlay(merged[entry.key])) {
-        continue;
-      }
-      merged[entry.key] = entry.value;
-    }
-    if (existing['server'] == true && incoming['server'] != false) {
-      merged['server'] = true;
-    }
-    final incomingMetadata = incoming['metadata'];
-    if (incomingMetadata is Map && incomingMetadata.isNotEmpty) {
-      final existingMetadata = merged['metadata'];
-      merged['metadata'] = <String, dynamic>{
-        if (existingMetadata is Map)
-          ...Map<String, dynamic>.from(existingMetadata),
-        ...Map<String, dynamic>.from(incomingMetadata),
-      };
-    } else if (!merged.containsKey('metadata')) {
-      final existingMetadata = existing['metadata'];
-      if (existingMetadata is Map) {
-        merged['metadata'] = Map<String, dynamic>.from(existingMetadata);
-      }
-    }
-    return merged;
-  }
-
-  static bool _isEmptyToolOverlay(Object? value) {
-    if (value == null) return true;
-    if (value is String) return value.isEmpty;
-    if (value is Map) return value.isEmpty;
-    if (value is List) return value.isEmpty;
-    return false;
-  }
 
   bool _isReasoningModel(String providerKey, String modelId) {
     return generationController.isReasoningModel(providerKey, modelId);
@@ -2485,22 +2404,27 @@ class ChatActions {
         '${nativeCompactionScope(ctx.config)}:${spec.apiModelId ?? ctx.modelId}';
     var nativeAttempted = false;
     var notified = false;
-    final attempted = <String>{};
+    final attempted = <(String, bool)>{};
+    ContextCompressionTask? automaticReview;
     bool cancelled() =>
         disposed ||
         isStopping(id) ||
         !identical(_streamingStates[state.messageId], state) ||
         !_activeAssistantMessages.isActive(ctx.assistantMessage);
     late RequestHistoryContext history;
-    Future<int> estimate(
+    Future<int?> estimate(
       Map<String, dynamic> body, {
       Set<String> excluded = const {},
     }) async {
-      final projected =
-          await ctx.imageContext?.project(body, excludedOwners: excluded) ??
-          body;
-      return (estimateRequestInput(projected, kind) * history.calibration)
-          .ceil();
+      try {
+        final projected =
+            await ctx.imageContext?.project(body, excludedOwners: excluded) ??
+            body;
+        return (estimateRequestInput(projected, kind) * history.calibration)
+            .ceil();
+      } catch (_) {
+        return null;
+      }
     }
 
     Future<void> checkMode() async {
@@ -2554,7 +2478,8 @@ class ChatActions {
           return null;
         }
         var before = await estimate(body);
-        history.lastEstimatedTokens = (before / history.calibration).ceil();
+        history.lastEstimatedTokens = ((before ?? 0) / history.calibration)
+            .ceil();
         final output = normalizedRequestOutputReserve(body, spec.maxOutput);
         final budget = window == null
             ? null
@@ -2574,11 +2499,13 @@ class ChatActions {
             return null;
           }
           before = overflow
-              ? math.max(before, budget?.input ?? window ?? before)
+              ? math.max(before ?? 0, budget?.input ?? window ?? 0)
               : nativeEstimate ?? measured!.usedTokens;
         }
         if (!overflow &&
-            (budget == null || !budget.shouldTrigger(before, preferences))) {
+            (before == null ||
+                budget == null ||
+                !budget.shouldTrigger(before, preferences))) {
           return null;
         }
         if (current.mode == AutoCompressionMode.notify) {
@@ -2588,30 +2515,51 @@ class ChatActions {
           }
           return null;
         }
-        if (chatService.contextCompression.taskFor(id)?.active == true) {
+        final compression = chatService.contextCompression;
+        final previousTask = compression.taskFor(id);
+        final retryReview =
+            overflow &&
+            previousTask?.phase == CompressionPhase.review &&
+            identical(previousTask, automaticReview);
+        if (previousTask?.active == true && !retryReview) {
           return null;
         }
         await _checkpointWriters[state.messageId]?.barrier();
         if (cancelled() || !allowed) return null;
         final snapshot = await chatService.loadContextSnapshot(id);
         final source = ContextHistory.throughMessage(snapshot.messages, userId);
-        final options = CompressContextOptions(
+        CompressContextOptions optionsFor(int keep) => CompressContextOptions(
           mode: CompressContextLimitMode.keepRecent,
           native: useNative,
           carry: useNative
               ? preferences.nativeCarryOriginals
               : preferences.carryOriginals,
-          keepUserMessages: useNative
+          keepUserMessages: keep,
+          regenerateExisting: overflow && !useNative,
+        );
+        CompressionSelection select(CompressContextOptions options) =>
+            selectCompressionHistory(
+              source,
+              snapshot.operations,
+              options,
+              protectedMessageId: userId,
+              effectiveMessageIds: allowedMessageIds,
+            );
+
+        var options = optionsFor(
+          useNative
               ? preferences.nativeKeepRecentUserTurns
+              : overflow
+              ? 1
               : preferences.keepRecentUserTurns,
         );
-        final selection = selectCompressionHistory(
-          source,
-          snapshot.operations,
-          options,
-          protectedMessageId: userId,
-          effectiveMessageIds: allowedMessageIds,
-        );
+        var selection = select(options);
+        if (!useNative &&
+            options.keepUserMessages! > 1 &&
+            selection.covered.isEmpty) {
+          options = optionsFor(1);
+          selection = select(options);
+        }
         if (selection.missingOriginals) {
           if (!notified) {
             notified = true;
@@ -2626,9 +2574,9 @@ class ChatActions {
           source,
           snapshot.operations,
         );
-        if (!attempted.add(fingerprint)) return null;
+        if (!attempted.add((fingerprint, overflow))) return null;
         nativeAttempted = useNative;
-        final excluded = selection.covered.map((m) => m.id).toSet();
+        var excluded = selection.covered.map((m) => m.id).toSet();
         List<ChatMessage> candidateHistory(ContextOperation candidate) =>
             ContextHistory.resolve(source, [...snapshot.operations, candidate])
                 .where(
@@ -2655,43 +2603,63 @@ class ChatActions {
           return preview.apiMessages;
         }
 
+        Future<int?> estimateFixed() async {
+          final empty = ContextOperation(
+            id: 'planning',
+            kind: ContextOperationKind.compress,
+            anchorGroupId: ContextHistory.group(selection.covered.last),
+            appliedAfterGroupId: ContextHistory.group(source.last),
+            sourceGroups: selection.covered.map(ContextHistory.group).toList(),
+            dependencies: selection.dependencies,
+            createdAt: DateTime.now(),
+            compressionDetails: const {'envelope': 'history-v1'},
+          );
+          try {
+            return await estimate(
+              project(await rebuild(empty)),
+              excluded: excluded,
+            );
+          } catch (_) {
+            return null;
+          }
+        }
+
         List<Map<String, dynamic>>? replacement;
         try {
           var summaryTokens = preferences.summaryTokens;
           int? carryBudgetTokens;
           if (budget != null) {
-            final empty = ContextOperation(
-              id: 'planning',
-              kind: ContextOperationKind.compress,
-              anchorGroupId: ContextHistory.group(selection.covered.last),
-              appliedAfterGroupId: ContextHistory.group(source.last),
-              sourceGroups: selection.covered
-                  .map(ContextHistory.group)
-                  .toList(),
-              dependencies: selection.dependencies,
-              createdAt: DateTime.now(),
-              compressionDetails: const {'envelope': 'history-v1'},
-            );
-            final fixed = await estimate(
-              project(await rebuild(empty)),
-              excluded: excluded,
-            );
-            final space =
-                (budget.input * preferences.targetInputRatio).floor() - fixed;
-            if (space < 128 && !useNative) {
-              if (!notified) {
-                notified = true;
-                viewModel.onError?.call('compression_reference_too_large');
+            var fixed = await estimateFixed();
+            if (!useNative &&
+                options.keepUserMessages! > 1 &&
+                fixed != null &&
+                budget.input - fixed < 128) {
+              final shorter = optionsFor(1);
+              final expanded = select(shorter);
+              if (expanded.covered.isNotEmpty &&
+                  !expanded.missingOriginals &&
+                  !expanded.needsRegeneration) {
+                options = shorter;
+                selection = expanded;
+                excluded = selection.covered.map((m) => m.id).toSet();
+                fixed = await estimateFixed();
               }
-              return null;
             }
-            carryBudgetTokens = useNative
-                ? space.clamp(0, 64000)
-                : (space - 128).clamp(0, space);
-            if (!useNative) {
-              summaryTokens = space.clamp(128, summaryTokens);
+            if (fixed != null) {
+              final goal =
+                  (budget.input * preferences.targetInputRatio).floor() - fixed;
+              final space = useNative || goal >= 128
+                  ? goal
+                  : budget.input - fixed;
+              carryBudgetTokens = useNative
+                  ? space.clamp(0, 64000)
+                  : math.max(0, space - 128);
+              if (!useNative && space > 0) {
+                summaryTokens = space.clamp(128, summaryTokens);
+              }
             }
           }
+          if (cancelled() || !allowed) return null;
           final request = await viewModel.buildCompressionRequest(
             id,
             options: options,
@@ -2720,22 +2688,23 @@ class ChatActions {
                 replacement = next;
                 return true;
               }
+              final prior = before;
               final after = await estimate(project(next), excluded: excluded);
-              final accepted = budget == null
-                  ? after < before
-                  : budget.accepts(
-                      before: before,
-                      after: after,
-                      config: preferences,
-                    );
+              final accepted = prior == null || after == null || after < prior;
               if (accepted) replacement = next;
               return accepted;
             },
           );
-          final task = await chatService.contextCompression.runAtSafePoint(
-            id,
-            request,
-          );
+          if (retryReview) {
+            if (!identical(compression.taskFor(id), previousTask) ||
+                previousTask?.phase != CompressionPhase.review) {
+              return null;
+            }
+            await compression.cancel(id);
+          }
+          if (cancelled() || !allowed) return null;
+          final task = await compression.runAtSafePoint(id, request);
+          automaticReview = task.phase == CompressionPhase.review ? task : null;
           if (cancelled() ||
               !allowed ||
               task.phase != CompressionPhase.completed) {
@@ -2862,10 +2831,7 @@ class ChatActions {
     // Mark this message as actively streaming to suppress UI rebuilds
     streamController.markStreamingStarted(state.messageId);
     _activeAssistantMessages.put(state.ctx.assistantMessage);
-    _streamingToolEvents[state.messageId] = toolEvents
-        .map((event) => Map<String, dynamic>.from(event))
-        .toList();
-    _toolEventSnapshots.remove(state.messageId);
+    _streamingToolEvents[state.messageId] = StreamingToolEvents(toolEvents);
     _checkpointWriters[state.messageId] =
         LatestWinsCheckpointWriter<_StreamingCheckpoint>(
           write: (checkpoint) => chatService.updateStreamingCheckpointSilent(
@@ -3033,7 +2999,7 @@ class ChatActions {
       case RetryPending() || RetryAttemptStart():
         break;
       case TextDelta(:final text):
-        await _handleContentChunk(state, text);
+        _handleContentChunk(state, text);
         _scheduleStreamingCheckpoint(state);
       case ReasoningStart(:final id):
         streamController.handleReasoningStart(id, state);
@@ -3053,7 +3019,7 @@ class ChatActions {
         _scheduleStreamingCheckpoint(state);
       case ToolCallStart(:final id, :final toolName):
         if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
-        await _handleToolCallsChunk(chunk, state);
+        _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case ToolCallDelta(:final id, :final toolNameDelta):
         if (toolNameDelta.isNotEmpty) {
@@ -3061,7 +3027,7 @@ class ChatActions {
               '${state.pendingToolNames[id] ?? ''}$toolNameDelta';
         }
       case ToolCallEnd():
-        await _handleToolCallsChunk(chunk, state);
+        _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case AssistantRoundEnd():
         streamController.finishReasoningIfNeeded(state.messageId);
@@ -3071,7 +3037,7 @@ class ChatActions {
         _scheduleStreamingCheckpoint(state);
       case ServerToolStart(:final id, :final toolName):
         if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
-        await _handleToolCallsChunk(chunk, state);
+        _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case ServerToolEnd() || ToolCallResult() || Annotations():
         await _handleToolResultsChunk(chunk, state);
@@ -3133,24 +3099,14 @@ class ChatActions {
   }
 
   /// Handle tool calls chunk from stream.
-  Future<void> _handleToolCallsChunk(
+  void _handleToolCallsChunk(
     StreamChunk chunk,
     stream_ctrl.StreamingState state,
-  ) async {
-    await streamController.handleToolCallsChunk(
+  ) {
+    streamController.handleToolCallsChunk(
       chunk,
       state,
-      updateReasoningSegmentsInDb: (String messageId, String json) async {
-        // The complete reasoning snapshot is coalesced after this chunk.
-      },
-      setToolEventsInDb:
-          (String messageId, List<Map<String, dynamic>> events) async {
-            _toolEventSnapshots.remove(messageId);
-            _streamingToolEvents[messageId] = events
-                .map((event) => Map<String, dynamic>.from(event))
-                .toList();
-          },
-      getToolEventsFromDb: _copyToolEvents,
+      recordCall: _eventsFor(state.messageId).start,
     );
     _publishAssistantParts(state);
   }
@@ -3172,14 +3128,13 @@ class ChatActions {
             String? content,
             Map<String, dynamic>? metadata,
           }) async {
-            _upsertStreamingToolEvent(
-              messageId,
-              id: id,
-              name: name,
-              arguments: arguments,
-              content: content,
-              metadata: metadata,
-            );
+            _eventsFor(messageId).complete({
+              'id': id,
+              'name': name,
+              'arguments': arguments,
+              'content': content,
+              if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
+            });
           },
     );
     _publishAssistantParts(state);
@@ -3199,10 +3154,10 @@ class ChatActions {
   }
 
   /// Handle content chunk from stream (non-done).
-  Future<void> _handleContentChunk(
+  void _handleContentChunk(
     stream_ctrl.StreamingState state,
     String chunkContent,
-  ) async {
+  ) {
     // Fast bail-out: if _finishStreaming already ran, don't touch state at all.
     if (state.finishHandled) return;
 
@@ -3213,7 +3168,7 @@ class ChatActions {
 
     // End reasoning when content starts
     if (state.ctx.streamOutput && chunkContent.isNotEmpty) {
-      await _finishReasoningOnContent(state);
+      streamController.finishReasoningIfNeeded(messageId);
     }
 
     _scheduleBackgroundGenerationUpdate(state);
@@ -3241,24 +3196,6 @@ class ChatActions {
         },
       );
     }
-  }
-
-  /// Finish reasoning segment when content starts arriving.
-  Future<void> _finishReasoningOnContent(
-    stream_ctrl.StreamingState state,
-  ) async {
-    await streamController.finishReasoningAndPersist(
-      state.messageId,
-      updateReasoningInDb:
-          (
-            String messageId, {
-            String? reasoningText,
-            DateTime? reasoningFinishedAt,
-            String? reasoningSegmentsJson,
-          }) async {
-            // The complete reasoning snapshot is coalesced after this chunk.
-          },
-    );
   }
 
   /// Handle stream finish (isDone == true).
@@ -3607,7 +3544,8 @@ class ChatActions {
             _conversationStreams.remove(conversationId);
           }
           if (!oauthFailure && truncation == null) {
-            if (isContextLengthError(errorText) && onContextOverflow != null) {
+            if (isCompressionCapacityError(errorText) &&
+                onContextOverflow != null) {
               onContextOverflow!(
                 errorMessage,
                 errorText,
