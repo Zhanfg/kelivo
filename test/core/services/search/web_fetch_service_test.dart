@@ -195,6 +195,7 @@ void main() {
       final client = MockClient(
         (request) async => http.Response(
           request.url.userInfo.isEmpty ? 'anonymous' : 'See $url',
+          200,
         ),
       );
       Future<WebFetchPage> read(String url) => WebFetchService.fetchCached(

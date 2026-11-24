@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:Kelivo/core/services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import 'package:Kelivo/core/services/network/request_logger.dart';
 import 'package:Kelivo/core/services/search/search_service.dart';
+import 'package:Kelivo/core/services/search/web_fetch.dart';
 import 'package:Kelivo/core/services/search/web_fetch_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
