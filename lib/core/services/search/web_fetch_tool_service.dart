@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../providers/settings_provider.dart';
+import '../logging/log_redactor.dart';
 import 'web_fetch_service.dart';
 
 /// The `fetch_url` tool offered next to `search_web`.
@@ -76,7 +77,9 @@ Response format: url, title, content, total_length, and next_start_index when mo
       );
       return jsonEncode(window(page.url, page.title, page.content, start));
     } catch (e) {
-      return jsonEncode({'error': 'Fetch failed: $e'});
+      return jsonEncode({
+        'error': 'Fetch failed: ${LogRedactor.redactText(e.toString())}',
+      });
     }
   }
 

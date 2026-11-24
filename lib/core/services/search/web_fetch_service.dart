@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../logging/log_redactor.dart';
+import '../network/public_fetch_request.dart';
 import '../mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import 'search_service.dart';
 import 'web_fetch.dart';
@@ -33,12 +35,14 @@ final class ProviderWebFetchSource extends WebFetchSource {
   final SearchServiceOptions options;
 }
 
+typedef _FetchResult = ({WebFetchPage page, String? canonicalUrl});
+
 abstract final class WebFetchService {
   static const Duration _cacheTtl = Duration(minutes: 10);
   static const int _cacheCapacity = 8;
   static final Map<String, ({WebFetchPage page, DateTime fetchedAt})> _cache =
       {};
-  static final Map<String, Future<WebFetchPage>> _pending = {};
+  static final Map<String, Future<_FetchResult>> _pending = {};
 
   static bool supports(SearchServiceOptions options) =>
       SearchService.getService(options) is WebFetchCapable;
@@ -98,8 +102,14 @@ abstract final class WebFetchService {
     String url, {
     required SearchCommonOptions commonOptions,
     http.Client? client,
-  }) async {
-    final uri = _parseUrl(url);
+  }) async => (await _read(source, _parseUrl(url), commonOptions, client)).page;
+
+  static Future<_FetchResult> _read(
+    WebFetchSource source,
+    Uri uri,
+    SearchCommonOptions commonOptions,
+    http.Client? client,
+  ) async {
     final page = switch (source) {
       LocalWebFetchSource() => await _fetchLocally(
         uri,
@@ -113,7 +123,7 @@ abstract final class WebFetchService {
           serviceOptions: options,
         ),
     };
-    var content = page.content.trim();
+    var content = LogRedactor.redactUrlsInText(page.content.trim());
     if (content.isEmpty) {
       throw StateError('The page has no readable content');
     }
@@ -123,10 +133,22 @@ abstract final class WebFetchService {
       if (last >= 0xD800 && last <= 0xDBFF) end--;
       content = content.substring(0, end);
     }
-    return WebFetchPage(
-      url: page.url.trim().isEmpty ? uri.toString() : page.url.trim(),
-      title: page.title.trim(),
-      content: content,
+    final canonical = page.url.trim().isEmpty
+        ? uri.toString()
+        : page.url.trim();
+    final displayUrl = LogRedactor.redactUrl(canonical);
+    return (
+      page: WebFetchPage(
+        url: displayUrl,
+        title: LogRedactor.redactUrlsInText(page.title.trim()),
+        content: content,
+      ),
+      // Never alias a credentialed response to a key usable without it.
+      canonicalUrl:
+          canonical == displayUrl &&
+              uri.toString() == LogRedactor.redactUrl(uri.toString())
+          ? canonical
+          : null,
     );
   }
 
@@ -138,29 +160,27 @@ abstract final class WebFetchService {
     required SearchCommonOptions commonOptions,
     http.Client? client,
   }) async {
-    final normalizedUrl = _parseUrl(url).toString();
+    final uri = _parseUrl(url);
+    final normalizedUrl = uri.toString();
     final key = jsonEncode([_sourceKey(source), normalizedUrl]);
     final now = DateTime.now();
     _cache.removeWhere((_, v) => now.difference(v.fetchedAt) > _cacheTtl);
     final hit = _cache[key];
     if (hit != null) return hit.page;
     final pending = _pending[key];
-    if (pending != null) return pending;
-    final request = fetch(
-      source,
-      normalizedUrl,
-      commonOptions: commonOptions,
-      client: client,
-    );
+    if (pending != null) return (await pending).page;
+    final request = _read(source, uri, commonOptions, client);
     _pending[key] = request;
     try {
-      final page = await request;
+      final (:page, :canonicalUrl) = await request;
       if (identical(_pending[key], request)) {
         final entry = (page: page, fetchedAt: DateTime.now());
         _cache[key] = entry;
         // Providers may return a canonical URL after a redirect. A model will
         // use that URL to continue reading the same snapshot.
-        final returnedUri = Uri.tryParse(page.url);
+        final returnedUri = canonicalUrl == null
+            ? null
+            : Uri.tryParse(canonicalUrl);
         if (returnedUri != null &&
             returnedUri.host.isNotEmpty &&
             (returnedUri.isScheme('http') || returnedUri.isScheme('https'))) {
@@ -199,7 +219,9 @@ abstract final class WebFetchService {
     if (uri == null ||
         !(uri.isScheme('http') || uri.isScheme('https')) ||
         uri.host.isEmpty) {
-      throw FormatException('Invalid URL: $url');
+      throw const FormatException(
+        'Invalid URL: expected an HTTP(S) URL with a host',
+      );
     }
     return uri;
   }
@@ -210,10 +232,13 @@ abstract final class WebFetchService {
     http.Client? client,
   }) async {
     try {
-      final response = await withWebFetchClient(
-        (client) =>
-            client.get(uri, headers: {'User-Agent': KelivoFetcher.userAgent}),
-        commonOptions: commonOptions,
+      final request = PublicFetchRequest(
+        timeout: Duration(milliseconds: commonOptions.timeout),
+        logRequests: true,
+      );
+      final response = await request.send(
+        uri,
+        userAgent: KelivoFetcher.userAgent,
         client: client,
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -226,7 +251,9 @@ abstract final class WebFetchService {
         content: readable.content,
       );
     } catch (e) {
-      throw Exception('Local fetch failed: $e');
+      throw Exception(
+        'Local fetch failed: ${LogRedactor.redactText(e.toString())}',
+      );
     }
   }
 }

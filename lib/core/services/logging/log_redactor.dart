@@ -58,6 +58,17 @@ class LogRedactor {
     'password',
     'x-amz-signature',
     'x-amz-credential',
+    'code',
+    'user',
+    'username',
+    'auth',
+    'jwt',
+    'session',
+    'sessionid',
+    'session_id',
+    'pwd',
+    'passwd',
+    'x-goog-signature',
   };
 
   static final RegExp _schemeRe = RegExp(
@@ -67,9 +78,12 @@ class LogRedactor {
   static final RegExp _alreadyMaskedRe = RegExp(
     r'^(?:\*\*\*\(len=\d+\)|.{3}\*\*\*.{4}\(len=\d+\))$',
   );
-  static final RegExp _userInfoRe = RegExp(r'(://)([^/@\s?#&]+)@');
+  static final RegExp _userInfoRe = RegExp(r'(//)([^/@\s?#]+)@');
   static final RegExp _urlQueryRe = RegExp(
-    r'([?&](?:x-amz-signature|x-amz-credential|access_token|api_key|apikey|password|signature|token|key|sig)=)([^&\s]*)',
+    r'''([?&#])([^&?=#\s<>"']+)=([^?&#\s<>"']*)''',
+  );
+  static final RegExp _webUrl = RegExp(
+    r'''(?:https?:)?//[^\s<>"']+''',
     caseSensitive: false,
   );
   static final RegExp _bodyStringFieldRe = RegExp(
@@ -86,21 +100,28 @@ class LogRedactor {
       if (_isSensitiveName(name)) {
         return MapEntry(name, maskSecret(value));
       }
-      return MapEntry(name, value);
+      // Redirect and link targets can carry opaque credentials in their
+      // paths as well as in query parameters.
+      if (const {
+        'location',
+        'content-location',
+        'link',
+        'refresh',
+        'referer',
+      }.contains(name.toLowerCase())) {
+        return MapEntry(name, '[redacted]');
+      }
+      return MapEntry(name, redactUrlsInText(value));
     });
   }
 
   static String redactUrl(String url) {
-    final stripped = _redactUserInfo(url);
-    final uri = Uri.tryParse(stripped);
-    if (uri == null) return _redactUrlByRegex(stripped);
-    if (!uri.hasQuery) return stripped;
-    final hasSensitive = uri.queryParametersAll.keys.any(
-      (key) => _sensitiveQueryKeys.contains(key.toLowerCase()),
-    );
-    if (!hasSensitive) return stripped;
-    return _redactUrlByRegex(stripped);
+    return _redactKnownPrefixes(_redactUrlByRegex(_redactUserInfo(url)));
   }
+
+  /// Sanitize links before pagination so a slice cannot expose half a URL.
+  static String redactUrlsInText(String text) =>
+      text.replaceAllMapped(_webUrl, (match) => redactUrl(match[0]!));
 
   static String redactBody(String body) {
     if (body.length < _maxJsonBodyChars) {
@@ -170,7 +191,22 @@ class LogRedactor {
 
   static String _redactUrlByRegex(String text) {
     return text.replaceAllMapped(_urlQueryRe, (match) {
-      return '${match.group(1)}${maskSecret(match.group(2)!)}';
+      final encoded = match[2]!;
+      String name;
+      try {
+        name = Uri.decodeQueryComponent(encoded);
+      } on FormatException {
+        name = encoded;
+      } on ArgumentError {
+        name = encoded;
+      }
+      final lower = name.toLowerCase();
+      if (!_sensitiveQueryKeys.contains(lower) &&
+          !_isSensitiveBodyName(name) &&
+          !lower.contains('token')) {
+        return match[0]!;
+      }
+      return '${match[1]}$encoded=${maskSecret(match[3]!)}';
     });
   }
 

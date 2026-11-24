@@ -1777,7 +1777,9 @@ class McpProvider extends ChangeNotifier {
       if (server.transport == McpTransportType.inmemory) {
         client = mcp.McpClient.createClient(clientConfig);
         await client.connect(
-          KelivoInMemoryClientTransport(KelivoFetchMcpServerEngine()),
+          KelivoInMemoryClientTransport(
+            KelivoFetchMcpServerEngine(requestTimeout: () => _requestTimeout),
+          ),
         );
       } else if (server.transport == McpTransportType.stdio &&
           !_isDesktopPlatform()) {
