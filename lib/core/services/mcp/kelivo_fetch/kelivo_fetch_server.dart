@@ -8,6 +8,10 @@ import 'package:html/dom.dart' as dom;
 import 'package:html2md/html2md.dart' as html2md;
 import 'package:mcp_client/mcp_client.dart' as mcp;
 
+import '../../api/tool_call_cancellation.dart';
+import '../../logging/log_redactor.dart';
+import '../../network/public_fetch_request.dart';
+
 /// @kelivo/fetch — In-memory MCP server engine and transport (Flutter/Dart)
 ///
 /// Provides one token-conscious `fetch` tool. HTML is simplified to Markdown
@@ -54,8 +58,10 @@ class KelivoFetchRequestPayload {
     final map = args.cast<String, dynamic>();
     final urlRaw = (map['url'] ?? '').toString().trim();
     final uri = Uri.tryParse(urlRaw);
-    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
-      throw ArgumentError('Invalid url: $urlRaw');
+    if (uri == null ||
+        uri.host.isEmpty ||
+        !(uri.isScheme('http') || uri.isScheme('https'))) {
+      throw ArgumentError('Invalid url: expected an HTTP(S) URL with a host');
     }
     final headersAny = map['headers'];
     final headers = <String, String>{};
@@ -175,39 +181,26 @@ class KelivoFetcher {
   static const userAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-  static Future<http.Response> _fetch(KelivoFetchRequestPayload payload) async {
-    try {
-      final merged = <String, String>{
-        'User-Agent': userAgent,
-        ...payload.headers,
-      };
-      if (payload.method == 'POST') {
-        // Send bytes so the caller's Content-Type header is passed through
-        // untouched instead of having its charset rewritten by `encoding`.
-        return await http.post(
-          payload.url,
-          headers: merged,
-          body: utf8.encode(payload.body ?? ''),
-        );
-      }
-      return await http.get(payload.url, headers: merged);
-    } catch (e) {
-      throw Exception(
-        'Failed to fetch ${payload.url}: ${e is Exception ? e.toString() : 'Unknown error'}',
-      );
-    }
-  }
-
   static Future<Map<String, dynamic>> fetch(
-    KelivoFetchRequestPayload payload,
-  ) async {
+    KelivoFetchRequestPayload payload, {
+    PublicFetchRequest? request,
+  }) async {
+    final operation =
+        request ?? PublicFetchRequest(timeout: const Duration(seconds: 30));
+    final unregister = ToolCallCancellation.current?.onCancel(operation.cancel);
     try {
-      final resp = await _fetch(payload);
+      final resp = await operation.send(
+        payload.url,
+        userAgent: userAgent,
+        method: payload.method,
+        headers: payload.headers,
+        body: payload.method == 'POST' ? utf8.encode(payload.body ?? '') : null,
+      );
       final contentType = (resp.headers['content-type'] ?? '').toLowerCase();
       final body = _decodeBody(resp, contentType: contentType);
-      final text = payload.raw
-          ? body
-          : _contentForModel(body, contentType: contentType);
+      final text = LogRedactor.redactUrlsInText(
+        payload.raw ? body : _contentForModel(body, contentType: contentType),
+      );
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
         // Custom APIs carry their error details in the 4xx/5xx body, so hand
         // both the status and the response back instead of a bare failure.
@@ -222,7 +215,9 @@ class KelivoFetcher {
       }
       return _ok(_bounded(text, payload));
     } catch (e) {
-      return _err(e.toString());
+      return _err(LogRedactor.redactText(e.toString()));
+    } finally {
+      unregister?.call();
     }
   }
 
@@ -362,6 +357,13 @@ class KelivoFetcher {
 
 /// Minimal JSON-RPC server for MCP that serves @kelivo/fetch tools.
 class KelivoFetchMcpServerEngine {
+  KelivoFetchMcpServerEngine({this.requestTimeout});
+
+  final Duration Function()? requestTimeout;
+  final _active = <Object, PublicFetchRequest>{};
+
+  void cancel(Object? id) => _active[id]?.cancel();
+
   bool _closed = false;
 
   Future<dynamic> handleMessage(dynamic message) async {
@@ -369,11 +371,7 @@ class KelivoFetchMcpServerEngine {
 
     // Support batch arrays defensively (return array of responses)
     if (message is List) {
-      final out = <dynamic>[];
-      for (final m in message) {
-        out.add(await _handleSingle(m));
-      }
-      return out;
+      return Future.wait(message.map(_handleSingle));
     }
     return await _handleSingle(message);
   }
@@ -407,6 +405,14 @@ class KelivoFetchMcpServerEngine {
         case mcp.McpProtocol.methodListTools:
           return _ok(id, result: {'tools': _toolDefinitions()});
 
+        case mcp.McpProtocol.methodCancelled:
+          final requestId = params['requestId'];
+          cancel(requestId);
+          if (requestId is String && !_active.containsKey(requestId)) {
+            cancel(int.tryParse(requestId));
+          }
+          return _noop();
+
         case mcp.McpProtocol.methodCallTool:
           final name = (params['name'] ?? '').toString();
           final arguments = (params['arguments'] is Map)
@@ -417,11 +423,28 @@ class KelivoFetchMcpServerEngine {
           try {
             payload = KelivoFetchRequestPayload.parse(arguments);
           } catch (e) {
-            return _ok(id, result: KelivoFetcher._err(e.toString()));
+            return _ok(
+              id,
+              result: KelivoFetcher._err(LogRedactor.redactText(e.toString())),
+            );
           }
 
           if (name == 'kelivo_fetch') {
-            return _ok(id, result: await KelivoFetcher.fetch(payload));
+            if (id == null || _active.containsKey(id)) {
+              return _error(id, code: -32600, message: 'Invalid request id');
+            }
+            final request = PublicFetchRequest(
+              timeout: requestTimeout?.call() ?? const Duration(seconds: 30),
+            );
+            _active[id] = request;
+            try {
+              return _ok(
+                id,
+                result: await KelivoFetcher.fetch(payload, request: request),
+              );
+            } finally {
+              _active.remove(id);
+            }
           }
           return _error(id, code: -32101, message: 'Tool not found: $name');
 
@@ -439,6 +462,9 @@ class KelivoFetchMcpServerEngine {
 
   void close() {
     _closed = true;
+    for (final request in _active.values) {
+      request.cancel();
+    }
   }
 
   Map<String, dynamic> _ok(dynamic id, {required Map<String, dynamic> result}) {
@@ -453,7 +479,7 @@ class KelivoFetchMcpServerEngine {
     return {
       'jsonrpc': '2.0',
       if (id != null) 'id': id,
-      'error': {'code': code, 'message': message},
+      'error': {'code': code, 'message': LogRedactor.redactText(message)},
     };
   }
 
@@ -552,14 +578,25 @@ class KelivoInMemoryClientTransport implements mcp.ClientTransport {
   mcp.TransportSendOperation send(dynamic message) {
     if (_closed) return mcp.TransportSendOperation.completed();
     // Process asynchronously to mimic real transport
-    Future.microtask(() async {
+    var cancelled = false;
+    final done = Future.microtask(() async {
+      if (cancelled || _closed) return;
       final resp = await _server.handleMessage(message);
-      if (_closed) return;
+      if (cancelled || _closed) return;
       if (resp != null) {
         _messageController.add(resp);
       }
     });
-    return mcp.TransportSendOperation.completed();
+    return mcp.TransportSendOperation(
+      done,
+      cancel: () {
+        cancelled = true;
+        if (message is Map &&
+            message['method'] == mcp.McpProtocol.methodCallTool) {
+          _server.cancel(message['id']);
+        }
+      },
+    );
   }
 
   @override

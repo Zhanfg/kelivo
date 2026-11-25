@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
 
+import '../../../support/fetch_http_fixture.dart';
+
 void main() {
   group('Kelivo fetch MCP', () {
     late HttpServer httpServer;
@@ -13,7 +15,7 @@ void main() {
 
     setUp(() async {
       httpServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      baseUri = Uri.parse('http://127.0.0.1:${httpServer.port}');
+      baseUri = mountFetchFixture(httpServer.port);
       engine = KelivoFetchMcpServerEngine();
       httpServer.listen((request) async {
         if (request.uri.path == '/echo') {
@@ -245,6 +247,16 @@ void main() {
 
       expect(result['isError'], isTrue);
       expect(_resultText(result), contains('only POST requests'));
+    });
+
+    test('transport errors omit credentials from the requested URL', () async {
+      final url = Uri.parse(
+        'http://name:fixture-password@127.0.0.1/?token=fixture-token',
+      );
+      final result = await _callFetch(engine, url);
+      expect(result['isError'], isTrue);
+      expect(_resultText(result), isNot(contains('fixture-password')));
+      expect(_resultText(result), isNot(contains('fixture-token')));
     });
 
     test('reports the status code together with the error body', () async {

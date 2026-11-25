@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import '../../../support/business_test_harness.dart';
+import '../../../support/fetch_http_fixture.dart';
 
 const _common = SearchCommonOptions(timeout: 5000);
 
@@ -92,7 +93,7 @@ void main() {
                 )
               : WebFetchService.fetch(
                   const LocalWebFetchSource(),
-                  url,
+                  mountFetchFixture(server.port).toString(),
                   commonOptions: common,
                 );
           final failed = expectLater(
@@ -186,6 +187,31 @@ void main() {
       expect(page.title, 'Post Title');
       expect(page.content, contains('Body text'));
       expect(page.content, isNot(contains('Menu')));
+    });
+
+    test('redacts credentialed URLs without sharing the cached page', () async {
+      const url =
+          'https://name:fixture-password@example.com/page?token=fixture-token';
+      final client = MockClient(
+        (request) async => http.Response(
+          request.url.userInfo.isEmpty ? 'anonymous' : 'See $url',
+          200,
+        ),
+      );
+      Future<WebFetchPage> read(String url) => WebFetchService.fetchCached(
+        const LocalWebFetchSource(),
+        url,
+        commonOptions: _common,
+        client: client,
+      );
+      final page = await read(url);
+      for (final value in [page.url, page.content]) {
+        expect(value, contains('example.com/page'));
+        expect(value, isNot(contains('name:')));
+        expect(value, isNot(contains('fixture-password')));
+        expect(value, isNot(contains('fixture-token')));
+      }
+      expect((await read(page.url)).content, 'anonymous');
     });
 
     test('reports HTTP failures and empty pages', () async {
